@@ -216,7 +216,16 @@ function apiItems(): Item[] {
 function infraItems(): Item[] {
   return [
     item({ setting_id: "reviewer.enabled", feature: "reviewer", title: "Review pull requests", current: { value: false, set: false }, recommended: true, source: "default" }),
-    item({ setting_id: "security.enabled", feature: "security", title: "Open security fix pull requests", current: { value: false, set: false }, recommended: true, source: "detected", evidence: [{ text: "Terraform lock file with 18 providers", file: ".terraform.lock.hcl" }] }),
+    item({
+      setting_id: "security.enabled",
+      feature: "security",
+      title: "Open security fix pull requests",
+      current: { value: false, set: false },
+      recommended: true,
+      source: "detected",
+      needs: "Manage security fixes",
+      evidence: [{ text: "Terraform lock file with 18 providers", file: ".terraform.lock.hcl" }],
+    }),
   ];
 }
 
@@ -263,6 +272,8 @@ export interface SetupDb {
   runOverride?: unknown;
   /** Keep the run applying (for a picture of it mid-way). */
   holdApply?: boolean;
+  /** The estimate says the run doesn't fit the token limit. */
+  overBudget?: boolean;
 }
 
 export function analyzingRun(): Record<string, unknown> {
@@ -338,6 +349,18 @@ export async function mockSetup(page: Page, init: Partial<SetupDb> = {}): Promis
 
       if (p === "/api/setup" && method === "GET") return json(route, db.homeOverride ?? db.home);
       if (p === "/api/setup/runs" && method === "GET") return json(route, db.runs);
+      if (p === "/api/setup/estimate" && method === "POST") {
+        const reposArg = (body as { repos?: unknown } | null)?.repos;
+        const all = (db.home as typeof HOME).repos ?? [];
+        const n = Array.isArray(reposArg) ? reposArg.length : reposArg === "not_set_up" ? all.filter((r) => r.state === "not_set_up").length : all.length;
+        return json(route, { repos: n, estimate_tokens: 420_000 * n, over_budget: !!db.overBudget, reason: db.overBudget ? "Your team has 300k new tokens left this month." : null });
+      }
+      if (p === "/api/setup/seen" && method === "POST") {
+        const ids = ((body as { setting_ids?: string[] } | null)?.setting_ids ?? []) as string[];
+        const h = db.home as typeof HOME;
+        db.home = { ...h, new_recommendations: h.new_recommendations.filter((n) => !ids.includes(n.setting_id)) };
+        return json(route, { new_recommendations: (db.home as typeof HOME).new_recommendations.map((n) => n.setting_id) });
+      }
       if (p === "/api/setup/runs" && method === "POST") {
         const b = (body ?? {}) as { mode?: string };
         db.run = b.mode === "auto" ? { ...analyzingRun(), mode: "auto" } : analyzingRun();
@@ -348,7 +371,7 @@ export async function mockSetup(page: Page, init: Partial<SetupDb> = {}): Promis
         db.home = { ...(db.home as object), ...(body as object) };
         return json(route, db.home);
       }
-      const m = p.match(/^\/api\/setup\/runs\/([^/]+)(\/(decisions|apply|undo))?$/);
+      const m = p.match(/^\/api\/setup\/runs\/([^/]+)(\/(decisions|apply|undo|switch-on))?$/);
       if (m) {
         const sub = m[3];
         if (!sub && method === "GET") {
@@ -357,6 +380,18 @@ export async function mockSetup(page: Page, init: Partial<SetupDb> = {}): Promis
           if (db.run.state === "analyzing" && db.readyAfter && db.reads >= db.readyAfter) db.run = db.run.mode === "auto" ? autoDoneRun() : readyRun();
           if (db.run.state === "applying" && !db.holdApply) db.run = applied(db);
           return json(route, db.run);
+        }
+        if (sub === "switch-on") {
+          const one = body as { repo: string; setting_id: string };
+          // Stale closing turns its dry run off; auto-merge turns on.
+          const target = one.setting_id.startsWith("stale_prs.") ? "stale_prs.dry_run" : one.setting_id;
+          const after = target.endsWith(".dry_run") ? false : true;
+          const change = { setting_id: target, before: { value: !after, stored: false, row: null }, after, at: iso(0), evidence: [], row_created: false, undone: false };
+          const repos = (db.run.repos as { repo: string; changes?: Item[] }[]).map((r) =>
+            r.repo === one.repo ? { ...r, changes: [...(r.changes ?? []).filter((c) => c.setting_id !== target), change] } : r,
+          );
+          db.run = { ...db.run, repos };
+          return json(route, { ...db.run, switched_on: change });
         }
         if (sub === "decisions") {
           const b = (body ?? {}) as { choice?: string };
@@ -402,7 +437,7 @@ function applied(db: SetupDb): Record<string, unknown> {
     if (!retry && db.failOn.includes(repo)) {
       return { repo, state: "failed", changed: 0, error: "The reviewer needs the GitHub App on this repo. Install it on GitHub, then retry.", prs: [] };
     }
-    if (repo === "acme/web-app") return { repo, state: "done", changed: 9, prs: [{ number: 1102, url: `${GH}/web-app/pull/1102` }] };
+    if (repo === "acme/web-app") return { repo, state: "done", changed: 9, failed: [], prs: [] };
     if (repo === "acme/api") return { repo, state: "done", changed: 2, prs: [] };
     return { repo, state: "done", changed: 2, prs: [] };
   });
@@ -426,19 +461,20 @@ export function autoDoneRun(): Record<string, unknown> {
       items = [
         ...items,
         item({ setting_id: "stale_prs.dry_run", feature: "stale_prs", title: "Dry run", current: { value: true, set: false }, recommended: true, source: "default" }),
-        item({ setting_id: "auto_merge.dry_run", feature: "auto_merge", title: "Dry run", current: { value: false, set: false }, recommended: true, source: "default" }),
       ];
     }
+    // Auto-merge is never applied by the run itself: it waits for Switch on. A setting someone lacks the permission for stays as it is.
     const changes = items
+      .filter((it) => it.setting_id !== "auto_merge.enabled" && !it.needs)
       .filter((it) => !(it.current as { set: boolean }).set && JSON.stringify((it.current as { value: unknown }).value) !== JSON.stringify(it.recommended))
       .map((it) => ({ setting_id: it.setting_id, before: { value: (it.current as { value: unknown }).value, stored: false, row: null }, after: it.recommended, at: iso(0.01), evidence: it.evidence, row_created: false, undone: false }));
     const kept = items.filter((it) => (it.current as { set: boolean }).set && JSON.stringify((it.current as { value: unknown }).value) !== JSON.stringify(it.recommended)).length;
-    // Stale closing and auto-merge start as previews; their dry run switches are part of the preview, not settings of their own.
-    const previews = r.repo === "acme/web-app" ? 2 : 0;
-    const turned = changes.filter((c) => !/\.dry_run$/.test(c.setting_id as string)).length - previews;
+    // Stale closing is on as a preview (its dry run on) and auto-merge waits off for Switch on: two previews on web-app.
+    const previews: number = r.repo === "acme/web-app" ? 2 : 0;
+    const turned = changes.filter((c) => !/\.dry_run$/.test(c.setting_id as string)).length - (r.repo === "acme/web-app" ? 1 : 0);
     return {
       ...r,
-      items: items.map((it) => ({ ...it, decision: (it.current as { set: boolean }).set ? "keep" : "use" })),
+      items: items.map((it) => ({ ...it, decision: (it.current as { set: boolean }).set || it.needs || it.setting_id === "auto_merge.enabled" ? "keep" : "use" })),
       changes,
       summary: {
         changed: turned,

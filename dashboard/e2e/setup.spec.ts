@@ -14,20 +14,22 @@ const decisionOf = (d: Decisions, repo: string, id: string) => d.items.find((i) 
 
 test.describe("Setup", () => {
   test("the menu puts Setup first with a count of new recommendations plus repos not set up", async ({ page }) => {
-    await mockSetup(page);
+    const db = await mockSetup(page);
     await page.goto("/setup");
     const link = page.getByTestId("main-nav").getByRole("link").first();
     // 3 new recommendations + 2 repos not set up.
     await expect(link).toHaveText(/^Setup5 things to set up$/);
     await expect(link).toHaveAttribute("aria-current", "page");
 
-    // Dismissing one recommendation hides it here and takes one off the count.
+    // Dismissing one recommendation tells the server, for the whole team, and takes one off the count.
     const recs = page.getByTestId("new-rec");
     await expect(recs).toHaveCount(3);
     await recs.first().getByTestId("dismiss-rec").click();
     await expect(recs).toHaveCount(2);
+    await expect.poll(() => calls(db, "POST /api/setup/seen").length).toBe(1);
+    expect(calls(db, "POST /api/setup/seen")[0].body).toEqual({ setting_ids: ["security.enabled"] });
     await expect(link.getByTestId("count-badge")).toHaveText(/^4/);
-    // It stays dismissed after a reload.
+    // Anyone loading the page sees it gone.
     await page.reload();
     await expect(page.getByTestId("new-rec")).toHaveCount(2);
   });
@@ -127,7 +129,7 @@ test.describe("Setup", () => {
     await chooser.getByTestId("start-auto").click();
     await expect(page.getByTestId("mode-auto").getByRole("radio")).toBeChecked();
     await expect(page.getByTestId("keep-mine-toggle")).toHaveAttribute("aria-checked", "true");
-    await expect(page.getByTestId("cost-note")).toContainText("estimate");
+    await expect(page.getByTestId("estimate")).toContainText("About 840k tokens for 2 repos");
     await page.getByTestId("analyze").click();
     expect(calls(db, "POST /api/setup/runs")[0].body).toEqual({ repos: "not_set_up", mode: "auto", overwrite: "keep_mine" });
 
@@ -160,7 +162,7 @@ test.describe("Setup", () => {
     expect(calls(db, "POST /api/setup/runs")[0].body).toEqual({ repos: "all", mode: "auto", overwrite: "use_recommended" });
   });
 
-  test("after Do it for me, one change can be undone, and a preview opens its setting to switch on", async ({ page }) => {
+  test("after Do it for me, one change can be undone, and a preview switches on in one click with Undo", async ({ page }) => {
     const db = await mockSetup(page, { run: autoDoneRun() });
     await page.goto("/setup/run?id=run_03");
     const web = page.locator('[data-testid="auto-repo"][data-repo="acme/web-app"]');
@@ -174,11 +176,54 @@ test.describe("Setup", () => {
     // The rest of the run stays.
     await expect(page.getByTestId("undo")).toBeVisible();
 
-    // Switching a preview on is turning its dry run off, on its settings page for this repo.
-    await expect(web.locator('[data-testid="preview-item"][data-id="stale_prs.enabled"]').getByTestId("switch-on")).toHaveAttribute(
-      "href",
-      /\/reviewer\/config\/?\?section=stale&repo=acme%2Fweb-app/,
-    );
+    // Switch on is one click, in place, with Undo.
+    const merge = web.locator('[data-testid="preview-item"][data-id="auto_merge.enabled"]');
+    await merge.getByTestId("switch-on").click();
+    await expect.poll(() => calls(db, "POST /api/setup/runs/run_03/switch-on").length).toBe(1);
+    expect(calls(db, "POST /api/setup/runs/run_03/switch-on")[0].body).toEqual({ repo: "acme/web-app", setting_id: "auto_merge.enabled" });
+    await expect(merge).toHaveCount(0);
+    await expect(web.getByTestId("preview-item")).toHaveCount(1);
+    await page.getByRole("button", { name: "Undo" }).last().click();
+    await expect.poll(() => calls(db, "POST /api/setup/runs/run_03/undo").length).toBe(2);
+    expect(calls(db, "POST /api/setup/runs/run_03/undo")[1].body).toEqual({ items: [{ repo: "acme/web-app", setting_id: "auto_merge.enabled" }] });
+    // Undone, it waits as a preview again.
+    await expect(web.locator('[data-testid="preview-item"][data-id="auto_merge.enabled"]')).toHaveCount(1);
+  });
+
+  test("the cost shows before a run starts, and a run over the token limit can't start", async ({ page }) => {
+    const db = await mockSetup(page, { overBudget: false });
+    await page.goto("/setup/run?repos=not_set_up&mode=auto");
+    await expect(page.getByTestId("estimate")).toContainText("About 840k tokens for 2 repos");
+    expect(calls(db, "POST /api/setup/estimate").at(-1)?.body).toEqual({ repos: "not_set_up" });
+    await page.getByTestId("pick-all").click();
+    await expect(page.getByTestId("estimate")).toContainText("2.5M tokens for 6 repos");
+    db.overBudget = true;
+    await page.getByTestId("pick-not_set_up").click();
+    await expect(page.getByTestId("over-budget")).toContainText("300k new tokens left");
+    await expect(page.getByTestId("analyze")).toBeDisabled();
+  });
+
+  test("auto-merge is never turned on by a choice at the top, only by Use", async ({ page }) => {
+    const db = await mockSetup(page);
+    await page.goto("/setup/run?id=run_03");
+    await page.getByTestId("choice-use_recommended").click();
+    const merge = page.locator('[data-testid="plan-item"][data-id="auto_merge.enabled"]');
+    await expect(merge).toHaveAttribute("data-decision", "keep");
+    await expect(merge.getByTestId("preview-only-note")).toBeVisible();
+    await merge.getByRole("button", { name: "Use" }).click();
+    await expect(merge).toHaveAttribute("data-decision", "use");
+    await page.getByTestId("apply").click();
+    await page.getByRole("button", { name: /^Replace \d+ and apply$/ }).click();
+    await expect(page.getByTestId("apply-step")).toBeVisible();
+    expect(decisionOf(lastDecisions(db), "acme/web-app", "auto_merge.enabled")).toBe("use");
+  });
+
+  test("a setting the person can't change shows what it needs", async ({ page }) => {
+    await mockSetup(page);
+    await page.goto(`/setup/run?id=run_03&repo=${encodeURIComponent("acme/infra")}`);
+    const sec = page.locator('[data-testid="plan-item"][data-id="security.enabled"]');
+    await expect(sec.getByTestId("needs")).toHaveText("needs Manage security fixes");
+    await expect(sec.getByRole("button", { name: "Use" })).toBeDisabled();
   });
 
   test("a run that doesn't fit the token limit says so, with the estimate", async ({ page }) => {
@@ -216,7 +261,9 @@ test.describe("Setup", () => {
     expect(decisionOf(d, "acme/web-app", "reviewer.enabled")).toBe("use");
     expect(decisionOf(d, "acme/web-app", "tests.e2e")).toBe("use");
     expect(decisionOf(d, "acme/api", "reviewer.require_tests")).toBe("keep");
-    expect(decisionOf(d, "acme/infra", "security.enabled")).toBe("use");
+    // A setting the person can't change stays as it is.
+    expect(decisionOf(d, "acme/infra", "security.enabled")).toBe("keep");
+    expect(decisionOf(d, "acme/infra", "reviewer.enabled")).toBe("use");
     expect(calls(db, "POST /api/setup/runs/run_03/apply")).toHaveLength(1);
   });
 
@@ -267,14 +314,15 @@ test.describe("Setup", () => {
     expect(decisionOf(d, "acme/web-app", "ci_labels.auto_labels")).toBe("keep");
   });
 
-  test("a partial failure retries only the repos that failed, and links the draft PR", async ({ page }) => {
+  test("a partial failure retries only the repos that failed, and opens no pull requests", async ({ page }) => {
     const db = await mockSetup(page);
     await page.goto("/setup/run?id=run_03");
     await page.getByTestId("apply").click();
     await expect(page.getByTestId("apply-headline")).toHaveText("2 of 3 repos done, 1 failed");
     await expect(page.getByTestId("apply-headline")).toHaveAttribute("aria-live", "polite");
     await expect(page.locator('[data-testid="apply-repo"][data-repo="acme/infra"]')).toContainText("GitHub App");
-    await expect(page.getByTestId("draft-pr")).toHaveAttribute("href", "https://github.com/acme/web-app/pull/1102");
+    // Setup opens no pull requests in the repos.
+    await expect(page.getByTestId("draft-pr")).toHaveCount(0);
     await expect(page.getByTestId("audit-undo")).toContainText("Saved to the audit log");
 
     await page.getByTestId("retry-failed").click();

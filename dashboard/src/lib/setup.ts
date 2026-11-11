@@ -371,6 +371,25 @@ export const setupApi = {
   decide: (id: string, body: DecisionBody) => request<unknown>(`/api/setup/runs/${encodeURIComponent(id)}/decisions`, json("PUT", body)),
   apply: (id: string, repos?: string[]) => request<unknown>(`/api/setup/runs/${encodeURIComponent(id)}/apply`, json("POST", repos ? { repos } : {})),
   undo: (id: string) => request<unknown>(`/api/setup/runs/${encodeURIComponent(id)}/undo`, json("POST", {})),
+  /** Turn a preview into the real setting; recorded as a change, so its own Undo puts it back. */
+  switchOn: (id: string, repo: string, settingId: string) =>
+    request<unknown>(`/api/setup/runs/${encodeURIComponent(id)}/switch-on`, json("POST", { repo, setting_id: settingId })).then((r) => {
+      const o = isObj(r) ? r : {};
+      const sw = isObj(o.switched_on) && typeof o.switched_on.setting_id === "string" ? (o.switched_on.setting_id as string) : null;
+      return { run: isObj(o) && typeof o.run_id === "string" ? checkRun(o) : null, switched: sw };
+    }),
+  /** Dismiss new recommendations for the whole team. */
+  seen: (ids: string[]) =>
+    request<unknown>("/api/setup/seen", json("POST", { setting_ids: ids })).then((r) =>
+      isObj(r) && Array.isArray(r.new_recommendations) ? (r.new_recommendations.filter((x) => typeof x === "string") as string[]) : null,
+    ),
+  /** What a run would cost, before it is created. */
+  estimate: (repos: RepoPick, onlyNew = false) =>
+    request<unknown>("/api/setup/estimate", json("POST", onlyNew ? { repos, only_new: true } : { repos })).then((r) => {
+      if (!isObj(r) || typeof r.estimate_tokens !== "number") fail();
+      const o = r as Record<string, unknown>;
+      return { repos: num(o.repos), estimate_tokens: o.estimate_tokens as number, over_budget: o.over_budget === true, reason: typeof o.reason === "string" && o.reason ? o.reason : null };
+    }),
   /** Undo one setting of the run: the same undo, narrowed to it. */
   undoItem: (id: string, repo: string, settingId: string) =>
     request<unknown>(`/api/setup/runs/${encodeURIComponent(id)}/undo`, json("POST", { items: [{ repo, setting_id: settingId }] })),
@@ -484,37 +503,16 @@ export function badgeText(n: number): string {
 }
 
 /** The Setup menu item's count: new recommendations plus repos not set up yet. */
-export function badgeCount(home: Pick<SetupHome, "repos" | "new_recommendations">, dismissed: ReadonlySet<string> = new Set()): number {
-  const fresh = home.new_recommendations.filter((n) => !dismissed.has(dismissKey(n))).length;
-  return fresh + home.repos.filter((r) => r.state === "not_set_up").length;
+export function badgeCount(home: Pick<SetupHome, "repos" | "new_recommendations">): number {
+  return home.new_recommendations.length + home.repos.filter((r) => r.state === "not_set_up").length;
 }
 
-/** A dismissal is remembered per recommendation and per release. */
+/** One recommendation of one release, as a list key. */
 export function dismissKey(n: Pick<NewRecommendation, "setting_id" | "since">): string {
   return `${n.setting_id}@${n.since}`;
 }
 
-const DISMISS_STORE = "coderhelm.setup.dismissed";
 export const SETUP_CHANGED = "coderhelm:setup-changed";
-
-export function readDismissed(): Set<string> {
-  try {
-    const raw = window.localStorage.getItem(DISMISS_STORE);
-    const list = raw ? JSON.parse(raw) : [];
-    return new Set(Array.isArray(list) ? list.filter((x) => typeof x === "string") : []);
-  } catch {
-    return new Set();
-  }
-}
-
-export function writeDismissed(keys: Set<string>) {
-  try {
-    window.localStorage.setItem(DISMISS_STORE, JSON.stringify([...keys]));
-  } catch {
-    // Private windows and blocked storage: the dismissal lasts for this page.
-  }
-  window.dispatchEvent(new Event(SETUP_CHANGED));
-}
 
 // ── Values ──────────────────────────────────────────────────────────────
 
@@ -555,6 +553,14 @@ export function valueWords(v: Value, set = true): string {
 
 // ── Decisions ───────────────────────────────────────────────────────────
 
+/**
+ * Settings that close or merge on their own and are never turned on by a
+ * choice at the top, "Use recommended everywhere" included: only an explicit
+ * Use or Edit on the setting, or Switch on after a run (registry `preview_only`).
+ */
+export const PREVIEW_ONLY = new Set(["auto_merge.enabled"]);
+export const isPreviewOnly = (item: Pick<PlanItem, "setting_id">) => PREVIEW_ONLY.has(item.setting_id);
+
 export interface Override {
   decision: Decision;
   value?: Value;
@@ -573,6 +579,7 @@ export const itemKey = (repo: string, settingId: string) => `${repo}\u0000${sett
 export function effectiveDecision(item: PlanItem, choice: Choice, override?: Override): Override {
   if (item.needs) return { decision: "keep" };
   if (override) return override;
+  if (isPreviewOnly(item)) return { decision: "keep" };
   if (choice === "use_recommended") return { decision: "use" };
   return { decision: item.current.set ? "keep" : "use" };
 }
@@ -665,21 +672,23 @@ export function autoOutcome(repo: RunRepo, choice: Choice): AutoOutcome {
   const out: AutoOutcome = { changed: [], previews: [], kept: [], undone: [] };
   const after = (item: PlanItem): Value => {
     const c = repo.changes.find((x) => x.setting_id === item.setting_id);
-    if (c) return c.after;
+    if (c) return c.undone ? c.before : c.after;
     const d: Override = item.decision ? (item.decision === "edit" ? { decision: "edit", value: item.value } : { decision: item.decision }) : effectiveDecision(item, choice);
     return valueAfter(item, d);
   };
   const dryRun = new Set(repo.items.filter((i) => /\.dry_run$/.test(i.setting_id) && after(i) === true).map((i) => i.feature));
   for (const item of repo.items) {
-    if (item.undone) {
+    const isDryRun = /\.dry_run$/.test(item.setting_id);
+    if (isDryRun) continue; // part of its feature's preview, never listed on its own
+    // Undoing a Switch on of a preview-only setting puts it back with the previews.
+    if (item.undone && !isPreviewOnly(item)) {
       out.undone.push(item);
       continue;
     }
-    const isDryRun = /\.dry_run$/.test(item.setting_id);
     const value = after(item);
     const changed = repo.changes.length ? repo.changes.some((c) => c.setting_id === item.setting_id && !c.undone) : !sameValue(value, item.current.value);
-    if (isDryRun) continue; // shown as its feature's preview
-    if (item.preview || (item.risk === "acts" && dryRun.has(item.feature) && value === true)) out.previews.push(item);
+    const waiting = isPreviewOnly(item) && !changed && item.recommended === true && item.current.value !== true;
+    if (item.preview || waiting || (item.risk === "acts" && dryRun.has(item.feature) && value === true)) out.previews.push(item);
     else if (changed) out.changed.push(item);
     else if (item.current.set && !sameValue(item.current.value, item.recommended)) out.kept.push(item);
   }

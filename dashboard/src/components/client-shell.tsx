@@ -39,7 +39,7 @@ import { TwoFactorSetup } from "./two-factor-setup";
 import { useSignInMethods } from "@/hooks/use-sign-in-methods";
 import type { MyTwoFactor } from "@/lib/api";
 import { securityApi } from "@/lib/security";
-import { SETUP_CHANGED, badgeCount, badgeText, readDismissed, setupApi } from "@/lib/setup";
+import { SETUP_CHANGED, badgeCount, badgeText, setupApi } from "@/lib/setup";
 
 /** Sign out everywhere the same way: end the session, then the sign-in screen. */
 async function signOut() {
@@ -711,7 +711,7 @@ function Sidebar({
     let live = true;
     const load = () =>
       setupApi.home().then(
-        (h) => live && setSetupTodo(badgeCount(h, readDismissed())),
+        (h) => live && setSetupTodo(badgeCount(h)),
         () => {},
       );
     load();

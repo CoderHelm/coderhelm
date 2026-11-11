@@ -10,10 +10,10 @@ import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
 import { Callout } from "@/components/callout";
 import { Chip, StatusDot, formatDate } from "@/components/list";
-import { CheckIcon, ChevronRightIcon, ExternalLinkIcon, WarningIcon } from "@/components/icons";
+import { CheckIcon, ChevronRightIcon, WarningIcon } from "@/components/icons";
 import { buttonClass, focusRing, linkButton } from "@/components/ui";
 import { usePluginsFlag } from "@/hooks/use-plugins-flag";
-import { FEATURE_HREF, autoOutcome, outcomeWords, plural, shortRepo, valueWords, type PlanItem, type RepoResult, type RunRepo, type SetupRun } from "@/lib/setup";
+import { autoOutcome, outcomeWords, plural, shortRepo, valueWords, type PlanItem, type RepoResult, type RunRepo, type SetupRun } from "@/lib/setup";
 import { EvidenceList, SourceTag } from "../parts";
 
 export function AuditUndo({ run, changed, onUndo, busy }: { run: SetupRun; changed: number; onUndo: () => void; busy: boolean }) {
@@ -95,6 +95,7 @@ export function AutoResults({
   run,
   onUndo,
   onUndoItem,
+  onSwitchOn,
   onRetry,
   busy,
   pending,
@@ -103,6 +104,7 @@ export function AutoResults({
   run: SetupRun;
   onUndo: () => void;
   onUndoItem: (repo: string, settingId: string) => void;
+  onSwitchOn: (repo: string, settingId: string) => void;
   onRetry: (repos: string[]) => void;
   busy: boolean;
   /** The one setting being undone or switched on: "repo\u0000id". */
@@ -143,7 +145,7 @@ export function AutoResults({
 
       <ul className="space-y-3">
         {outcomes.map(({ repo, outcome, result }) => (
-          <RepoCard key={repo.repo} repo={repo} outcome={outcome} result={result} undone={undone} onUndoItem={onUndoItem} pending={pending} />
+          <RepoCard key={repo.repo} repo={repo} outcome={outcome} result={result} undone={undone} onUndoItem={onUndoItem} onSwitchOn={onSwitchOn} pending={pending} />
         ))}
       </ul>
 
@@ -170,6 +172,7 @@ function RepoCard({
   result,
   undone,
   onUndoItem,
+  onSwitchOn,
   pending,
 }: {
   repo: RunRepo;
@@ -177,6 +180,7 @@ function RepoCard({
   result?: RepoResult;
   undone: boolean;
   onUndoItem: (repo: string, settingId: string) => void;
+  onSwitchOn: (repo: string, settingId: string) => void;
   pending: string | null;
 }) {
   const repo = runRepo.repo;
@@ -213,28 +217,13 @@ function RepoCard({
             </ul>
           )}
         </div>
-        {result && result.prs.length > 0 && !undone && (
-          <ul className="flex flex-wrap gap-x-3">
-            {result.prs.map((p) => (
-              <li key={p.url}>
-                <a href={p.url} target="_blank" rel="noreferrer" className={`${linkButton} gap-1 !text-sm`} data-testid="draft-pr">
-                  Draft PR #{p.number}
-                  <span aria-hidden="true" className="inline-flex">
-                    <ExternalLinkIcon />
-                  </span>
-                  <span className="sr-only"> (opens GitHub)</span>
-                </a>
-              </li>
-            ))}
-          </ul>
-        )}
       </div>
       {!failed && !undone && (
         <div className="divide-y divide-zinc-800 border-t border-zinc-800">
           {outcome.previews.length > 0 && (
             <Group title="Previews to switch on" count={outcome.previews.length} tone="waiting" open testId="group-previews">
               {outcome.previews.map((it) => (
-                <PreviewRow key={it.setting_id} repo={repo} item={it} />
+                <PreviewRow key={it.setting_id} repo={repo} item={{ ...it, evidence: evidenceOf(it) }} onSwitchOn={onSwitchOn} pending={pending === `${repo}\u0000${it.setting_id}`} />
               ))}
             </Group>
           )}
@@ -312,14 +301,7 @@ function ChangeRow({ repo, item, onUndoItem, pending }: { repo: string; item: Pl
   );
 }
 
-/** Where a preview is switched on: its setting's page, on this repo. */
-function switchOnHref(repo: string, item: PlanItem): string {
-  const base = FEATURE_HREF[item.feature] ?? "/setup";
-  if (!base.startsWith("/reviewer/config")) return base;
-  return `${base}${base.includes("?") ? "&" : "?"}repo=${encodeURIComponent(repo)}`;
-}
-
-function PreviewRow({ repo, item }: { repo: string; item: PlanItem }) {
+function PreviewRow({ repo, item, onSwitchOn, pending }: { repo: string; item: PlanItem; onSwitchOn: (repo: string, id: string) => void; pending: boolean }) {
   return (
     <li className="flex min-w-0 flex-wrap items-start gap-x-4 gap-y-2 px-4 py-3" data-testid="preview-item" data-id={item.setting_id}>
       <div className="min-w-0 flex-1 basis-64">
@@ -327,7 +309,7 @@ function PreviewRow({ repo, item }: { repo: string; item: PlanItem }) {
           <span className="text-sm font-medium text-zinc-100">{item.title}</span>
           <Chip tone="waiting">Preview</Chip>
         </div>
-        <p className="mt-0.5 text-sm text-zinc-400">It reports what it would do and changes nothing until you switch it on, by turning off its dry run on its settings page.</p>
+        <p className="mt-0.5 text-sm text-zinc-400">{item.risk === "acts" && /^auto_merge\./.test(item.setting_id) ? "Off until you switch it on. Here is what it would have done." : "It reports what it would do and changes nothing until you switch it on."}</p>
         {item.evidence.length > 0 && (
           <div className="mt-2 rounded-md border border-amber-500/25 bg-amber-500/5 px-3 py-2">
             <p className="flex items-center gap-1.5 text-xs font-medium text-amber-200">
@@ -340,9 +322,9 @@ function PreviewRow({ repo, item }: { repo: string; item: PlanItem }) {
           </div>
         )}
       </div>
-      <Link href={switchOnHref(repo, item)} className={buttonClass("primary", "sm")} aria-label={`Switch on ${item.title} on ${shortRepo(repo)}`} data-testid="switch-on">
-        Switch on
-      </Link>
+      <button type="button" onClick={() => onSwitchOn(repo, item.setting_id)} disabled={pending} className={buttonClass("primary", "sm")} aria-label={`Switch on ${item.title} on ${shortRepo(repo)}`} data-testid="switch-on">
+        {pending ? "Switching on…" : "Switch on"}
+      </button>
     </li>
   );
 }

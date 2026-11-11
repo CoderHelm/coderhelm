@@ -23,6 +23,7 @@ import {
   changes,
   effectiveDecision,
   featureLabel,
+  isPreviewOnly,
   isText,
   itemKey,
   overwrites,
@@ -375,10 +376,13 @@ function ItemRow({
               </Chip>
             )}
             {item.needs && (
-              <Chip tone="muted" title={`Only someone with the ${item.needs} role can change this.`}>
-                Needs {item.needs}
-              </Chip>
+              <span className="inline-flex" data-testid="needs">
+                <Chip tone="muted" title={`You can't change this one: it needs the "${item.needs}" permission. It stays as it is.`}>
+                  needs {item.needs}
+                </Chip>
+              </span>
             )}
+            {item.isNew && <Chip tone="merged">New</Chip>}
             {override && (
               <span className="text-xs text-zinc-400" data-testid="overridden">
                 your pick
@@ -426,6 +430,12 @@ function ItemRow({
 
       {d.decision === "edit" && (
         <Editor item={item} value={override?.value ?? item.recommended} labelledBy={titleId} onChange={(v) => onOverride({ decision: "edit", value: v })} />
+      )}
+
+      {isPreviewOnly(item) && d.decision === "keep" && !same && (
+        <p className="mt-2 text-xs text-zinc-400" data-testid="preview-only-note">
+          Never turned on by a choice at the top. Pick Use to turn it on, or switch it on later from the results.
+        </p>
       )}
 
       {replacing && (

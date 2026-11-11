@@ -21,13 +21,12 @@ import { buttonClass, focusRing, linkButton, primaryButton } from "@/components/
 import {
   REPO_STATE_LOOK,
   SETUP_ADMIN,
+  SETUP_CHANGED,
   dismissKey,
   featureLabel,
   plural,
-  readDismissed,
   setupApi,
   shortRepo,
-  writeDismissed,
   type NewRecommendation,
   type RepoState,
   type RunSummary,
@@ -46,10 +45,9 @@ export default function SetupPage() {
   const [attempt, setAttempt] = useState(0);
   const [runs, setRuns] = useState<RunSummary[] | null>(null);
   const [runsError, setRunsError] = useState(false);
-  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [dismissProblem, setDismissProblem] = useState<string | null>(null);
   const [savingAuto, setSavingAuto] = useState(false);
 
-  useEffect(() => setDismissed(readDismissed()), []);
 
   useEffect(() => {
     let live = true;
@@ -77,10 +75,20 @@ export default function SetupPage() {
     return () => window.clearInterval(t);
   }, [analyzing]);
 
-  const dismiss = (n: NewRecommendation) => {
-    const next = new Set(dismissed).add(dismissKey(n));
-    setDismissed(next);
-    writeDismissed(next);
+  // Dismissed for the whole team: it leaves this list and the menu count for everyone.
+  const dismiss = async (n: NewRecommendation) => {
+    if (!home) return;
+    const before = home;
+    setDismissProblem(null);
+    setHome({ ...home, new_recommendations: home.new_recommendations.filter((x) => x.setting_id !== n.setting_id) });
+    try {
+      const still = await setupApi.seen([n.setting_id]);
+      if (still) setHome((h) => (h ? { ...h, new_recommendations: before.new_recommendations.filter((x) => still.includes(x.setting_id)) } : h));
+      window.dispatchEvent(new Event(SETUP_CHANGED));
+    } catch {
+      setHome(before);
+      setDismissProblem(`"${n.title}" wasn't dismissed. Try again.`);
+    }
   };
 
   const setAuto = async (on: boolean) => {
@@ -97,7 +105,7 @@ export default function SetupPage() {
     setSavingAuto(false);
   };
 
-  const fresh = home?.new_recommendations.filter((n) => !dismissed.has(dismissKey(n))) ?? [];
+  const fresh = home?.new_recommendations ?? [];
   const open = home?.last_run && ["analyzing", "ready", "applying"].includes(home.last_run.state) ? home.last_run : null;
   const notSetUp = home?.repos.filter((r) => r.state === "not_set_up").length ?? 0;
 
@@ -144,6 +152,11 @@ export default function SetupPage() {
             </div>
           )}
           {fresh.length > 0 && <NewPanel items={fresh} admin={admin} onDismiss={dismiss} />}
+          {dismissProblem && (
+            <p role="alert" className="mt-2 text-sm text-red-300" data-testid="dismiss-problem">
+              {dismissProblem}
+            </p>
+          )}
           <ReposSection repos={home.repos} admin={admin} />
           <HistorySection runs={runs} failed={runsError} />
           <div className="mt-10">
@@ -251,18 +264,20 @@ function NewPanel({ items, admin, onDismiss }: { items: NewRecommendation[]; adm
                 {n.since ? <span className="whitespace-nowrap"> · new in {n.since}</span> : null}
               </span>
             </p>
+            {admin && (
             <button
               type="button"
               onClick={() => onDismiss(n)}
               className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 ${focusRing}`}
               aria-label={`Dismiss ${n.title}`}
-              title="Dismiss. It won't show again until a release changes it."
+              title="Dismiss for the whole team."
               data-testid="dismiss-rec"
             >
               <span className="scale-90">
                 <XIcon />
               </span>
             </button>
+            )}
           </li>
         ))}
       </ul>

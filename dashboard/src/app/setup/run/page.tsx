@@ -11,13 +11,14 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { useRouter, useSearchParams } from "next/navigation";
 import { RoleGuard } from "@/components/role-guard";
 import { ApiError } from "@/lib/api";
+import { useToast } from "@/components/toast";
 import { Page, PageHeader } from "@/components/page";
 import { Stepper } from "@/components/stepper";
 import { Problem } from "@/components/problem";
 import { Callout } from "@/components/callout";
 import { Skeleton } from "@/components/skeleton";
 import { Chip, StatusDot, formatDate } from "@/components/list";
-import { CheckIcon, ExternalLinkIcon, SearchIcon, XIcon } from "@/components/icons";
+import { CheckIcon, SearchIcon, XIcon } from "@/components/icons";
 import { buttonClass, focusRing, inputClass, linkButton } from "@/components/ui";
 import {
   SETUP_ADMIN,
@@ -266,6 +267,29 @@ function SetupRunPage() {
     setPending(null);
   };
 
+  // Switch a preview on in place; the toast's Undo puts it back as a preview.
+  const { toast } = useToast();
+  const switchOn = async (repo: string, settingId: string) => {
+    if (!id) return;
+    setPending(itemKey(repo, settingId));
+    setProblem(null);
+    try {
+      const r = await setupApi.switchOn(id, repo, settingId);
+      const title = run?.repos.find((x) => x.repo === repo)?.items.find((i) => i.setting_id === settingId)?.title ?? "It";
+      setRun(r.run ?? (await setupApi.run(id)));
+      window.dispatchEvent(new Event(SETUP_CHANGED));
+      const undoId = r.switched;
+      toast(
+        undoId ? `${title} is on for ${shortRepo(repo)}` : `${title} was already on for ${shortRepo(repo)}`,
+        "success",
+        undoId ? { action: { label: "Undo", onClick: () => void undoItem(repo, undoId) } } : undefined,
+      );
+    } catch (e) {
+      setProblem(e instanceof Error ? `It wasn't switched on. ${e.message}` : "It wasn't switched on. Try again.");
+    }
+    setPending(null);
+  };
+
   const hrefFor = useCallback((repo: string) => `/setup/run?id=${encodeURIComponent(id ?? "")}&repo=${encodeURIComponent(repo)}`, [id]);
 
   const title = run ? `Setup run, ${formatDate(run.created_at)}` : "Set up repos";
@@ -315,6 +339,7 @@ function SetupRunPage() {
               run={run}
               onUndo={undo}
               onUndoItem={undoItem}
+              onSwitchOn={switchOn}
               onRetry={retry}
               busy={busy}
               pending={pending}
@@ -376,6 +401,8 @@ function ReposStep({ onStart, busy, problem }: { onStart: (repos: RepoPick, opts
   const [onlyNew, setOnlyNew] = useState(params.get("only_new") === "1");
   const [mode, setRunMode] = useState<RunMode>(params.get("mode") === "guided" ? "guided" : "auto");
   const [keepMine, setKeepMine] = useState(true);
+  const [estimate, setEstimate] = useState<{ repos: number; estimate_tokens: number; over_budget: boolean; reason: string | null } | null>(null);
+  const [estimateFailed, setEstimateFailed] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -399,6 +426,29 @@ function ReposStep({ onStart, busy, problem }: { onStart: (repos: RepoPick, opts
       live = false;
     };
   }, [attempt, preset]);
+
+  // The cost before anything starts, asked again when the pick changes.
+  const pickKey = pick === "pick" ? [...picked].sort().join(",") : pick;
+  useEffect(() => {
+    if (!home || !pickKey) {
+      setEstimate(null);
+      return;
+    }
+    let live = true;
+    setEstimate(null);
+    setEstimateFailed(false);
+    const t = window.setTimeout(() => {
+      setupApi.estimate(pick === "pick" ? [...picked] : pick, onlyNew).then(
+        (e) => live && setEstimate(e),
+        () => live && setEstimateFailed(true),
+      );
+    }, 300);
+    return () => {
+      live = false;
+      window.clearTimeout(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pickKey, onlyNew, !!home]);
 
   if (error) {
     return (
@@ -543,10 +593,28 @@ function ReposStep({ onStart, busy, problem }: { onStart: (repos: RepoPick, opts
         </div>
       )}
 
-      <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 px-4 py-3" data-testid="cost-note">
-        <p className="text-sm text-zinc-200">
-          <span className="font-medium text-zinc-50">What it costs.</span> Coderhelm reads each repo&apos;s files, workflows and last 50 merged pull requests, once. That uses
-          tokens from your team&apos;s monthly budget; the estimate for this run shows the moment it starts, next to what it has used so far.
+      <div className={`rounded-lg border px-4 py-3 ${estimate?.over_budget ? "border-amber-500/30 bg-amber-500/5" : "border-zinc-800 bg-zinc-900/40"}`} data-testid="cost-note">
+        <p className="flex min-h-7 flex-wrap items-baseline gap-x-2 text-sm text-zinc-200" aria-live="polite" data-testid="estimate">
+          <span className="font-medium text-zinc-50">What it costs.</span>
+          {chosen.length === 0 ? (
+            <span className="text-zinc-400">Pick a repo to see the estimate.</span>
+          ) : estimate ? (
+            <span>
+              About <span className="font-semibold tabular-nums text-zinc-50">{tokensWords(estimate.estimate_tokens)} tokens</span> for {plural(estimate.repos || chosen.length, "repo")}, from your team&apos;s monthly budget.
+            </span>
+          ) : estimateFailed ? (
+            <span className="text-zinc-400">The estimate isn&apos;t available right now; it shows once the run starts.</span>
+          ) : (
+            <span className="text-zinc-400">Working it out…</span>
+          )}
+        </p>
+        {estimate?.over_budget && (
+          <p className="mt-1 text-sm text-amber-200" data-testid="over-budget">
+            {estimate.reason ?? "That's more than is left of your team's monthly token limit."} Pick fewer repos, or raise the limit in Settings, then Token limit.
+          </p>
+        )}
+        <p className="mt-1 text-sm text-zinc-400">
+          Coderhelm reads each repo&apos;s files, workflows and last 50 merged pull requests, once.
         </p>
         <p className="mt-1 text-sm text-zinc-400">
           {mode === "auto"
@@ -565,7 +633,7 @@ function ReposStep({ onStart, busy, problem }: { onStart: (repos: RepoPick, opts
         <Link href="/setup" className={buttonClass("ghost")}>
           Cancel
         </Link>
-        <button type="button" onClick={go} disabled={busy || chosen.length === 0} className={buttonClass("primary")} data-testid="analyze">
+        <button type="button" onClick={go} disabled={busy || chosen.length === 0 || !!estimate?.over_budget} className={buttonClass("primary")} data-testid="analyze">
           {busy ? "Starting…" : !chosen.length ? "Pick a repo" : mode === "auto" ? `Set up ${plural(chosen.length, "repo")} for me` : `Analyze ${plural(chosen.length, "repo")}`}
         </button>
       </div>
@@ -708,7 +776,6 @@ function ApplyStep({ run, onRetry, onUndo, busy, problem }: { run: SetupRun; onR
   const byRepo = new Map(results.map((r) => [r.repo, r]));
   const failed = results.filter((r) => r.state === "failed");
   const changed = results.reduce((n, r) => n + r.changed, 0);
-  const prs = results.flatMap((r) => r.prs);
   const done = results.filter((r) => r.state === "done").length;
 
   const repos = run.repos.map((r) => r.repo);
@@ -763,31 +830,11 @@ function ApplyStep({ run, onRetry, onUndo, busy, problem }: { run: SetupRun; onR
                   <>{plural(res?.changed ?? 0, "setting")} changed{undone ? ", then put back" : ""}</>
                 )}
               </div>
-              {res && res.prs.length > 0 && (
-                <ul className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
-                  {res.prs.map((p) => (
-                    <li key={p.url}>
-                      <a href={p.url} target="_blank" rel="noreferrer" className={`${linkButton} gap-1 !text-sm`} data-testid="draft-pr">
-                        Draft PR #{p.number}
-                        <span aria-hidden="true" className="inline-flex">
-                          <ExternalLinkIcon />
-                        </span>
-                        <span className="sr-only"> (opens GitHub)</span>
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              )}
             </li>
           );
         })}
       </ul>
 
-      {prs.length > 0 && !undone && (
-        <p className="text-sm text-zinc-400">
-          Changes to files in a repo go out as draft pull requests. They change nothing until someone merges them.
-        </p>
-      )}
 
       {problem && (
         <Callout variant="error" title="That didn't work" testId="apply-step-problem">

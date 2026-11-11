@@ -101,7 +101,7 @@ const home: Page = {
                   id: "setup",
                   title: "Set up your repos",
                   heading: "It reads each repository and turns on what fits how it already works.",
-                  text: "Pick your repositories and click Do it for me. CoderHelm reads each one: its tests, workflows, labels, branch protection, AGENTS.md and recent pull requests. It turns on the reviewer, tests, CI labels and the rest with the reason for each, and keeps any setting you already chose. Stale pull request closing starts as a preview, and auto merge is only recommended where branch protection requires checks. Any change can be undone, or review each setting first.",
+                  text: "Pick your repositories and click Do it for me. CoderHelm reads each one: its tests, workflows, labels, branch protection, AGENTS.md and recent pull requests. It turns on the reviewer, tests, CI labels and the rest with the reason for each, and keeps any setting you already chose. Anything that closes or merges starts as a preview you switch on in one click. Any change can be undone, or review each setting first.",
                   frame: "setup",
                   caption: "A Setup run in the CoderHelm dashboard: what it turned on for each repository with the evidence, what it kept, and a preview waiting to be switched on.",
                   href: "https://docs.coderhelm.com/getting-started/setup/",
