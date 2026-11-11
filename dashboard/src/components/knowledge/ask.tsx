@@ -33,6 +33,7 @@ export function Ask({
   ready,
   bringingIn,
   canAsk,
+  asked,
 }: {
   kbId: string;
   /** Pages searchable now. */
@@ -41,6 +42,8 @@ export function Ask({
   bringingIn: boolean;
   /** The person may ask Chat (passages only otherwise). */
   canAsk: boolean;
+  /** A question the page asks for ("Ask again" in Usage). */
+  asked?: { q: string; at: number } | null;
 }) {
   const [q, setQ] = useState("");
   const [passagesOnly, setPassagesOnly] = useState(!canAsk);
@@ -61,6 +64,13 @@ export function Ask({
       .catch(() => setSuggested([]));
   }, [kbId, ready]);
   useEffect(() => () => abort.current?.abort(), []);
+  useEffect(() => {
+    if (!asked) return;
+    setQ(asked.q);
+    void ask(asked.q);
+    // ask reads the state of this render; only a new request asks again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [asked]);
 
   const ask = async (question: string) => {
     const text = question.trim();

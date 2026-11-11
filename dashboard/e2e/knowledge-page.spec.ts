@@ -366,3 +366,48 @@ test.describe("knowledge base page: ask this knowledge base", () => {
     await shot(page, "ask-400");
   });
 });
+
+test.describe("knowledge base page: usage", () => {
+  test("searches by surface, cited pages as bars, where it was used, questions without an answer, pages nothing found", async ({ page }) => {
+    const db = newBackend("healthy");
+    await mockKnowledge(page, db);
+    await page.goto("/knowledge/base/?id=kb_dw");
+    await expect(page.getByTestId("tile-searches")).toContainText("63");
+    await expect(page.getByTestId("tile-searches")).toContainText("+19% on last week");
+    await expect(page.getByTestId("tile-searches").getByRole("img")).toHaveAttribute("aria-label", "Searches per day: 4, 7, 12, 9, 14, 11, 6");
+    const usage = page.getByTestId("usage");
+    await expect(usage.getByTestId("usage-surfaces")).toContainText("Chat");
+    await expect(usage.getByTestId("usage-surfaces")).toContainText("Coder runs");
+    await expect(usage.getByTestId("usage-surfaces")).toContainText("MCP and API keys");
+    await expect(usage.getByTestId("usage-top")).toContainText("31 cited · found 40");
+    await expect(usage.getByTestId("usage-used-in").getByRole("link", { name: "Coder run" })).toHaveAttribute("href", /\/runs\/detail\/?\?id=r4812/);
+    await expect(usage.getByTestId("usage-never")).toContainText("212");
+    const gap = usage.getByTestId("usage-gap").first();
+    await expect(gap).toContainText("What is the retention for raw events?");
+    await expect(gap).toContainText("×3 · Nothing matched");
+    // Ask again puts the question in the box and asks it.
+    await gap.getByRole("button", { name: "Ask again" }).click();
+    await expect(page.getByTestId("ask-input")).toHaveValue("What is the retention for raw events?");
+    await expect.poll(() => db.bodies.some((b) => b.question === "What is the retention for raw events?")).toBe(true);
+    await shot(page, "usage-1280");
+  });
+
+  test("a reader sees counts, never the questions", async ({ page }) => {
+    const db = newBackend("healthy", "member");
+    await mockKnowledge(page, db);
+    await page.goto("/knowledge/base/?id=kb_dw");
+    const gaps = page.getByTestId("usage-gaps");
+    await expect(gaps).toContainText("No good answer, 30 days: 2");
+    await expect(gaps).toContainText("shown to the people who manage");
+    await expect(page.getByTestId("usage-gap")).toHaveCount(0);
+  });
+
+  test("phone width: usage fits", async ({ page }) => {
+    await page.setViewportSize({ width: 400, height: 860 });
+    const db = newBackend("healthy");
+    await mockKnowledge(page, db);
+    await page.goto("/knowledge/base/?id=kb_dw");
+    await expect(page.getByTestId("usage-top")).toBeVisible();
+    await noSideways(page);
+  });
+});

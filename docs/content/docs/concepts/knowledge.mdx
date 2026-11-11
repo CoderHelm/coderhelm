@@ -11,6 +11,18 @@ A base can also stay in sync with pages in Notion, Confluence, Google Drive, San
 
 A base can be attached to the whole team or to specific agents (planner, coder, reviewer, plan chat). Attached agents get a tool to search it, so a plan can follow your runbook instead of guessing. A base can be marked as a source of truth, and has its own read role (viewers, members or admins), optionally narrowed to only some people or roles.
 
+## The knowledge base page
+
+Each base has one page that answers, in order: is it healthy, does it answer well, what is in it, and who uses it.
+
+- **Status and tiles.** One status for the whole base (Up to date, Syncing 350 of 1,000, Needs attention), then four tiles: pages searchable (with links to pages that couldn't be read or were skipped), passages, freshness (the last check, the next one, and whether live updates are on), and searches this week. A problems banner appears only when something is wrong, with each fix, and pages already brought in stay searchable.
+- **Ask this knowledge base.** Ask a question and get a cited answer from this base only, through Chat; the thread is saved in your Chat history, marked as asked from the knowledge base page, and **Continue in Chat** opens it. Turn on **Passages only** to see what a search finds instead: the ranked passages, each with a score bar against the best match, whether the last answer cited it, and a link to the original. Passages only uses one embedding and no AI tokens. Suggested questions are written from the page titles once and kept until the pages change by more than a tenth, or for a week. You can ask 20 questions an hour from the page.
+- **Connections.** One row per source with how it connects: the team's sign-in, a member's own sign-in, a saved API token, the GitHub App, the team's AWS role, public pages, or an uploaded export. Open a row to see whose connection it is and when it was made, its scopes and whether its token still works (for people who manage the base), live updates with the last change event and the next check, what was picked, and what happens if the person who connected it leaves. **Reconnect** signs in again; **Change connection** switches a Notion or Confluence source between the team's sign-in and its saved API token.
+- **Content.** Every page as a tree: source, then space or folder, then parent. Filter by state (searchable, reading, couldn't read, skipped, cut short), by when it was updated and by source, or search the titles. Each page says its state in words, when it was updated and indexed, and links to the original. Pages that couldn't be read or were skipped (no text, a file type that isn't read, too large) can be picked and read again.
+- **Sync history.** Every sync of each source for 90 days: what started it, how long it took, how it went, and what it added, updated, removed, couldn't read or skipped. Syncs that changed nothing fold into one line; a sync with problems opens to each page, the error and the fix.
+- **Usage.** Searches this week from Chat, agent runs, MCP and this page; the most cited pages; the runs and chats that used it; the questions it had no good answer for (nothing matched, nothing supported an answer, or rated not helpful), shown with their words to the people who manage it; and the pages no search found in 90 days.
+- **Access.** Who reads it, which agents search it, and whether it is a source of truth.
+
 ## Chat
 
 [Chat](/concepts/chat) answers questions from your knowledge and your team's other sources, with a citation on every claim. Viewers can read shared chats, members can ask, and admins manage knowledge.

@@ -17,6 +17,7 @@ import { ConnectionRow, type ConnectionActions } from "@/components/knowledge/co
 import { Ask } from "@/components/knowledge/ask";
 import { Content } from "@/components/knowledge/content";
 import { History } from "@/components/knowledge/history";
+import { Usage } from "@/components/knowledge/usage";
 import { Access, PageNav, ProblemsBanner, StatusChip, Tiles, overallStatus } from "@/components/knowledge/base-parts";
 import { kbHistory, kbPage, missingRoute, type ItemState, type PageBase, type PageItem, type PageSource } from "@/lib/knowledge-page";
 import { errorMessage } from "@/lib/data-sources";
@@ -82,6 +83,8 @@ function BaseView() {
   const [visibilityNote, setVisibilityNote] = useState("");
   const [version, setVersion] = useState(0);
   const [openRow, setOpenRow] = useState<string | null>(null);
+  const [searches, setSearches] = useState<{ week: number; last_week: number; by_day: number[] } | null>(null);
+  const [asked, setAsked] = useState<{ q: string; at: number } | null>(null);
   const [wantStatus, setWantStatus] = useState<{ status: ItemState | ""; at: number } | null>(null);
   const [limits, setLimits] = useState<KnowledgeLimits | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -403,6 +406,7 @@ function BaseView() {
     { id: "connections", label: "Connections" },
     { id: "content", label: "Content" },
     { id: "history", label: "History" },
+    { id: "usage", label: "Usage" },
     { id: "access", label: "Access" },
   ];
   const showState = (st: ItemState | "") => {
@@ -504,7 +508,7 @@ function BaseView() {
           <>
             <PageNav sections={nav} />
             <Tiles
-              data={{ searchable: base.ready, failed: base.failed, skipped: base.skipped ?? 0, working: base.processing, passages: base.passages ?? 0 }}
+              data={{ searchable: base.ready, failed: base.failed, skipped: base.skipped ?? 0, working: base.processing, passages: base.passages ?? 0, searches }}
               sources={sources}
               onShow={showState}
             />
@@ -577,6 +581,7 @@ function BaseView() {
               ready={inPlace ? Math.max(1, base.ready) : base.ready}
               bringingIn={sources.some((s) => s.status === "syncing" && !s.last_success_at)}
               canAsk={can("brain_ask")}
+              asked={asked}
             />
           </Section>
         )}
@@ -665,6 +670,22 @@ function BaseView() {
               </Section>
             )}
           </>
+        )}
+
+        {base && !empty && (
+          <Section title="Usage" id="usage" description="What searches this knowledge base, what it cites, and what it couldn't answer.">
+            <Usage
+              kbId={id}
+              limits={limits}
+              canManage={canManage}
+              onSearches={setSearches}
+              onAddPage={() => setFlow({ open: true, start: null })}
+              onAsk={(q) => {
+                setAsked({ q, at: Date.now() });
+                document.getElementById("ask")?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+            />
+          </Section>
         )}
 
         {base && (
