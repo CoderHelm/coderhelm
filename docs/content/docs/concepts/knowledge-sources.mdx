@@ -41,6 +41,8 @@ Signing in is the first choice: there is nothing to set up and no key to copy. T
 
 By default a document's title is its first `title`, `name`, `heading` or `label` field and its body is every text field, with Portable Text read as paragraphs and headings. A source's settings can set, per type, which field is the title, which fields are the body, and a link template such as `https://example.com/blog/{slug.current}` so citations open the published page. With `studio_url` set, citations open the document in your Studio instead.
 
+Sanity's server answers at most 64 KiB at a time. A document bigger than that (a long policy page, a page builder with many components) is read in pieces: its fields in groups, long lists of blocks a slice at a time, and text too long for one answer line by line. The pieces are put back together before the document is indexed, so Portable Text inside nested components becomes passages like any other text. Field names come from your deployed schema when there is one (`sanity schema deploy`, or deploying your Studio), so every field of a large document is found.
+
 ## How much a source keeps
 
 A source keeps up to **50,000 items** by default; there is no fixed cap of 1,000. Admins and owners change **Items per source** under **Sync limits** on the **Knowledge** page (or **Raise the limit** on a source), from 1,000 to 100,000; everyone else can see the number there, with "Admins and owners can change this." The number is a cost choice: the dialog shows what embedding a full source of that size costs the first time, in tokens and dollars, that later syncs embed only what changed, and how much of your team's monthly token limit is left. One knowledge base holds up to 100,000 synced items across all its sources.
@@ -48,6 +50,7 @@ A source keeps up to **50,000 items** by default; there is no fixed cap of 1,000
 - **Large first syncs wait for an admin.** When a new source covers more than 2,000 items, its card shows the estimate first (for example "About 4,812 documents to embed: about 3.9M tokens", with the cost in dollars and the tokens left this month) and an admin starts it with **Start sync**. If the estimate is more than your team has left this month, it says so instead of starting.
 - **Embeddings count against your token limit.** Indexing a source counts against the team's monthly token limit set on the budget settings. When the limit is reached, the sync stops and says so; what is already indexed stays searchable.
 - **Big syncs run in steps.** A sync brings in as much as fits in one run, remembers where it stopped, and carries on by itself until it is done. You don't need to press anything. If an app asks CoderHelm to slow down, the sync waits and continues.
+- **Reading at the app's pace.** Every app is read a few items at a time, at a pace it accepts (Notion about three requests a second, Sanity two documents at a time). When an app says to slow down (however it says it: Notion's and Sanity's `429`, Google Drive's and GitHub's quota errors, S3's `SlowDown`), CoderHelm waits as long as it asks and reads more slowly after that; when it is busy or doesn't answer, CoderHelm asks again with growing pauses.
 - **Nothing is cut silently.** A source that covers more than it keeps says so on its card, with the real numbers ("Holds 50,000 of 63,210 documents; the rest aren't searchable"), whether that is the per source limit or the knowledge base's own cap of 100,000, and a **Raise the limit** button for admins.
 
 ## Staying up to date
@@ -78,12 +81,20 @@ Each source on a knowledge base's page shows how many documents are searchable n
 | The sign-in expired or was revoked | **Reconnect Notion** |
 | The Sanity sign-in a source syncs with expired, or that person left the team | One sentence saying whose sign-in stopped, and **Sign in again**. Any admin can press it; the source then syncs with their sign-in. The team's owner and admins are told once, in your chat channels and by email. |
 | What you picked was moved or deleted | **Choose pages again** |
-| The app asked CoderHelm to slow down | Nothing: the sync waits and carries on by itself |
+| The app asked CoderHelm to slow down | Nothing: the sync waits and carries on by itself. Documents it refused show **Waiting to retry** with their next try |
 | The app didn't answer | **Try again** (it also retries on its own) |
 | A large first sync is waiting | Its estimate, and **Start sync** for admins |
 | The source covers more than it keeps | The real numbers, and **Raise the limit** for admins |
 
-A page that couldn't be read says why in the list of pages, and is tried again on the next check.
+In the list of pages, each page that isn't searchable says why, in one of three states:
+
+| State | Means | What happens |
+|---|---|---|
+| **Waiting to retry · next try 14:20** | The app limited how fast CoderHelm reads, was overloaded, didn't answer in time or dropped the connection | It is read again on its own at that time, also when the app reports no change. Nothing to do |
+| **Couldn't read** | The app refused it for good: no access, it was deleted, or it can't be read | It says why and what fixes it; it is tried again on the next check |
+| **Skipped** | It has no text, is a kind of file that isn't read, or is too large | It says why |
+
+Above the list, pages that aren't searchable are summed up by reason, for example **162 rate limited by Sanity, retrying · next try 14:20**, with **Show them** to list them. The sync history groups the same way, with a few of the pages under each reason. **Read these again** works on any of them: pick them and the sync reads them now.
 
 ## Who can read it
 

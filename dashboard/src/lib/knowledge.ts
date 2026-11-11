@@ -191,6 +191,10 @@ export interface Source {
   /** Documents searchable now (kept up to date while a sync runs). */
   items: number;
   failed_items: number;
+  /** Items refused for a passing reason (a rate limit), read again on their own (newer gateways). */
+  waiting_items?: number;
+  /** When the first of them is tried again. */
+  next_retry_at?: string;
   /** The selection covers more than `item_limit`. */
   truncated: boolean;
   /** How many items the selection really covers; null when not listed yet or the app can't count past the limit. */

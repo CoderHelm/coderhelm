@@ -13,6 +13,8 @@ import {
   historyRows,
   kbHistory,
   missingRoute,
+  problemGroups,
+  reasonWords,
   tookWords,
   type PageSource,
   type SyncRun,
@@ -20,11 +22,16 @@ import {
 
 // Sync history: one row per sync of each source (newest first) with what
 // started it, how long it took, how it went and what it added, changed,
-// removed, couldn't read or left out. Syncs that changed nothing fold into
-// one line; a row with problems opens to each item, its error and its fix.
+// removed, couldn't read, left out or is waiting to read again. Syncs that
+// changed nothing fold into one line; a row with problems opens to its
+// items grouped by reason ("165 rate limited by Sanity, retrying"), each
+// group with a few of its items, their error and fix.
 // A table on wide screens, stacked rows on a phone.
 
-const RESULT_TONE: Record<SyncRun["result"], Tone> = { done: "success", problems: "attention", stopped: "danger" };
+const RESULT_TONE: Record<SyncRun["result"], Tone> = { done: "success", problems: "attention", waiting: "waiting", stopped: "danger" };
+/** Items shown under each reason before "and N more". */
+const EXAMPLES = 3;
+const KIND_WORDS = { failed: "Couldn't read", skipped: "Skipped", waiting: "Waiting to retry" } as const;
 
 function when(iso: string): string {
   const d = new Date(iso);
@@ -39,6 +46,7 @@ function Counts({ r }: { r: SyncRun }) {
     ["updated", r.updated],
     ["removed", r.removed],
     ["couldn't read", r.failed],
+    ["waiting to retry", r.waiting ?? 0],
     ["skipped", r.skipped],
   ];
   const shown = parts.filter(([, n]) => n > 0);
@@ -47,6 +55,7 @@ function Counts({ r }: { r: SyncRun }) {
 }
 
 export function History({ kbId, sources, version }: { kbId: string; sources: PageSource[]; version: number }) {
+  const [more, setMore] = useState<Record<string, boolean>>({});
   const [source, setSource] = useState("");
   const [runs, setRuns] = useState<SyncRun[] | null>(null);
   const [kept, setKept] = useState(90);
@@ -176,7 +185,10 @@ export function History({ kbId, sources, version }: { kbId: string; sources: Pag
                             onClick={() => setOpen((o) => ({ ...o, [key]: !isOpen }))}
                             data-testid="history-open"
                           >
-                            {isOpen ? "Hide" : r.error ? "Why" : `${r.problems.length} ${r.problems.length === 1 ? "item" : "items"}`}
+                            {isOpen ? "Hide" : r.error ? "Why" : (() => {
+                              const n = (r.reasons ?? []).reduce((a, c) => a + c.count, 0) || r.problems.length;
+                              return `${n.toLocaleString()} ${n === 1 ? "item" : "items"}`;
+                            })()}
                           </button>
                         )}
                       </td>
@@ -190,24 +202,51 @@ export function History({ kbId, sources, version }: { kbId: string; sources: Pag
                             </p>
                           )}
                           {r.problems.length > 0 && (
-                            <ul className="space-y-2">
-                              {r.problems.map((p, j) => (
-                                <li key={j} className="min-w-0 text-sm" data-testid="history-problem">
-                                  <span className="font-medium text-zinc-200">
-                                    {p.url ? (
-                                      <a href={p.url} target="_blank" rel="noopener noreferrer" className={`rounded hover:underline ${focusRing}`}>
-                                        {p.name}
-                                        <span className="sr-only"> (opens the original)</span>
-                                      </a>
-                                    ) : (
-                                      p.name
-                                    )}
-                                  </span>
-                                  <span className="text-zinc-400"> · {p.kind === "skipped" ? "Skipped" : "Couldn't read"}: </span>
-                                  <span className="text-zinc-300 [overflow-wrap:anywhere]">{p.error}</span>
-                                  <span className="block text-xs text-zinc-400">{p.fix}</span>
-                                </li>
-                              ))}
+                            <ul className="space-y-3" data-testid="history-groups">
+                              {problemGroups(r).map((g) => {
+                                const gk = `${key}|${g.kind}|${g.reason}`;
+                                const label = KIND_LABEL[byId.get(r.source_id)?.kind ?? "web"] ?? "the app";
+                                const all = !!more[gk];
+                                const shown = all ? g.examples : g.examples.slice(0, EXAMPLES);
+                                const left = g.count - shown.length;
+                                return (
+                                  <li key={gk} className="min-w-0 text-sm" data-testid="history-group" data-kind={g.kind} data-reason={g.reason}>
+                                    <p className="text-zinc-200">
+                                      <span className="font-semibold tabular-nums">{g.count.toLocaleString()}</span> {reasonWords(g.kind, g.reason, label)}
+                                      <span className="text-zinc-400"> · {KIND_WORDS[g.kind]}</span>
+                                    </p>
+                                    {shown[0]?.fix && <p className="text-xs text-zinc-400">{shown[0].fix}</p>}
+                                    <ul className="mt-1 space-y-1 border-l border-zinc-800 pl-3">
+                                      {shown.map((p, j) => (
+                                        <li key={j} className="min-w-0 text-xs" data-testid="history-problem">
+                                          <span className="font-medium text-zinc-300">
+                                            {p.url ? (
+                                              <a href={p.url} target="_blank" rel="noopener noreferrer" className={`rounded hover:underline ${focusRing}`}>
+                                                {p.name}
+                                                <span className="sr-only"> (opens the original)</span>
+                                              </a>
+                                            ) : (
+                                              p.name
+                                            )}
+                                          </span>
+                                          <span className="text-zinc-400 [overflow-wrap:anywhere]"> · {p.error}</span>
+                                        </li>
+                                      ))}
+                                      {left > 0 && (
+                                        <li className="text-xs text-zinc-400">
+                                          {g.examples.length > shown.length ? (
+                                            <button type="button" className={`rounded underline underline-offset-4 hover:text-zinc-100 ${focusRing}`} onClick={() => setMore((m) => ({ ...m, [gk]: true }))}>
+                                              {`And ${left.toLocaleString()} more`}
+                                            </button>
+                                          ) : (
+                                            `And ${left.toLocaleString()} more, the same`
+                                          )}
+                                        </li>
+                                      )}
+                                    </ul>
+                                  </li>
+                                );
+                              })}
                             </ul>
                           )}
                         </td>

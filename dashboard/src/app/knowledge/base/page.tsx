@@ -522,7 +522,7 @@ function BaseView() {
           <>
             <PageNav sections={nav} />
             <Tiles
-              data={{ searchable: base.ready, failed: base.failed, skipped: base.skipped ?? 0, working: base.processing, passages: base.passages ?? 0, searches }}
+              data={{ searchable: base.ready, failed: base.failed, skipped: base.skipped ?? 0, waiting: base.waiting ?? 0, working: base.processing, passages: base.passages ?? 0, searches }}
               sources={sources}
               onShow={showState}
             />
