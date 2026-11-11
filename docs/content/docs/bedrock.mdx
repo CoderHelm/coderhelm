@@ -1,13 +1,13 @@
 ---
-title: Connect Coderhelm knowledge to Amazon Bedrock
-description: Let Amazon Bedrock agents search your team's Coderhelm knowledge live through AgentCore Gateway, or keep chosen knowledge bases copied into a Bedrock knowledge base in your own AWS account.
+title: Amazon Bedrock
+description: Let Amazon Bedrock agents search your team's CoderHelm knowledge live through AgentCore Gateway, or keep chosen knowledge bases copied into a Bedrock knowledge base in your own AWS account.
 ---
 
-Your team's knowledge bases in Coderhelm hold pages from Notion, Confluence, Google Drive, Sanity, GitHub, websites and uploaded files. There are two ways to use them from Amazon Bedrock. Pick one, or use both.
+Your team's knowledge bases in CoderHelm hold pages from Notion, Confluence, Google Drive, Sanity, GitHub, websites and uploaded files. There are two ways to use them from Amazon Bedrock. Pick one, or use both.
 
 | | Search live over MCP | Copy into a Bedrock knowledge base |
 | --- | --- | --- |
-| What Bedrock gets | Two tools, `knowledge_search` and `knowledge_list`, on Coderhelm's MCP server | A Bedrock knowledge base you own, kept in step with Coderhelm |
+| What Bedrock gets | Two tools, `knowledge_search` and `knowledge_list`, on CoderHelm's MCP server | A Bedrock knowledge base you own, kept in step with CoderHelm |
 | Who reads what | Each search reads only the knowledge bases the key was given, and only while the person who made the key can read them in Chat | Everyone with Bedrock access to that knowledge base reads everything copied into it |
 | Freshness | Live | Minutes for a custom data source; up to 15 minutes for an S3 folder |
 | Works with | Bedrock AgentCore Gateway, Bedrock agents through it, and any MCP client | Bedrock Retrieve and RetrieveAndGenerate, Bedrock Agents, and anything that reads a Bedrock knowledge base |
@@ -17,14 +17,14 @@ Both are for people who manage knowledge bases (admins, or a custom role with **
 
 ## Search live with AgentCore Gateway
 
-AgentCore Gateway can add a remote MCP server as a target and sign in to it with an API key or with OAuth client credentials ([outbound authorization](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-outbound-auth.html), [MCP server targets](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-target-MCPservers.html)). A Coderhelm **knowledge key** works both ways.
+AgentCore Gateway can add a remote MCP server as a target and sign in to it with an API key or with OAuth client credentials ([outbound authorization](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-outbound-auth.html), [MCP server targets](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-target-MCPservers.html)). A CoderHelm **knowledge key** works both ways.
 
 ### 1. Make a knowledge key
 
-1. In Coderhelm, open **Knowledge**, then **Use in Bedrock**.
+1. In CoderHelm, open **Knowledge**, then **Use in Bedrock**.
 2. Under **Search live from an agent**, choose **New knowledge key**.
 3. Name it, tick the knowledge bases it may read, choose when it expires, and choose **Make the key**.
-4. Copy the key now. Coderhelm keeps only a hash of it, so it is shown this once. The page also shows its **Client ID** (`chkbc_...`), the **MCP server address** and the **token address**.
+4. Copy the key now. CoderHelm keeps only a hash of it, so it is shown this once. The page also shows its **Client ID** (`chkbc_...`), the **MCP server address** and the **token address**.
 
 A key holds one scope, `knowledge:read`. It can search and list knowledge, nothing else: no runs, no reviews, no settings.
 
@@ -40,7 +40,7 @@ aws bedrock-agentcore-control create-api-key-credential-provider \
   --api-key 'chkb_...'
 ```
 
-**As OAuth client credentials** (the gateway asks Coderhelm for an hour-long token):
+**As OAuth client credentials** (the gateway asks CoderHelm for an hour-long token):
 
 ```bash
 aws bedrock-agentcore-control create-oauth2-credential-provider \
@@ -57,7 +57,7 @@ aws bedrock-agentcore-control create-oauth2-credential-provider \
 
 On a self-hosted install, use your own address instead of `https://api.coderhelm.com`. Both commands print a `credentialProviderArn`.
 
-### 3. Add Coderhelm as a target
+### 3. Add CoderHelm as a target
 
 With an API key, the key goes in the `Authorization` header with the prefix `Bearer`:
 
@@ -77,7 +77,7 @@ aws bedrock-agentcore-control create-gateway-target \
   }]'
 ```
 
-Coderhelm also accepts the key in an `X-Api-Key` header, if you'd rather set `credentialParameterName` to `X-Api-Key` and leave the prefix out.
+CoderHelm also accepts the key in an `X-Api-Key` header, if you'd rather set `credentialParameterName` to `X-Api-Key` and leave the prefix out.
 
 With OAuth, use `"credentialProviderType": "OAUTH"` and `"oauthCredentialProvider": { "providerArn": "<credentialProviderArn>", "grantType": "CLIENT_CREDENTIALS", "scopes": ["knowledge:read"] }`.
 
@@ -97,52 +97,52 @@ The gateway reads the tools when the target is created. Agents then see `coderhe
 - Revoking a key stops it at once, including access tokens it already got.
 - Every call is written to the team's audit log with the key's name and the knowledge base it searched. The query and the passages are never logged.
 
-People can also give their own MCP apps (Claude, Cursor, VS Code) knowledge search: see [Use CoderHelm from Claude, Cursor and VS Code](/mcp).
+People can also give their own MCP apps (Claude, Cursor, VS Code) knowledge search: see [Claude, Cursor and VS Code](/mcp).
 
 ## Copy into a Bedrock knowledge base
 
-Coderhelm keeps the knowledge bases you choose copied into a Bedrock knowledge base in your AWS account. Added and changed documents are written again, and deleted ones are removed: a deleted file, a deleted knowledge base, one you take off the list, or turning copying off.
+CoderHelm keeps the knowledge bases you choose copied into a Bedrock knowledge base in your AWS account. Added and changed documents are written again, and deleted ones are removed: a deleted file, a deleted knowledge base, one you take off the list, or turning copying off.
 
-**Read this first.** A Bedrock knowledge base has no per-person access. Everyone with Bedrock access to it, and every agent or application that retrieves from it, can read every document copied into it, whatever their access in Coderhelm or in the app the document came from. So only the knowledge bases you tick are copied, and Coderhelm asks you to confirm this before it copies anything. Knowledge bases connected in place (already searched where they live) are never copied.
+**Read this first.** A Bedrock knowledge base has no per-person access. Everyone with Bedrock access to it, and every agent or application that retrieves from it, can read every document copied into it, whatever their access in CoderHelm or in the app the document came from. So only the knowledge bases you tick are copied, and CoderHelm asks you to confirm this before it copies anything. Knowledge bases connected in place (already searched where they live) are never copied.
 
-Each document is the text of one file or page, with this metadata (you can filter on it in Bedrock): `title`, `link` (the original page, or the knowledge base in Coderhelm for an uploaded file), `source` (`notion`, `confluence`, `upload`, ...), `team`, `base`, `base_id`, `file_id` and `updated_at`.
+Each document is the text of one file or page, with this metadata (you can filter on it in Bedrock): `title`, `link` (the original page, or the knowledge base in CoderHelm for an uploaded file), `source` (`notion`, `confluence`, `upload`, ...), `team`, `base`, `base_id`, `file_id` and `updated_at`.
 
-### Coderhelm cloud: a custom data source
+### CoderHelm cloud: a custom data source
 
 Bedrock's custom data source takes documents pushed straight in, with no sync to run ([direct ingestion](https://docs.aws.amazon.com/bedrock/latest/userguide/kb-direct-ingestion.html)).
 
 1. In the Bedrock console, open your knowledge base and add a data source of type **Custom**. Note the knowledge base's ARN and the data source's ID.
-2. Connect the knowledge base's AWS account to Coderhelm if you haven't (**Settings**, **Integrations**, **AWS**). This creates the `CoderHelmLogReader` role, which Coderhelm takes on with your team's private External ID.
-3. In Coderhelm, open **Knowledge**, **Use in Bedrock**, **Copy into a Bedrock knowledge base**. Choose **A custom data source**, paste the ARN and the ID, tick the knowledge bases to copy, confirm the warning, and choose **Start copying**.
+2. Connect the knowledge base's AWS account to CoderHelm if you haven't (**Settings**, **Integrations**, **AWS**). This creates the `CoderHelmLogReader` role, which CoderHelm takes on with your team's private External ID.
+3. In CoderHelm, open **Knowledge**, **Use in Bedrock**, **Copy into a Bedrock knowledge base**. Choose **A custom data source**, paste the ARN and the ID, tick the knowledge bases to copy, confirm the warning, and choose **Start copying**.
 4. The page shows **Update the role in your AWS account**. Open it: it is a CloudFormation update that adds your knowledge base to the role's `SyncKnowledgeBases` parameter. That adds one policy to the role, which allows only these actions, only on that knowledge base:
    - `bedrock:IngestKnowledgeBaseDocuments` and `bedrock:DeleteKnowledgeBaseDocuments`
    - `bedrock:GetKnowledgeBaseDocuments` and `bedrock:ListKnowledgeBaseDocuments`
    - `bedrock:StartIngestionJob` and `bedrock:GetIngestionJob`
    - `bedrock:GetKnowledgeBase` and `bedrock:GetDataSource`
 
-Coderhelm never uses a Bedrock resource policy that names its own shared role, so no other team can write to your knowledge base.
+CoderHelm never uses a Bedrock resource policy that names its own shared role, so no other team can write to your knowledge base.
 
 ### Self-hosted: an S3 folder
 
 A self-hosted install copies into an S3 folder in its own account, read by a Bedrock S3 data source ([S3 connector](https://docs.aws.amazon.com/bedrock/latest/userguide/s3-data-source-connector.html)). Each file becomes `<folder><base id>/<file id>.txt` with its metadata beside it in `<file id>.txt.metadata.json`. The install's own role never writes to a knowledge base, and its permission limit does not change. The self-hosting guide has the steps: [Bedrock knowledge bases](/self-host/bedrock).
 
-A self-hosted install can also push into a custom data source of a knowledge base in another AWS account it has connected, the same way as Coderhelm cloud.
+A self-hosted install can also push into a custom data source of a knowledge base in another AWS account it has connected, the same way as CoderHelm cloud.
 
 ### Status
 
-The section shows the last sync, how many documents are in Bedrock, what the last sync added, updated and removed, and any problem in plain words. **Sync now** runs one at once; otherwise Coderhelm syncs every 15 minutes and right after you save.
+The section shows the last sync, how many documents are in Bedrock, what the last sync added, updated and removed, and any problem in plain words. **Sync now** runs one at once; otherwise CoderHelm syncs every 15 minutes and right after you save.
 
 ## Limits
 
-- Bedrock takes 10 documents per direct ingestion call and 6 MB per request; Coderhelm sends at most 10 documents and 5 MB per call, and a document longer than about 4.5 MB is cut there (the status says which). [Quotas](https://docs.aws.amazon.com/general/latest/gr/bedrock.html)
-- A metadata file beside an S3 document is at most 10 KB; Coderhelm shortens long titles and links to fit.
+- Bedrock takes 10 documents per direct ingestion call and 6 MB per request; CoderHelm sends at most 10 documents and 5 MB per call, and a document longer than about 4.5 MB is cut there (the status says which). [Quotas](https://docs.aws.amazon.com/general/latest/gr/bedrock.html)
+- A metadata file beside an S3 document is at most 10 KB; CoderHelm shortens long titles and links to fit.
 - A Bedrock data source runs one ingestion job at a time, and StartIngestionJob is limited to one call every 10 seconds per account.
 - Web crawler data sources can't sign in to a site, so they can't read your private pages. Since September 30, 2026, new knowledge bases you manage yourself can only add S3 and custom data sources ([connectors](https://docs.aws.amazon.com/bedrock/latest/userguide/data-source-connectors.html)).
 - A knowledge key reads at most 300 calls a minute.
 
 ## Costs
 
-Coderhelm doesn't charge for either way. AWS charges you in your own account:
+CoderHelm doesn't charge for either way. AWS charges you in your own account:
 
 - **AgentCore Gateway**: $0.005 per 1,000 calls to list or invoke tools, $0.025 per 1,000 searches, and $0.02 per 100 tools indexed a month. AgentCore Identity adds no charge when used through the gateway. ([AgentCore pricing](https://aws.amazon.com/bedrock/agentcore/pricing/))
 - **Bedrock knowledge base**: the knowledge base itself is free. You pay for the embedding model while documents are indexed (Titan Text Embeddings V2 is $0.02 per million tokens in us-east-1), for the vector store it uses (Amazon OpenSearch Serverless, S3 Vectors, Aurora and others, each priced by that service), and for any reranking or model calls when you retrieve. ([Bedrock pricing](https://aws.amazon.com/bedrock/pricing/))
