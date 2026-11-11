@@ -100,7 +100,7 @@ export interface BaseLoad {
 
 const e = encodeURIComponent;
 
-function qs(q: ItemsQuery): string {
+function qs(q: object): string {
   const p = new URLSearchParams();
   for (const [k, v] of Object.entries(q)) if (v !== undefined && v !== "" && v !== null) p.set(k, String(v));
   const s = p.toString();
@@ -309,4 +309,90 @@ export const SKIP_WORDS: Record<string, string> = {
 
 export function isKind(k: string): k is SourceKind {
   return k in KIND_LABEL;
+}
+
+// ── Sync history ────────────────────────────────────────────────────────────
+
+/** One item a sync couldn't read, or left out. */
+export interface RunProblem {
+  name: string;
+  url: string;
+  kind: "failed" | "skipped";
+  error: string;
+  fix: string;
+}
+
+/** One sync of a source. */
+export interface SyncRun {
+  kb_id: string;
+  source_id: string;
+  /** `schedule`, `change`, `manual`, `added`, `edited`, `sign_in`, `retry`. */
+  trigger: string;
+  started_at: string;
+  ended_at: string;
+  took_secs: number;
+  /** `done`, `problems` or `stopped`. */
+  result: "done" | "problems" | "stopped";
+  listed: number;
+  added: number;
+  updated: number;
+  unchanged: number;
+  removed: number;
+  failed: number;
+  skipped: number;
+  embedded: number;
+  reused: number;
+  via: string;
+  error?: { message: string; fix: string; action: string; at: string } | null;
+  problems: RunProblem[];
+}
+
+export const kbHistory = {
+  runs: (id: string, source = "", limit = 50) =>
+    request<{ runs: SyncRun[]; kept_days: number }>(`/api/knowledge/${e(id)}/runs${qs({ source: source || undefined, limit })}`),
+  retry: (kbId: string, sourceId: string, itemIds: string[]) =>
+    request<{ queued: number }>(`/api/knowledge/${e(kbId)}/sources/${e(sourceId)}/retry`, { method: "POST", body: JSON.stringify({ item_ids: itemIds }) }),
+};
+
+export const TRIGGER_WORDS: Record<string, string> = {
+  schedule: "Schedule",
+  change: "Change event",
+  manual: "Checked by hand",
+  added: "Added",
+  edited: "Pages changed",
+  sign_in: "Signed in",
+  retry: "Read again",
+};
+
+export const RESULT_WORDS: Record<SyncRun["result"], string> = {
+  done: "Done",
+  problems: "Done with problems",
+  stopped: "Stopped",
+};
+
+/** A run that changed nothing: folded with its neighbours. */
+export function quietRun(r: SyncRun): boolean {
+  return r.result === "done" && !r.added && !r.updated && !r.removed && !r.failed && !r.skipped;
+}
+
+/** Runs, with each stretch of runs that changed nothing folded into one row. */
+export type HistoryRow = { kind: "run"; run: SyncRun } | { kind: "quiet"; runs: SyncRun[] };
+
+export function historyRows(runs: SyncRun[]): HistoryRow[] {
+  const out: HistoryRow[] = [];
+  for (const r of runs) {
+    const last = out[out.length - 1];
+    if (quietRun(r) && last?.kind === "quiet") last.runs.push(r);
+    else if (quietRun(r)) out.push({ kind: "quiet", runs: [r] });
+    else out.push({ kind: "run", run: r });
+  }
+  // A single quiet run stays a row of its own.
+  return out.map((row) => (row.kind === "quiet" && row.runs.length === 1 ? { kind: "run", run: row.runs[0] } : row));
+}
+
+/** "41 s", "6 min", "1 h 5 min". */
+export function tookWords(secs: number): string {
+  if (secs < 60) return `${Math.max(0, Math.round(secs))} s`;
+  const m = Math.round(secs / 60);
+  return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`;
 }

@@ -131,6 +131,41 @@ const ITEMS_PAGE = {
   all: 1300,
 };
 
+const wideRun = (over: Record<string, unknown>) => ({
+  kb_id: KB_ID,
+  source_id: "src_ok",
+  trigger: "change",
+  started_at: iso(5),
+  ended_at: iso(4),
+  took_secs: 3_725,
+  result: "problems",
+  listed: 1284,
+  added: 1_201_337,
+  updated: 44,
+  unchanged: 39,
+  removed: 2,
+  failed: 3,
+  skipped: 7,
+  embedded: 182_304,
+  reused: 9_120_400,
+  via: "oauth",
+  error: null,
+  problems: [
+    { name: `${TITLE} ${TOKEN}`, url: LONG_URL, kind: "failed", error: `${SENTENCE} ${TOKEN}`, fix: SENTENCE },
+    { name: TOKEN, url: "", kind: "skipped", error: TOKEN, fix: `${SENTENCE} ${TOKEN}` },
+  ],
+  ...over,
+});
+const RUNS = {
+  runs: [
+    wideRun({}),
+    wideRun({ source_id: "src_err", result: "stopped", error: { message: `${SENTENCE} ${TOKEN}`, fix: SENTENCE, action: "reconnect", at: iso(30) }, problems: [] }),
+    wideRun({ source_id: "src_sync", result: "done", added: 0, updated: 0, removed: 0, failed: 0, skipped: 0, problems: [] }),
+    wideRun({ source_id: "src_sync", result: "done", added: 0, updated: 0, removed: 0, failed: 0, skipped: 0, problems: [] }),
+  ],
+  kept_days: 90,
+};
+
 const CONNECTION = {
   via: "oauth",
   owner: "team",
@@ -235,6 +270,7 @@ export const knowledgeData: Handler = ({ method, path }) => {
   if (path === "/api/knowledge/keys") return BEDROCK_KEYS;
   if (path === "/api/knowledge/bedrock-sync") return BEDROCK_SYNC;
   if (/^\/api\/knowledge\/[^/]+\/items$/.test(path)) return ITEMS_PAGE;
+  if (/^\/api\/knowledge\/[^/]+\/runs$/.test(path)) return RUNS;
   if (/^\/api\/knowledge\/[^/]+\/sources$/.test(path)) return { base: BASE, sources: SOURCES, uploads_working: true };
   if (/^\/api\/knowledge\/[^/]+\/sources\/[^/]+\/connection$/.test(path)) return CONNECTION;
   if (path.startsWith("/api/knowledge/")) {

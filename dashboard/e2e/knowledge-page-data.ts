@@ -293,6 +293,84 @@ export function itemsPage(items: KItem[], q: URLSearchParams) {
   };
 }
 
+export interface Run {
+  kb_id: string;
+  source_id: string;
+  trigger: string;
+  started_at: string;
+  ended_at: string;
+  took_secs: number;
+  result: "done" | "problems" | "stopped";
+  listed: number;
+  added: number;
+  updated: number;
+  unchanged: number;
+  removed: number;
+  failed: number;
+  skipped: number;
+  embedded: number;
+  reused: number;
+  via: string;
+  error?: { message: string; fix: string; action: string; at: string } | null;
+  problems: { name: string; url: string; kind: string; error: string; fix: string }[];
+}
+
+export const run = (over: Partial<Run>): Run => ({
+  kb_id: "kb_dw",
+  source_id: "src_conf",
+  trigger: "schedule",
+  started_at: iso(4),
+  ended_at: iso(3),
+  took_secs: 41,
+  result: "done",
+  listed: 412,
+  added: 0,
+  updated: 3,
+  unchanged: 409,
+  removed: 0,
+  failed: 0,
+  skipped: 0,
+  embedded: 18,
+  reused: 402,
+  via: "oauth",
+  problems: [],
+  ...over,
+});
+
+export function runsFor(db: Backend): Run[] {
+  if (db.state === "empty" || db.state === "in_place") return [];
+  if (db.state === "first_sync") return [];
+  if (db.state === "error")
+    return [
+      run({ started_at: iso(30), ended_at: iso(30), took_secs: 0, result: "stopped", listed: 0, updated: 0, unchanged: 0, embedded: 0, reused: 0, error: { message: "Confluence refused the saved sign-in.", fix: "Reconnect Confluence to sign in again.", action: "reconnect", at: iso(30) } }),
+      run({ started_at: iso(90), ended_at: iso(89) }),
+    ];
+  return [
+    run({}),
+    run({ started_at: iso(64), updated: 0, unchanged: 412, embedded: 0, took_secs: 12 }),
+    run({ started_at: iso(124), updated: 0, unchanged: 412, embedded: 0, took_secs: 11 }),
+    run({ started_at: iso(184), updated: 0, unchanged: 412, embedded: 0, took_secs: 13 }),
+    run({ source_id: "src_notion", trigger: "change", started_at: iso(200), updated: 1, listed: 210, unchanged: 209, embedded: 4, reused: 30, took_secs: 6, via: "saved_key" }),
+    run({
+      started_at: iso(60 * 24 * 2),
+      trigger: "added",
+      took_secs: 372,
+      result: "problems",
+      added: 410,
+      updated: 0,
+      unchanged: 0,
+      failed: 1,
+      skipped: 1,
+      embedded: 14_210,
+      reused: 0,
+      problems: [
+        { name: "Legacy export (PDF)", url: "https://acme.atlassian.net/wiki/x", kind: "failed", error: "No text found in this PDF. A scanned PDF needs text recognition, which isn't supported yet.", fix: "Upload a version with selectable text (export it again, or run text recognition on it)." },
+        { name: "Empty page", url: "https://acme.atlassian.net/wiki/y", kind: "skipped", error: "It has no text to read.", fix: "Nothing to search in it. Add text to the page, or leave it out." },
+      ],
+    }),
+  ];
+}
+
 export function connectionFor(s: Src) {
   if (s.via === "sign_in") {
     return {
@@ -384,6 +462,12 @@ export async function mockKnowledge(page: Page, db: Backend, extra?: (p: string,
           });
         if (rest === "/sources" && method === "GET") return json(route, { base: baseJson(db), sources: db.sources, uploads_working: false });
         if (rest === "/items" && method === "GET") return json(route, db.over.items ?? itemsPage(db.items, url.searchParams));
+        if (rest === "/runs" && method === "GET") {
+          const src = url.searchParams.get("source");
+          return json(route, { runs: (db.over.runs as Run[] | undefined ?? runsFor(db)).filter((r) => !src || r.source_id === src), kept_days: 90 });
+        }
+        const retry = rest.match(/^\/sources\/([^/]+)\/retry$/);
+        if (retry && method === "POST") return json(route, { queued: ((db.bodies[db.bodies.length - 1] as { item_ids?: string[] }).item_ids ?? []).length });
         const conn = rest.match(/^\/sources\/([^/]+)\/connection$/);
         if (conn) {
           if (!manage) return json(route, { error: "Only admins manage knowledge bases." }, 403);
