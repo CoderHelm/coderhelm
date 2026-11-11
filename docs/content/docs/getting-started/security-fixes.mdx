@@ -1,6 +1,6 @@
 ---
 title: Security fixes
-description: How CoderHelm checks each advisory that touches your dependencies against your code, opens one fix pull request per fix, and posts the urgent ones to your alerts channel with a deadline.
+description: How CoderHelm checks each advisory that touches your dependencies against your code, opens as few fix pull requests as it can (one per repository by default), and posts the urgent ones to your alerts channel with a deadline.
 ---
 
 When an advisory is published for a package one of your repositories uses, CoderHelm works out whether your code actually reaches the vulnerable part. It then gives the finding a tier and a deadline, opens a fix pull request and gets its CI green. For urgent findings it also posts a card to the same channel as your production alerts.
@@ -52,7 +52,7 @@ Each verdict comes with its evidence: the files and lines that show it, the depe
 
 ## Tiers and deadlines
 
-These are the defaults. You can change when each tier gets a pull request, which tiers post to the alerts channel, and the number of days for each deadline.
+These are the defaults. You can change when each tier gets a pull request, which tiers post to the alerts channel, and the number of days for each deadline. With one pull request per repository (the default, see [Pull requests](#pull-requests)), the tiers' timing decides when the repository's pull request starts.
 
 | Tier | When | What CoderHelm does | Due |
 | --- | --- | --- | --- |
@@ -78,24 +78,51 @@ Security never runs away with your tokens. These limits are in the policy, with 
 
 The Security page shows the day's spend ("Checked 38 packages today, 92k of 400k tokens") and the month's. **Analytics**, then **Security**, shows findings opened and fixed, fix pull requests, the time to fix by tier and the tokens per day, and the usage breakdown lists security checks and security fix runs on their own lines.
 
+## Pull requests
+
+The policy's **Pull requests** choice decides how many there are:
+
+| Choice | What you get |
+| --- | --- |
+| **One PR per repo (fewest PRs, recommended)** | Every due fix in a repository, across all its ecosystems, in one pull request. The default for teams that turn Security on. |
+| **One per ecosystem** | The same, one pull request per repository and ecosystem (npm, Python, Go...). |
+| **One per package** | P0 and P1 get a pull request per package; P2 and P3 are grouped per repository and ecosystem, daily or weekly. A policy saved before this choice existed keeps this. |
+
+With one per repository, the most urgent fix sets when the pull request starts: a P0 starts it at once and brings everything else that is due or waiting in that repository; otherwise it starts once a day. A repository with 57 package fixes gets one pull request, not 57.
+
+A repository has one open security pull request at a time. New fixes join it: a follow-up run on the same pull request pushes their bumps to its branch, and the title, description and labels are written again to count them. Nothing opens a second one while the first is open.
+
+Major version bumps stay in the pull request. When CI fails, CoderHelm fixes it in the same pull request. Only when it can't get CI green with a major bump in it does that bump leave: a follow-up run reverts it on the branch, and it gets a pull request of its own. With **Open an issue only** for major bumps, they never join the pull request.
+
+A pull request counts as one fix run against the [daily limits](#daily-limits), however many packages it bumps, and its tokens, follow-up runs included, count against the token limit.
+
 ## Opening a fix PR by hand
 
-Admins can open a fix pull request from a finding's page (**Open fix PR**), or select rows on the Security page and open them together. CoderHelm shows what it will open first: one pull request per package version, and how many of today's fix runs it uses. It starts at once even in a preview, for those findings only, within the daily limits; past them the rest wait for tomorrow, unless the admin raises today's limit for that request, which is recorded in the audit log. A finding that already has an open pull request links to it instead; one with no fixed version can't be picked and says why.
+Admins can pick findings on the Security page and send them as one pull request:
+
+1. Pick rows, or use the quick selects above the list: **Select everything fixable**, **Select P0 and P1**, or a repository. `x` picks the row under the pointer, shift-click picks a range, and `Esc` clears.
+2. The bar at the bottom says what the selection becomes, for example "14 fixes selected in web-app: 1 pull request · 31 advisories · 2 major upgrades". **Fix in one PR** makes one pull request per repository, whatever the policy says; a pull request lives in one repository, so a selection across two repositories is two. The menu beside it offers **One PR per package**.
+3. A review opens in the page before anything runs. It shows each pull request's title, branch and labels, and every package bump with its versions, advisories and verdict; any row can be taken out. It warns about major upgrades, says what is left out and why (no fixed version yet, already in a pull request), and says when the fixes are added to the repository's open security pull request instead of a new one. It shows the cost against today's limits: "Uses 1 of today's 3 fix runs · estimated 180k of 2M tokens".
+4. Confirming starts the runs and links each one.
+
+From a finding's page, **Open fix PR** opens a pull request for that package, and **Add to the open PR** adds the fix to the repository's open security pull request (or starts one).
+
+A request starts at once even in a preview, for those findings only, within the daily limits; past them the rest wait for tomorrow, unless the admin raises today's limit for that request, which is recorded in the audit log.
 
 ## The pull request
 
-One pull request per fix, not per alert. The same flaw listed under its CVE, GHSA and ecosystem IDs counts once, and a bump that clears three advisories is one pull request.
+One pull request per repository by default, never one per alert. The same flaw listed under its CVE, GHSA and ecosystem IDs counts once, and a bump that clears three advisories is one bump.
 
-- **Branch:** `coderhelm/security-<package>-<version>`.
-- **Title:** `fix(deps): bump <package> <from> to <to> [SECURITY] (<ID>)`, for example `fix(deps): bump undici 6.19.2 to 6.21.1 [SECURITY] (CVE-2026-31337)`. The prefix follows your repository's commit style, or your team's git conventions.
+- **Branch:** `coderhelm/security-updates-<date>-<id>`, or `coderhelm/security-<package>-<version>` for one package.
+- **Title:** `fix(deps): security updates for <repo> (14 packages, 31 advisories)`; for one package, `fix(deps): bump <package> <from> to <to> [SECURITY] (<ID>)`. The prefix follows your repository's commit style, or your team's git conventions.
 - **Labels**, created when missing:
   - the labels you set in the policy (by default `security` and `dependencies`);
-  - `severity:critical`, `severity:high`, `severity:medium` or `severity:low`;
+  - `severity:critical`, `severity:high`, `severity:medium` or `severity:low`, the highest of its fixes;
   - `reachable`, `not-reachable` or `reachability:unknown`;
   - `exploited` when it is on CISA's list;
   - `breaking` when a major version bump was needed;
   - the ecosystem label Dependabot would use, so your existing filters keep working.
-- **Body:** a summary with the tier and due date; the advisory (IDs, CVSS, EPSS, the exploited list, the weakness); what is affected (the dependency path, runtime or development, direct or indirect); the reachability verdict with its files and lines; the change; and the CI run. It ends with the Dependabot alert it closes and the data credit.
+- **Body:** a summary with the tier and due date; for a pull request with several packages, a table of every bump with its advisories, reachability and due date; the advisory (IDs, CVSS, EPSS, the exploited list, the weakness); what is affected (the dependency path, runtime or development, direct or indirect); the reachability verdict with its files and lines; the change; and the CI run. It ends with the Dependabot alert it closes and the data credit.
 
 The pull request has the public facts about the advisory. How exposed your own production is stays in the dashboard and the card, never in a public repository.
 

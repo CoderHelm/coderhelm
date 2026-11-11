@@ -248,3 +248,23 @@ input[data-autocompleted] {
     transform: translateX(300%);
   }
 }
+
+/* A tier that was still being checked turns solid. */
+@keyframes tier-settle {
+  from {
+    opacity: 0.45;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.tier-settle {
+  animation: tier-settle 420ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tier-settle {
+    animation: none;
+  }
+}

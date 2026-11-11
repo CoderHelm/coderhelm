@@ -139,6 +139,7 @@ const CONFIG = {
   reachability_labels: true,
   ecosystem_labels: true,
   major_bumps: "fix_in_pr",
+  bundle: "per_repo",
   adopt_bot_prs: true,
   repos: "all",
   ignore: [] as Record<string, unknown>[],
@@ -178,14 +179,51 @@ const overview = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
+const bump = (pkg: string, from: string, to: string, ids: string[], over: Record<string, unknown> = {}) => ({
+  package: pkg,
+  from,
+  to,
+  major: from.split(".")[0] !== to.split(".")[0],
+  manifest: "pnpm-lock.yaml",
+  verdict: "unknown",
+  tier: "P2",
+  finding_ids: ids,
+  advisories: ids.map((id) => `GHSA-${id}`),
+  ...over,
+});
+const unit = (repo: string, title: string, bumps: ReturnType<typeof bump>[], over: Record<string, unknown> = {}) => ({
+  unit: `bundle:ask:${repo}`,
+  ticket: `SEC-${repo.split("/")[1].toUpperCase()}`,
+  repo,
+  title,
+  branch: `coderhelm/security-updates-2026-11-11-${repo.split("/")[1]}`,
+  labels: ["security", "dependencies", "severity:high", "javascript"],
+  tier: "P1",
+  bundle: true,
+  finding_ids: bumps.flatMap((b) => b.finding_ids),
+  advisories: bumps.reduce((n, b) => n + b.advisories.length, 0),
+  majors: bumps.filter((b) => b.major).length,
+  bumps,
+  joins: null,
+  estimated_tokens: 120_000 + 60_000 * bumps.filter((b) => b.major).length,
+  package: bumps.length === 1 ? bumps[0].package : `${bumps.length} packages`,
+  from: bumps[0].from,
+  to: bumps[0].to,
+  ...over,
+});
 const PLAN = {
   units: [
-    { unit: "tar@7.5.21", repo: "acme/web-app", package: "tar", from: "6.2.1", to: "7.5.21", finding_ids: TAR.map((f) => f.id), title: "fix(deps): bump tar 6.2.1 to 7.5.21" },
-    { unit: "python-multipart@0.0.18", repo: "acme/api", package: "python-multipart", from: "0.0.9", to: "0.0.18", finding_ids: ["sec_2"], title: "fix(deps): bump python-multipart" },
+    unit("acme/web-app", "fix(deps): bump tar 6.2.1 to 7.5.21", [bump("tar", "6.2.1", "7.5.21", TAR.map((f) => f.id), { tier: "P1" })], { unit: "tar@7.5.21", package: "tar", bundle: false }),
+    unit("acme/api", "fix(deps): bump python-multipart", [bump("python-multipart", "0.0.9", "0.0.18", ["sec_2"])], { unit: "python-multipart@0.0.18", package: "python-multipart", bundle: false }),
   ],
-  skipped: [],
+  skipped: [] as { finding_id: string; reason: string; pr_url?: string }[],
   runs_today: 1,
   runs_limit: 3,
+  pr_count: 2,
+  joins: 0,
+  tokens_today: 310_000,
+  tokens_limit: 2_000_000,
+  estimated_tokens: 300_000,
 };
 
 const INSIGHTS = {
@@ -206,6 +244,9 @@ interface Db {
   config: unknown;
   synced: boolean;
   dismissRefuse: string | null;
+  /** Plans by the request: the panel asks again when a row is removed. */
+  planFor?: (ids: string[], combine: string) => unknown;
+  slowFix?: boolean;
   calls: { call: string; url: string; body: unknown }[];
 }
 
@@ -246,18 +287,23 @@ async function mockApi(page: Page, init: Partial<Db> = {}): Promise<Db> {
     if (p === "/api/security/findings" && method === "GET") return json(route, db.findings);
     if (p === "/api/security/groups") return json(route, db.groups);
     if (p === "/api/security/insights") return json(route, INSIGHTS);
-    if (p === "/api/security/fix/plan") return json(route, db.plan);
+    if (p === "/api/security/fix/plan") {
+      const b = body as { finding_ids: string[]; combine: string };
+      return json(route, db.planFor ? db.planFor(b.finding_ids, b.combine) : db.plan);
+    }
     if (p === "/api/security/fix") {
       if (db.role !== "admin") return json(route, { error: "Forbidden" }, 403);
       const ids = (body as { finding_ids: string[]; raise_limit: boolean }).finding_ids;
       const raise = (body as { raise_limit: boolean }).raise_limit;
-      const units = (db.plan as typeof PLAN).units.filter((u) => u.finding_ids.some((id) => ids.includes(id)));
-      const room = raise ? units.length : Math.max(0, 3 - (db.plan as typeof PLAN).runs_today);
+      const plan = (db.planFor ? db.planFor(ids, (body as { combine: string }).combine) : db.plan) as typeof PLAN;
+      const units = plan.units.filter((u) => u.finding_ids.some((id) => ids.includes(id)));
+      const room = raise ? units.length : Math.max(0, 3 - plan.runs_today);
+      if (db.slowFix) await new Promise((r) => setTimeout(r, 400));
       return json(route, {
-        started: units.slice(0, room).map((u) => ({ unit: u.unit, ticket: `SEC-${u.package}`, repo: u.repo, package: u.package, finding_ids: u.finding_ids, run_id: null, runs_url: `/?q=SEC-${u.package}` })),
+        started: units.slice(0, room).map((u) => ({ unit: u.unit, ticket: `SEC-${u.package}`, repo: u.repo, package: u.package, finding_ids: u.finding_ids, run_id: null, runs_url: `/?q=SEC-${u.package}`, joins: (u.joins as { number: number } | null)?.number ?? null })),
         queued: units.slice(room).map((u) => ({ unit: u.unit, ticket: `SEC-${u.package}`, repo: u.repo, package: u.package, finding_ids: u.finding_ids, reason: "Waiting: today's 3 fix runs are used. Next starts tomorrow." })),
         skipped: [],
-        runs_today: (db.plan as typeof PLAN).runs_today + Math.min(units.length, room),
+        runs_today: plan.runs_today + Math.min(units.length, room),
         runs_limit: 3,
       });
     }
@@ -272,8 +318,17 @@ async function mockApi(page: Page, init: Partial<Db> = {}): Promise<Db> {
     if (p === "/api/security/config" && method === "PUT") return json(route, { config: body });
     if (p === "/api/security/preview")
       return json(route, {
-        would_open: [{ finding_id: "sec_1", repo: "acme/web-app", title: "Bump undici 6.19.2 to 6.21.1", tier: "P0", branch: "coderhelm/security-undici-6.21.1", labels: ["security", "severity:critical"] }],
+        would_open: [
+          { finding_id: "sec_1", repo: "acme/web-app", title: "fix(deps): security updates for web-app (2 packages, 2 advisories)", tier: "P0", branch: "coderhelm/security-updates-2026-11-11-a1b2c3", labels: ["security", "severity:critical"] },
+          { finding_id: "tar_1", repo: "acme/web-app", title: "fix(deps): security updates for web-app (2 packages, 2 advisories)", tier: "P0", branch: "coderhelm/security-updates-2026-11-11-a1b2c3", labels: ["security", "severity:critical"] },
+          { finding_id: "sec_2", repo: "acme/api", title: "fix(deps): security updates for api (1 package, 1 advisory)", tier: "P2", branch: "coderhelm/security-updates-2026-11-11-d4e5f6", labels: ["security"] },
+        ],
         would_post: [{ finding_id: "sec_1", repo: "acme/web-app", title: "web-app is affected by CVE-2026-31337", tier: "P0" }],
+        prs: [
+          { ...unit("acme/web-app", "fix(deps): security updates for web-app (2 packages, 2 advisories)", [bump("undici", "6.19.2", "6.21.1", ["sec_1"]), bump("tar", "6.2.1", "6.2.2", ["tar_1"])]), tier: "P0", branch: "coderhelm/security-updates-2026-11-11-a1b2c3", labels: ["security", "severity:critical"] },
+          { ...unit("acme/api", "fix(deps): security updates for api (1 package, 1 advisory)", [bump("python-multipart", "0.0.9", "0.0.18", ["sec_2"])]), tier: "P2", joins: { number: 812, url: "https://github.com/acme/api/pull/812" } },
+        ],
+        pr_count: 1,
       });
     return json(route, { error: `Not mocked: ${method} ${p}` }, 404);
   });
@@ -281,6 +336,35 @@ async function mockApi(page: Page, init: Partial<Db> = {}): Promise<Db> {
 }
 
 const call = (db: Db, c: string) => db.calls.filter((x) => x.call === c);
+
+
+// A fix still being checked, in the same repo as tar: the mixed list.
+const WS = finding({ id: "ws_1", package: "ws", version: "8.17.0", fixed_version: "8.17.1", tier: "P2", verdict: "pending", status: "open", pr: null, due_at: iso(20 * 24), advisory: { ...finding().advisory, ids: ["GHSA-ws01-aaaa-bbbb"], primary: "GHSA-ws01-aaaa-bbbb", title: "ws denial of service", kev: false, epss: 0.02 } });
+const MIXED = [group(FINDINGS[0]), TAR_GROUP, group(WS), group(FINDINGS[1]), group(NOFIX)];
+
+/** The plan for what is asked: one bundle per repo, one unit per package when asked so, an open PR that takes it. */
+function planFor(joins: { number: number; url: string } | null = null) {
+  return (ids: string[], combine: string) => {
+    const web = [
+      ids.some((id) => id.startsWith("tar_")) ? bump("tar", "6.2.1", "7.5.21", TAR.map((f) => f.id).filter((id) => ids.includes(id)), { tier: "P1" }) : null,
+      ids.includes("ws_1") ? bump("ws", "8.17.0", "8.17.1", ["ws_1"], { verdict: "pending" }) : null,
+    ].filter((b): b is ReturnType<typeof bump> => !!b);
+    const api = ids.includes("sec_2") ? [bump("python-multipart", "0.0.9", "0.0.18", ["sec_2"], { verdict: "not_reachable" })] : [];
+    const title = (name: string, n: number, a: number) => `fix(deps): security updates for ${name} (${n} package${n === 1 ? "" : "s"}, ${a} advisor${a === 1 ? "y" : "ies"})`;
+    const units =
+      combine === "per_package"
+        ? [...web, ...api].map((b) => unit(b.package === "python-multipart" ? "acme/api" : "acme/web-app", `fix(deps): bump ${b.package} ${b.from} to ${b.to} [SECURITY]`, [b], { unit: `${b.package}@${b.to}`, bundle: false }))
+        : [
+            ...(web.length ? [unit("acme/web-app", title("web-app", web.length, web.reduce((n, b) => n + b.advisories.length, 0)), web, { joins })] : []),
+            ...(api.length ? [unit("acme/api", title("api", 1, 1), api)] : []),
+          ];
+    const skipped = ids.includes("nofix_1") ? [{ finding_id: "nofix_1", reason: "no fixed version" }] : [];
+    const estimated = units.reduce((n, u) => n + u.estimated_tokens, 0);
+    return { units, skipped, runs_today: 1, runs_limit: 3, pr_count: units.filter((u) => !u.joins).length, joins: units.filter((u) => u.joins).length, tokens_today: 310_000, tokens_limit: 2_000_000, estimated_tokens: estimated };
+  };
+}
+
+const rowOf = (page: Page, pkg: string) => page.getByTestId("finding-row").filter({ has: page.getByRole("link", { name: new RegExp(`^${pkg} `) }) });
 
 test.describe("Security", () => {
   test("the overview shows fixes as rows, the tiles, the spend and the badge, and filters ask the server", async ({ page }) => {
@@ -403,17 +487,20 @@ test.describe("Security", () => {
     await expect(rows.nth(3).getByTestId("pick")).toHaveAttribute("aria-label", /No fixed version yet/);
     await page.getByTestId("pick-all").check();
     const bar = page.getByTestId("bulk-bar");
-    await expect(bar.getByTestId("bulk-summary")).toHaveText("2 selected (4 advisories): these become 2 PRs (tar, python-multipart)");
+    // Two repos: a PR lives in one, so one PR each.
+    await expect(bar.getByTestId("bulk-summary")).toHaveText("2 fixes selected in 2 repos: 2 pull requests · 4 advisories · 2 major upgrades");
+    await expect(bar.getByTestId("bulk-open")).toHaveText("Fix in 2 PRs, one per repo");
     await bar.getByTestId("bulk-open").click();
     const req = page.getByTestId("fix-request");
-    await expect(req.getByTestId("fix-units")).toContainText("tar 6.2.1 to 7.5.21 · 3 advisories · web-app");
-    await expect(req.getByTestId("fix-budget")).toContainText("Uses 2 of today's 3 fix runs (1 used so far).");
-    expect(call(db, "POST /api/security/fix/plan")[0].body).toEqual({ finding_ids: ["tar_1", "tar_2", "tar_3", "sec_2"] });
+    await expect(req.getByTestId("fix-unit")).toHaveCount(2);
+    await expect(req.getByTestId("fix-bump").first()).toContainText("tar 6.2.1 to 7.5.21major");
+    await expect(req.getByTestId("fix-budget")).toContainText("Uses 2 of today's 3 fix runs (1 used so far) · estimated 300k of 2M tokens (310k used today).");
+    expect(call(db, "POST /api/security/fix/plan")[0].body).toEqual({ finding_ids: ["tar_1", "tar_2", "tar_3", "sec_2"], combine: "one_pr" });
     await req.getByTestId("fix-confirm").click();
     const res = page.getByTestId("fix-results");
     await expect(res).toContainText("2 started");
     await expect(res.getByTestId("fix-started").first().getByRole("link", { name: "See the run" })).toHaveAttribute("href", "/?q=SEC-tar");
-    expect(call(db, "POST /api/security/fix")[0].body).toEqual({ finding_ids: ["tar_1", "tar_2", "tar_3", "sec_2"], raise_limit: false });
+    expect(call(db, "POST /api/security/fix")[0].body).toEqual({ finding_ids: ["tar_1", "tar_2", "tar_3", "sec_2"], raise_limit: false, combine: "one_pr" });
   });
 
   test("past today's limit the rest wait, unless an admin raises it for the request", async ({ page }) => {
@@ -422,7 +509,7 @@ test.describe("Security", () => {
     await page.getByTestId("pick-all").check();
     await page.getByTestId("bulk-open").click();
     const req = page.getByTestId("fix-request");
-    await expect(req.getByTestId("fix-budget")).toContainText("Uses 1 of today's 3 fix runs (2 used so far). 1 waits for tomorrow");
+    await expect(req.getByTestId("fix-budget")).toContainText("Uses 1 of today's 3 fix runs (2 used so far) · estimated 300k of 2M tokens (310k used today). 1 waits for tomorrow");
     await req.getByTestId("fix-confirm").click();
     await expect(page.getByTestId("fix-queued")).toContainText("Waiting: today's 3 fix runs are used. Next starts tomorrow.");
     await page.getByRole("button", { name: "Done" }).click();
@@ -431,7 +518,7 @@ test.describe("Security", () => {
     await page.getByTestId("raise-limit").check();
     await page.getByTestId("fix-confirm").click();
     await expect(page.getByTestId("fix-results")).toContainText("2 started");
-    expect(call(db, "POST /api/security/fix").at(-1)?.body).toEqual({ finding_ids: ["tar_1", "tar_2", "tar_3", "sec_2"], raise_limit: true });
+    expect(call(db, "POST /api/security/fix").at(-1)?.body).toEqual({ finding_ids: ["tar_1", "tar_2", "tar_3", "sec_2"], raise_limit: true, combine: "one_pr" });
   });
 
   test("a missing GitHub permission says what to grant and how", async ({ page }) => {
@@ -473,14 +560,16 @@ test.describe("Security", () => {
     await mockApi(page);
     await page.goto("/security/detail?id=sec_1");
     await expect(page.getByRole("heading", { level: 1, name: "Request smuggling in HTTP parser" })).toBeVisible();
-    await expect(page.getByTestId("page-header")).toContainText("undici 6.19.2 in web-app");
+    await expect(page.getByTestId("page-header")).toContainText("undici 6.19.2 · fixed in 6.21.1 · web-app");
     await expect(page.getByTestId("page-header")).toContainText("On exploited list");
-    await expect(page.getByTestId("finding-facts")).toContainText("CVE-2026-31337 · GHSA-q9fx-2w5c-8m4r · CVSS 9.1 · EPSS 0.71 (99th) · due");
+    await expect(page.getByTestId("finding-facts")).toContainText("CVE-2026-31337 · GHSA-q9fx-2w5c-8m4r · due");
+    await expect(page.getByTestId("severity")).toContainText("CVSS9.1 critical");
+    await expect(page.getByTestId("severity")).toContainText("0.71 (99th)");
     await expect(page.getByRole("heading", { name: "Why we think web-app is affected" })).toBeVisible();
     const lines = page.getByTestId("evidence-lines");
     await expect(lines).toContainText("apps/web/src/server/proxy.ts:44");
     await expect(lines).toContainText("new Agent({ pipelining: 1 })");
-    await expect(lines).toContainText("dependency path: web-app > next 15.4.2 > undici 6.19.2 (runtime, transitive)");
+    await expect(page.getByTestId("dependency-path").getByRole("listitem")).toHaveText([/web-app$/, /next 15\.4\.2$/, /undici 6\.19\.2$/]);
     await expect(page.getByTestId("evidence")).toContainText("Confidence high.");
     await expect(page.getByTestId("fix")).toContainText("Fixed in undici 6.21.1");
     await expect(page.getByTestId("fix")).toContainText("is open; CI is passing.");
@@ -569,13 +658,13 @@ test.describe("Security", () => {
     await expect(page.getByTestId("fix-budget")).toContainText("Uses 1 of today's 3 fix runs");
     await page.getByTestId("fix-confirm").click();
     await expect(page.getByTestId("fix-results")).toContainText("1 started");
-    expect(call(db, "POST /api/security/fix")[0].body).toEqual({ finding_ids: ["tar_3"], raise_limit: false });
+    expect(call(db, "POST /api/security/fix")[0].body).toEqual({ finding_ids: ["tar_3"], raise_limit: false, combine: "per_package" });
 
     db.detail = { finding: NOFIX, timeline: [] };
     await page.goto("/security/detail?id=nofix_1");
-    await expect(page.getByTestId("open-fix-pr")).toBeDisabled();
-    await expect(page.getByTestId("open-fix-pr")).toHaveText("No fixed version yet");
-    await expect(page.getByTestId("fix-cannot")).toContainText("No version of the package fixes this yet");
+    // No fixed version: no button to press, the card says why and what happens next.
+    await expect(page.getByTestId("open-fix-pr")).toHaveCount(0);
+    await expect(page.getByTestId("fix")).toContainText("No fixed version is out yet. Coderhelm checks again when the advisory gets one.");
   });
 
   test("the policy recommends opening PRs, and saves the daily limits", async ({ page }) => {
@@ -628,6 +717,7 @@ test.describe("Security", () => {
     await page.getByTestId("repo-checklist").getByLabel("acme/web-app").check();
 
     // P2: never; P3 posts to the alerts channel.
+    await page.getByRole("group", { name: "Pull requests" }).getByRole("button", { name: "One per ecosystem" }).click();
     await pickOption(page.getByTestId("tier-P2").getByLabel("Open a pull request"), "off");
     await page.getByTestId("post-P3").click();
     await page.getByTestId("sec-escalate").click();
@@ -677,6 +767,7 @@ test.describe("Security", () => {
       reachability_labels: true,
       ecosystem_labels: false,
       major_bumps: "issue_only",
+      bundle: "per_repo_ecosystem",
       adopt_bot_prs: false,
       repos: ["acme/web-app"],
       ignore: [{ advisory: "GHSA-7fh5-64p2-3v2j", repo: null, reason: "Build-time only", until: "2099-01-31", by: "admin@example.com" }],
@@ -692,8 +783,13 @@ test.describe("Security", () => {
     await mockApi(page);
     await page.goto("/security/policy");
     await page.getByTestId("preview-load").click();
-    await expect(page.getByTestId("would-open")).toContainText("Bump undici 6.19.2 to 6.21.1 in web-app");
-    await expect(page.getByTestId("would-open")).toContainText("coderhelm/security-undici-6.21.1 · security, severity:critical");
+    // One entry per PR, counted as new PRs: the api fixes join its open PR.
+    await expect(page.getByTestId("would-open-count")).toHaveText("1");
+    await expect(page.getByTestId("would-open").getByRole("listitem")).toHaveCount(2);
+    await expect(page.getByTestId("would-open")).toContainText("fix(deps): security updates for web-app (2 packages, 2 advisories) in web-app");
+    await expect(page.getByTestId("would-open")).toContainText("coderhelm/security-updates-2026-11-11-a1b2c3 · security, severity:critical");
+    await expect(page.getByTestId("would-open")).toContainText("(added to PR #812)");
+    await expect(page.getByText("3 fixes in 1 new PR")).toBeVisible();
     await expect(page.getByTestId("would-post")).toContainText("web-app is affected by CVE-2026-31337");
   });
 
@@ -740,5 +836,117 @@ test.describe("Security", () => {
     await expect(page.getByTestId("policy-error")).toContainText("answered in a form this page can't read");
     await expect(page.getByTestId("policy-save-bar")).toHaveCount(0);
     expect(errors).toEqual([]);
+  });
+
+  test("picking fixes for one PR: quick selects, x, shift-click and Esc, a bar clear of the last row, the review and the result", async ({ page }) => {
+    const db = await mockApi(page, { groups: { groups: MIXED, total: MIXED.length, next_cursor: null }, planFor: planFor(), slowFix: true });
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto("/security");
+    const bar = page.getByTestId("bulk-bar");
+    const summary = bar.getByTestId("bulk-summary");
+    await page.getByTestId("select-urgent").click();
+    await expect(summary).toHaveText("1 fix selected in web-app: 1 pull request · 3 advisories · 1 major upgrade");
+    await page.keyboard.press("Escape");
+    await expect(bar).toHaveCount(0);
+    await page.getByTestId("select-fixable").click();
+    await expect(summary).toHaveText("3 fixes selected in 2 repos: 2 pull requests · 5 advisories · 2 major upgrades · 1 still being checked");
+    await page.getByTestId("select-repo").click();
+    await page.getByRole("option", { name: "web-app (2)" }).click();
+    await expect(summary).toHaveText("2 fixes selected in web-app: 1 pull request · 4 advisories · 1 major upgrade · 1 still being checked");
+    // x toggles the row under the pointer.
+    await rowOf(page, "python-multipart").hover();
+    await page.keyboard.press("x");
+    await expect(summary).toContainText("3 fixes selected in 2 repos");
+    await page.keyboard.press("x");
+    await expect(summary).toContainText("2 fixes selected in web-app");
+    // Shift-click picks the range, skipping rows that can't be fixed.
+    await page.keyboard.press("Escape");
+    await rowOf(page, "undici").hover();
+    await rowOf(page, "tar").getByTestId("pick").click();
+    await rowOf(page, "ws").getByTestId("pick").click({ modifiers: ["Shift"] });
+    await expect(summary).toContainText("3 fixes selected in 2 repos");
+    await expect(rowOf(page, "undici").getByTestId("pick")).not.toBeChecked();
+    // The bar never covers the last row.
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    const last = await page.getByTestId("finding-row").last().boundingBox();
+    const barBox = await bar.boundingBox();
+    expect(last!.y + last!.height).toBeLessThanOrEqual(barBox!.y + 1);
+
+    // One repo: one PR, reviewed in the page.
+    await page.keyboard.press("Escape");
+    await page.getByTestId("select-repo").click();
+    await page.getByRole("option", { name: "web-app (2)" }).click();
+    await expect(bar.getByTestId("bulk-open")).toHaveText("Fix in one PR");
+    await bar.getByTestId("bulk-open").click();
+    const req = page.getByTestId("fix-request");
+    await expect(req.getByTestId("fix-heading")).toHaveText("1 pull request");
+    await expect(req.getByTestId("fix-summary")).toHaveText("web-app · 4 advisories · 1 major upgrade");
+    await expect(req.getByTestId("fix-title")).toHaveText("fix(deps): security updates for web-app (2 packages, 4 advisories)");
+    await expect(req.getByTestId("fix-branch")).toHaveText("coderhelm/security-updates-2026-11-11-web-app");
+    await expect(req.getByTestId("fix-label")).toHaveText(["security", "dependencies", "severity:high", "javascript"]);
+    await expect(req.getByTestId("fix-bump")).toHaveCount(2);
+    await expect(req.getByTestId("warn-major")).toContainText("tar moves to a new major version. It may need code changes; Coderhelm fixes CI in the same PR");
+    await expect(req.getByTestId("fix-budget")).toContainText("Uses 1 of today's 3 fix runs (1 used so far) · estimated 180k of 2M tokens (310k used today).");
+    expect(call(db, "POST /api/security/fix/plan").at(-1)?.body).toEqual({ finding_ids: ["tar_1", "tar_2", "tar_3", "ws_1"], combine: "one_pr" });
+    // Removing a row changes the request.
+    await req.locator('[data-package="ws"]').getByRole("button", { name: "Remove ws from this request" }).click();
+    await expect(req.getByTestId("fix-bump")).toHaveCount(1);
+    expect(call(db, "POST /api/security/fix/plan").at(-1)?.body).toEqual({ finding_ids: ["tar_1", "tar_2", "tar_3"], combine: "one_pr" });
+    await req.getByTestId("fix-confirm").click();
+    await expect(page.getByTestId("fix-progress")).toContainText("Starting the fix run");
+    const res = page.getByTestId("fix-results");
+    await expect(res).toContainText("1 started");
+    await expect(res.getByRole("link", { name: "See the run" })).toBeVisible();
+    expect(call(db, "POST /api/security/fix").at(-1)?.body).toEqual({ finding_ids: ["tar_1", "tar_2", "tar_3"], raise_limit: false, combine: "one_pr" });
+  });
+
+  test("an open security PR takes the selection, what can't be fixed is left out with why, and one PR per package is a choice", async ({ page }) => {
+    const db = await mockApi(page, { groups: { groups: MIXED, total: MIXED.length, next_cursor: null }, planFor: planFor({ number: 812, url: "https://github.com/acme/web-app/pull/812" }) });
+    await page.goto("/security");
+    await page.getByTestId("select-repo").click();
+    await page.getByRole("option", { name: "web-app (2)" }).click();
+    await page.getByTestId("bulk-open").click();
+    const req = page.getByTestId("fix-request");
+    await expect(req.getByTestId("fix-heading")).toHaveText("added to PR #812");
+    await expect(req.getByTestId("fix-unit")).toContainText("Adds to PR #812");
+    await expect(req.getByTestId("warn-join")).toContainText("Added to PR #812, the open security PR for web-app, instead of a second one.");
+    await expect(req.getByTestId("fix-confirm")).toHaveText("Add to PR #812");
+    await req.getByTestId("fix-confirm").click();
+    await expect(page.getByTestId("fix-started")).toContainText("added to PR #812");
+    await expect(page.getByTestId("fix-started").getByRole("link", { name: "PR #812" })).toHaveAttribute("href", "https://github.com/acme/web-app/pull/812");
+    await page.getByRole("button", { name: "Done" }).click();
+
+    // One PR per package, from the menu.
+    await page.getByTestId("select-fixable").click();
+    await page.getByTestId("bulk-more").click();
+    await expect(page.getByTestId("bulk-per-package")).toContainText("3 pull requests");
+    await page.getByTestId("bulk-per-package").click();
+    await expect(page.getByTestId("fix-heading")).toHaveText("3 pull requests");
+    expect(call(db, "POST /api/security/fix/plan").at(-1)?.body).toMatchObject({ combine: "per_package" });
+    await page.getByRole("button", { name: "Cancel" }).click();
+    await expect(page.getByTestId("fix-request")).toHaveCount(0);
+  });
+
+  test("a finding's page adds its fix to the repo's open security PR", async ({ page }) => {
+    const db = await mockApi(page, { detail: { finding: TAR[2], timeline: [] }, planFor: planFor({ number: 812, url: "https://github.com/acme/web-app/pull/812" }) });
+    await page.goto("/security/detail?id=tar_3");
+    await page.getByTestId("add-to-pr").click();
+    await expect(page.getByTestId("fix-unit")).toContainText("Adds to PR #812");
+    await page.getByTestId("fix-confirm").click();
+    await expect(page.getByTestId("fix-results")).toContainText("1 started");
+    expect(call(db, "POST /api/security/fix/plan")[0].body).toEqual({ finding_ids: ["tar_3"], combine: "one_pr" });
+    expect(call(db, "POST /api/security/fix")[0].body).toEqual({ finding_ids: ["tar_3"], raise_limit: false, combine: "one_pr" });
+  });
+
+  test("a tier still being checked is a muted pill with a clock, never a question mark, and sorts below settled rows", async ({ page }) => {
+    await mockApi(page, { groups: { groups: MIXED, total: MIXED.length, next_cursor: null } });
+    await page.goto("/security");
+    const ws = rowOf(page, "ws").getByTestId("tier-pill");
+    await expect(ws).toHaveAttribute("data-provisional", "true");
+    await expect(ws).toHaveAttribute("title", "Likely P2. Still checking whether your code uses this package; the tier can change.");
+    await expect(ws.locator(".sr-only")).toHaveText("Likely P2. Still checking whether your code uses this package; the tier can change.");
+    await expect(page.getByTestId("tier-pill").filter({ hasText: "?" })).toHaveCount(0);
+    const keys = await page.getByTestId("finding-row").evaluateAll((rows) => rows.map((r) => r.getAttribute("data-key")));
+    expect(keys.indexOf("acme/web-app|npm|ws|8.17.0")).toBeGreaterThan(keys.indexOf("acme/api|npm|python-multipart|0.0.9"));
   });
 });

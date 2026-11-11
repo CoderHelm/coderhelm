@@ -18,6 +18,7 @@ import { Field, SaveBar, SettingsRow, SettingsSection, Switch, useDirtyForm } fr
 import { focusRing, monoInputClass, secondaryButton, smallSecondaryButton } from "@/components/ui";
 import { XIcon } from "@/components/icons";
 import {
+  BUNDLE_LABEL,
   OPEN_PRS_LABEL,
   SECURITY_ADMIN,
   LIMIT_MAX,
@@ -27,6 +28,7 @@ import {
   labelProblem,
   repoName,
   securityApi,
+  type Bundle,
   type IgnoreRule,
   type OpenPrs,
   type SecurityConfig,
@@ -42,6 +44,12 @@ const TIER_WHEN: Record<Tier, string> = {
   P1: "High and reachable, or likely to be exploited soon.",
   P2: "Medium and reachable, or high but not reachable.",
   P3: "Dev only, not loaded, or low.",
+};
+
+const BUNDLE_HELP: Record<Bundle, string> = {
+  per_repo: "Every due fix in a repo goes in one PR. A P0 starts it at once; otherwise it opens once a day. New fixes join the open PR instead of opening another.",
+  per_repo_ecosystem: "One PR per repo and ecosystem (npm, Python, Go...), with the same timing as one per repo.",
+  per_package: "P0 and P1 get a PR per package; P2 and P3 are grouped per repo and ecosystem on their schedule below.",
 };
 
 const OPEN_PRS_OPTIONS = (Object.keys(OPEN_PRS_LABEL) as OpenPrs[]).map((v) => ({ value: v, label: OPEN_PRS_LABEL[v] }));
@@ -227,6 +235,21 @@ export default function SecurityPolicyPage() {
               title="Pull requests and alerts"
               description="Each finding gets a tier from whether your code reaches it, its severity, the exploited list and its exploit score."
             >
+              <SettingsRow
+                label="Pull requests"
+                help={BUNDLE_HELP[c.bundle]}
+                unsaved={form.isDirty("bundle")}
+                layout="stacked"
+                testId="bundle"
+                control={() => (
+                  <Segmented<Bundle>
+                    label="Pull requests"
+                    value={c.bundle}
+                    onChange={(v) => set("bundle", v)}
+                    options={(Object.keys(BUNDLE_LABEL) as Bundle[]).map((v) => ({ value: v, label: BUNDLE_LABEL[v] }))}
+                  />
+                )}
+              />
               {TIERS.map((t) => (
                 <SettingsRow
                   key={t}
@@ -668,7 +691,14 @@ function PreviewPanel({ readOnly }: { readOnly: boolean }) {
         </div>
       ) : preview ? (
         <div className="grid min-w-0 gap-4 p-4 sm:grid-cols-2">
-          <PreviewList title="Pull requests it would open" items={preview.would_open} empty="None right now." testId="would-open" />
+          <PreviewList
+            title="Pull requests it would open"
+            count={preview.pr_count}
+            items={preview.prs ? preview.prs.map((p) => ({ finding_id: p.unit, repo: p.repo, title: p.joins ? `${p.title} (added to PR #${p.joins.number})` : p.title, tier: p.tier ?? "P3", branch: p.branch, labels: p.labels })) : preview.would_open}
+            empty="None right now."
+            testId="would-open"
+            note={preview.prs ? `${preview.would_open.length} fix${preview.would_open.length === 1 ? "" : "es"} in ${preview.pr_count ?? preview.prs.length} new PR${(preview.pr_count ?? preview.prs.length) === 1 ? "" : "s"}` : undefined}
+          />
           <PreviewList title="Cards it would post" items={preview.would_post} empty="None right now." testId="would-post" />
         </div>
       ) : (
@@ -678,12 +708,16 @@ function PreviewPanel({ readOnly }: { readOnly: boolean }) {
   );
 }
 
-function PreviewList({ title, items, empty, testId }: { title: string; items: SecurityPreview["would_open"]; empty: string; testId: string }) {
+function PreviewList({ title, items, empty, testId, count, note }: { title: string; items: SecurityPreview["would_open"]; empty: string; testId: string; count?: number; note?: string }) {
   return (
     <div className="min-w-0">
       <h3 className="text-sm font-medium text-zinc-200">
-        {title} <span className="tabular-nums text-zinc-400">{items.length}</span>
+        {title}{" "}
+        <span className="tabular-nums text-zinc-400" data-testid={`${testId}-count`}>
+          {count ?? items.length}
+        </span>
       </h3>
+      {note && items.length > 0 && <p className="mt-0.5 text-xs text-zinc-400">{note}</p>}
       {items.length === 0 ? (
         <p className="mt-1 text-sm text-zinc-400">{empty}</p>
       ) : (
