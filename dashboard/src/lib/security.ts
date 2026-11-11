@@ -80,6 +80,21 @@ export interface SourceRow {
   count: number;
   /** CISA's list: how many vulnerabilities it lists. */
   listed?: number;
+  /** The GitHub advisory feed: the hourly poll of GitHub's advisory database. */
+  poll?: AdvisoryPoll;
+}
+
+/** The advisory poll's last run, and where it has read to while behind. */
+export interface AdvisoryPoll {
+  run_at: string | null;
+  /** The last read that counted: the last full poll, or the last run while catching up. */
+  synced_at: string | null;
+  /** The last poll reached the newest advisories. */
+  caught_up: boolean;
+  /** While behind: the update time of the last advisory read. */
+  read_up_to: string | null;
+  /** The last run's failure. */
+  error: string | null;
 }
 
 export interface RepoInventory {
@@ -87,6 +102,8 @@ export interface RepoInventory {
   packages: number;
   ecosystems: Record<string, number>;
   read_at: string | null;
+  /** The branch the list was read from (the default branch). */
+  branch?: string | null;
   /** When the list is read again (empty until it was read once). */
   next_read?: string;
   state: "ok" | "graph_off" | "error" | "not_read";
