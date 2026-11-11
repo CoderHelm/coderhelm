@@ -372,7 +372,8 @@ test.describe("creating a knowledge base", () => {
 
     await page.getByTestId("flow-continue").click();
     const name = page.getByTestId("flow-name");
-    await expect(name).toHaveValue("Engineering");
+    // One word alone is vague: the suggestion says what it is.
+    await expect(name).toHaveValue("Engineering docs");
     await expect(page.getByTestId("read-sentence")).toContainText("Everyone on your team can read this.");
     await expect(page.getByTestId("visibility-note")).toContainText("can't open it in the app it comes from");
     await shot(page, "flow-3-name");
@@ -385,7 +386,7 @@ test.describe("creating a knowledge base", () => {
     const sent = db.bodies.find((b) => b.call === "POST /api/knowledge")!;
     expect(sent.name).toBe("Engineering wiki");
     expect(sent.read_role).toBe("member");
-    expect(sent.source).toEqual({ kind: "notion", selection: [{ id: "page:eng", title: "Engineering", kind: "page", path: [], include_children: true }] });
+    expect(sent.source).toEqual({ kind: "notion", name: "Engineering docs", selection: [{ id: "page:eng", title: "Engineering", kind: "page", path: [], include_children: true }] });
     // Per-page progress while it imports.
     await expect(page.getByTestId("progress-words")).toContainText(/Bringing in \d of 3|Done/);
     await shot(page, "flow-4-progress");
@@ -438,7 +439,7 @@ test.describe("creating a knowledge base", () => {
     await expect(page.getByTestId("upload-step")).toContainText("isn't supported");
     await shot(page, "flow-upload");
     await page.getByTestId("flow-continue").click();
-    await expect(page.getByTestId("flow-name")).toHaveValue("Benefits 2026");
+    await expect(page.getByTestId("flow-name")).toHaveValue("Benefits docs");
     await page.getByTestId("flow-finish").click();
     await expect(page.getByTestId("progress-step")).toContainText("All files uploaded");
     expect(db.calls.some((c) => c.startsWith("PUT /__upload/"))).toBe(true);
@@ -455,7 +456,7 @@ test.describe("creating a knowledge base", () => {
     await page.getByRole("button", { name: "Add", exact: true }).click();
     await expect(page.getByTestId("address-list")).toContainText("Every page in this sitemap");
     await page.getByTestId("flow-continue").click();
-    await expect(page.getByTestId("flow-name")).toHaveValue("https://docs.example.com/sitemap.xml");
+    await expect(page.getByTestId("flow-name")).toHaveValue("docs.example.com");
   });
 
   test("the picker searches as you type", async ({ page }) => {

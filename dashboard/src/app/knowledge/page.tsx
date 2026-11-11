@@ -117,6 +117,7 @@ function Knowledge() {
           mode={{ kind: "create" }}
           startWith={flow.start}
           limits={limits}
+          taken={bases?.map((b) => b.name) ?? []}
           onDone={(id) => router.push(`/knowledge/base/?id=${encodeURIComponent(id)}`)}
         />
       )}
