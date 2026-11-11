@@ -7,7 +7,7 @@
 
 import { Chip, Time, type Tone } from "@/components/list";
 import { Section } from "@/components/page";
-import { repoName, type RepoInventory, type SecurityOverview, type SourceRow } from "@/lib/security";
+import { repoName, type AdvisoryPoll, type RepoInventory, type SecurityOverview, type SourceRow } from "@/lib/security";
 
 const STATE_LOOK: Record<SourceRow["state"], { tone: Tone; label: string }> = {
   ok: { tone: "success", label: "On" },
@@ -29,6 +29,47 @@ function When({ at }: { at: string | null }) {
   return <Time iso={at} />;
 }
 
+/** "Nov 10, 17:42": how far a feed has been read, in the viewer's time. */
+function upTo(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+/** The advisory poll in one line: up to date, catching up, or its failure. */
+function PollStatus({ poll }: { poll: AdvisoryPoll }) {
+  if (poll.error) {
+    return (
+      <p className="mt-1 text-red-300" data-testid="feed-status" data-poll="error">
+        The last read failed: {poll.error}. It is tried again within the hour
+        {poll.read_up_to ? `; read up to ${upTo(poll.read_up_to)} so far` : ""}.
+      </p>
+    );
+  }
+  if (poll.read_up_to) {
+    return (
+      <p className="mt-1 text-amber-300" data-testid="feed-status" data-poll="behind">
+        Catching up: read up to <time dateTime={poll.read_up_to}>{upTo(poll.read_up_to)}</time>
+      </p>
+    );
+  }
+  if (poll.caught_up && poll.synced_at) {
+    return (
+      <p className="mt-1 text-zinc-400" data-testid="feed-status" data-poll="caught_up">
+        Synced <Time iso={poll.synced_at} /> · up to date
+      </p>
+    );
+  }
+  return null;
+}
+
+/** The feed is catching up (or failed) rather than plainly on. */
+function feedLook(s: SourceRow): { tone: Tone; label: string } | null {
+  if (!s.poll || s.state !== "ok") return null;
+  if (s.poll.read_up_to) return { tone: "attention", label: "Catching up" };
+  return null;
+}
+
 function countWords(s: SourceRow): string {
   if (s.id === "kev") return `${s.count} open finding${s.count === 1 ? "" : "s"} on the list${s.listed ? ` (lists ${s.listed.toLocaleString()})` : ""}`;
   if (s.id === "epss") return `${s.count} open finding${s.count === 1 ? "" : "s"} scored`;
@@ -43,7 +84,8 @@ export function SourcesPanel({ o }: { o: SecurityOverview }) {
     <Section id="sources" title="Sources" description="Where findings come from, when each source was last read, and what it found.">
       <ul className="mt-4 divide-y divide-zinc-800 rounded-lg border border-zinc-800 bg-zinc-900/30" data-testid="sources">
         {rows.map((s) => {
-          const look = STATE_LOOK[s.state] ?? STATE_LOOK.never;
+          const look = feedLook(s) ?? STATE_LOOK[s.state] ?? STATE_LOOK.never;
+          const poll = s.poll && (s.poll.error || s.poll.read_up_to || (s.poll.caught_up && s.poll.synced_at)) ? s.poll : null;
           return (
             <li key={s.id} className="grid min-w-0 gap-x-4 gap-y-1 px-4 py-3 lg:grid-cols-[12rem_minmax(0,1fr)_auto]" data-testid="source-row" data-source={s.id} data-state={s.state}>
               <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -52,7 +94,8 @@ export function SourcesPanel({ o }: { o: SecurityOverview }) {
               </div>
               <div className="min-w-0 text-sm text-zinc-400 [overflow-wrap:break-word]">
                 <p>{s.gives}</p>
-                {s.reason && (
+                {poll && <PollStatus poll={poll} />}
+                {s.reason && !poll && (
                   <p className={`mt-1 ${s.state === "error" ? "text-red-300" : s.state === "needs_permission" ? "text-amber-300" : "text-zinc-400"}`} data-testid="source-reason">
                     {s.reason}
                   </p>
@@ -99,9 +142,21 @@ export function SourcesPanel({ o }: { o: SecurityOverview }) {
                     {r.dependabot && r.dependabot !== "on" && r.dependabot_reason && <p className="text-amber-300">{r.dependabot_reason}</p>}
                     {r.osv_error && <p className="text-red-300">OSV: {r.osv_error}</p>}
                   </div>
-                  <div className="text-xs text-zinc-400 lg:whitespace-nowrap lg:text-right">
-                    Read <When at={r.read_at} />
-                    {r.read_at && r.next_read && <span data-testid="next-read">; {r.next_read.charAt(0).toLowerCase() + r.next_read.slice(1)}</span>}
+                  <div className="text-xs text-zinc-400 lg:max-w-xs lg:text-right">
+                    {r.read_at ? (
+                      <p data-testid="read-as-of">
+                        Matches {r.branch || "the default branch"} as of <When at={r.read_at} />
+                      </p>
+                    ) : (
+                      <p>
+                        Read <When at={null} />
+                      </p>
+                    )}
+                    {r.read_at && r.next_read && (
+                      <p className="mt-0.5 text-zinc-500" data-testid="next-read">
+                        {r.next_read}
+                      </p>
+                    )}
                   </div>
                 </li>
               );

@@ -11,6 +11,8 @@ import { pickOption } from "./select";
 const NOW = Date.now();
 const iso = (hoursFromNow: number) => new Date(NOW + hoursFromNow * 3_600_000).toISOString();
 
+const NEXT_READ = "Read again whenever a dependency file changes on the default branch, and daily; new GitHub advisories are checked against it as they arrive.";
+
 const finding = (over: Record<string, unknown> = {}) => ({
   id: "sec_1",
   repo: "acme/web-app",
@@ -166,7 +168,7 @@ const overview = (over: Record<string, unknown> = {}) => ({
     { id: "epss", name: "FIRST EPSS", gives: "The chance each vulnerability is exploited in the next 30 days.", state: "ok", reason: "", synced_at: iso(-2), count: 9 },
   ],
   repos: [
-    { repo: "acme/web-app", packages: 2712, ecosystems: { npm: 2708, "GitHub Actions": 3, docker: 1 }, read_at: iso(-1), state: "ok", reason: "", unpinned: 2, dependabot: "on", dependabot_reason: "", osv_error: null, next_read: "Next read on the next dependency change or within 24 h." },
+    { repo: "acme/web-app", packages: 2712, ecosystems: { npm: 2708, "GitHub Actions": 3, docker: 1 }, read_at: iso(-1), state: "ok", reason: "", unpinned: 2, dependabot: "on", dependabot_reason: "", osv_error: null, branch: "main", next_read: NEXT_READ },
     { repo: "acme/api", packages: 1, ecosystems: { docker: 1 }, read_at: iso(-1), state: "graph_off", reason: "GitHub's dependency graph is off for this repo; turn it on in the repo's Settings, Code security.", unpinned: 0, dependabot: null, dependabot_reason: "", osv_error: null },
   ],
   spend: {
@@ -551,8 +553,77 @@ test.describe("Security", () => {
     await expect(inv.locator('[data-repo="acme/web-app"]')).toContainText("2,712 packages · npm 2,708, GitHub Actions 3, docker 1 · 2 without an exact version");
     await expect(inv.locator('[data-repo="acme/api"]')).toContainText("Dependency graph off");
     await expect(inv.locator('[data-repo="acme/api"]')).toContainText("turn it on in the repo's Settings, Code security");
-    await expect(inv.locator('[data-repo="acme/web-app"]').getByTestId("next-read")).toHaveText("; next read on the next dependency change or within 24 h.");
+    await expect(inv.locator('[data-repo="acme/web-app"]').getByTestId("read-as-of")).toHaveText("Matches main as of 1 h ago");
+    await expect(inv.locator('[data-repo="acme/web-app"]').getByTestId("next-read")).toHaveText(NEXT_READ);
     await expect(inv.locator('[data-repo="acme/api"]').getByTestId("next-read")).toHaveCount(0);
+  });
+
+  // The GitHub advisory feed: up to date, catching up, or failed; never
+  // "Not synced yet" once a poll has read anything.
+  const feedRow = (poll: Record<string, unknown>, over: Record<string, unknown> = {}) => ({
+    id: "github_advisory",
+    name: "GitHub advisory feed",
+    gives: "New and changed GitHub advisories (the security_advisory webhook, and GitHub's advisory database read about hourly), matched against the dependency lists.",
+    state: "ok",
+    reason: "",
+    synced_at: iso(-0.2),
+    count: 2,
+    poll: { run_at: iso(-0.2), synced_at: iso(-0.2), caught_up: false, read_up_to: null, error: null, ...poll },
+    ...over,
+  });
+  const withFeed = (row: Record<string, unknown>) => {
+    const o = overview();
+    (o.source_rows as Record<string, unknown>[])[2] = row;
+    return o;
+  };
+  const feedShot = async (page: Page, name: string) => {
+    const feed = page.getByTestId("sources").locator('[data-source="github_advisory"]');
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await feed.scrollIntoViewIfNeeded();
+    await page.locator("#sources").screenshot({ path: `test-results/shots/sources-${name}-1280.png` });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await feed.scrollIntoViewIfNeeded();
+    await page.locator("#sources").screenshot({ path: `test-results/shots/sources-${name}-390.png` });
+  };
+
+  test("the advisory feed, caught up: synced and up to date", async ({ page }) => {
+    await mockApi(page, { overview: withFeed(feedRow({ caught_up: true }, { reason: "Waiting for GitHub's first webhook; checked by polling at Nov 11, 06:00 UTC." })) });
+    await page.goto("/security");
+    const feed = page.getByTestId("sources").locator('[data-source="github_advisory"]');
+    await expect(feed).toContainText("On");
+    await expect(feed.getByTestId("feed-status")).toHaveText("Synced 12 min ago · up to date");
+    await expect(feed.getByTestId("feed-status")).toHaveAttribute("data-poll", "caught_up");
+    await expect(feed).not.toContainText("Not synced yet");
+    await expect(feed.getByTestId("source-reason")).toHaveCount(0);
+    await feedShot(page, "caught-up");
+  });
+
+  test("the advisory feed, behind: catching up, with how far it has read", async ({ page }) => {
+    const upTo = "2026-11-10T17:42:00Z";
+    await mockApi(page, { overview: withFeed(feedRow({ read_up_to: upTo }, { reason: "Catching up on GitHub's advisory database: read up to Nov 10, 17:42 UTC." })) });
+    await page.goto("/security");
+    const feed = page.getByTestId("sources").locator('[data-source="github_advisory"]');
+    await expect(feed).toContainText("Catching up");
+    await expect(feed).not.toContainText("Not synced yet");
+    const status = feed.getByTestId("feed-status");
+    await expect(status).toHaveAttribute("data-poll", "behind");
+    const shown = await page.evaluate((t) => new Date(t).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }), upTo);
+    await expect(status).toHaveText(`Catching up: read up to ${shown}`);
+    await feedShot(page, "behind");
+  });
+
+  test("the advisory feed, failed: the error, and how far it had read", async ({ page }) => {
+    const upTo = "2026-11-10T17:42:00Z";
+    await mockApi(page, {
+      overview: withFeed(feedRow({ read_up_to: upTo, error: "GitHub answered 502: Server Error" }, { state: "error", reason: "The last read of GitHub's advisory database failed (GitHub answered 502: Server Error); it is tried again within the hour." })),
+    });
+    await page.goto("/security");
+    const feed = page.getByTestId("sources").locator('[data-source="github_advisory"]');
+    await expect(feed).toContainText("Error");
+    const status = feed.getByTestId("feed-status");
+    await expect(status).toHaveAttribute("data-poll", "error");
+    await expect(status).toContainText("The last read failed: GitHub answered 502: Server Error. It is tried again within the hour; read up to");
+    await feedShot(page, "error");
   });
 
   test("Dependabot needing a permission shows its state and fix in the Sources panel", async ({ page }) => {
