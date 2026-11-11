@@ -21,6 +21,8 @@ async function mockApi(page: Page) {
     if (p === "/api/me") return json(route, { user_id: "u_1", team_id: "t_1", github_login: "an-admin", email: "admin@coderhelm.com", avatar_url: "", role: "owner" });
     if (p === "/api/usage") return json(route, { month: "2026-01", tokens_in: 0, tokens_out: 0, total_runs: 0, total_tokens: 400_000, max_tokens: 1_000_000 });
     if (p === "/api/banners") return json(route, { banners: [] });
+    // Security is off: no count beside it in the sidebar.
+    if (p === "/api/security/overview") return json(route, { enabled: false, dry_run: true, counts: { open: 0, p0: 0, p1: 0 } });
     if (p === "/api/support/badge") return json(route, { waiting: 1, queue_open: 2 });
     if (p === "/api/teams") return json(route, { teams: [{ team_id: "t_1", org: "your-team", status: "active", current: true }] });
     if (p === "/api/admin/beta-signups") return json(route, { signups: [], counts: { new: 0, invited: 0, joined: 0, total: 0 } });

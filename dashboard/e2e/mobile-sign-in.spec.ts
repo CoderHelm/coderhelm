@@ -26,6 +26,8 @@ async function mockApi(page: Page, opts: { signedIn: boolean }) {
     if (p === "/api/me") return state.signedIn ? json(route, ME) : json(route, { error: "unauthorized" }, 401);
     if (p === "/api/usage") return json(route, { month: "2026-01", tokens_in: 0, tokens_out: 0, total_runs: 0, total_tokens: 0, max_tokens: 1_000_000 });
     if (p === "/api/banners") return json(route, { banners: [] });
+    // Security is off: no count beside it in the sidebar.
+    if (p === "/api/security/overview") return json(route, { enabled: false, dry_run: true, counts: { open: 0, p0: 0, p1: 0 } });
     if (p === "/api/support/badge") return json(route, { waiting: 0, queue_open: null });
     if (p === "/api/teams") return json(route, { teams: [{ team_id: "t_1", org: "your-team", status: "active", current: true }] });
     return json(route, { error: "Not mocked" }, 404);

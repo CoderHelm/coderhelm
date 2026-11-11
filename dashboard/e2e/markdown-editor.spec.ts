@@ -32,6 +32,8 @@ async function mockApi(page: Page): Promise<Backend> {
     if (p === "/api/banners") return json(route, { banners: [] });
     if (p === "/api/teams") return json(route, { teams: [{ team_id: "TEAM#t_1", org: "your-team", status: "active", current: true }] });
     if (p === "/api/repos") return json(route, { repos: [{ name: "your-team/web", enabled: true, ticket_source: "github", onboard_status: "done" }] });
+    // Security is off: no count beside it in the sidebar.
+    if (p === "/api/security/overview") return json(route, { enabled: false, dry_run: true, counts: { open: 0, p0: 0, p1: 0 } });
     if (p === "/api/support/badge") return json(route, { waiting: 0, queue_open: null });
     if (p === "/api/support/tickets" && method === "POST") {
       const ticket = {

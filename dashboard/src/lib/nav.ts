@@ -1,4 +1,4 @@
-// The app's top-level destinations: eight places a person goes, each with
+// The app's top-level destinations: nine places a person goes, each with
 // the pages that belong to it. The sidebar lists the destinations; when a
 // destination has more than one page, the shell shows its pages as tabs
 // above the page (components/section-tabs.tsx). Settings has its own left
@@ -7,7 +7,7 @@
 import { ANY_CHANGE } from "./capabilities";
 import { KNOWLEDGE_HREF, normalizePath } from "./routes";
 
-export type NavIconKey = "runs" | "plans" | "reviews" | "logs" | "chat" | "knowledge" | "plugins" | "insights" | "settings" | "admin" | "queue";
+export type NavIconKey = "runs" | "plans" | "reviews" | "logs" | "chat" | "knowledge" | "plugins" | "insights" | "settings" | "admin" | "queue" | "security";
 
 export interface NavPage {
   href: string;
@@ -26,7 +26,7 @@ export interface NavSection {
   alsoUnder?: string[];
   superAdminOnly?: boolean;
   /** A count beside the label. */
-  countKey?: "supportQueue";
+  countKey?: "supportQueue" | "securityUrgent";
   /** Shown only while this team flag is on. */
   flag?: "plugins";
 }
@@ -62,6 +62,18 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/logs", label: "Logs", need: "recommendations" },
       { href: "/alerts", label: "Alerts", need: "view_alerts" },
     ],
+  },
+  {
+    // Advisories that touch the team's dependencies and their fixes. The
+    // count is the open P0 and P1 findings.
+    key: "security",
+    label: "Security",
+    icon: "security",
+    pages: [
+      { href: "/security", label: "Overview" },
+      { href: "/security/policy", label: "Policy" },
+    ],
+    countKey: "securityUrgent",
   },
   { key: "chat", label: "Chat", icon: "chat", pages: [{ href: "/chat", label: "Chat", need: "brain_read" }] },
   { key: "knowledge", label: "Knowledge", icon: "knowledge", pages: [{ href: KNOWLEDGE_HREF, label: "Knowledge", need: "brain_read" }] },

@@ -13,3 +13,4 @@ export const SUPPORT_TICKET_ID = "ticket-01WIDE0000000000000001";
 export const PLUGIN_ID = "example-marketing-release-announcement-writer-for-every-channel";
 export const PLUGIN_RUN_ID = "plugin-run-01WIDE0000000000000001";
 export const DRAFT_ID = "draft-01WIDE0000000000000001";
+export const SECURITY_FINDING_ID = "sec_01WIDE0000000000000000000000000000000000000001";

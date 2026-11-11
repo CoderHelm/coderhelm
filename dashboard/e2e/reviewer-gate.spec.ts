@@ -63,6 +63,8 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     if (p === "/api/me") return json(route, { user_id: "u_1", team_id: "t_1", github_login: "a-maintainer", email: "someone@example.com", avatar_url: "", role: db.role });
     if (p === "/api/usage") return json(route, { month: "2026-01", total_tokens: 0, tokens_in: 0, tokens_out: 0, total_runs: 0, max_tokens: 0 });
     if (p === "/api/banners") return json(route, { banners: [] });
+    // Security is off: no count beside it in the sidebar.
+    if (p === "/api/security/overview") return json(route, { enabled: false, dry_run: true, counts: { open: 0, p0: 0, p1: 0 } });
     if (p === "/api/support/badge") return json(route, { waiting: 0, queue_open: null });
     if (p === "/api/integrations") return json(route, { can_edit: false, items: [], migrated: 0 });
     if (p === "/api/skills/used") return json(route, { skills: [], agents: [], sources: [], standards: [] });

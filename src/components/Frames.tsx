@@ -404,6 +404,41 @@ function MergeFrame() {
   );
 }
 
+function SecFixFrame() {
+  return (
+    <Window url="app.coderhelm.com/security" label="Security">
+      <div className="grid gap-3">
+        <div className="rounded-lg border border-line p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Pill tone="bad">P0</Pill>
+            <Pill tone="bad">Reachable</Pill>
+            <Pill tone="muted">On exploited list</Pill>
+            <span className="ml-auto font-mono text-[11px] text-text-muted">due in 31 h</span>
+          </div>
+          <p className="mt-2 text-text-primary">Request smuggling in the HTTP parser</p>
+          <p className="mt-0.5 font-mono text-[11px] text-text-muted">example-http 6.19.2 in example/web · CVE-2026-0001</p>
+        </div>
+        <div className="rounded-lg border border-line p-3">
+          <p className="text-text-secondary">Why we think <b className="text-text-primary">example/web</b> is affected</p>
+          <div className="mt-2 overflow-x-auto rounded-md bg-white/[0.03] px-3 py-2 font-mono text-[11px] leading-relaxed text-text-secondary">
+            <div className="whitespace-pre">src/server/proxy.ts:44   fetch(upstream, {"{ dispatcher: agent }"})</div>
+            <div className="whitespace-pre">src/server/agent.ts:12   new Agent({"{ pipelining: 1 }"})</div>
+          </div>
+        </div>
+        <div className="rounded-lg border border-line p-3">
+          <div className="flex items-center gap-2">
+            <Bot />
+            <span className="text-text-secondary">Opened <b className="text-text-primary">#1532 fix(deps): bump example-http 6.19.2 to 6.21.1 [SECURITY]</b></span>
+          </div>
+          <p className="mt-2 flex items-center gap-2 text-[12px] text-text-muted">
+            <Pill tone="ok">CI passing</Pill> Waiting for a person to review and approve
+          </p>
+        </div>
+      </div>
+    </Window>
+  );
+}
+
 const FRAMES: Record<FrameId, () => ReactNode> = {
   maintain: MaintainFrame,
   review: ReviewFrame,
@@ -416,6 +451,7 @@ const FRAMES: Record<FrameId, () => ReactNode> = {
   cifix: CiFixFrame,
   reply: ReplyFrame,
   merge: MergeFrame,
+  secfix: SecFixFrame,
 };
 
 export function Frame({ id, caption, priority = false, hideCaption = false }: { id: FrameId; caption: string; priority?: boolean; hideCaption?: boolean }) {
