@@ -199,6 +199,22 @@ export interface SignInSenders {
  */
 export type ForgotStatus = "sent";
 
+/** A repository's agent file: what Coderhelm learned about it, and when and
+ * why it was last written. Coderhelm writes it again by itself after
+ * changes to the files it is written from; one saved by hand is only marked
+ * out of date. */
+export interface AgentFile {
+  content: string;
+  updated_at?: string | null;
+  /** install, manual, push or age. */
+  regenerated_reason?: string | null;
+  /** What changed before an automatic update ("package.json", "CI"). */
+  regenerated_after?: string[];
+  edited?: boolean;
+  out_of_date?: boolean;
+  out_of_date_reasons?: string[];
+}
+
 export const api = {
   // Auth
   signInMethods: () => request<SignInMethods>("/auth/methods"),
@@ -570,7 +586,7 @@ export const api = {
   // Agents
   getGlobalAgents: () => request<{ content: string }>("/api/agents/global"),
   getRepoAgents: (repo: string) =>
-    request<{ content: string }>(`/api/agents/repo/${repo}`),
+    request<AgentFile>(`/api/agents/repo/${repo}`),
   updateRepoAgents: (repo: string, content: string) =>
     request<void>(`/api/agents/repo/${repo}`, {
       method: "PUT",

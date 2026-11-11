@@ -166,11 +166,26 @@ test("instructions: a labelled editor, what Coderhelm learned folded away, one s
   await expect(page.getByText("What Coderhelm learned about this repository")).toBeVisible();
   await page.getByText("What Coderhelm learned about this repository").click();
   await expect(page.getByText("A Next.js app with Playwright tests.")).toBeVisible();
+  await expect(page.getByTestId("agent-file-updated")).toHaveText("Updated automatically on November 9, 2026 after changes to package.json and CI.");
+  await expect(page.getByText("Out of date")).toHaveCount(0);
   await shot(page, "settings-instructions-repo");
   await editor.fill("Use the app router.");
   await saveChanges(page).click();
   await expect(saveBar(page)).toHaveCount(0);
   expect(callsTo(db, "PUT", /\/api\/instructions\/repo\//).map((c) => [c.path, c.body])).toEqual([[`/api/instructions/repo/${WEB}`, { content: "Use the app router." }]]);
+});
+
+test("instructions: an agent file saved by hand is marked out of date, never replaced", async ({ page }) => {
+  const db = await mockApi(page);
+  db.agentMeta[WEB] = { updated_at: "2026-11-02T10:00:00Z", edited: true, out_of_date: true, out_of_date_reasons: ["package.json", "CI"] };
+  await page.goto("/settings/instructions/");
+  await page.getByRole("button", { name: "One repository" }).click();
+  await page.getByText("What Coderhelm learned about this repository").click();
+  await expect(page.getByTestId("agent-file-updated")).toHaveText("Saved by hand on November 2, 2026.");
+  await expect(page.getByText("Out of date")).toBeVisible();
+  await expect(page.getByText(/didn.t replace it after package.json and CI/)).toBeVisible();
+  await page.getByRole("button", { name: "Write it again from the repository" }).click();
+  expect(callsTo(db, "POST", /\/api\/repos\/.+\/regenerate$/).map((c) => c.path)).toEqual([`/api/repos/${WEB}/regenerate`]);
 });
 
 test("voice: a failed load shows no editor, so nothing can be overwritten", async ({ page }) => {
