@@ -231,7 +231,17 @@ function infraItems(): Item[] {
 
 export const HOME = {
   repos: [
-    { repo: "acme/web-app", state: "update_available", features_on: 9, features_total: 14, last_run_at: iso(24 * 7), new_count: 2, custom_count: 0 },
+    {
+      repo: "acme/web-app",
+      state: "update_available",
+      features_on: 9,
+      features_total: 14,
+      last_run_at: iso(24 * 7),
+      new_count: 2,
+      custom_count: 0,
+      counts: { on: 5, previews: 2, off: 3, not_used: 2, total: 10 },
+      summary: "5 on, 2 previews, 3 off of the 10 that fit this repo: Auto-merge (preview waiting), Stale pull requests (preview waiting), Release tags (off by default) and 4 more",
+    },
     { repo: "acme/api", state: "custom", features_on: 8, features_total: 14, last_run_at: iso(24 * 13), new_count: 0, custom_count: 2 },
     { repo: "acme/mobile-app", state: "not_set_up", features_on: 2, features_total: 14, last_run_at: null, new_count: 0, custom_count: 0 },
     { repo: "acme/infra", state: "failed", features_on: 3, features_total: 14, last_run_at: iso(20), new_count: 0, custom_count: 0, error: "The reviewer needs the GitHub App on this repo" },
@@ -274,6 +284,11 @@ export interface SetupDb {
   holdApply?: boolean;
   /** The estimate says the run doesn't fit the token limit. */
   overBudget?: boolean;
+  /** GET /api/setup/repos/:owner/:name answers per repo; made up from `repoView` otherwise. */
+  repoViews?: Record<string, unknown>;
+  repoViewFails?: boolean;
+  /** Features switched on from the expanded row. */
+  switchedOn?: string[];
 }
 
 export function analyzingRun(): Record<string, unknown> {
@@ -348,6 +363,12 @@ export async function mockSetup(page: Page, init: Partial<SetupDb> = {}): Promis
       if (p === "/api/repos") return json(route, { repos: (db.home as typeof HOME).repos?.map((r) => ({ name: r.repo })) ?? [] });
 
       if (p === "/api/setup" && method === "GET") return json(route, db.homeOverride ?? db.home);
+      const rv = p.match(/^\/api\/setup\/repos\/([^/]+)\/([^/]+)$/);
+      if (rv && method === "GET") {
+        const repo = `${decodeURIComponent(rv[1])}/${decodeURIComponent(rv[2])}`;
+        if (db.repoViewFails) return json(route, { error: "Something went wrong. Try again." }, 500);
+        return json(route, db.repoViews?.[repo] ?? repoView(repo, db.switchedOn ?? []));
+      }
       if (p === "/api/setup/runs" && method === "GET") return json(route, db.runs);
       if (p === "/api/setup/estimate" && method === "POST") {
         const reposArg = (body as { repos?: unknown } | null)?.repos;
@@ -371,7 +392,7 @@ export async function mockSetup(page: Page, init: Partial<SetupDb> = {}): Promis
         db.home = { ...(db.home as object), ...(body as object) };
         return json(route, db.home);
       }
-      const m = p.match(/^\/api\/setup\/runs\/([^/]+)(\/(decisions|apply|undo|switch-on))?$/);
+      const m = p.match(/^\/api\/setup\/runs\/([^/]+)(\/(decisions|apply|undo|switch-on|use-recommended))?$/);
       if (m) {
         const sub = m[3];
         if (!sub && method === "GET") {
@@ -381,8 +402,35 @@ export async function mockSetup(page: Page, init: Partial<SetupDb> = {}): Promis
           if (db.run.state === "applying" && !db.holdApply) db.run = applied(db);
           return json(route, db.run);
         }
+        if (sub === "use-recommended") {
+          const items = (body as { items: { repo: string; setting_id: string }[] }).items;
+          const repos = (db.run.repos as { repo: string; items: Item[]; changes?: Item[]; summary?: Record<string, unknown> }[]).map((r) => {
+            const mine = items.filter((i) => i.repo === r.repo).map((i) => i.setting_id);
+            if (!mine.length) return r;
+            const s = { ...(r.summary ?? {}) } as Record<string, string[] | number | string>;
+            const drop = (k: string) => ((s[k] as string[]) ?? []).filter((x) => !mine.includes(x));
+            s.kept_ids = drop("kept_ids");
+            s.worth_ids = drop("worth_ids");
+            s.changed_ids = [...((s.changed_ids as string[]) ?? []), ...mine];
+            const changes = [
+              ...(r.changes ?? []),
+              ...mine.map((id) => {
+                const it = r.items.find((x) => x.setting_id === id) as Item;
+                return { setting_id: id, before: { value: (it.current as { value: unknown }).value, stored: true, row: true }, after: it.recommended, at: iso(0), evidence: it.evidence, row_created: false, undone: false };
+              }),
+            ];
+            return { ...r, summary: s, changes };
+          });
+          db.run = { ...db.run, repos };
+          return json(route, { ...db.run, used: items, skipped: [] });
+        }
         if (sub === "switch-on") {
           const one = body as { repo: string; setting_id: string };
+          // A switch from the expanded row names a run other than the one on screen.
+          if (m[1] !== db.run.run_id) {
+            db.switchedOn = [...(db.switchedOn ?? []), one.setting_id];
+            return json(route, { ...db.run, switched_on: { setting_id: one.setting_id } });
+          }
           // Stale closing turns its dry run off; auto-merge turns on.
           const target = one.setting_id.startsWith("stale_prs.") ? "stale_prs.dry_run" : one.setting_id;
           const after = target.endsWith(".dry_run") ? false : true;
@@ -490,5 +538,171 @@ export function autoDoneRun(): Record<string, unknown> {
     state: "done",
     repos,
     results: repos.map((r) => ({ repo: r.repo, state: "done", changed: r.changes.length, failed: [], prs: [] })),
+  };
+}
+
+// ── One repo's features (the expanded row) ─────────────────────────────
+
+const feature = (over: Item): Item => ({
+  counted: true,
+  matches: true,
+  mark: "recommended",
+  evidence: [],
+  switch_on: null,
+  needs: null,
+  settings: [],
+  short: "",
+  value_text: "",
+  ...over,
+});
+
+/** The features of one made-up repo, as GET /api/setup/repos/:owner/:name answers. */
+export function repoView(repo: string, switchedOn: string[] = []): Record<string, unknown> {
+  const staleOn = switchedOn.includes("stale_prs.enabled");
+  const rc = (s: string) => `/reviewer/config?section=${s}&repo=${encodeURIComponent(repo)}`;
+  const features: Item[] = [
+    feature({
+      feature: "reviewer",
+      title: "Code review",
+      state: "on",
+      value_text: "Reviews pull requests labelled ch-review",
+      why: "On, with some settings your own; the recommended values are listed below.",
+      evidence: [{ text: "Label ch-review exists, used on 31 of the last 50 merged pull requests" }],
+      settings_href: rc("reviews"),
+      settings: [
+        { setting_id: "reviewer.enabled", title: "Review pull requests", value_text: "On", matches: true, custom: false, scope: "repo" },
+        { setting_id: "reviewer.label", title: "Review label", value_text: "ch-review", matches: true, custom: false, scope: "repo" },
+        { setting_id: "reviewer.instructions", title: "Review focus", value_text: "3 lines", recommended_text: "5 lines", matches: false, custom: false, scope: "repo" },
+      ],
+      matches: false,
+      mark: "yours",
+    }),
+    feature({
+      feature: "tests",
+      title: "Tests",
+      state: "on",
+      value_text: "Checks tests in reviews, reads test results from CI",
+      why: "On, as recommended: workflow .github/workflows/e2e.yml runs Playwright tests in job e2e.",
+      evidence: [{ text: "Workflow .github/workflows/e2e.yml runs Playwright tests in job e2e", file: ".github/workflows/e2e.yml", line: 41 }],
+      settings_href: rc("tests"),
+      settings: [
+        { setting_id: "tests.verify_tests", title: "Check the tests in a review", value_text: "On", matches: true, custom: false, scope: "repo" },
+        { setting_id: "tests.e2e", title: "Read test results", value_text: "On", matches: true, custom: false, scope: "repo" },
+        { setting_id: "tests.auto_quarantine", title: "Quarantine flaky tests", value_text: "On", matches: true, custom: false, scope: "team" },
+      ],
+    }),
+    feature({ feature: "ci_labels", title: "CI labels", state: "on", value_text: "Adds E2E:WEB, E2E:IOS", why: "On, as recommended: workflow e2e.yml runs on label E2E:WEB.", settings_href: rc("labels") }),
+    feature({
+      feature: "auto_merge",
+      title: "Auto-merge",
+      state: "preview",
+      mark: "preview",
+      matches: false,
+      short: "preview waiting",
+      why: "Preview: recommended here, and nothing merges until you switch it on. Over the last 14 days this would have merged 7 pull requests, each once it was approved and build, e2e passed.",
+      settings_href: rc("merge"),
+      switch_on: { run_id: "run_02", setting_id: "auto_merge.enabled" },
+    }),
+    feature(
+      staleOn
+        ? { feature: "stale_prs", title: "Stale pull requests", state: "on", value_text: "Stale after 7 days, closed 7 days later", why: "On, as recommended.", settings_href: "/reviewer/stale?view=settings" }
+        : {
+            feature: "stale_prs",
+            title: "Stale pull requests",
+            state: "preview",
+            mark: "preview",
+            short: "preview waiting",
+            value_text: "Stale after 7 days, closed 7 days later, preview only",
+            why: "Preview: stale cleanup starts as a dry run. Over the last 14 days this would have marked 3 and closed 2 of the 9 open pull requests (7 days with no activity, then closed 7 days later).",
+            settings_href: "/reviewer/stale?view=settings",
+            switch_on: { run_id: "run_02", setting_id: "stale_prs.enabled" },
+          },
+    ),
+    feature({ feature: "security", title: "Security fixes", state: "on", value_text: "Watches dependencies and opens fix pull requests", why: "On, as recommended: npm lockfile package-lock.json.", settings_href: "/security/policy" }),
+    feature({ feature: "instructions", title: "Coder instructions", state: "on", value_text: "4 lines of instructions", why: "On, as recommended.", settings_href: "/settings/instructions" }),
+    feature({ feature: "tags", title: "Release tags", state: "off", short: "off by default", why: "Off by default: CoderHelm pushes release tags only when you ask it to.", settings_href: rc("after-merge") }),
+    feature({
+      feature: "reminders",
+      title: "Review reminders",
+      state: "off",
+      mark: "yours",
+      matches: false,
+      short: "kept yours",
+      why: "Off: you kept your setting. Recommended on: reviews here wait 2.4 days on average.",
+      settings_href: rc("reminders"),
+    }),
+    feature({ feature: "code_graph", title: "Code graph", state: "off", mark: null, matches: null, short: "needs permission", why: 'Off: turning it on needs the "Manage repos" permission.', needs: "Manage repos", settings_href: "/graph" }),
+    feature({ feature: "release_notes", title: "Release notes", state: "not_used", short: "no release tags", why: "Not used here: notes are written for release tags, and this repo has none.", settings_href: rc("release-notes") }),
+    feature({ feature: "alerts", title: "Alerts", state: "not_used", short: "doesn't fit", why: "Not used here: no alert source is connected for this repo.", settings_href: "/settings/alerts" }),
+    feature({ feature: "git_conventions", title: "Git conventions", state: "on", counted: false, mark: null, matches: null, value_text: "CoderHelm's default names for branches, commits and pull requests", why: "CoderHelm names its branches, commits and pull requests its own way until you set templates.", settings_href: "/settings/workflow", settings: [{ setting_id: "git_conventions.branch", title: "Branch name", value_text: "CoderHelm's default", matches: null, custom: false, scope: "team" }] }),
+    feature({ feature: "agent_file", title: "Agent file", state: "on", counted: false, mark: null, matches: null, value_text: "On, refreshes by itself", why: "Always on: CoderHelm refreshes the repo's agent file by itself after merges.", settings_href: "/settings/instructions" }),
+  ];
+  const counted = features.filter((f) => f.counted);
+  const n = (s: string) => counted.filter((f) => f.state === s).length;
+  const counts = { on: n("on"), previews: n("preview"), off: n("off"), not_used: n("not_used"), total: n("on") + n("preview") + n("off") };
+  return { repo, counts, summary: "", run_id: "run_02", run_at: iso(20), team_repo_count: 6, features };
+}
+
+/**
+ * A "Do it for me" run the server finished in smart mode, with its lists:
+ * what it turned on, a choice the repo argues against (worth a look), what
+ * someone chose that it kept and who set it, a preview, and the team-wide
+ * settings once, apart from the repo.
+ */
+export function smartDoneRun(): Record<string, unknown> {
+  const items: Item[] = [
+    item({ setting_id: "reviewer.enabled", feature: "reviewer", title: "Review pull requests", scope: "repo", current: { value: false, set: false, deliberate: false }, recommended: true, source: "detected", evidence: [{ text: "Label ch-review exists" }] }),
+    item({ setting_id: "tests.e2e", feature: "tests", title: "Read test results", scope: "repo", current: { value: false, set: false, deliberate: false }, recommended: true, source: "detected", evidence: [{ text: "Workflow ci.yml runs jest tests in job test", file: ".github/workflows/ci.yml", line: 41 }] }),
+    item({
+      setting_id: "tests.verify_tests",
+      feature: "tests",
+      title: "Check the tests in a review",
+      scope: "repo",
+      current: { value: false, set: true, deliberate: true, set_by: { page: "Reviewer settings", by: "sam@example.com", at: iso(24 * 9) } },
+      recommended: true,
+      source: "detected",
+      worth_a_look: true,
+      evidence: [{ text: "package.json depends on jest", file: "package.json", line: 12 }],
+    }),
+    item({ setting_id: "reviewer.label", feature: "reviewer", title: "Review label", scope: "repo", current: { value: "needs-review", set: true, deliberate: true, set_by: { page: "Reviewer settings" } }, recommended: "ch-review", source: "default" }),
+    item({ setting_id: "reminders.cooldown_hours", feature: "reminders", title: "Hours between reminders", scope: "repo", current: { value: 48, set: true, deliberate: true, set_by: { page: "Reviewer settings", by: "dana@example.com", at: iso(24 * 2) } }, recommended: 12, source: "default" }),
+    item({ setting_id: "stale_prs.enabled", feature: "stale_prs", title: "Clean up stale pull requests", scope: "repo", risk: "acts", current: { value: false, set: false }, recommended: true, source: "detected", evidence: [{ text: "Over the last 14 days this would have marked 1 and closed 1 of the 4 open pull requests (7 days with no activity, then closed 7 days later)" }] }),
+    item({ setting_id: "security.open_prs", feature: "security", title: "Open fix pull requests", scope: "team", risk: "acts", current: { value: false, set: true, deliberate: true, set_by: { page: "Security policy", by: "lee@example.com", at: iso(24 * 30) } }, recommended: true, source: "default" }),
+    item({ setting_id: "tests.auto_quarantine", feature: "tests", title: "Quarantine flaky tests", scope: "team", current: { value: false, set: false }, recommended: true, source: "default" }),
+  ];
+  const changes = ["reviewer.enabled", "tests.e2e", "stale_prs.enabled", "tests.auto_quarantine"].map((id) => {
+    const it = items.find((i) => i.setting_id === id) as Item;
+    return { setting_id: id, before: { value: false, stored: false, row: false }, after: it.recommended, at: iso(0.01), evidence: it.evidence, row_created: false, undone: false };
+  });
+  const summary = {
+    changed: 3,
+    kept: 3,
+    previews: 1,
+    worth: 1,
+    changed_ids: ["reviewer.enabled", "tests.e2e", "tests.auto_quarantine"],
+    kept_ids: ["reviewer.label", "reminders.cooldown_hours", "security.open_prs"],
+    preview_ids: ["stale_prs.enabled"],
+    worth_ids: ["tests.verify_tests"],
+    text: "Turned on 3, 1 worth a look, 1 preview to switch on, kept 3 settings someone chose",
+  };
+  const qi = items.find((i) => i.setting_id === "tests.auto_quarantine") as Item;
+  const so = items.find((i) => i.setting_id === "security.open_prs") as Item;
+  return {
+    run_id: "run_04",
+    state: "done",
+    mode: "auto",
+    choice: "smart",
+    created_at: iso(0.1),
+    by: "dana",
+    tokens_used: 400_000,
+    repos: [{ repo: "acme/web-app", state: "ready", items, changes, summary }],
+    results: [{ repo: "acme/web-app", state: "done", changed: 4, failed: [], prs: [], summary }],
+    team: {
+      repo_count: 6,
+      items: [
+        { ...qi, changed_in: "acme/web-app", change: changes[3] },
+        { ...so, changed_in: null, change: null },
+      ],
+    },
   };
 }

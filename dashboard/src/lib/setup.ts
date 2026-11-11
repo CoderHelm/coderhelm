@@ -11,7 +11,7 @@ import { request } from "./api";
 
 export type RepoState = "not_set_up" | "set_up" | "custom" | "update_available" | "failed" | "analyzing";
 export type RunState = "analyzing" | "ready" | "applying" | "done" | "failed" | "undone";
-export type Choice = "keep_mine" | "use_recommended" | "decide";
+export type Choice = "keep_mine" | "use_recommended" | "decide" | "smart";
 export type Decision = "use" | "keep" | "edit";
 export type Source = "detected" | "inferred" | "default";
 /** "auto": Coderhelm applies the recommendations itself; "guided": you review each one first. */
@@ -29,6 +29,60 @@ export interface SetupRepo {
   new_count: number;
   custom_count: number;
   error?: string;
+  /** On, previews, off and not used here: what "5 of 12" is made of. */
+  counts?: FeatureCounts;
+  /** The same in one line, with why: "5 on, 1 preview, 4 off: Auto-merge (no required checks), …". */
+  summary?: string;
+}
+
+export interface FeatureCounts {
+  on: number;
+  previews: number;
+  off: number;
+  not_used: number;
+  /** The features that fit this repo (on + previews + off). */
+  total: number;
+}
+
+export type FeatureState = "on" | "preview" | "off" | "not_used";
+
+export interface FeatureSetting {
+  setting_id: string;
+  title: string;
+  value_text: string;
+  recommended_text?: string;
+  matches: boolean | null;
+  custom: boolean;
+  scope: "repo" | "team";
+}
+
+/** One feature of one repo, as the expanded Setup row lists it. */
+export interface RepoFeature {
+  feature: string;
+  title: string;
+  state: FeatureState;
+  /** Part of the "N on" count. */
+  counted: boolean;
+  value_text: string;
+  matches: boolean | null;
+  mark: "recommended" | "yours" | "preview" | null;
+  why: string;
+  short: string;
+  evidence: Evidence[];
+  settings_href: string;
+  switch_on: { run_id: string; setting_id: string } | null;
+  needs: string | null;
+  settings: FeatureSetting[];
+}
+
+export interface RepoView {
+  repo: string;
+  counts: FeatureCounts;
+  summary: string;
+  run_id: string | null;
+  run_at: string | null;
+  team_repo_count: number;
+  features: RepoFeature[];
 }
 
 export interface NewRecommendation {
@@ -93,6 +147,19 @@ export interface PlanItem {
   isNew: boolean;
   /** The value's shape, from the registry: "bool", "number", "text", "list"… */
   kind?: string;
+  /** One value for this repository, or one for every repository of the team. */
+  scope: "repo" | "team";
+  /** A choice someone made that the repo's own files argue against: kept, and listed first. */
+  worthALook: boolean;
+  /** Who saved the current value and where, when the server knows. */
+  setBy?: SetBy;
+}
+
+export interface SetBy {
+  by?: string;
+  at?: string;
+  /** "Tests", "Security policy", "Reviewer settings"… */
+  page: string;
 }
 
 /** One change a run made, kept for review afterwards and single-setting undo. */
@@ -117,7 +184,23 @@ export interface RunRepo {
   warning?: string;
   /** What a run that applied itself did here, in words. */
   summaryText?: string;
+  /** The settings behind each count of that sentence, when the server lists them. */
+  lists?: { changed: string[]; kept: string[]; previews: string[]; worth: string[] };
   changes: RunChange[];
+}
+
+/** A team-wide setting of a run: one value for every repository, shown once. */
+export interface TeamItem {
+  setting_id: string;
+  title: string;
+  feature: string;
+  current: { value: Value; set: boolean };
+  recommended: Value;
+  source: Source;
+  evidence: Evidence[];
+  /** The repo whose record holds the change (what undo names). */
+  changedIn: string | null;
+  change: RunChange | null;
 }
 
 export interface RepoResult {
@@ -143,6 +226,8 @@ export interface SetupRun {
   estimate_tokens?: number;
   /** What undo could not put back, because it changed after the run. */
   undo_skipped?: { repo: string; setting_id: string; title?: string; reason?: string }[];
+  /** The team-wide settings, once, and how many repositories they cover. */
+  team?: { repoCount: number; items: TeamItem[] };
 }
 
 export type RepoPick = string[] | "all" | "not_set_up";
@@ -160,7 +245,7 @@ const str = (v: unknown, d = ""): string => (typeof v === "string" ? v : d);
 const num = (v: unknown, d = 0): number => (typeof v === "number" && Number.isFinite(v) ? v : d);
 const REPO_STATES: RepoState[] = ["not_set_up", "set_up", "custom", "update_available", "failed", "analyzing"];
 const RUN_STATES: RunState[] = ["analyzing", "ready", "applying", "done", "failed", "undone"];
-const CHOICES: Choice[] = ["keep_mine", "use_recommended", "decide"];
+const CHOICES: Choice[] = ["keep_mine", "use_recommended", "decide", "smart"];
 
 function checkRepo(r: unknown): SetupRepo {
   if (!isObj(r) || typeof r.repo !== "string") fail();
@@ -174,7 +259,85 @@ function checkRepo(r: unknown): SetupRepo {
     new_count: num(o.new_count),
     custom_count: num(o.custom_count),
     error: typeof o.error === "string" && o.error ? o.error : undefined,
+    counts: checkCounts(o.counts),
+    summary: typeof o.summary === "string" && o.summary ? o.summary : undefined,
   };
+}
+
+function checkCounts(c: unknown): FeatureCounts | undefined {
+  if (!isObj(c) || typeof c.on !== "number") return undefined;
+  return { on: num(c.on), previews: num(c.previews), off: num(c.off), not_used: num(c.not_used), total: num(c.total) };
+}
+
+const FEATURE_STATES: FeatureState[] = ["on", "preview", "off", "not_used"];
+const ids = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
+
+/** A path inside the dashboard only: never a link off it. */
+const localHref = (v: unknown, d: string) => (typeof v === "string" && /^\/(?!\/)/.test(v) ? v : d);
+
+export function checkRepoView(r: unknown): RepoView {
+  if (!isObj(r) || typeof r.repo !== "string" || !Array.isArray(r.features)) fail();
+  const o = r as Record<string, unknown>;
+  const features: RepoFeature[] = (o.features as unknown[]).filter(isObj).map((f) => {
+    const feature = str(f.feature);
+    const sw = isObj(f.switch_on) && typeof f.switch_on.run_id === "string" && typeof f.switch_on.setting_id === "string" ? { run_id: f.switch_on.run_id, setting_id: f.switch_on.setting_id } : null;
+    return {
+      feature,
+      title: str(f.title) || featureLabel(feature),
+      state: FEATURE_STATES.includes(f.state as FeatureState) ? (f.state as FeatureState) : "off",
+      counted: f.counted !== false,
+      value_text: str(f.value_text),
+      matches: typeof f.matches === "boolean" ? f.matches : null,
+      mark: f.mark === "recommended" || f.mark === "yours" || f.mark === "preview" ? f.mark : null,
+      why: str(f.why),
+      short: str(f.short),
+      evidence: Array.isArray(f.evidence) ? (f.evidence.map(checkEvidence).filter(Boolean) as Evidence[]) : [],
+      settings_href: localHref(f.settings_href, FEATURE_HREF[feature] ?? "/settings"),
+      switch_on: sw,
+      needs: typeof f.needs === "string" && f.needs ? f.needs : null,
+      settings: Array.isArray(f.settings)
+        ? f.settings.filter(isObj).map((s) => ({
+            setting_id: str(s.setting_id),
+            title: str(s.title) || titleOf(str(s.setting_id)),
+            value_text: str(s.value_text),
+            recommended_text: typeof s.recommended_text === "string" ? s.recommended_text : undefined,
+            matches: typeof s.matches === "boolean" ? s.matches : null,
+            custom: s.custom === true,
+            scope: s.scope === "team" ? ("team" as const) : ("repo" as const),
+          }))
+        : [],
+    };
+  });
+  const counts = checkCounts(o.counts) ?? countFeatures(features);
+  return {
+    repo: o.repo as string,
+    counts,
+    summary: str(o.summary),
+    run_id: typeof o.run_id === "string" ? o.run_id : null,
+    run_at: typeof o.run_at === "string" ? o.run_at : null,
+    team_repo_count: num(o.team_repo_count),
+    features,
+  };
+}
+
+export function countFeatures(features: Pick<RepoFeature, "counted" | "state">[]): FeatureCounts {
+  const c: FeatureCounts = { on: 0, previews: 0, off: 0, not_used: 0, total: 0 };
+  for (const f of features.filter((x) => x.counted)) {
+    if (f.state === "on") c.on++;
+    else if (f.state === "preview") c.previews++;
+    else if (f.state === "off") c.off++;
+    else c.not_used++;
+  }
+  c.total = c.on + c.previews + c.off;
+  return c;
+}
+
+/** "5 on · 2 previews · 4 off", for the repo row. */
+export function countsWords(c: FeatureCounts): string {
+  const parts = [`${c.on} on`];
+  if (c.previews) parts.push(plural(c.previews, "preview"));
+  if (c.off) parts.push(`${c.off} off`);
+  return parts.join(" · ");
 }
 
 function checkSummary(r: unknown): RunSummary {
@@ -243,8 +406,16 @@ function checkItem(i: unknown): PlanItem {
     preview: o.preview === true,
     undone: o.undone === true,
     isNew: o.is_new === true,
-    kind: typeof o.kind === "string" ? o.kind : undefined,
+    kind: typeof o.kind === "string" ? o.kind : isObj(o.kind) && typeof o.kind.type === "string" ? o.kind.type : undefined,
+    scope: o.scope === "team" ? "team" : "repo",
+    worthALook: o.worth_a_look === true,
+    setBy: checkSetBy(isObj(o.current) ? o.current.set_by : undefined),
   };
+}
+
+function checkSetBy(v: unknown): SetBy | undefined {
+  if (!isObj(v) || typeof v.page !== "string") return undefined;
+  return { page: v.page, by: typeof v.by === "string" && v.by ? v.by : undefined, at: typeof v.at === "string" && v.at ? v.at : undefined };
 }
 
 function checkRunRepo(r: unknown): RunRepo {
@@ -293,6 +464,10 @@ function checkRunRepo(r: unknown): RunRepo {
     error: typeof o.error === "string" && o.error ? o.error : undefined,
     warning: typeof o.warning === "string" && o.warning ? o.warning : undefined,
     summaryText: summary && typeof summary.text === "string" && summary.text ? summary.text : undefined,
+    lists:
+      summary && Array.isArray(summary.changed_ids)
+        ? { changed: ids(summary.changed_ids), kept: ids(summary.kept_ids), previews: ids(summary.preview_ids), worth: ids(summary.worth_ids) }
+        : undefined,
     changes,
   };
 }
@@ -327,7 +502,37 @@ export function checkRun(r: unknown): SetupRun {
     tokens_used: num(o.tokens_used),
     estimate_tokens: typeof o.estimate_tokens === "number" ? o.estimate_tokens : undefined,
     undo_skipped: skippedOf(o),
+    team: checkTeam(o.team),
   };
+}
+
+function checkChange(c: Record<string, unknown>): RunChange {
+  return {
+    setting_id: str(c.setting_id),
+    before: isObj(c.before) && "value" in c.before ? c.before.value : c.before,
+    after: c.after,
+    evidence: Array.isArray(c.evidence) ? (c.evidence.map(checkEvidence).filter(Boolean) as Evidence[]) : [],
+    undone: c.undone === true,
+  };
+}
+
+function checkTeam(t: unknown): SetupRun["team"] {
+  if (!isObj(t) || !Array.isArray(t.items)) return undefined;
+  const items: TeamItem[] = t.items.filter(isObj).filter((i) => typeof i.setting_id === "string").map((i) => {
+    const cur = isObj(i.current) ? i.current : {};
+    return {
+      setting_id: i.setting_id as string,
+      title: str(i.title) || titleOf(i.setting_id as string),
+      feature: str(i.feature) || featureOf(i.setting_id as string),
+      current: { value: cur.value ?? null, set: cur.set === true },
+      recommended: i.recommended ?? null,
+      source: SOURCES.includes(i.source as Source) ? (i.source as Source) : "default",
+      evidence: Array.isArray(i.evidence) ? (i.evidence.map(checkEvidence).filter(Boolean) as Evidence[]) : [],
+      changedIn: typeof i.changed_in === "string" ? i.changed_in : null,
+      change: isObj(i.change) ? checkChange(i.change) : null,
+    };
+  });
+  return { repoCount: num(t.repo_count), items };
 }
 
 /** What the last undo left alone: `undo.skipped` (or an older `undo_skipped`). */
@@ -363,7 +568,7 @@ export const setupApi = {
       json("POST", {
         repos,
         ...(opts.onlyNew ? { only_new: true } : {}),
-        ...(opts.mode === "auto" ? { mode: "auto", overwrite: opts.choice === "use_recommended" ? "use_recommended" : "keep_mine" } : {}),
+        ...(opts.mode === "auto" ? { mode: "auto", overwrite: opts.choice === "use_recommended" || opts.choice === "keep_mine" ? opts.choice : "smart" } : {}),
       }),
     ).then(checkStarted),
   run: (id: string) => request<unknown>(`/api/setup/runs/${encodeURIComponent(id)}`).then(checkRun),
@@ -378,6 +583,18 @@ export const setupApi = {
       const sw = isObj(o.switched_on) && typeof o.switched_on.setting_id === "string" ? (o.switched_on.setting_id as string) : null;
       return { run: isObj(o) && typeof o.run_id === "string" ? checkRun(o) : null, switched: sw };
     }),
+  /** Kept settings take their recommendation now: one, or a whole group. Each is its own change, undone on its own. */
+  useRecommended: (id: string, items: { repo: string; setting_id: string }[]) =>
+    request<unknown>(`/api/setup/runs/${encodeURIComponent(id)}/use-recommended`, json("POST", { items })).then((r) => {
+      const o = isObj(r) ? r : {};
+      const skipped = Array.isArray(o.skipped) ? o.skipped.filter(isObj).map((s) => ({ setting_id: str(s.setting_id), reason: str(s.reason) })) : [];
+      return { run: typeof o.run_id === "string" ? checkRun(o) : null, skipped };
+    }),
+  /** One repo's features, each with its state and why (the expanded Setup row). */
+  repo: (repo: string) => {
+    const [owner, name] = repo.split("/");
+    return request<unknown>(`/api/setup/repos/${encodeURIComponent(owner ?? "")}/${encodeURIComponent(name ?? "")}`).then(checkRepoView);
+  },
   /** Dismiss new recommendations for the whole team. */
   seen: (ids: string[]) =>
     request<unknown>("/api/setup/seen", json("POST", { setting_ids: ids })).then((r) =>
@@ -582,6 +799,7 @@ export function effectiveDecision(item: PlanItem, choice: Choice, override?: Ove
   if (isPreviewOnly(item)) return { decision: "keep" };
   if (choice === "use_recommended") return { decision: "use" };
   return { decision: item.current.set ? "keep" : "use" };
+  // "smart" is never picked in Review: it is the default of a run that applies itself, decided on the server.
 }
 
 /** The value the setting has after applying. */
@@ -652,6 +870,8 @@ export const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocal
 // ── Results of a run that applied itself ───────────────────────────────
 
 export interface AutoOutcome {
+  /** Choices someone made that the repo's own files argue against: kept, listed first. */
+  worth: PlanItem[];
   /** Turned on or changed to the recommendation. */
   changed: PlanItem[];
   /** Applied as a preview, waiting to be switched on. */
@@ -669,7 +889,18 @@ export interface AutoOutcome {
  * they are what "turned on" shows.
  */
 export function autoOutcome(repo: RunRepo, choice: Choice): AutoOutcome {
-  const out: AutoOutcome = { changed: [], previews: [], kept: [], undone: [] };
+  const out: AutoOutcome = { worth: [], changed: [], previews: [], kept: [], undone: [] };
+  // The server's lists, when it sends them: the same settings its sentence counts.
+  if (repo.lists) {
+    const pick = (list: string[]) => list.map((id) => repo.items.find((i) => i.setting_id === id)).filter((x): x is PlanItem => !!x);
+    out.worth = pick(repo.lists.worth);
+    out.changed = pick(repo.lists.changed);
+    out.previews = pick(repo.lists.previews);
+    out.kept = pick(repo.lists.kept);
+    out.undone = repo.items.filter((i) => i.undone && !isPreviewOnly(i) && !/\.dry_run$/.test(i.setting_id));
+    out.changed = out.changed.filter((i) => !i.undone);
+    return out;
+  }
   const after = (item: PlanItem): Value => {
     const c = repo.changes.find((x) => x.setting_id === item.setting_id);
     if (c) return c.undone ? c.before : c.after;
@@ -698,9 +929,26 @@ export function autoOutcome(repo: RunRepo, choice: Choice): AutoOutcome {
 /** "Turned on 9 settings, kept 3 of yours, 2 are previews you can switch on". */
 export function outcomeWords(o: AutoOutcome): string {
   const parts: string[] = [];
-  parts.push(o.changed.length ? `Turned on ${plural(o.changed.length, "setting")}` : "Changed nothing");
-  if (o.kept.length) parts.push(`kept ${o.kept.length} of yours`);
-  if (o.previews.length) parts.push(`${o.previews.length} ${o.previews.length === 1 ? "is a preview" : "are previews"} you can switch on`);
+  parts.push(o.changed.length ? `Turned on ${o.changed.length}` : "Changed nothing");
+  if (o.worth.length) parts.push(`${o.worth.length} worth a look`);
+  if (o.previews.length) parts.push(`${plural(o.previews.length, "preview")} to switch on`);
+  if (o.kept.length) parts.push(`kept ${plural(o.kept.length, "setting")} someone chose`);
   if (o.undone.length) parts.push(`${o.undone.length} undone`);
   return parts.join(", ");
+}
+
+/** "Set on the Tests page by dana on Nov 3", or what is known of it. */
+export function setByWords(s: SetBy | undefined, date: (iso: string) => string): string {
+  if (!s) return "Set before Setup tracked who";
+  const page = `on the ${s.page} page`;
+  if (s.by && s.at) return `Set ${page} by ${s.by} on ${date(s.at)}`;
+  if (s.by) return `Set ${page} by ${s.by}`;
+  if (s.at) return `Set ${page} on ${date(s.at)}`;
+  return `Set ${page}, before Setup tracked who`;
+}
+
+/** "This repository" or "Team-wide (all 12 repositories)". */
+export function scopeWords(scope: "repo" | "team", repoCount: number): string {
+  if (scope === "repo") return "This repository";
+  return repoCount > 0 ? `Team-wide (all ${plural(repoCount, "repository", "repositories")})` : "Team-wide (every repository)";
 }

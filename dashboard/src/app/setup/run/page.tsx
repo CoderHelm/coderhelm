@@ -290,6 +290,24 @@ function SetupRunPage() {
     setPending(null);
   };
 
+  // Kept settings take the recommendation: one, or a whole group. Each is its own change with its own Undo.
+  const useRecommended = async (items: { repo: string; setting_id: string }[], key: string) => {
+    if (!id || !items.length) return;
+    setPending(key);
+    setProblem(null);
+    try {
+      const r = await setupApi.useRecommended(id, items);
+      setRun(r.run ?? (await setupApi.run(id)));
+      window.dispatchEvent(new Event(SETUP_CHANGED));
+      const done = items.length - r.skipped.length;
+      if (r.skipped.length) setProblem(`${plural(r.skipped.length, "setting was", "settings were")} left as ${r.skipped.length === 1 ? "it was" : "they were"}: ${r.skipped[0].reason}`);
+      if (done > 0) toast(done === 1 ? "Set to the recommendation. Undo it from Turned on." : `${done} settings set to the recommendation. Undo any one from Turned on.`, "success");
+    } catch (e) {
+      setProblem(e instanceof Error ? `Nothing was changed. ${e.message}` : "Nothing was changed. Try again.");
+    }
+    setPending(null);
+  };
+
   const hrefFor = useCallback((repo: string) => `/setup/run?id=${encodeURIComponent(id ?? "")}&repo=${encodeURIComponent(repo)}`, [id]);
 
   const title = run ? `Setup run, ${formatDate(run.created_at)}` : "Set up repos";
@@ -301,7 +319,7 @@ function SetupRunPage() {
     analyze: "Coderhelm is reading each repo. You can leave this page; the run keeps going.",
     review: "Check what Coderhelm recommends next to what you have now. Nothing changes until you apply.",
     apply: run?.state === "undone" ? "This run was undone. Every setting it changed is back the way it was." : "What changed on each repo.",
-    results: "What Coderhelm turned on, what of yours it kept, and what waits for you to switch on. Undo any one of them, or the whole run.",
+    results: "What Coderhelm turned on, what is worth a look, what someone chose that it kept, and what waits for you to switch on. Undo any one of them, or the whole run.",
   }[step];
   const auto = run ? run.mode === "auto" : params.get("mode") !== "guided";
 
@@ -340,6 +358,7 @@ function SetupRunPage() {
               onUndo={undo}
               onUndoItem={undoItem}
               onSwitchOn={switchOn}
+              onUseRecommended={useRecommended}
               onRetry={retry}
               busy={busy}
               pending={pending}
@@ -472,7 +491,7 @@ function ReposStep({ onStart, busy, problem }: { onStart: (repos: RepoPick, opts
       else n.add(name);
       return n;
     });
-  const go = () => onStart(pick === "pick" ? chosen : pick, { onlyNew, mode, choice: keepMine ? "keep_mine" : "use_recommended" });
+  const go = () => onStart(pick === "pick" ? chosen : pick, { onlyNew, mode, choice: keepMine ? "smart" : "use_recommended" });
 
   const modes: { value: PickMode; title: string; body: string; disabled?: boolean }[] = [
     { value: "not_set_up", title: "Repos not set up", body: notSetUp.length ? plural(notSetUp.length, "repo") : "Every repo is set up", disabled: notSetUp.length === 0 },
@@ -575,11 +594,11 @@ function ReposStep({ onStart, busy, problem }: { onStart: (repos: RepoPick, opts
           <div className="flex items-start justify-between gap-4 px-4 py-3">
             <div className="min-w-0">
               <p id="keep-mine-label" className="text-sm font-medium text-zinc-100">
-                {keepMine ? "Keep my settings" : "Replace mine with recommended"}
+                {keepMine ? "Keep what someone chose" : "Replace mine with recommended"}
               </p>
               <p id="keep-mine-help" className="mt-0.5 text-sm text-zinc-400">
                 {keepMine
-                  ? "Anything someone already set stays as it is. Only settings nobody has set are turned on."
+                  ? "A value someone chose for a repo stays, and if the repo argues against it, it's listed first as worth a look. Defaults, values Coderhelm set before, and repos missing from a team list take the recommendation."
                   : "Every setting takes the recommendation, including values someone chose. Undo puts them back."}
               </p>
             </div>

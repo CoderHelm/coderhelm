@@ -131,13 +131,13 @@ test.describe("Setup", () => {
     await expect(page.getByTestId("keep-mine-toggle")).toHaveAttribute("aria-checked", "true");
     await expect(page.getByTestId("estimate")).toContainText("About 840k tokens for 2 repos");
     await page.getByTestId("analyze").click();
-    expect(calls(db, "POST /api/setup/runs")[0].body).toEqual({ repos: "not_set_up", mode: "auto", overwrite: "keep_mine" });
+    expect(calls(db, "POST /api/setup/runs")[0].body).toEqual({ repos: "not_set_up", mode: "auto", overwrite: "smart" });
 
     // The same live progress while it works, then the results are the review.
     await expect(page.getByTestId("analyze-step")).toBeVisible();
     await expect(page.getByTestId("auto-results")).toBeVisible({ timeout: 20_000 });
     const web = page.locator('[data-testid="auto-repo"][data-repo="acme/web-app"]');
-    await expect(web.getByTestId("auto-summary")).toHaveText("Turned on 7 settings, kept 3 of yours, 2 are previews you can switch on");
+    await expect(web.getByTestId("auto-summary")).toHaveText("Turned on 7, 2 previews to switch on, kept 3 settings someone chose");
     // Previews are open; each change lists its evidence once opened.
     await expect(web.getByTestId("preview-item")).toHaveCount(2);
     await expect(web.locator('[data-testid="preview-item"][data-id="stale_prs.enabled"]')).toContainText("closed 2 in the last 14 days");
@@ -170,7 +170,7 @@ test.describe("Setup", () => {
     await web.locator('[data-testid="changed-item"][data-id="reviewer.enabled"]').getByTestId("undo-item").click();
     await expect.poll(() => calls(db, "POST /api/setup/runs/run_03/undo").length).toBe(1);
     expect(calls(db, "POST /api/setup/runs/run_03/undo")[0].body).toEqual({ items: [{ repo: "acme/web-app", setting_id: "reviewer.enabled" }] });
-    await expect(web.getByTestId("auto-summary")).toHaveText("Turned on 6 settings, kept 3 of yours, 2 are previews you can switch on, 1 undone");
+    await expect(web.getByTestId("auto-summary")).toHaveText("Turned on 6, 2 previews to switch on, kept 3 settings someone chose, 1 undone");
     await web.getByTestId("group-undone").getByRole("button").click();
     await expect(web.locator('[data-testid="undone-item"][data-id="reviewer.enabled"]')).toContainText("is back to");
     // The rest of the run stays.
