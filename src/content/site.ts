@@ -191,7 +191,7 @@ const home: Page = {
                   id: "security-fixes",
                   title: "Fix what your code reaches",
                   heading: "Security fixes for what your code reaches, not for every package that is present.",
-                  text: "When an advisory touches one of your dependencies, CoderHelm reads your code to see whether it calls the vulnerable part, and shows the files and lines. Each finding gets a tier and a deadline. It opens one pull request per fix, gets CI green, and posts the urgent ones to your alerts channel.",
+                  text: "When an advisory touches one of your dependencies, CoderHelm reads your code to see whether it calls the vulnerable part, and shows the files and lines. Each finding gets a tier and a deadline. It opens one pull request per fix, gets CI green, and posts the urgent ones to your alerts channel. It checks what you run on AWS too, and says which fixes AWS makes for you.",
                   frame: "secfix",
                   caption: "A finding CoderHelm marked reachable, with the lines that call the vulnerable code, its deadline and the fix pull request with CI passing.",
                   href: "/security-fixes/",
@@ -846,6 +846,23 @@ const securityFixes: Page = {
           ],
         },
         { type: "p", text: "A [self hosted](/self-host/) install stores every dependency list in its own AWS account and sends OSV only package names and versions. See the [docs](https://docs.coderhelm.com/getting-started/security-fixes/) for what is sent where." },
+      ],
+    },
+    {
+      id: "infrastructure",
+      heading: "What you run on AWS, and who has to fix it",
+      blocks: [
+        { type: "p", text: "Switch on Infrastructure vulnerabilities for a connected AWS account, and CoderHelm reads, read-only and once a day, which AMIs, node groups, databases and caches run there. It matches them by version against AWS's security bulletins and the Amazon Linux and Bottlerocket advisories, with no model and no tokens. It never reads Lambda function settings or user data." },
+        {
+          type: "table",
+          head: ["Fix", "What you get"],
+          rows: [
+            ["Pull request", "In the Terraform that defines the resource: the AMI, a node group's release version, a Lambda runtime or a Dockerfile base image."],
+            ["Step in AWS", "The exact CLI command, the console path and AWS's apply-by date, for RDS, ElastiCache and OpenSearch updates. CoderHelm never runs it."],
+            ["AWS-managed", "Fargate, Lambda, the EKS control plane: AWS patches them, the bulletin says so, and they never count as open."],
+          ],
+        },
+        { type: "p", text: "One row per fix, however many advisories it clears, and it closes only when the next read of the account shows the fix running. See the [docs](https://docs.coderhelm.com/getting-started/infrastructure-vulnerabilities/) for the permissions and a worked example." },
       ],
     },
   ],

@@ -1,0 +1,96 @@
+---
+title: Infrastructure vulnerabilities
+description: How CoderHelm checks what runs in your AWS accounts against AWS's security bulletins and the Amazon Linux and Bottlerocket advisories, says which fixes are yours and which AWS makes, and opens the pull request or shows the step in AWS.
+---
+
+[Security fixes](/getting-started/security-fixes/) checks the packages your code imports. Infrastructure vulnerabilities checks what you actually run on AWS: the AMIs and kernels of your instances, your EKS node groups, your databases and caches. For each one it says whether you have to act, opens the fix pull request or shows the exact step in AWS, and marks what AWS patches for you.
+
+It is off for every AWS account until an admin switches it on, in **Settings**, then **Integrations**, then **AWS**, on the account. Findings show in **Security**, then **Infrastructure**, and what runs in each account shows in **Insights**, then **Infrastructure**, under **Running in AWS**.
+
+## Where the vulnerabilities come from
+
+These public sources are read once a day for every team. Nothing about your accounts is sent to read them.
+
+| Source | What it gives |
+| --- | --- |
+| **AWS security bulletins** | The feed lists the last 30 days of bulletins. CoderHelm reads each bulletin's page for its per-service section: who has to act for each service (you, you in AWS, AWS, or nobody because it is not affected), the fixed AMI releases, the named service updates, and when patched Fargate tasks started. |
+| **Amazon Linux advisories (ALAS)** | Every Amazon Linux 2023 and Amazon Linux 2 advisory. For kernel and important advisories, the page with the first fixed Amazon Linux 2023 release and the new package versions. |
+| **Bottlerocket advisories** | Every advisory with its fixed kernel and package versions. |
+| **Lambda runtimes** | AWS's deprecation dates for each runtime. A deprecated runtime gets no more patches. |
+| **AWS's latest AMI parameters** | The current ECS, EKS and Bottlerocket images, which a fix points to. |
+
+A source that can't be read, or whose page changed its format, keeps its last good copy, and **Security**, then **Infrastructure**, then **Sources** says it failed and when.
+
+## What it reads in your account
+
+With the option on, CoderHelm reads each account once a day through the same read-only `CoderHelmLogReader` role, in the account's region. These are describe and list calls only:
+
+| Permission | What it is for |
+| --- | --- |
+| `ec2:DescribeInstances`, `ec2:DescribeImages` | Which AMI each instance runs, and the release in the AMI's name. Whether it has a public IP address. |
+| `autoscaling:DescribeAutoScalingGroups` | Which instances one fix changes together, and their launch template. |
+| `elasticloadbalancing:DescribeTargetGroups`, `elasticloadbalancing:DescribeLoadBalancers` | Whether an Auto Scaling group or a service sits behind an internet-facing load balancer. |
+| `eks:ListClusters`, `eks:DescribeCluster`, `eks:ListNodegroups`, `eks:DescribeNodegroup` | Each node group's release version and AMI type, and whether the cluster uses Auto Mode. |
+| `rds:DescribeDBClusters`, `rds:DescribeDBInstances`, `rds:DescribePendingMaintenanceActions` | Engine versions, whether a database is publicly accessible, and the OS updates AWS has waiting for it. |
+| `elasticache:DescribeServiceUpdates`, `elasticache:DescribeUpdateActions` | The self-service updates waiting for each cache, and AWS's apply-by date. |
+| `es:ListDomainNames`, `es:DescribeDomains` | OpenSearch service software updates. |
+| `ecr:DescribeImageScanFindings` | ECR's own scan results for the images your services run. |
+| `ssm:ListInventoryEntries` | The installed kernel, for instances managed by Systems Manager. |
+| `ssm:GetParameters`, on `arn:aws:ssm:*::parameter/aws/service/*` only | AWS's public latest AMI in your region. |
+
+ECS services on Fargate are read with the ECS permissions the role already has.
+
+What it never reads:
+
+- **Lambda function settings.** `lambda:ListFunctions` and `lambda:GetFunctionConfiguration` both return environment variables. CoderHelm finds your Lambda functions and their runtimes in your Terraform instead.
+- **User data.** It never reads launch template versions or instance attributes.
+- **Anything it would change.** CoderHelm opens pull requests in your code and shows the AWS steps for a person to run. It never runs them.
+
+Switching the option on when the role lacks these reads shows a warning that names the feature, with the one-click update: an AWS admin signs in to the account and creates the update stack, which adds only these permissions. The stack's `InfrastructureVulnerabilities` parameter is set to `on` by the link.
+
+On a self-hosted install, accounts you connect with their own role work the same way. The install's own account isn't read yet: its role needs the permissions boundary to allow these calls, which comes with a later access stack step.
+
+## Three kinds of fix
+
+Matching is by version, with no model, so it costs no tokens. One row is one fix: one AMI, one node group, one database. However many advisories that fix clears, it is still one row.
+
+| Fix | When | What you get |
+| --- | --- | --- |
+| **Fix PR** | The change is in the code that defines the resource. | A pull request that points the AMI at AWS's latest parameter, sets a node group's `release_version`, changes a Lambda `runtime` or bumps a Dockerfile `FROM`. It goes through the same daily run and token limits as dependency fixes. When rolling the change out needs a step, such as an instance refresh, the exact command is shown with it. |
+| **Runbook** | The change happens in AWS, not in code. | A card with the exact AWS CLI command, the path in the AWS console, and AWS's apply-by date: apply an RDS OS update, an ElastiCache service update or an OpenSearch software update. CoderHelm never runs it. |
+| **AWS-managed** | AWS patches it itself. | A row with the bulletin's reason, collapsed at the bottom. It is never counted as open and has no tier. |
+
+Where the code is comes from the resource's tags (a `Repo` tag, its CloudFormation stack), or from a search of your connected repositories for its AMI, group or name. For Terraform that is the file and the resource address, such as `aws_launch_template.web`.
+
+Urgency uses the same tiers as dependency fixes. Whether the internet can reach the resource takes the place of whether your code reaches the vulnerable part: a public IP address, an internet-facing load balancer or a publicly accessible database.
+
+A finding closes only when CoderHelm reads the account again and sees the fix running, such as the new AMI on every instance. A merged pull request isn't enough. That also catches a fix that was merged but never rolled out.
+
+## A worked example: bulletin 2026-160-AWS
+
+CVE-2026-98432 is a use-after-free in the Linux kernel's IPv4 TCP code, rated Important. The bulletin's per-service section says who acts. Take a team that runs:
+
+- an Auto Scaling group of three Amazon Linux 2023 instances on release `2023.12.20261020`, behind an internet-facing load balancer;
+- an EKS managed node group on release `1.31.0-20261015`;
+- an ECS service on Fargate;
+- a zip Lambda function on `python3.12`;
+- an Aurora PostgreSQL cluster.
+
+**Security**, then **Infrastructure**, shows exactly this:
+
+| Row | Fix | Why |
+| --- | --- | --- |
+| Auto Scaling group `web-asg` | Fix PR, P1 | Amazon Linux 2023 is fixed in release `2023.12.20261102`. The pull request changes `aws_launch_template.web`, then an instance refresh rolls it out. Internet-facing, so P1. |
+| EKS node group `prod-ng` | Fix PR, P2 | EKS optimized AMIs are fixed in `v20261031`. The pull request sets the node group's `release_version`. |
+| Aurora cluster `orders` | Runbook | The bulletin says to apply the database OS update, and RDS lists it as pending with a date. The card shows `aws rds apply-pending-maintenance-action` with the cluster's ARN. |
+| ECS service `api` on Fargate | AWS-managed | Tasks started after the fix run patched, and AWS retires older ones. Forcing a new deployment replaces them sooner. |
+| Lambda `thumbs` | AWS-managed | The bulletin says Lambda is not affected. |
+
+The EKS control plane, load balancers and CloudFront are AWS's as well. They aren't listed, because nothing of yours runs there.
+
+## Inspector and AWS Health
+
+Both are optional, and both depend on something on your AWS account:
+
+- **Amazon Inspector** is billed by AWS: about $1.25 per instance a month, $0.09 per container image scan, and $0.30 per Lambda function a month. When you turn it on and CoderHelm may read its findings, they take the place of CoderHelm's own matching for the resources Inspector covers. They also add whether an exploit is known and whether the network can reach the vulnerable port.
+- **AWS Health** names your own affected resources for some bulletins. Its API needs AWS Business Support or higher. Without that plan, a CloudFormation template adds an EventBridge rule in your account that forwards the same Health events.

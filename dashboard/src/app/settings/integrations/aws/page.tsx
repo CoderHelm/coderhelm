@@ -25,6 +25,7 @@ import { buttonClass, inputClass, linkButton, monoInputClass, primaryButton, sec
 import { Code, SaveBar, SettingsRow, Switch, useDirtyForm, type DirtyForm } from "@/components/settings";
 import { Chip, MoreMenu } from "@/components/list";
 import { securityEmail } from "@/lib/runtime-config";
+import { InfraReadsHelp } from "@/components/infra-reads";
 import { PermissionsOverview, PermissionsPanel, useAwsPermissions, type AwsPermissionsApi } from "@/components/aws-permissions";
 
 export default function AwsPageGuarded() {
@@ -111,6 +112,7 @@ function AwsPage() {
         if (dirty("metrics")) await api.setAwsAbilities(account, { metrics: f.metrics });
         if (dirty("airflow")) await api.setAwsAbilities(account, { airflow: f.airflow });
         if (dirty("environments")) await api.setAwsAbilities(account, { airflow_environments: f.environments });
+        if (dirty("infrastructure")) await api.setAwsAbilities(account, { infrastructure: f.infrastructure });
       } catch (e) {
         failed.push(`${id}: ${e instanceof Error && e.message ? e.message : "the request failed"}`);
       }
@@ -225,6 +227,8 @@ interface AccountForm {
   airflow: boolean;
   /** The Airflow environments agents may read. */
   environments: string[];
+  /** Infrastructure vulnerabilities: read which versions run here. */
+  infrastructure: boolean;
 }
 
 /** Every account's fields in one flat form, keyed "<account>:<field>", so the save bar counts fields. */
@@ -247,6 +251,7 @@ function formFrom(connections: AwsConnection[]): AccountsForm {
       metrics: a ? a.metrics.on : false,
       airflow: a ? airflowOn(a) : false,
       environments: a ? a.airflow.found.filter((e) => !a.airflow.skipped.includes(e)) : [],
+      infrastructure: !!a?.infrastructure?.on,
     };
     for (const [k, v] of Object.entries(f)) out[key(c.connection_id, k as keyof AccountForm)] = v;
   }
@@ -261,6 +266,7 @@ function accountValues(values: AccountsForm, id: string): AccountForm {
     metrics: !!values[key(id, "metrics")],
     airflow: !!values[key(id, "airflow")],
     environments: (values[key(id, "environments")] as string[]) ?? [],
+    infrastructure: !!values[key(id, "infrastructure")],
   };
 }
 
@@ -527,6 +533,22 @@ function AccountSettings({
                   labelledBy={ids.labelId}
                   describedBy={ids.helpId}
                   disabled={!canEdit || a.metrics.available !== true}
+                />
+              )}
+            />
+            <SettingsRow
+              label="Infrastructure vulnerabilities"
+              layout="toggle"
+              unsaved={dirty("infrastructure")}
+              help={<InfraReadsHelp a={a} on={v.infrastructure} />}
+              control={(ids) => (
+                <Switch
+                  id={ids.inputId}
+                  checked={v.infrastructure}
+                  onChange={(on) => set("infrastructure", on)}
+                  labelledBy={ids.labelId}
+                  describedBy={ids.helpId}
+                  disabled={!canEdit}
                 />
               )}
             />

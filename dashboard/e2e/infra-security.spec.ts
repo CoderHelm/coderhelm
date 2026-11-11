@@ -1,0 +1,208 @@
+import { expect, test, type Page, type Route } from "@playwright/test";
+import fs from "node:fs";
+import path from "node:path";
+import { ACCOUNT_MISSING, INFRA_FEEDS, INFRA_INSIGHTS, INFRA_RESOURCES, infraOverview } from "./infra-data";
+
+// Infrastructure vulnerabilities: Security › Infrastructure grouped by fix
+// (pull requests, runbook cards, AWS-managed rows collapsed at the bottom),
+// an account that lacks the reads, the off state, a page the server can't
+// answer, and Insights › Infrastructure's live resources linked to their
+// findings. Every API call is answered here; nothing reaches a real backend.
+// With E2E_SHOTS_DIR set, each screen is also saved at 1280 and 400 wide.
+
+interface Db {
+  role: string;
+  overview: unknown;
+  overviewCode: number;
+  calls: { call: string; body: unknown }[];
+}
+
+async function mockApi(page: Page, init: Partial<Db> = {}): Promise<Db> {
+  const db: Db = { role: "admin", overview: infraOverview(), overviewCode: 200, calls: [], ...init };
+  const json = (route: Route, body: unknown, code = 200) => route.fulfill({ status: code, contentType: "application/json", body: JSON.stringify(body) });
+  await page.route((url) => url.hostname !== "localhost", (route) => route.abort());
+  await page.route((url) => url.hostname === "localhost" && /^\/(api|auth)\//.test(url.pathname), async (route) => {
+    const req = route.request();
+    const p = new URL(req.url()).pathname;
+    const method = req.method();
+    let body: unknown = null;
+    try {
+      body = req.postDataJSON();
+    } catch {
+      body = null;
+    }
+    if (p.startsWith("/api/security")) db.calls.push({ call: `${method} ${p}`, body });
+    if (p === "/api/me") return json(route, { user_id: "u_1", team_id: "t_1", github_login: null, email: "admin@example.com", avatar_url: "", role: db.role });
+    if (p === "/api/usage") return json(route, { month: "2026-11", total_tokens: 0, tokens_in: 0, tokens_out: 0, total_runs: 0, max_tokens: 0 });
+    if (p === "/api/banners") return json(route, { banners: [] });
+    if (p === "/api/teams") return json(route, { teams: [{ team_id: "t_1", org: "acme", status: "active", current: true }] });
+    if (p === "/api/repos") return json(route, { repos: [{ name: "acme/infra" }, { name: "acme/web-app" }] });
+    if (p === "/api/security/overview")
+      return json(route, {
+        enabled: true,
+        dry_run: false,
+        counts: { open: 3, p0: 0, p1: 1, p2: 2, p3: 0, due_7d: 0, fixed_30d: 0, dismissed: 0, noise_removed: 0 },
+        median_hours_to_merge_30d: null,
+        next_due_at: null,
+        sources: { dependabot: "on", osv: { synced_at: null, mode: "api" }, kev_synced_at: null, epss_synced_at: null },
+        permission_missing: false,
+      });
+    if (p === "/api/security/infrastructure") return json(route, db.overview, db.overviewCode);
+    if (p === "/api/security/infrastructure/sources") return json(route, { feeds: INFRA_FEEDS });
+    if (p === "/api/security/infrastructure/resources") return json(route, { accounts: (db.overview as { accounts?: unknown }).accounts ?? [], resources: INFRA_RESOURCES, count: INFRA_RESOURCES.length });
+    if (p === "/api/security/infrastructure/insights") return json(route, INFRA_INSIGHTS);
+    if (p === "/api/security/infrastructure/check") return json(route, { status: "queued" }, 202);
+    if (/^\/api\/security\/infrastructure\/findings\/[^/]+\/fix$/.test(p)) return json(route, { status: "started", reason: null });
+    if (p === "/api/infra/analysis" || p.startsWith("/api/infra")) return json(route, { analysis: null });
+    return json(route, { error: `Not mocked: ${method} ${p}` }, 404);
+  });
+  return db;
+}
+
+const call = (db: Db, c: string) => db.calls.filter((x) => x.call === c);
+
+const SHOTS = process.env.E2E_SHOTS_DIR;
+async function shoot(page: Page, name: string) {
+  if (!SHOTS) return;
+  fs.mkdirSync(SHOTS, { recursive: true });
+  await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
+  for (const width of [1280, 400]) {
+    await page.setViewportSize({ width, height: width === 1280 ? 900 : 860 });
+    await page.waitForTimeout(300);
+    // Nothing may scroll the page sideways at either width.
+    const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(wide, `${name} at ${width} scrolls sideways`).toBeLessThanOrEqual(0);
+    await page.screenshot({ path: path.join(SHOTS, `${name}-${width}.png`), fullPage: true });
+  }
+  await page.setViewportSize({ width: 1280, height: 800 });
+}
+
+test.describe("Infrastructure vulnerabilities", () => {
+  test("the Infrastructure tab groups by fix: PRs, a runbook card and AWS-managed rows that never count", async ({ page }) => {
+    const db = await mockApi(page);
+    await page.goto("/security/infrastructure");
+    await expect(page.getByRole("heading", { name: "Infrastructure", exact: true })).toBeVisible();
+    await expect(page.getByTestId("section-tabs").getByRole("link", { name: "Infrastructure" })).toBeVisible();
+    await expect(page.getByTestId("infra-tile-now")).toContainText("1");
+    await expect(page.getByTestId("infra-tile-prs")).toContainText("2");
+    await expect(page.getByTestId("infra-tile-runbooks")).toContainText("1");
+    await expect(page.getByTestId("infra-tile-aws")).toContainText("2");
+
+    // Open rows: two PRs and the Aurora runbook; AWS-managed rows aren't among them.
+    const open = page.getByRole("list", { name: "Infrastructure findings" }).getByTestId("infra-row");
+    await expect(open).toHaveCount(3);
+    const asg = open.filter({ hasText: "web-asg" });
+    await expect(asg.getByTestId("tier-pill")).toHaveText("P1");
+    await expect(asg.getByTestId("fix-chip")).toHaveText("Fix PR");
+    await expect(asg).toContainText("3 instances");
+    await expect(asg.getByTestId("exposure")).toContainText("Internet-facing: behind internet-facing load balancer web-alb");
+    await asg.getByRole("button", { name: /details of web-asg/ }).click();
+    await expect(asg.getByTestId("from-to")).toHaveText("2023.12.20261020 to 2023.12.20261102");
+    await expect(asg.getByRole("link", { name: /acme\/infra · envs\/prod\/main.tf:3 · aws_launch_template.web/ })).toHaveAttribute(
+      "href",
+      "https://github.com/acme/infra/blob/HEAD/envs/prod/main.tf#L3",
+    );
+    await expect(asg.getByRole("link", { name: "2026-160-AWS" })).toBeVisible();
+    await expect(asg).toContainText("CVE-2026-98432");
+
+    // An admin asks for the PR now.
+    await asg.getByTestId("infra-fix").click();
+    await expect(asg).toContainText("Fix run started.");
+    expect(call(db, "POST /api/security/infrastructure/findings/f_asg/fix")).toHaveLength(1);
+
+    // The node group's PR is open: its link and state, no button.
+    const ng = open.filter({ hasText: "prod-ng" });
+    await expect(ng.getByTestId("infra-pr")).toHaveAttribute("href", "https://github.com/acme/infra/pull/412");
+    await expect(ng.getByTestId("infra-fix")).toHaveCount(0);
+
+    // The Aurora runbook card: the CLI, the console path, AWS's date, never run.
+    const db1 = open.filter({ hasText: "orders" });
+    await expect(db1.getByTestId("fix-chip")).toHaveText("Runbook");
+    await db1.getByRole("button", { name: /details of orders/ }).click();
+    await expect(db1.getByTestId("runbook-cli")).toContainText("aws rds apply-pending-maintenance-action");
+    await expect(db1).toContainText("RDS > Databases > orders > Maintenance & backups > Pending maintenance > Apply");
+    await expect(db1.getByTestId("apply-by")).toContainText("Apply by");
+    await expect(db1).toContainText("Coderhelm never runs this.");
+    await shoot(page, "security-infrastructure");
+
+    // AWS-managed, collapsed at the bottom with the bulletin's reason.
+    const aws = page.getByTestId("aws-managed");
+    await expect(aws).toContainText("AWS-managed, nothing to do (2)");
+    await aws.getByText("AWS-managed, nothing to do (2)").click();
+    const awsRows = aws.getByTestId("infra-row");
+    await expect(awsRows).toHaveCount(2);
+    await expect(awsRows.filter({ hasText: "api" }).getByTestId("tier-pill")).toHaveCount(0);
+    await expect(awsRows.filter({ hasText: "thumbs" })).toContainText("not affected");
+
+    // The Sources panel names a feed that failed and keeps its last copy.
+    const sources = page.getByTestId("infra-source");
+    await expect(sources).toHaveCount(7);
+    await expect(sources.filter({ hasText: "AWS security bulletins" })).toContainText("Last read failed");
+
+    // Filters.
+    await page.getByRole("group", { name: "Fix" }).getByRole("button", { name: /^In AWS/ }).click();
+    await expect(open).toHaveCount(1);
+    await page.getByRole("group", { name: "Tier" }).getByRole("button", { name: /^P1/ }).click();
+    await expect(page.getByTestId("infra-empty")).toContainText("No findings match");
+
+    await page.getByTestId("infra-check-now").click();
+    await expect(page.getByText("Reading every account now.")).toBeVisible();
+    expect(call(db, "POST /api/security/infrastructure/check")).toHaveLength(1);
+  });
+
+  test("an account switched on without the reads warns, naming the feature, with the one-click update", async ({ page }) => {
+    await mockApi(page, { overview: infraOverview({ accounts: [...infraOverview().accounts, ACCOUNT_MISSING] }) });
+    await page.goto("/security/infrastructure");
+    const warn = page.getByTestId("missing-reads");
+    await expect(warn).toContainText("Infrastructure vulnerabilities needs 4 more read-only permissions in account 444455556666");
+    await expect(warn).toContainText("ec2:DescribeInstances");
+    await expect(warn.getByRole("link", { name: "Update the role in AWS" })).toHaveAttribute("href", /InfrastructureVulnerabilities=on/);
+    await shoot(page, "security-infrastructure-missing");
+  });
+
+  test("with no account switched on, the page says how to start; a member sees no buttons", async ({ page }) => {
+    const db = await mockApi(page, { role: "member", overview: infraOverview({ accounts: [], findings: [] }) });
+    await page.goto("/security/infrastructure");
+    await expect(page.getByTestId("infra-off")).toContainText("No AWS account is being read yet");
+    await expect(page.getByRole("link", { name: "See AWS accounts" })).toHaveAttribute("href", /^\/settings\/integrations\/aws\/?$/);
+    await expect(page.getByTestId("infra-check-now")).toHaveCount(0);
+    expect(call(db, "POST /api/security/infrastructure/check")).toHaveLength(0);
+    await shoot(page, "security-infrastructure-off");
+  });
+
+  test("an answer the page can't read is a problem with a retry, never a crash", async ({ page }) => {
+    await mockApi(page, { overview: { error: "boom" }, overviewCode: 500 });
+    await page.goto("/security/infrastructure");
+    await expect(page.getByTestId("infra-error")).toBeVisible();
+  });
+
+  test("a finding linked from Insights opens on its row", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/security/infrastructure?finding=f_db");
+    await expect(page.getByRole("list", { name: "Infrastructure findings" }).getByTestId("infra-row").filter({ hasText: "orders" }).getByTestId("runbook-cli")).toBeVisible();
+  });
+
+  test("Insights › Infrastructure: what runs in AWS, linked to its findings, next to the code review", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/infrastructure?view=running");
+    await expect(page.locator('a[href^="/infrastructure"]', { hasText: "Code review" })).toBeVisible();
+    await expect(page.locator('a[href*="view=running"]', { hasText: "Running in AWS" })).toBeVisible();
+    const rows = page.getByTestId("resource-row");
+    await expect(rows).toHaveCount(5);
+    await expect(page.getByTestId("resources-summary")).toContainText("5 resources, 3 with something to fix.");
+    const asg = rows.filter({ hasText: "Auto Scaling group web-asg" });
+    await expect(asg).toContainText("AMI 2023.12.20261020");
+    await expect(asg.getByTestId("exposure")).toContainText("Internet-facing");
+    await expect(asg.getByTestId("resource-findings")).toHaveAttribute("href", /^\/security\/infrastructure\/?\?finding=f_asg$/);
+    const db = rows.filter({ hasText: "Aurora cluster orders" });
+    await expect(db).toContainText("Pending in AWS");
+    await db.getByRole("button", { name: /details of orders/ }).click();
+    await expect(db).toContainText("New Operating System update is available");
+    await expect(db).toContainText("apply by Dec 1, 2026");
+    await expect(db.getByRole("link", { name: /aws_rds_cluster.orders/ })).toHaveAttribute("href", "https://github.com/acme/infra/blob/HEAD/envs/prod/main.tf#L46");
+    await expect(rows.filter({ hasText: "Lambda function thumbs" })).toContainText("From your code");
+    await shoot(page, "insights-infrastructure-running");
+    await page.getByRole("searchbox", { name: "Search resources" }).or(page.getByLabel("Search resources")).first().fill("thumbs");
+    await expect(rows).toHaveCount(1);
+  });
+});

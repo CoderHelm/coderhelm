@@ -1,5 +1,5 @@
 {
   "title": "Getting started",
   "defaultOpen": true,
-  "pages": ["index", "github", "jira", "first-run", "reviewer", "stale-pull-requests", "review-fixes", "security-fixes", "plans"]
+  "pages": ["index", "github", "jira", "first-run", "reviewer", "stale-pull-requests", "review-fixes", "security-fixes", "infrastructure-vulnerabilities", "plans"]
 }

@@ -17,6 +17,7 @@ import { RepoFilter, formatDuration, formatMs } from "@/components/list";
 import { ChartCard, ChartTip, SERIES, Table, axis, delta, shortDay } from "@/components/charts";
 import { DecisionsSection } from "./decisions";
 import { SecuritySection } from "./security";
+import { InfraSecuritySection } from "./infra-security";
 
 const PERIODS: { value: `${AnalyticsPeriod}`; label: string }[] = [
   { value: "7", label: "7 days" },
@@ -201,7 +202,12 @@ function AnalyticsPage() {
       </div>
 
       {tab === "overview" && <DeliveriesCard />}
-      {tab === "security" && <SecuritySection days={period === "mtd" ? new Date().getUTCDate() : period} />}
+      {tab === "security" && (
+        <>
+          <SecuritySection days={period === "mtd" ? new Date().getUTCDate() : period} />
+          <InfraSecuritySection />
+        </>
+      )}
 
       {tab === "security" ? null : error ? (
         <div className="mt-6">
