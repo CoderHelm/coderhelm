@@ -445,6 +445,18 @@ test.describe("Security", () => {
     await expect(page.getByTestId("finding-row")).toHaveCount(4);
   });
 
+  test("without Repository security advisories the page says what isn't read and how to add it", async ({ page }) => {
+    const note =
+      "Your repositories' own advisories and private vulnerability reports aren't read because CoderHelm can't read Repository security advisories on this installation; add Repository security advisories: read to the GitHub App.";
+    await mockApi(page, {
+      overview: overview({
+        sources: { dependabot: "on", osv: { synced_at: iso(-1), mode: "mirror" }, kev_synced_at: iso(-1), epss_synced_at: iso(-1), repository_advisories: { state: "no_permission", note } },
+      }),
+    });
+    await page.goto("/security");
+    await expect(page.getByTestId("advisories-note")).toHaveText(note);
+  });
+
   test("with the feature off, the page says so and points at the policy", async ({ page }) => {
     const db = await mockApi(page, { overview: overview({ enabled: false }) });
     await page.goto("/security");
@@ -477,6 +489,24 @@ test.describe("Security", () => {
     await expect(page.getByTestId("timeline")).toContainText("Dependabot alert #88 received");
     await expect(page.getByTestId("timeline").getByRole("link", { name: "PR #1532 opened" })).toBeVisible();
     await expect(page.getByTestId("advisory")).toContainText("On CISA's list of exploited vulnerabilities");
+  });
+
+  test("a private report against the repository's own code says it stays out of public pull requests and channels", async ({ page }) => {
+    const priv = finding({
+      private_report: true,
+      ecosystem: "repository",
+      manifest: "(this repository's code)",
+      package: "web-app",
+      version: "",
+      pr: null,
+      dependabot_alert: null,
+      status: "open",
+      advisory: { ...finding().advisory, source: "repository_advisory", ids: ["GHSA-aaaa-bbbb-cccc"], primary: "GHSA-aaaa-bbbb-cccc" },
+    });
+    await mockApi(page, { detail: { finding: priv, timeline: [] } });
+    await page.goto("/security/detail?id=sec_1");
+    await expect(page.getByTestId("private-report")).toContainText("never posted to a channel and never fixed in a public pull request or issue");
+    await expect(page.getByTestId("advisory")).toContainText("Advisory data: the repository's own security advisory");
   });
 
   test("dismissing needs a reason, takes an optional date, and is confirmed in the page; reopening undoes it", async ({ page }) => {

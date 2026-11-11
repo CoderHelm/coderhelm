@@ -601,6 +601,9 @@ function Comparison({ c, period, previous, mtd }: { c: AnalyticsComparison; peri
       `Coderhelm can't read workflow runs in ${plural(c.deploys_no_access.length, "repository", "repositories")} (${c.deploys_no_access.join(", ")}), so deploys there are not counted. Grant the app Actions: read on them.`,
     );
   }
+  if (c.deploys_source_note) {
+    notes.push(c.deploys_source_note);
+  }
   if (c.deploys_not_read?.length) {
     notes.push(
       `Coderhelm could not read earlier deploys in ${plural(c.deploys_not_read.length, "repository", "repositories")} (${c.deploys_not_read.map((r) => (r.reason ? `${r.repo}: ${r.reason}` : r.repo)).join("; ")}), so deploys there before webhooks recorded them are not counted.`,

@@ -118,6 +118,11 @@ function SecurityOverviewPage() {
               <PermissionBanner reason={overview.sources.dependabot_reason} />
             </div>
           )}
+          {overview.sources.repository_advisories?.note && (
+            <p className="mt-4 text-sm text-zinc-400" data-testid="advisories-note">
+              {overview.sources.repository_advisories.note}
+            </p>
+          )}
           {!on ? (
             <div className="mt-6">
               <EmptyState

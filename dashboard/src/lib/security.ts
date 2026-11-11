@@ -44,6 +44,8 @@ export interface SecurityOverview {
     osv: { synced_at: string | null; mode: "mirror" | "api" };
     kev_synced_at: string | null;
     epss_synced_at: string | null;
+    /** How the repositories' own advisories were last read, with a sentence when the App can't read them (older servers: absent). */
+    repository_advisories?: { state: "ok" | "no_permission" | "error" | "unread"; note: string | null };
   };
   /** One row per source, for the Sources panel. */
   source_rows?: SourceRow[];
@@ -180,6 +182,8 @@ export interface Finding {
   status: FindingStatus;
   pr: { number: number; url: string; ci: "pending" | "passing" | "failing" | null; state: "open" | "merged" | "closed"; adopted: boolean } | null;
   dependabot_alert: { number: number; url: string } | null;
+  /** A private report against the repository's own code (its advisory is still in triage or draft): never posted or fixed in public (older servers: absent). */
+  private_report?: boolean;
   dismissed: { by: string; reason: string; until: string | null; at: string } | null;
   first_seen_at: string;
   updated_at: string;

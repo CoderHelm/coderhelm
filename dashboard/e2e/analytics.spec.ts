@@ -68,7 +68,7 @@ function windows(period: string) {
 /** How far earlier deploys were read: known (a real 0 before), still counting, or read only from the start of this period. */
 type DeployState = "known" | "counting" | "before_records";
 
-function analytics(period: string, repo: string | null, deployState: DeployState = "known", noAccess: string[] = []) {
+function analytics(period: string, repo: string | null, deployState: DeployState = "known", noAccess: string[] = [], sourceNote: string | null = null) {
   const scale = repo ? 0.5 : 1;
   const w = windows(period);
   const daysN = w.days;
@@ -88,6 +88,7 @@ function analytics(period: string, repo: string | null, deployState: DeployState
       deploys_previous_state: deployState,
       deploys_backfill: deployState === "counting" ? "running" : "done",
       deploys_no_access: noAccess,
+      deploys_source_note: sourceNote,
       daily: compareDaily(w.start, w.prevStart, Math.max(2, daysN)).map((d) => (deployState === "counting" ? { ...d, previous_deploys: null } : d)),
     },
     summary: { ...SUMMARY, prs_merged: Math.round(21 * scale), runs: Math.round(42 * scale) },
@@ -140,7 +141,7 @@ function analytics(period: string, repo: string | null, deployState: DeployState
   };
 }
 
-interface Backend { calls: string[]; fail: boolean; empty: boolean; oldServer: boolean; estimated: number; recovered: number; deliveries?: "ok" | "refused"; deployState?: DeployState; noAccess?: string[]; notRead?: { repo: string; reason: string }[]; progress?: { read: number; total: number; resumes_at?: string | null } | null }
+interface Backend { calls: string[]; fail: boolean; empty: boolean; oldServer: boolean; estimated: number; recovered: number; deliveries?: "ok" | "refused"; deployState?: DeployState; noAccess?: string[]; sourceNote?: string | null; notRead?: { repo: string; reason: string }[]; progress?: { read: number; total: number; resumes_at?: string | null } | null }
 
 async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend> {
   const db: Backend = { calls: [], fail: false, empty: false, oldServer: false, estimated: 0, recovered: 0, ...init };
@@ -163,7 +164,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     if (p === "/api/analytics") {
       if (db.fail) return json(route, { error: "boom" }, 500);
       const period = url.searchParams.get("period") === "mtd" ? "mtd" : url.searchParams.get("days") || "30";
-      const { comparison: base, ...older } = analytics(period, url.searchParams.get("repo"), db.deployState, db.noAccess);
+      const { comparison: base, ...older } = analytics(period, url.searchParams.get("repo"), db.deployState, db.noAccess, db.sourceNote ?? null);
       const comparison = { ...base, deploys_not_read: db.notRead ?? [], deploys_backfill_progress: db.progress ?? null };
       const body = db.oldServer ? older : { ...older, comparison };
       if (db.empty) {
@@ -453,6 +454,14 @@ test("repositories Coderhelm can't read runs in are named, with the permission t
   const notes = page.getByTestId("compare-notes");
   await expect(notes).toContainText("can't read workflow runs in 1 repository (your-team/infra)");
   await expect(notes).toContainText("Actions: read");
+});
+
+test("deploys read without Deployments access say so and how to fix it", async ({ page }) => {
+  const note =
+    "Deploys are inferred from workflow names and jobs because CoderHelm can't read Deployments on this installation; add Deployments: read to the GitHub App.";
+  await mockApi(page, { sourceNote: note });
+  await page.goto("/analytics?tab=trends");
+  await expect(page.getByTestId("compare-notes")).toContainText(note);
 });
 
 test("month to date compares the same days of last month and shows all of last month", async ({ page }) => {
