@@ -1,5 +1,5 @@
 import { REPO } from "./long";
-import { ALERT_ID, DRAFT_ID, PLAN_ID, PLUGIN_ID, PLUGIN_RUN_ID, REVIEW_SK, RUN_ID, SESSION_ID, SECURITY_FINDING_ID, SUPPORT_TICKET_ID, TEST_ID, TEST_RUN_KEY, TOOL_NAME } from "./ids";
+import { ALERT_ID, DRAFT_ID, PLAN_ID, PLUGIN_ID, PLUGIN_RUN_ID, REVIEW_SK, RUN_ID, SESSION_ID, SECURITY_FINDING_ID, SETUP_RUN_ID, SUPPORT_TICKET_ID, TEST_ID, TEST_RUN_KEY, TOOL_NAME } from "./ids";
 
 /**
  * The query an item's page (`detail: true` in lib/routes.ts) is opened with,
@@ -18,6 +18,7 @@ export const SAMPLE_QUERY: Record<string, string> = {
   "/plans/detail": `?id=${PLAN_ID}`,
   "/data-sources/tools/tool": `?name=${encodeURIComponent(TOOL_NAME)}`,
   "/alerts/detail": `?id=${encodeURIComponent(ALERT_ID)}`,
+  "/setup/run": `?id=${SETUP_RUN_ID}`,
   "/security/detail": `?id=${encodeURIComponent(SECURITY_FINDING_ID)}`,
   "/skills/item": `?repo=${encodeURIComponent(REPO)}&path=${encodeURIComponent(".claude/skills/schedule-table-conventions/SKILL.md")}`,
   "/skills/agent": `?repo=${encodeURIComponent(REPO)}&path=${encodeURIComponent(".claude/agents/payments-reconciliation-reviewer.md")}`,

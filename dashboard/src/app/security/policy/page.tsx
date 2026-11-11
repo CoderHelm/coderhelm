@@ -35,6 +35,7 @@ import {
 } from "@/lib/security";
 import { TierPill } from "../parts";
 import { InfraPolicySection } from "./infra";
+import { ReviewInSetup, useSetupMarks } from "@/components/setup-marks";
 
 const TIER_WHEN: Record<Tier, string> = {
   P0: "Exploited and loaded, or critical and reachable, or a malicious package.",
@@ -56,6 +57,7 @@ export default function SecurityPolicyPage() {
   const [saving, setSaving] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const form = useDirtyForm<SecurityConfig>(SECURITY_DEFAULTS, { disabled: state !== "ready" });
+  const setupMarks = useSetupMarks(null);
   const { values: c, set, reset } = form;
   const teamRepos = useTeamRepos();
 
@@ -110,6 +112,7 @@ export default function SecurityPolicyPage() {
         title="Security policy"
         lead="What Coderhelm does when an advisory touches your dependencies: which findings get a pull request and when, what is posted to your alerts channel, and the deadlines."
       />
+      <ReviewInSetup available={setupMarks.available} />
 
       {readOnly && (
         <div className="mt-6">
@@ -138,7 +141,7 @@ export default function SecurityPolicyPage() {
               <SettingsRow
                 label="Security fixes"
                 help="Check advisories against your code, open fix pull requests and post urgent ones."
-                unsaved={form.isDirty("enabled")}
+                unsaved={form.isDirty("enabled")} setup={setupMarks.mark(["security.enabled"], form.values.enabled)}
                 layout="toggle"
                 control={({ labelId, helpId, inputId }) => (
                   <Switch

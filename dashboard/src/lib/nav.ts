@@ -7,7 +7,7 @@
 import { ANY_CHANGE } from "./capabilities";
 import { KNOWLEDGE_HREF, normalizePath } from "./routes";
 
-export type NavIconKey = "runs" | "plans" | "reviews" | "logs" | "chat" | "knowledge" | "plugins" | "insights" | "settings" | "admin" | "queue" | "security";
+export type NavIconKey = "runs" | "plans" | "reviews" | "logs" | "chat" | "knowledge" | "plugins" | "insights" | "settings" | "admin" | "queue" | "security" | "setup";
 
 export interface NavPage {
   href: string;
@@ -26,12 +26,21 @@ export interface NavSection {
   alsoUnder?: string[];
   superAdminOnly?: boolean;
   /** A count beside the label. */
-  countKey?: "supportQueue" | "securityUrgent";
+  countKey?: "supportQueue" | "securityUrgent" | "setupTodo";
   /** Shown only while this team flag is on. */
   flag?: "plugins";
 }
 
 export const NAV_SECTIONS: NavSection[] = [
+  {
+    // Recommended settings per repo. The count is the new recommendations
+    // plus the repos not set up yet, shown as "9+" past nine.
+    key: "setup",
+    label: "Setup",
+    icon: "setup",
+    pages: [{ href: "/setup", label: "Setup", need: ANY_CHANGE }],
+    countKey: "setupTodo",
+  },
   { key: "runs", label: "Runs", icon: "runs", pages: [{ href: "/", label: "Runs" }], alsoUnder: ["/runs"] },
   {
     key: "plans",

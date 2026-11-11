@@ -126,6 +126,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     if (p === "/api/teams") return json(route, { teams: [{ team_id: "t_1", org: "your-team", status: "active", current: true }] });
     // Security is off: no count beside it in the sidebar.
     if (p === "/api/security/overview") return json(route, { enabled: false, dry_run: true, counts: { open: 0, p0: 0, p1: 0 } });
+    if (p === "/api/setup") return json(route, { repos: [], new_recommendations: [], auto_setup_new_repos: false });
     if (p === "/api/support/badge") return json(route, { waiting: 0, queue_open: null });
     if (p === "/api/plugins/flag") return json(route, { enabled: db.flag });
     if (!db.flag && (p.startsWith("/api/plugins/") || p === "/api/audit")) return refuse(route, 403, "flag_off", "Plugins are not turned on for this team.");

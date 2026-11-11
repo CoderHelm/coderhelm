@@ -484,6 +484,50 @@ function StaleFrame() {
   );
 }
 
+function SetupFrame() {
+  return (
+    <Window url="app.coderhelm.com/setup" label="Setup">
+      <div className="grid gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-text-primary">Set up 3 repos</span>
+          <span className="text-text-muted">· 14 settings turned on · 4 of yours kept</span>
+        </div>
+        <div className="rounded-lg border border-line p-3">
+          <div className="flex items-start gap-2.5">
+            <Dot tone="ok" />
+            <div className="min-w-0">
+              <p className="text-text-primary">example/web</p>
+              <p className="text-text-secondary">Turned on 9 settings, kept 3 of yours, 1 is a preview you can switch on</p>
+            </div>
+          </div>
+          <div className="mt-3 grid gap-2 border-t border-line pt-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-text-primary">Review pull requests</span>
+              <Pill tone="ok">Detected</Pill>
+              <span className="ml-auto text-[12px] text-text-muted">Undo</span>
+            </div>
+            <p className="text-[12px] text-text-muted">Label ch-review is on 31 merged pull requests</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-text-primary">Require tests</span>
+              <Pill tone="info">Inferred</Pill>
+              <span className="ml-auto text-[12px] text-text-muted">Undo</span>
+            </div>
+            <p className="text-[12px] text-text-muted">18 of the last 20 merged pull requests changed tests</p>
+          </div>
+        </div>
+        <div className="rounded-lg border border-warn/30 bg-warn/5 p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-text-primary">Close stale pull requests</span>
+            <Pill tone="warn">Preview</Pill>
+            <span className="ml-auto rounded-md bg-white px-2 py-0.5 text-[12px] font-medium text-black">Switch on</span>
+          </div>
+          <p className="mt-1 text-[12px] text-text-secondary">Would have marked 6 pull requests stale and closed 2 in the last 14 days</p>
+        </div>
+      </div>
+    </Window>
+  );
+}
+
 const FRAMES: Record<FrameId, () => ReactNode> = {
   maintain: MaintainFrame,
   review: ReviewFrame,
@@ -498,6 +542,7 @@ const FRAMES: Record<FrameId, () => ReactNode> = {
   merge: MergeFrame,
   secfix: SecFixFrame,
   stale: StaleFrame,
+  setup: SetupFrame,
 };
 
 export function Frame({ id, caption, priority = false, hideCaption = false }: { id: FrameId; caption: string; priority?: boolean; hideCaption?: boolean }) {

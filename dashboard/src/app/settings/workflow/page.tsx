@@ -12,6 +12,7 @@ import { Page, PageHeader } from "@/components/page";
 import { buttonClass, linkButton, monoInputClass } from "@/components/ui";
 import { Select } from "@/components/select";
 import { Code, SaveBar, SettingsDisclosure, SettingsRow, SettingsSection, Switch, useDirtyForm } from "@/components/settings";
+import { ReviewInSetup, useSetupMarks } from "@/components/setup-marks";
 
 export default function WorkflowPageGuarded() {
   return <RoleGuard need="agent_settings"><WorkflowPage /></RoleGuard>;
@@ -51,6 +52,7 @@ function WorkflowPage() {
   const [serverError, setServerError] = useState<{ field: Kind; error: string } | null>(null);
 
   const form = useDirtyForm<Form>(EMPTY, { same: sameField, disabled: load !== "ready" });
+  const setupMarks = useSetupMarks(null);
   const { reset } = form;
   const v = form.values;
 
@@ -138,6 +140,7 @@ function WorkflowPage() {
   const header = (
     <div className="mb-6">
       <PageHeader title="Workflow" lead="How Coderhelm shapes the pull requests it opens and where plan tasks go." />
+      <ReviewInSetup available={setupMarks.available} />
     </div>
   );
 
@@ -205,6 +208,7 @@ function WorkflowPage() {
                 label={f.label}
                 layout="stacked"
                 unsaved={form.isDirty(f.key)}
+                setup={setupMarks.mark([`git_conventions.${f.key}`], v[f.key])}
                 help={f.what}
                 control={(ids) => (
                   <div className="min-w-0">

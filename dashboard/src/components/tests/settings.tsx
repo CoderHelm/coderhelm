@@ -12,6 +12,7 @@ import { useToast } from "@/components/toast";
 import { focusRing, inputClass } from "@/components/ui";
 import { Code, RowMarks, SaveBar, SettingsRow, SettingsSection, Switch as RowSwitch, useDirtyForm } from "@/components/settings";
 import { Select } from "@/components/select";
+import { ReviewInSetup, useSetupMarks } from "@/components/setup-marks";
 
 /** The shared switch, under the name this file's callers use. */
 export function Switch({ checked, onChange, label, disabled }: { checked: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {
@@ -108,6 +109,7 @@ export function SettingsView({
 }) {
   const { toast } = useToast();
   const form = useDirtyForm<TestSettings>(normalized(settings));
+  const setupMarks = useSetupMarks(null);
   const { reset } = form;
   const draft = form.values;
   const [repos, setRepos] = useState<Repo[] | null>(null);
@@ -197,18 +199,19 @@ export function SettingsView({
 
   return (
     <div className="space-y-8">
+      <ReviewInSetup available={setupMarks.available} />
       <SettingsSection id="test-settings" title="Settings">
         <SettingsRow
           label="Track E2E tests"
           layout="toggle"
-          unsaved={form.isDirty("enabled")}
+          unsaved={form.isDirty("enabled")} setup={setupMarks.mark(["tests.e2e"], form.values.enabled)}
           help="Read every E2E run your CI finishes, and tell flaky tests from broken ones. Nothing changes in your repos."
           control={(ids) => <RowSwitch id={ids.inputId} checked={draft.enabled} onChange={(v) => form.set("enabled", v)} labelledBy={ids.labelId} describedBy={ids.helpId} />}
         />
         <SettingsRow
           label="Quarantine flaky tests"
           layout="toggle"
-          unsaved={form.isDirty("auto_quarantine")}
+          unsaved={form.isDirty("auto_quarantine")} setup={setupMarks.mark(["tests.auto_quarantine"], form.values.auto_quarantine)}
           help="A test that turns flaky on your main branch stops failing builds. It still runs and is still recorded. Broken tests are never quarantined."
           control={(ids) => (
             <RowSwitch id={ids.inputId} checked={draft.auto_quarantine} onChange={(v) => form.set("auto_quarantine", v)} labelledBy={ids.labelId} describedBy={ids.helpId} disabled={off} />
@@ -217,7 +220,7 @@ export function SettingsView({
         <SettingsRow
           label="Open fix PRs"
           layout="toggle"
-          unsaved={form.isDirty("fix_prs")}
+          unsaved={form.isDirty("fix_prs")} setup={setupMarks.mark(["tests.fix_prs"], form.values.fix_prs)}
           help="Coderhelm reproduces a flaky test, writes a fix and opens a PR only after 20 green runs. It never skips a test or weakens a check to make it pass."
           control={(ids) => (
             <RowSwitch id={ids.inputId} checked={draft.fix_prs} onChange={(v) => form.set("fix_prs", v)} labelledBy={ids.labelId} describedBy={ids.helpId} disabled={off} />

@@ -14,6 +14,7 @@ import { Problem } from "@/components/problem";
 import { EmptyState } from "@/components/empty-state";
 import { linkButton, monoInputClass, secondaryButton } from "@/components/ui";
 import { Code, Field, SaveBar, SettingsRow, SettingsSection, Switch, useDirtyForm } from "@/components/settings";
+import { ReviewInSetup, useSetupMarks } from "@/components/setup-marks";
 
 export const STALE_DEFAULTS: StaleConfig = {
   enabled: false,
@@ -81,6 +82,7 @@ export function StaleSection({ repo, readOnly }: { repo: string; readOnly: boole
   const [problem, setProblem] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
   const form = useDirtyForm<Form>({ ...STALE_DEFAULTS, own: false }, { disabled: loadState !== "ready" });
+  const setupMarks = useSetupMarks(repo || null);
   const { values: f, set, reset } = form;
 
   useEffect(() => {
@@ -205,7 +207,7 @@ export function StaleSection({ repo, readOnly }: { repo: string; readOnly: boole
                   <SettingsRow
                     label="Close stale pull requests"
                     help="Only on repositories the reviewer is on for. Off by default."
-                    unsaved={form.isDirty("enabled")}
+                    unsaved={form.isDirty("enabled")} setup={setupMarks.mark(["stale_prs.enabled"], form.values.enabled)}
                     layout="toggle"
                     control={({ labelId, helpId, inputId }) => (
                       <Switch id={inputId} checked={f.enabled} onChange={(v) => set("enabled", v)} labelledBy={labelId} describedBy={helpId} testId="stale-enabled" />
@@ -214,7 +216,7 @@ export function StaleSection({ repo, readOnly }: { repo: string; readOnly: boole
                   <SettingsRow
                     label="Dry run"
                     help="Shows what would be marked and closed below, and changes nothing on GitHub. Turn it off once the list looks right."
-                    unsaved={form.isDirty("dry_run")}
+                    unsaved={form.isDirty("dry_run")} setup={setupMarks.mark(["stale_prs.dry_run"], form.values.dry_run)}
                     layout="toggle"
                     control={({ labelId, helpId, inputId }) => (
                       <Switch id={inputId} checked={f.dry_run} onChange={(v) => set("dry_run", v)} labelledBy={labelId} describedBy={helpId} testId="stale-dry-run" />

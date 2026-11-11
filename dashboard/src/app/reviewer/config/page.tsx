@@ -39,6 +39,29 @@ import {
 import { Page, PageHeader } from "@/components/page";
 import { MarkdownEditor } from "@/components/markdown-editor";
 import { StaleSection } from "./stale";
+import { ReviewInSetup, useSetupMarks } from "@/components/setup-marks";
+
+/** Setup's registry id for each reviewer field that Setup recommends. */
+const SETUP_IDS: Partial<Record<Key, string>> = {
+  enabled: "reviewer.enabled",
+  label: "reviewer.label",
+  instructions: "reviewer.instructions",
+  verify_tests: "tests.verify_tests",
+  require_tests: "tests.require_tests",
+  auto_labels: "ci_labels.enabled",
+  auto_label_allow: "ci_labels.allow",
+  auto_merge: "auto_merge.enabled",
+  merge_method: "auto_merge.merge_method",
+  require_human_approval: "auto_merge.require_human_approval",
+  auto_tag: "tags.auto_tag",
+  tag_mode: "tags.tag_mode",
+  tag_prefix: "tags.tag_prefix",
+  tag_batch_minutes: "tags.tag_batch_minutes",
+  health_check: "tags.health_check",
+  release_notes: "release_notes.enabled",
+  reminders_enabled: "reminders.enabled",
+  reminder_cooldown_hours: "reminders.cooldown_hours",
+};
 
 export default function ReviewerConfigGuarded() {
   return (
@@ -313,7 +336,9 @@ function ReviewerConfigPage() {
   const isChanged = (...ks: Key[]) => ks.some((k) => !sameSetting(cfg[k], DEFAULTS[k]));
   // Only what the person just changed is marked; "differs from the default"
   // would sit on nearly every row of a configured repo.
-  const marks = (...ks: Key[]) => ({ unsaved: form.isDirty(...ks) });
+  // Setup's opinion on the first field of a row: "Recommended" or "Custom".
+  const setupMarks = useSetupMarks(repo);
+  const marks = (...ks: Key[]) => ({ unsaved: form.isDirty(...ks), setup: ks[0] && SETUP_IDS[ks[0]] ? setupMarks.mark(SETUP_IDS[ks[0]]!, cfg[ks[0]]) : null });
 
   // Leaving with unsaved repo edits asks first (useDirtyForm); so do unsaved standards.
   useLeaveWarning(orgDirty);
@@ -424,6 +449,8 @@ function ReviewerConfigPage() {
           </>
         }
       />
+
+      <ReviewInSetup repo={repo} available={setupMarks.available && !!repo} />
 
       <Tabs label="Settings sections" value={view} items={tabs} />
 

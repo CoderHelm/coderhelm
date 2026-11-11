@@ -24,8 +24,8 @@ test("the main menu is a handful of destinations with one Settings entry, Chat a
   // Plugins shows only while the team's plugins flag is on (the wide data turns it on).
   // toHaveText waits for the menu to render; a one-time read can run before it does.
   // Security carries the count of its open P0 and P1 findings (two in the wide data).
-  await expect(main.getByRole("link")).toHaveText(["Runs", "Plans", "Code review", "Logs", /^Security2 urgent security findings$/, "Chat", "Knowledge", "Plugins", "Insights", "Settings"]);
-  await expect(main.getByRole("link", { name: "Runs" })).toHaveAttribute("aria-current", "page");
+  await expect(main.getByRole("link")).toHaveText([/^Setup2 things to set up$/, "Runs", "Plans", "Code review", "Logs", /^Security2 urgent security findings$/, "Chat", "Knowledge", "Plugins", "Insights", "Settings"]);
+  await expect(main.getByRole("link", { name: "Runs", exact: true })).toHaveAttribute("aria-current", "page");
   // "Brain" is never a word people see in the menu.
   await expect(page.getByRole("navigation", { name: "Main" })).not.toContainText("Brain");
   // Help is one menu.

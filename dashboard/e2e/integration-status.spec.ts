@@ -37,6 +37,7 @@ async function mockApi(page: Page, opts: { cards: Card[]; install: string; repos
     if (p === "/api/integrations/jira/events") return json(r, { events: [] });
     // Security is off: no count beside it in the sidebar.
     if (p === "/api/security/overview") return json(r, { enabled: false, dry_run: true, counts: { open: 0, p0: 0, p1: 0 } });
+    if (p === "/api/setup") return json(r, { repos: [], new_recommendations: [], auto_setup_new_repos: false });
     if (p === "/api/support/badge") return json(r, { waiting: 0, queue_open: null });
     return json(r, {});
   });
