@@ -160,12 +160,12 @@ const overview = (over: Record<string, unknown> = {}) => ({
   source_rows: [
     { id: "dependabot", name: "Dependabot alerts", gives: "GitHub's own alerts for each repository's dependencies.", state: "ok", reason: "", synced_at: iso(-1), count: 3 },
     { id: "osv", name: "OSV (by API)", gives: "Every package and version matched against advisories.", state: "ok", reason: "", synced_at: iso(-0.5), count: 11 },
-    { id: "github_advisory", name: "GitHub advisory feed", gives: "New and changed GitHub advisories as they are published.", state: "never", reason: "No advisory has arrived since Security was turned on.", synced_at: null, count: 0 },
+    { id: "github_advisory", name: "GitHub advisory feed", gives: "New and changed GitHub advisories as they are published.", state: "ok", reason: "Waiting for GitHub's first webhook; checked by polling at Nov 11, 06:00 UTC.", synced_at: iso(-1), count: 0 },
     { id: "kev", name: "CISA known exploited list", gives: "Vulnerabilities attackers are using now.", state: "ok", reason: "", synced_at: iso(-2), count: 1, listed: 1484 },
     { id: "epss", name: "FIRST EPSS", gives: "The chance each vulnerability is exploited in the next 30 days.", state: "ok", reason: "", synced_at: iso(-2), count: 9 },
   ],
   repos: [
-    { repo: "acme/web-app", packages: 2712, ecosystems: { npm: 2708, "GitHub Actions": 3, docker: 1 }, read_at: iso(-1), state: "ok", reason: "", unpinned: 2, dependabot: "on", dependabot_reason: "", osv_error: null },
+    { repo: "acme/web-app", packages: 2712, ecosystems: { npm: 2708, "GitHub Actions": 3, docker: 1 }, read_at: iso(-1), state: "ok", reason: "", unpinned: 2, dependabot: "on", dependabot_reason: "", osv_error: null, next_read: "Next read on the next dependency change or within 24 h." },
     { repo: "acme/api", packages: 1, ecosystems: { docker: 1 }, read_at: iso(-1), state: "graph_off", reason: "GitHub's dependency graph is off for this repo; turn it on in the repo's Settings, Code security.", unpinned: 0, dependabot: null, dependabot_reason: "", osv_error: null },
   ],
   spend: {
@@ -369,13 +369,15 @@ test.describe("Security", () => {
     await expect(osv).toContainText("11 open findings");
     await expect(osv).toContainText("Last read");
     const feed = sources.locator('[data-source="github_advisory"]');
-    await expect(feed).toContainText("Not synced yet");
-    await expect(feed.getByTestId("source-reason")).toContainText("No advisory has arrived");
+    await expect(feed).toContainText("Last read");
+    await expect(feed.getByTestId("source-reason")).toContainText("Waiting for GitHub's first webhook; checked by polling at");
     await expect(sources.locator('[data-source="kev"]')).toContainText("1 open finding on the list (lists 1,484)");
     const inv = page.getByTestId("inventory");
     await expect(inv.locator('[data-repo="acme/web-app"]')).toContainText("2,712 packages · npm 2,708, GitHub Actions 3, docker 1 · 2 without an exact version");
     await expect(inv.locator('[data-repo="acme/api"]')).toContainText("Dependency graph off");
     await expect(inv.locator('[data-repo="acme/api"]')).toContainText("turn it on in the repo's Settings, Code security");
+    await expect(inv.locator('[data-repo="acme/web-app"]').getByTestId("next-read")).toHaveText("; next read on the next dependency change or within 24 h.");
+    await expect(inv.locator('[data-repo="acme/api"]').getByTestId("next-read")).toHaveCount(0);
   });
 
   test("Dependabot needing a permission shows its state and fix in the Sources panel", async ({ page }) => {

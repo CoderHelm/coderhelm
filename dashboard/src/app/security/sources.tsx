@@ -101,6 +101,7 @@ export function SourcesPanel({ o }: { o: SecurityOverview }) {
                   </div>
                   <div className="text-xs text-zinc-400 lg:whitespace-nowrap lg:text-right">
                     Read <When at={r.read_at} />
+                    {r.read_at && r.next_read && <span data-testid="next-read">; {r.next_read.charAt(0).toLowerCase() + r.next_read.slice(1)}</span>}
                   </div>
                 </li>
               );
