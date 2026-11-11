@@ -111,6 +111,8 @@ interface Db {
   findings: unknown;
   detail: unknown;
   config: unknown;
+  synced: boolean;
+  dismissRefuse: string | null;
   calls: { call: string; url: string; body: unknown }[];
 }
 
@@ -121,6 +123,8 @@ async function mockApi(page: Page, init: Partial<Db> = {}): Promise<Db> {
     findings: { findings: FINDINGS, next_cursor: null },
     detail: { finding: finding(), timeline: [{ at: iso(-5), text: "Dependabot alert #88 received", link: null }, { at: iso(-4), text: "PR #1532 opened", link: "https://github.com/acme/web-app/pull/1532" }] },
     config: { config: CONFIG, defaults: CONFIG },
+    synced: true,
+    dismissRefuse: null,
     calls: [],
     ...init,
   };
@@ -146,14 +150,17 @@ async function mockApi(page: Page, init: Partial<Db> = {}): Promise<Db> {
     if (p === "/api/security/overview") return json(route, db.overview);
     if (p === "/api/security/findings" && method === "GET") return json(route, db.findings);
     if (/^\/api\/security\/findings\/[^/]+$/.test(p)) return json(route, db.detail);
-    if (p.endsWith("/dismiss")) return json(route, { status: "dismissed" });
-    if (p.endsWith("/reopen")) return json(route, { status: "open" });
-    if (p === "/api/security/scan") return json(route, { status: "queued" });
+    if (p.endsWith("/dismiss")) {
+      if (db.dismissRefuse) return json(route, { error: db.dismissRefuse }, 400);
+      return json(route, { finding: finding({ status: "dismissed" }), synced: db.synced });
+    }
+    if (p.endsWith("/reopen")) return json(route, { finding: finding(), synced: true });
+    if (p === "/api/security/scan") return json(route, { status: "queued" }, 202);
     if (p === "/api/security/config" && method === "GET") return json(route, db.config);
     if (p === "/api/security/config" && method === "PUT") return json(route, { config: body });
     if (p === "/api/security/preview")
       return json(route, {
-        would_open: [{ finding_id: "sec_1", repo: "acme/web-app", title: "Bump undici 6.19.2 to 6.21.1", tier: "P0" }],
+        would_open: [{ finding_id: "sec_1", repo: "acme/web-app", title: "Bump undici 6.19.2 to 6.21.1", tier: "P0", branch: "coderhelm/security-undici-6.21.1", labels: ["security", "severity:critical"] }],
         would_post: [{ finding_id: "sec_1", repo: "acme/web-app", title: "web-app is affected by CVE-2026-31337", tier: "P0" }],
       });
     return json(route, { error: `Not mocked: ${method} ${p}` }, 404);
@@ -265,7 +272,7 @@ test.describe("Security", () => {
     await page.goto("/security/detail?id=sec_1");
     await page.getByTestId("dismiss-open").click();
     const form = page.getByTestId("dismiss-form");
-    await expect(form).toContainText("sent to the Dependabot alert");
+    await expect(form).toContainText("the Dependabot alert is dismissed too");
     await form.getByTestId("dismiss-confirm").click();
     await expect(form.getByRole("alert")).toHaveText("Say why, so the next person who looks knows.");
     expect(call(db, "POST /api/security/findings/sec_1/dismiss")).toHaveLength(0);
@@ -277,12 +284,19 @@ test.describe("Security", () => {
     expect(call(db, "POST /api/security/findings/sec_1/dismiss")[0].body).toEqual({ reason: "The pipelining option is off in every environment.", until: "2099-01-31" });
     expect(dialogs).toBe(0);
 
-    // Without a date it goes as null.
-    db.detail = { finding: finding({ id: "sec_1" }), timeline: [] };
+    // The server's refusal is shown as it said it.
+    db.dismissRefuse = "The date it comes back is in the past.";
     await page.getByTestId("dismiss-open").click();
     await page.getByTestId("dismiss-form").getByLabel("Why").fill("Not used.");
     await page.getByTestId("dismiss-form").getByTestId("dismiss-confirm").click();
-    await expect.poll(() => call(db, "POST /api/security/findings/sec_1/dismiss")[1]?.body).toEqual({ reason: "Not used.", until: null });
+    await expect(page.getByTestId("dismiss-form").getByRole("alert")).toHaveText("The date it comes back is in the past.");
+
+    // Without a date it goes as null; with only read access, the alert stays open and the page says so.
+    db.dismissRefuse = null;
+    db.synced = false;
+    await page.getByTestId("dismiss-form").getByTestId("dismiss-confirm").click();
+    await expect(page.getByText("The Dependabot alert stays open")).toBeVisible();
+    expect(call(db, "POST /api/security/findings/sec_1/dismiss")[2]?.body).toEqual({ reason: "Not used.", until: null });
 
     db.detail = {
       finding: finding({ status: "dismissed", dismissed: { by: "admin@example.com", reason: "Not used.", until: null, at: iso(0) } }),
@@ -369,6 +383,7 @@ test.describe("Security", () => {
     await page.goto("/security/policy");
     await page.getByTestId("preview-load").click();
     await expect(page.getByTestId("would-open")).toContainText("Bump undici 6.19.2 to 6.21.1 in web-app");
+    await expect(page.getByTestId("would-open")).toContainText("coderhelm/security-undici-6.21.1 · security, severity:critical");
     await expect(page.getByTestId("would-post")).toContainText("web-app is affected by CVE-2026-31337");
   });
 

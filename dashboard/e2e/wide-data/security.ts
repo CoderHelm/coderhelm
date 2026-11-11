@@ -92,7 +92,7 @@ export const securityData: Handler = ({ method, path }) => {
       counts: { open: 14, p0: 1, p1: 1, p2: 7, p3: 5, due_7d: 5, fixed_30d: 23, dismissed: 4, noise_removed: 61 },
       median_hours_to_merge_30d: 19,
       next_due_at: iso(-41 * HOUR),
-      sources: { dependabot: "no_permission", osv: { synced_at: iso(60), mode: "mirror" }, kev_synced_at: iso(60), epss_synced_at: iso(60) },
+      sources: { dependabot: "no_permission", osv: { synced_at: iso(60), mode: "api" }, kev_synced_at: iso(60), epss_synced_at: iso(60) },
       permission_missing: true,
     };
   if (path === "/api/security/findings") return { findings: FINDINGS, next_cursor: "cursor_wide" };
@@ -108,6 +108,6 @@ export const securityData: Handler = ({ method, path }) => {
     };
   if (path === "/api/security/config") return { config: CONFIG, defaults: { ...CONFIG, enabled: false, dry_run: true, repos: "all", ignore: [], labels: ["security", "dependencies"] } };
   if (path === "/api/security/preview")
-    return { would_open: [{ finding_id: SECURITY_FINDING_ID, repo: REPO, title: TITLE, tier: "P0" }], would_post: [{ finding_id: SECURITY_FINDING_ID, repo: REPO, title: TITLE, tier: "P0" }] };
+    return { would_open: [{ finding_id: SECURITY_FINDING_ID, repo: REPO, title: TITLE, tier: "P0", branch: "coderhelm/security-at-your-team-http-client-with-retries-and-circuit-breaker-6.21.1", labels: ["security", "dependencies", "needs-review-by-the-platform-security-team-before-merge"] }], would_post: [{ finding_id: SECURITY_FINDING_ID, repo: REPO, title: TITLE, tier: "P0" }] };
   return undefined;
 };

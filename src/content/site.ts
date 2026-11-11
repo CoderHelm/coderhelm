@@ -723,13 +723,13 @@ const securityFixes: Page = {
         {
           type: "list",
           items: [
-            "OSV.dev, copied daily, covering about 30 package ecosystems and the Linux distributions behind base images",
+            "OSV.dev, covering about 30 package ecosystems and the Linux distributions behind base images",
             "Dependabot alerts, as they happen, when they are on",
             "GitHub's advisories, for repositories where Dependabot alerts are off",
             "CISA's list of exploited vulnerabilities and FIRST's EPSS scores, for how urgent each one is",
           ],
         },
-        { type: "p", text: "A [self hosted](/self-host/) install keeps every dependency list in its own AWS account. See the [docs](https://docs.coderhelm.com/getting-started/security-fixes/) for what is sent where." },
+        { type: "p", text: "A [self hosted](/self-host/) install stores every dependency list in its own AWS account and sends OSV only package names and versions. See the [docs](https://docs.coderhelm.com/getting-started/security-fixes/) for what is sent where." },
       ],
     },
   ],

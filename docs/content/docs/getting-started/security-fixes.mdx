@@ -11,7 +11,7 @@ Security fixes are off for new teams. Turn them on in **Security**, then **Polic
 
 | Source | What it is used for |
 | --- | --- |
-| **OSV.dev** | The main advisory database: about 30 package ecosystems plus the Linux distributions behind base images. CoderHelm keeps a copy of OSV's daily export and matches your dependency lists against it locally. |
+| **OSV.dev** | The main advisory database: about 30 package ecosystems plus the Linux distributions behind base images. CoderHelm asks OSV about the packages and versions in your stored dependency lists. |
 | **Dependabot alerts** | The fastest signal when Dependabot alerts are on for a repository. CoderHelm hears about each alert as it is created, fixed, dismissed or withdrawn, and reads its direct or indirect and runtime or development details. |
 | **GitHub advisories** | Every new GitHub advisory is checked against the stored dependency list of each repository, including repositories where Dependabot alerts are off. |
 | **CISA's known exploited list** | Vulnerabilities being exploited now. Its due date for each one can become the deadline. |
@@ -23,9 +23,9 @@ CoderHelm stores each repository's dependency list when its default branch chang
 
 ### What is sent where on a self-hosted install
 
-Your dependency lists never leave your AWS account. The install makes these outbound calls, none of which carry anything about your code:
+Your dependency lists are stored in your own AWS account. To check them, the install makes these outbound calls:
 
-- the OSV export (`osv-vulnerabilities` on Google Cloud Storage), read daily for changed records only. Without the optional mirror bucket, the install asks OSV's API about each package and version instead, which does send package names and versions to OSV;
+- OSV's API (`api.osv.dev`), with the package names and versions from your dependency lists, never your code;
 - CISA's exploited list (a public JSON file), a few times a day;
 - FIRST's EPSS scores, for the vulnerability IDs the install holds;
 - GitHub's API, as for everything else CoderHelm does.
@@ -85,7 +85,7 @@ The same card is updated when the pull request opens, when CI passes and when it
 
 ## Dismissing and ignoring
 
-**Dismiss** a finding from its page when it doesn't apply (admins only). A reason is required, and you can give a date for it to come back if it still applies. The reason is kept with the finding and, when there is a Dependabot alert, sent to that alert too. **Reopen** undoes it.
+**Dismiss** a finding from its page when it doesn't apply (admins only). A reason is required, and you can give a date for it to come back if it still applies. The reason is kept with the finding. When there is a Dependabot alert and the GitHub App has **Dependabot alerts: write**, the alert is dismissed too; with read only, it is recorded in CoderHelm only. **Reopen** undoes it.
 
 **Ignore** an advisory in the policy, for one repository or every repository. Every ignore needs a reason and an end date, so nothing is ignored forever by accident. When the date passes, the advisory is checked again.
 

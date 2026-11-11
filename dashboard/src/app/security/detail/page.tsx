@@ -402,11 +402,24 @@ function DismissForm({ f, onDone, onCancel }: { f: Finding; onDone: () => void; 
     setProblem(null);
     setSaving(true);
     try {
-      await securityApi.dismiss(f.id, { reason: reason.trim(), until: until || null });
-      toast(f.dependabot_alert ? "Dismissed here and on the Dependabot alert." : "Dismissed.");
+      const r = await securityApi.dismiss(f.id, { reason: reason.trim(), until: until || null });
+      toast(
+        r?.synced
+          ? "Dismissed here and on the Dependabot alert."
+          : f.dependabot_alert
+            ? "Dismissed in Coderhelm. The Dependabot alert stays open: the GitHub App can only read alerts."
+            : "Dismissed.",
+      );
       onDone();
     } catch (e) {
-      setProblem(e instanceof Error && /\b403\b/.test(e.message) ? "Only admins can dismiss a finding." : "Could not dismiss it. Try again.");
+      const status = errorStatus(e);
+      setProblem(
+        status === 403
+          ? "Only admins can dismiss a finding."
+          : status === 400 && e instanceof Error && e.message
+            ? e.message
+            : "Could not dismiss it. Try again.",
+      );
     }
     setSaving(false);
   };
@@ -419,7 +432,7 @@ function DismissForm({ f, onDone, onCancel }: { f: Finding; onDone: () => void; 
         </h2>
         <p className="mt-1 max-w-prose text-sm text-zinc-400">
           Coderhelm stops working on it and posts nothing more about it. The reason is kept with the finding
-          {f.dependabot_alert ? " and sent to the Dependabot alert" : ""}.
+          {f.dependabot_alert ? ", and the Dependabot alert is dismissed too when the GitHub App may change alerts" : ""}.
         </p>
       </div>
       <Field

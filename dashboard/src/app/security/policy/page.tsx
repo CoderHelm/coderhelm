@@ -607,6 +607,11 @@ function PreviewList({ title, items, empty, testId }: { title: string; items: Se
               <TierPill tier={i.tier} />
               <span className="min-w-0 text-zinc-200 [overflow-wrap:anywhere]">
                 {i.title} <span className="text-zinc-400">in {repoName(i.repo)}</span>
+                {(i.branch || (i.labels?.length ?? 0) > 0) && (
+                  <span className="mt-0.5 block text-xs text-zinc-400 [overflow-wrap:anywhere]">
+                    {[i.branch, i.labels?.join(", ")].filter(Boolean).join(" · ")}
+                  </span>
+                )}
               </span>
             </li>
           ))}

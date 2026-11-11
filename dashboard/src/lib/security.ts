@@ -149,6 +149,9 @@ export interface PreviewItem {
   repo: string;
   title: string;
   tier: Tier;
+  /** Pull requests it would open only. */
+  branch?: string;
+  labels?: string[];
 }
 
 export interface SecurityPreview {
@@ -232,8 +235,9 @@ export const securityApi = {
   overview: () => request<unknown>("/api/security/overview").then(checkOverview),
   findings: (f: FindingFilter) => request<unknown>(`/api/security/findings?${findingsQuery(f)}`).then(checkFindings),
   finding: (id: string) => request<unknown>(`/api/security/findings/${encodeURIComponent(id)}`).then(checkFindingDetail),
+  /** `synced`: the Dependabot alert was dismissed too (the App needs "Dependabot alerts: write"). */
   dismiss: (id: string, body: { reason: string; until: string | null }) =>
-    request<unknown>(`/api/security/findings/${encodeURIComponent(id)}/dismiss`, json("POST", body)),
+    request<{ finding?: Finding; synced?: boolean } | undefined>(`/api/security/findings/${encodeURIComponent(id)}/dismiss`, json("POST", body)),
   reopen: (id: string) => request<unknown>(`/api/security/findings/${encodeURIComponent(id)}/reopen`, json("POST")),
   scan: (repo: string | null) => request<{ status: string }>("/api/security/scan", json("POST", { repo })),
   config: () => request<unknown>("/api/security/config").then(checkConfig),
