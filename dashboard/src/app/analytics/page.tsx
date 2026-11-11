@@ -74,7 +74,7 @@ function actorLabel(a: string) {
   return ({ reviewer: "Reviewer", planner: "Planner", coder: "Coding agent", people: "People in the dashboard" } as Record<string, string>)[a] ?? a;
 }
 function stepLabel(s: string) {
-  return ({ triage: "Triage", plan: "Planning", implement: "Writing code", ci_fix: "Fixing CI", review: "Self-review", feedback: "Answering feedback", pr: "Opening the PR", security: "Security check" } as Record<string, string>)[s] ?? s.replace(/_/g, " ");
+  return ({ triage: "Triage", plan: "Planning", implement: "Writing code", test: "Testing", ci_fix: "Fixing CI", review: "Self-review", feedback: "Answering feedback", pr: "Opening the PR", security: "Security check" } as Record<string, string>)[s] ?? s.replace(/_/g, " ");
 }
 function sourceLabel(s: string) {
   return ({ github: "GitHub issues", jira: "Jira", alert: "Alerts", other: "Other" } as Record<string, string>)[s] ?? s;
@@ -261,7 +261,7 @@ function Body({ data, loading, stats, tab }: { data: Analytics; loading: boolean
           <Tile testId="tile-untouched" label="Merged as written" value={s.edits_known ? pct(s.merged_untouched / s.edits_known) : "—"} basis={s.edits_known ? `${count(s.merged_untouched)} of ${plural(s.edits_known, "merged PR")} had no commits from people` : "Recorded for PRs merged from now on"} />
           <Tile testId="tile-ci" label="Red CI fixed by Coderhelm" value={pct(data.ci.fix_rate)} basis={data.ci.runs_with_red_ci ? `${count(data.ci.fixed_by_coderhelm)} of ${plural(data.ci.runs_with_red_ci, "run")} went green after its fixes` : "No red CI on Coderhelm's PRs"} />
           <Tile testId="tile-findings" label="Review findings acted on" value={pct(data.reviews.acted_on_rate)} basis={data.reviews.outcomes_known_reviews ? `${count(data.reviews.findings_fixed)} fixed in code, ${count(data.reviews.findings_settled_by_person)} settled by a person` : "Counted from re-reviews from now on"} />
-          <Tile testId="tile-failed" label="Failed runs" value={count(s.failed_runs)} change={delta(s.failed_runs, p.failed_runs, "count", vs)} basis={s.runs ? `${pct(s.failure_rate)} of runs${s.closed_runs ? ` · ${plural(s.closed_runs, "run")} closed by a person, not counted` : ""}` : undefined} />
+          <Tile testId="tile-failed" label="Failed runs" value={count(s.failed_runs)} change={delta(s.failed_runs, p.failed_runs, "count", vs)} basis={s.runs ? `${pct(s.failure_rate)} of runs${s.failed_then_retried ? ` · ${count(s.failed_then_retried)} retried by a person` : ""}${s.closed_runs ? ` · ${plural(s.closed_runs, "run")} closed by a person, not counted` : ""}` : undefined} />
         </StatGrid>
         <UsageNote stats={stats} />
       </Section>
@@ -320,17 +320,8 @@ function Body({ data, loading, stats, tab }: { data: Analytics; loading: boolean
 
       {tab === "reliability" && (
         <>
-      <Section title="Where it struggles" id="struggles" description="Failed runs grouped by what went wrong. Open the latest run of a group to see its steps.">
-        <Table
-          label="Failures by reason"
-          head={["Reason", "Runs", "Latest"]}
-          rows={data.failures.map((f) => [
-            f.reason,
-            f.count,
-            <Link key={f.last_run_id} href={`/runs/detail?id=${f.last_run_id}`} className="text-zinc-100 underline-offset-2 hover:underline">Open run</Link>,
-          ])}
-          empty={`No failed runs in ${span}.`}
-        />
+      <Section title="Where it struggles" id="struggles" description="Failed runs grouped by what went wrong, those a person retried included. Open the latest run of a group: its page says what to do next.">
+        <FailureTable data={data} span={span} />
         {(data.ci.runs_with_red_ci > 0 || (data.ci.red_on_base_runs ?? 0) > 0) && (
           <p className="mt-3 text-sm text-zinc-400" data-testid="ci-line">
             CI went red on {plural(data.ci.runs_with_red_ci, "run")}
@@ -340,6 +331,7 @@ function Body({ data, loading, stats, tab }: { data: Analytics; loading: boolean
         )}
         {data.ci.outcomes && <CiOutcomes ci={data.ci} outcomes={data.ci.outcomes} />}
         {!!data.loops_stopped?.total && <LoopsStopped stopped={data.loops_stopped} />}
+        {!!data.waiting?.total && <Waiting waiting={data.waiting} />}
       </Section>
 
       <DecisionsSection days={d} />
@@ -370,7 +362,11 @@ function Body({ data, loading, stats, tab }: { data: Analytics; loading: boolean
             rows={data.failed_recent.map((r) => [
               <span key={r.run_id} className="block min-w-0">
                 <Link href={`/runs/detail?id=${r.run_id}`} className="text-zinc-100 underline-offset-2 hover:underline">{r.title || `Run ${r.run_id}`}</Link>
-                <span className="block text-xs text-zinc-400">{r.repo}</span>
+                <span className="block text-xs text-zinc-400">
+                  {r.repo}
+                  {r.stage && <>{" · "}{stepLabel(r.stage)}</>}
+                  {r.retried && <>{" · "}retried by a person</>}
+                </span>
               </span>,
               <span key="reason" className="text-xs text-zinc-300" title={r.reason}>{r.reason}</span>,
             ])}
@@ -724,6 +720,49 @@ function CiOutcomes({ ci, outcomes }: { ci: Analytics["ci"]; outcomes: Analytics
     <div className="mt-4">
       <h3 className="mb-2 text-sm font-medium text-zinc-200">CI outcomes</h3>
       <Table label="CI outcomes" head={["How red CI ended", "Runs"]} rows={rows} empty="No red CI." />
+    </div>
+  );
+}
+
+/** Failed runs by reason, with the step they failed in and how many a person retried. */
+function FailureTable({ data, span }: { data: Analytics; span: string }) {
+  const more = data.failures_more;
+  const rows: ReactNode[][] = data.failures.map((f) => [
+    <span key="reason" className="block min-w-0 text-zinc-200" title={f.reason}>{f.reason}</span>,
+    f.stage ? stepLabel(f.stage) : "—",
+    f.count,
+    f.retried == null ? "—" : f.retried,
+    <Link key={f.last_run_id} href={`/runs/detail?id=${f.last_run_id}`} className="text-zinc-100 underline-offset-2 hover:underline">Open run</Link>,
+  ]);
+  if (more && more.reasons > 0) {
+    rows.push([
+      <span key="more" className="text-zinc-400">{`${plural(more.reasons, "other reason")}`}</span>,
+      "—",
+      more.runs,
+      "—",
+      "",
+    ]);
+  }
+  return <Table label="Failures by reason" head={["Reason", "Step", "Runs", "Retried", "Latest"]} rows={rows} empty={`No failed runs in ${span}.`} />;
+}
+
+/** Runs that stopped for a person and still wait: what each waits for. */
+function Waiting({ waiting }: { waiting: NonNullable<Analytics["waiting"]> }) {
+  const rows: ReactNode[][] = waiting.reasons.map((r) => [
+    r.reason === "Nothing recorded" ? (
+      <span key="reason" className="text-amber-300" title="The run stopped for a person without saying what for. Open it, read its last notes, then retry or close it.">
+        Nothing recorded: open the run, then retry or close it
+      </span>
+    ) : (
+      r.reason
+    ),
+    r.count,
+    <Link key={r.last_run_id} href={`/runs/detail?id=${r.last_run_id}`} className="text-zinc-100 underline-offset-2 hover:underline">Open run</Link>,
+  ]);
+  return (
+    <div className="mt-4" data-testid="waiting">
+      <h3 className="mb-2 text-sm font-medium text-zinc-200">Waiting on a person ({count(waiting.total)})</h3>
+      <Table label="Runs waiting on a person" head={["Waiting for", "Runs", "Latest"]} rows={rows} empty="None." />
     </div>
   );
 }

@@ -17,7 +17,7 @@ function days(n: number) {
 }
 
 const SUMMARY = {
-  runs: 42, prs_opened: 30, prs_merged: 21, prs_closed: 3, prs_open: 6, merge_rate: 0.7, failed_runs: 4, failure_rate: 0.095,
+  runs: 42, prs_opened: 30, prs_merged: 21, prs_closed: 3, prs_open: 6, merge_rate: 0.7, failed_runs: 4, failure_rate: 0.095, failed_then_retried: 2,
   cost_usd: 96.4, run_cost_usd: 41.2, cost_basis: "metered", cost_by_feature: [{ feature: "review", cost_usd: 50 }, { feature: "run", cost_usd: 41.2 }, { feature: "feedback", cost_usd: 5.2 }],
   cost_per_run: 2.3, cost_per_merged_pr: 4.59, tokens_in: 12_000_000, tokens_out: 900_000,
   median_run_minutes: 11.5, median_hours_to_merge: 5.2, time_to_merge_known: 12, merged_untouched: 9, merged_with_edits: 3, edits_known: 12, reviews: 55,
@@ -108,9 +108,17 @@ function analytics(period: string, repo: string | null, deployState: DeployState
       { person: "Coderhelm (E2E tests)", kind: "coderhelm", runs: 4, merged: 2 },
     ],
     failures: [
-      { reason: "Timed out after #s", count: 3, last_run_id: "01RUNFAILED00000000000000A", last_at: new Date().toISOString() },
-      { reason: "Branch … already exists", count: 1, last_run_id: "01RUNFAILED00000000000000B", last_at: new Date().toISOString() },
+      { reason: "Timed out after #s", count: 3, last_run_id: "01RUNFAILED00000000000000A", last_at: new Date().toISOString(), stage: "implement", retried: 2 },
+      { reason: "Branch … already exists", count: 1, last_run_id: "01RUNFAILED00000000000000B", last_at: new Date().toISOString(), stage: "pr", retried: 0 },
     ],
+    failures_more: { reasons: 2, runs: 3 },
+    waiting: {
+      total: 4,
+      reasons: [
+        { reason: "Review pull request", count: 3, last_run_id: "01RUNWAITING000000000000A", last_at: new Date().toISOString() },
+        { reason: "Nothing recorded", count: 1, last_run_id: "01RUNWAITING000000000000B", last_at: new Date().toISOString() },
+      ],
+    },
     ci: {
       runs_with_red_ci: 8, fixed_by_coderhelm: 6, fix_rate: 0.75, fix_attempts: 11, fix_commits: 9, red_on_base_runs: 1,
       outcomes: { green_after_fix: 6, green_without_fix: 0, flaky: 1, red_on_base: 1, gave_up: 1, running: 0 },
@@ -135,7 +143,7 @@ function analytics(period: string, repo: string | null, deployState: DeployState
       { run_id: "01RUNMERGED00000000000000B", title: "Retry the sync job once", repo: "your-team/backend", pr_number: 55, pr_url: "https://github.com/your-team/backend/pull/55", hours_to_merge: null, human_commits: null },
     ],
     failed_recent: [
-      { run_id: "01RUNFAILED00000000000000A", title: "Update the pricing page", repo: "your-team/web", reason: "Timed out after #s", at: new Date().toISOString() },
+      { run_id: "01RUNFAILED00000000000000A", title: "Update the pricing page", repo: "your-team/web", reason: "Timed out after #s", at: new Date().toISOString(), stage: "implement", retried: true },
     ],
     repo_names: ["your-team/backend", "your-team/web"],
   };
@@ -270,6 +278,24 @@ test("stops and blocks show the unnecessary and the nuisance ones, with examples
   expect(db.calls).toContain("/api/analytics/decisions?days=30");
   await page.getByTestId("tile-nuisance-blocks").scrollIntoViewIfNeeded();
   await shot(page, "analytics-decisions");
+});
+
+test("failures show their step and retries, the rest summed, and what waiting runs wait for", async ({ page }) => {
+  await mockApi(page);
+  await page.goto("/analytics?tab=reliability");
+  const failures = page.getByRole("table", { name: "Failures by reason" });
+  await expect(failures.locator("tbody tr td:first-child")).toHaveText(["Timed out after #s", "Branch … already exists", "2 other reasons"]);
+  await expect(failures.locator("tbody tr").first()).toContainText("Writing code");
+  await expect(failures.locator("tbody tr").nth(1)).toContainText("Opening the PR");
+  const waiting = page.getByRole("table", { name: "Runs waiting on a person" });
+  await expect(page.getByTestId("waiting")).toContainText("Waiting on a person (4)");
+  await expect(waiting.locator("tbody tr td:first-child")).toHaveText(["Review pull request", "Nothing recorded: open the run, then retry or close it"]);
+  await expect(waiting.getByRole("link", { name: "Open run" }).first()).toHaveAttribute("href", /id=01RUNWAITING000000000000A$/);
+  await expect(page.getByRole("table", { name: "Recently failed" })).toContainText("retried by a person");
+  await page.getByRole("table", { name: "Failures by reason" }).scrollIntoViewIfNeeded();
+  await shot(page, "analytics-failures");
+  await page.goto("/analytics");
+  await expect(page.getByTestId("tile-failed")).toContainText("2 retried by a person");
 });
 
 test("where it struggles places every red CI run in one outcome, base-branch failures apart", async ({ page }) => {

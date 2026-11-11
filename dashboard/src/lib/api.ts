@@ -3693,8 +3693,11 @@ export interface AnalyticsSummary {
   prs_open: number;
   /** Merged out of opened, 0-1; null with no PRs. */
   merge_rate: number | null;
+  /** Failed runs, those a person then retried or started over included. */
   failed_runs: number;
   failure_rate: number | null;
+  /** Of the failed runs, those a person retried. Older backends leave it out. */
+  failed_then_retried?: number;
   /** Runs a person closed on purpose: not failures. Older backends leave it out. */
   closed_runs?: number;
   /**
@@ -3744,7 +3747,16 @@ export interface Analytics {
   repos: { repo: string; runs: number; prs: number; merged: number; failed: number; cost_usd: number; tokens?: number; merge_rate: number | null; reviews: number }[];
   /** One row per person (however Jira, GitHub or the dashboard named them), Coderhelm's own work, and runs that recorded nobody. */
   people: { person: string; kind?: "person" | "coderhelm" | "not_recorded"; runs: number; merged: number }[];
-  failures: { reason: string; count: number; last_run_id: string; last_at: string }[];
+  /**
+   * Failed runs by reason, most first. `stage` is the step most of the group
+   * failed in and `retried` how many a person retried (older backends leave
+   * both out).
+   */
+  failures: { reason: string; count: number; last_run_id: string; last_at: string; stage?: string; retried?: number }[];
+  /** Reasons past the ones listed, summed. Missing from older backends. */
+  failures_more?: { reasons: number; runs: number };
+  /** Runs that stopped for a person and still wait, by what for. Missing from older backends. */
+  waiting?: { total: number; reasons: { reason: string; count: number; last_run_id: string; last_at: string }[] };
   ci: {
     /** Runs whose own CI went red (runs red only on base-branch checks are counted apart). */
     runs_with_red_ci: number;
@@ -3775,7 +3787,7 @@ export interface Analytics {
   steps: { step: string; count: number; tokens_in: number; tokens_out: number; avg_seconds: number }[];
   steps_window_days: number;
   merged_recent: { run_id: string; title: string; repo: string; pr_number: number; pr_url: string; hours_to_merge: number | null; human_commits: number | null }[];
-  failed_recent: { run_id: string; title: string; repo: string; reason: string; at: string }[];
+  failed_recent: { run_id: string; title: string; repo: string; reason: string; at: string; stage?: string; retried?: boolean }[];
   repo_names: string[];
   /** Absent from servers older than the comparison. */
   comparison?: AnalyticsComparison;
