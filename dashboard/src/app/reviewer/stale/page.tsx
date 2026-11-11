@@ -231,27 +231,18 @@ function StalePage() {
     setBusy(null);
   };
 
-  // The header's one action follows the state.
+  // The header's one action follows the state. Settings is never one: the
+  // Settings tab right below is the way there.
   const primary =
-    state === null ? null : state === "off" ? (
-      admin ? (
-        <button type="button" className={primaryButton} onClick={turnOn} disabled={busy === "turn-on" || !config} data-testid="stale-primary">
-          {busy === "turn-on" ? "Turning on…" : "Turn on"}
-        </button>
-      ) : (
-        <Link href={tabHref("settings")} className={primaryButton} data-testid="stale-primary">
-          Settings
-        </Link>
-      )
+    state === "off" && admin ? (
+      <button type="button" className={primaryButton} onClick={turnOn} disabled={busy === "turn-on" || !config} data-testid="stale-primary">
+        {busy === "turn-on" ? "Turning on…" : "Turn on"}
+      </button>
     ) : state === "dry_run" ? (
       <Link href={tabHref("next")} className={primaryButton} data-testid="stale-primary" aria-current={view === "next" ? "page" : undefined}>
         Preview what it would close
       </Link>
-    ) : (
-      <Link href={tabHref("settings")} className={primaryButton} data-testid="stale-primary" aria-current={view === "settings" ? "page" : undefined}>
-        Settings
-      </Link>
-    );
+    ) : null;
 
   const filtered = !!q || !!repo;
   const clear = () => setParams({ q: "", repo: "" });

@@ -236,7 +236,9 @@ test("on: closing now, recently closed with a Reopen link, and what is exempt", 
   const db = await mockApi(page, { team: { enabled: true, dry_run: false } });
   await page.goto("/reviewer/stale");
   await expect(page.getByTestId("stale-state")).toHaveAttribute("data-state", "on");
-  await expect(page.getByTestId("stale-primary")).toHaveText("Settings");
+  // No header button duplicates the Settings tab.
+  await expect(page.getByTestId("stale-primary")).toHaveCount(0);
+  await expect(views(page).getByRole("link", { name: "Settings", exact: true })).toBeVisible();
   await expect(views(page).getByRole("link", { name: /^Up next/ })).toBeVisible();
   // Closing for real on this sweep is marked, not a preview.
   await expect(page.getByTestId("stale-row").filter({ hasText: "#30" })).toContainText("Closing now");
@@ -264,7 +266,7 @@ test("on: closing now, recently closed with a Reopen link, and what is exempt", 
   expect(db.keeps).toEqual([{ repo: "acme/api", pr: 2, keep: false }]);
   await shot(page, "stale-on-exempt-1280");
 
-  await page.getByTestId("stale-primary").click();
+  await views(page).getByRole("link", { name: "Settings", exact: true }).click();
   await expect(page).toHaveURL(/view=settings/);
   await expect(page.getByTestId("stale-section")).toBeVisible();
 });
