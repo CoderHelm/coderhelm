@@ -371,6 +371,39 @@ export function runsFor(db: Backend): Run[] {
   ];
 }
 
+const passage = (rank: number, pct: number, title: string, loc: string, text: string) => ({
+  rank,
+  score_pct: pct,
+  score: 0.0328 * (pct / 100),
+  file_id: `f${rank}`,
+  title,
+  loc,
+  as_of: "2026-10-02",
+  text,
+  url: `https://acme.atlassian.net/wiki/spaces/DW/pages/${rank}`,
+  source_kind: "confluence",
+  authoritative: rank === 1,
+});
+
+export const PASSAGES = [
+  passage(1, 100, "Backfills runbook", "Steps", "Run the backfill job with --start set to the first missing day. It reads the raw events and rebuilds the orders table one day at a time. ".repeat(4)),
+  passage(2, 81, "PII policy", "Staging", "Masking happens in the staging layer: every column tagged pii is hashed before it reaches the marts."),
+  passage(3, 52, "Orders table", "Columns", "order_id, customer_id, placed_at, total."),
+];
+
+export const CITATIONS = PASSAGES.map((p, i) => ({
+  id: `S${i + 1}`,
+  kind: "knowledge",
+  title: p.title,
+  loc: p.loc,
+  as_of: p.as_of,
+  passage: p.text,
+  url: p.url,
+  authoritative: p.authoritative,
+  base: "kb_dw",
+  source_kind: "confluence",
+}));
+
 export function connectionFor(s: Src) {
   if (s.via === "sign_in") {
     return {
@@ -447,6 +480,22 @@ export async function mockKnowledge(page: Page, db: Backend, extra?: (p: string,
       if (p === "/api/banners") return json(route, { banners: [] });
       if (p === "/api/teams") return json(route, { teams: [{ team_id: "t_1", org: "acme", status: "active", current: true }] });
       if (p === "/api/knowledge/connectors") return json(route, { connectors: [], visibility_note: "" });
+      if (p === "/api/me/capabilities" || p === "/api/me/permissions") return json(route, { error: "Not mocked" }, 404);
+      if (p === "/api/brain/token" && method === "POST") return json(route, { token: "tok" });
+      if (p === "/api/brain/stream" && method === "POST") {
+        const b = db.bodies[db.bodies.length - 1] as { question: string };
+        if (db.over.askLimited) return json(route, { error: "You've asked 20 questions here in the last hour. Ask again at the top of the hour, or keep going in Chat.", code: "rate_limited" }, 429);
+        const ev = (t: string, d: unknown) => `event: ${t}\ndata: ${JSON.stringify(d)}\n\n`;
+        const body =
+          ev("thread", { id: "th_kb", title: b.question }) +
+          ev("retrieved", { sources: CITATIONS }) +
+          ev("answer", { text: "Run the backfill job with a start date [S1]. Masking happens in the staging layer [S2].", citations: CITATIONS.slice(0, 2), grounded: true }) +
+          ev("done", {});
+        return route.fulfill({ status: 200, contentType: "text/event-stream", body });
+      }
+      if (p === "/api/brain/threads/th_kb" && method === "GET")
+        return json(route, { thread: { id: "th_kb", title: "q", shared: false, mine: true, owner_email: "admin@example.com", created_at: iso(0), updated_at: iso(0), messages: 2, origin: "kb_page" }, messages: [{ seq: 0, role: "user", content: "q", citations: [], grounded: true, attachments: [], used: [], at: iso(0) }, { seq: 1, role: "assistant", content: "a", citations: [], grounded: true, attachments: [], used: [], at: iso(0) }], can_ask: true });
+      if (p.startsWith("/api/brain/threads/th_kb/messages/") && method === "PUT") return json(route, { ok: true, feedback: (db.bodies[db.bodies.length - 1] as { rating: string | null }).rating });
       const m = p.match(/^\/api\/knowledge\/([^/]+)(\/.*)?$/);
       if (m) {
         const rest = m[2] ?? "";
@@ -461,6 +510,11 @@ export async function mockKnowledge(page: Page, db: Backend, extra?: (p: string,
             visibility_note: "Everyone who can read this knowledge base can read what you add, even if they can't open it in the app it comes from.",
           });
         if (rest === "/sources" && method === "GET") return json(route, { base: baseJson(db), sources: db.sources, uploads_working: false });
+        if (rest === "/suggestions" && method === "GET") return json(route, { questions: db.items.length ? ["How do we backfill the orders table?", "Where is PII masked?", "Who owns the dbt jobs?"] : [], from: "model", built_at: 0 });
+        if (rest === "/search" && method === "POST") {
+          if (db.over.askLimited) return json(route, { error: "You've asked 20 questions here in the last hour. Ask again at the top of the hour, or keep going in Chat.", code: "rate_limited" }, 429);
+          return json(route, { passages: PASSAGES, reindexing: 0, unreached: [], asks_per_hour: 20 });
+        }
         if (rest === "/items" && method === "GET") return json(route, db.over.items ?? itemsPage(db.items, url.searchParams));
         if (rest === "/runs" && method === "GET") {
           const src = url.searchParams.get("source");

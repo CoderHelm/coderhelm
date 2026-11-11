@@ -14,6 +14,7 @@ import { AddFlow, ConnectProblemNote } from "@/components/knowledge/add-flow";
 import { SourceLogo } from "@/components/knowledge/logos";
 import { Picker } from "@/components/knowledge/picker";
 import { ConnectionRow, type ConnectionActions } from "@/components/knowledge/connections";
+import { Ask } from "@/components/knowledge/ask";
 import { Content } from "@/components/knowledge/content";
 import { History } from "@/components/knowledge/history";
 import { Access, PageNav, ProblemsBanner, StatusChip, Tiles, overallStatus } from "@/components/knowledge/base-parts";
@@ -398,6 +399,7 @@ function BaseView() {
   // Nothing in it yet and nothing coming: the one thing to do is add.
   const empty = !!base && loaded && sources.length === 0 && (base.files ?? 0) === 0 && uploads.length === 0;
   const nav = [
+    { id: "ask", label: "Ask" },
     { id: "connections", label: "Connections" },
     { id: "content", label: "Content" },
     { id: "history", label: "History" },
@@ -566,6 +568,17 @@ function BaseView() {
               ))}
             </ul>
           </div>
+        )}
+
+        {base && !empty && (
+          <Section title="Ask this knowledge base" id="ask" description="A cited answer from these pages only, or the passages a search finds.">
+            <Ask
+              kbId={id}
+              ready={inPlace ? Math.max(1, base.ready) : base.ready}
+              bringingIn={sources.some((s) => s.status === "syncing" && !s.last_success_at)}
+              canAsk={can("brain_ask")}
+            />
+          </Section>
         )}
 
         {inPlace && base && (

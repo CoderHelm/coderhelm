@@ -129,7 +129,7 @@ export function History({ kbId, sources, version }: { kbId: string; sources: Pag
                   return (
                     <tr key={`q${i}`} data-testid="history-quiet" className="block sm:table-row">
                       <td colSpan={7} className="block px-4 py-2.5 text-xs text-zinc-400 sm:table-cell">
-                        {row.runs.length} checks, nothing changed, last {when(last.started_at)}
+                        {row.runs.length} checks, nothing changed, last {when(last.started_at).replace(/^Today/, "today")}
                       </td>
                     </tr>
                   );
@@ -155,14 +155,14 @@ export function History({ kbId, sources, version }: { kbId: string; sources: Pag
                         </td>
                       )}
                       <td className="hidden whitespace-nowrap px-2 py-2.5 text-zinc-300 sm:table-cell">{TRIGGER_WORDS[r.trigger] ?? r.trigger}</td>
-                      <td className="hidden px-2 py-2.5 tabular-nums text-zinc-300 sm:table-cell">{tookWords(r.took_secs)}</td>
+                      <td className="hidden whitespace-nowrap px-2 py-2.5 tabular-nums text-zinc-300 sm:table-cell">{tookWords(r.took_secs)}</td>
                       <td className="mt-1 block sm:mt-0 sm:table-cell sm:whitespace-nowrap sm:px-2 sm:py-2.5">
                         <span className="inline-flex items-center gap-1.5 text-zinc-200">
                           <StatusDot tone={RESULT_TONE[r.result]} />
                           {RESULT_WORDS[r.result]}
                         </span>
                       </td>
-                      <td className="mt-0.5 block min-w-0 text-zinc-300 sm:mt-0 sm:table-cell sm:px-2 sm:py-2.5">
+                      <td className="mt-0.5 block min-w-0 text-zinc-300 sm:mt-0 sm:min-w-[11rem] sm:table-cell sm:px-2 sm:py-2.5">
                         <Counts r={r} />
                         {hasMore && (
                           <button

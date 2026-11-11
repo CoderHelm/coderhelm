@@ -281,3 +281,88 @@ test.describe("knowledge base page: sync history and reading pages again", () =>
     await noSideways(page);
   });
 });
+
+test.describe("knowledge base page: ask this knowledge base", () => {
+  test("a cited answer from this base only, marked as asked from the page, with what it read and cited", async ({ page }) => {
+    const db = newBackend("healthy");
+    await mockKnowledge(page, db);
+    await page.goto("/knowledge/base/?id=kb_dw");
+    const ask = page.getByTestId("ask");
+    await expect(ask.getByTestId("ask-suggestions")).toContainText("Where is PII masked?");
+    await ask.getByTestId("ask-input").fill("How do we backfill the orders table?");
+    await ask.getByTestId("ask-submit").click();
+    await expect(ask.getByTestId("ask-answer")).toContainText("Run the backfill job with a start date");
+    const sent = db.bodies.find((b) => b.question === "How do we backfill the orders table?") as { mentions: unknown; origin: string };
+    expect(sent.mentions).toEqual([{ kind: "knowledge", id: "kb_dw" }]);
+    expect(sent.origin).toBe("kb_page");
+    await expect(ask.getByTestId("ask-continue")).toHaveAttribute("href", /\/chat\/?\?thread=th_kb$/);
+    await ask.getByTestId("ask-sources-toggle").click();
+    const rows = ask.getByTestId("ask-passage");
+    await expect(rows).toHaveCount(3);
+    await expect(rows.nth(0)).toContainText("Cited as S1");
+    await expect(rows.nth(1)).toContainText("Cited as S2");
+    await expect(rows.nth(2)).toContainText("Not used");
+    // Thumbs down is saved on the Chat answer.
+    await ask.getByTestId("ask-down").click();
+    await expect(ask.getByTestId("ask-down")).toHaveAttribute("aria-pressed", "true");
+    expect(db.calls).toContain("PUT /api/brain/threads/th_kb/messages/1/feedback");
+    await shot(page, "ask-answer-1280");
+  });
+
+  test("passages only: ranked, a score bar, and whether the last answer cited each, at no AI cost", async ({ page }) => {
+    const db = newBackend("healthy");
+    await mockKnowledge(page, db);
+    await page.goto("/knowledge/base/?id=kb_dw");
+    const ask = page.getByTestId("ask");
+    await ask.getByTestId("ask-input").fill("How do we backfill the orders table?");
+    await ask.getByTestId("ask-submit").click();
+    await expect(ask.getByTestId("ask-answer")).toContainText("Run the backfill job");
+    await ask.getByTestId("ask-passages-only").check();
+    await expect(ask.getByTestId("ask-submit")).toHaveText("Search");
+    await ask.getByTestId("ask-submit").click();
+    const list = ask.getByTestId("ask-passages");
+    await expect(list.getByTestId("ask-passage")).toHaveCount(3);
+    await expect(list.getByTestId("ask-score").first()).toContainText("100");
+    await expect(list.getByTestId("ask-score").nth(1)).toContainText("81");
+    await expect(list.getByTestId("ask-passage").first()).toContainText("Cited as S1");
+    await expect(list.getByTestId("ask-passage").nth(2)).toContainText("Not used");
+    await expect(list.getByTestId("ask-passage").first()).toContainText("Source of truth");
+    await expect(list.getByTestId("ask-passage").first().getByRole("link")).toHaveAttribute("href", /atlassian/);
+    expect(db.calls).toContain("POST /api/knowledge/kb_dw/search");
+    await list.getByRole("button", { name: "Show the whole passage" }).first().click();
+    await shot(page, "ask-passages-1280");
+  });
+
+  test("the hourly limit is said plainly", async ({ page }) => {
+    const db = newBackend("healthy");
+    db.over.askLimited = true;
+    await mockKnowledge(page, db);
+    await page.goto("/knowledge/base/?id=kb_dw");
+    await page.getByTestId("ask-passages-only").check();
+    await page.getByTestId("ask-input").fill("anything");
+    await page.getByTestId("ask-submit").click();
+    await expect(page.getByTestId("ask-error")).toContainText("20 questions here in the last hour");
+  });
+
+  test("a suggested question asks at once; Ask waits for the first page during a first sync", async ({ page }) => {
+    const db = newBackend("healthy");
+    await mockKnowledge(page, db);
+    await page.goto("/knowledge/base/?id=kb_dw");
+    await page.getByTestId("ask-suggestions").getByRole("button", { name: "Where is PII masked?" }).click();
+    await expect(page.getByTestId("ask-answer")).toContainText("Masking happens");
+    expect(db.bodies.some((b) => b.question === "Where is PII masked?")).toBe(true);
+  });
+
+  test("phone width: ask, answer and passages fit", async ({ page }) => {
+    await page.setViewportSize({ width: 400, height: 860 });
+    const db = newBackend("healthy");
+    await mockKnowledge(page, db);
+    await page.goto("/knowledge/base/?id=kb_dw");
+    await page.getByTestId("ask-input").fill("How do we backfill the orders table?");
+    await page.getByTestId("ask-submit").click();
+    await page.getByTestId("ask-sources-toggle").click();
+    await expect(page.getByTestId("ask-passage")).toHaveCount(3);
+    await noSideways(page);
+    await shot(page, "ask-400");
+  });
+});
