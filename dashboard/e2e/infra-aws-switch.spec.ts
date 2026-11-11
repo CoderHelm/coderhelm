@@ -1,6 +1,5 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
-import fs from "node:fs";
-import path from "node:path";
+import { shoot } from "./infra-shots";
 import { permissionsView } from "./aws-permissions-data";
 
 // Integrations › AWS: the "Infrastructure vulnerabilities" switch on a
@@ -81,16 +80,6 @@ test("switching on Infrastructure vulnerabilities names what it reads and the up
   await expect(missing).toContainText("Infrastructure vulnerabilities needs 4 more read-only permissions.");
   await expect(missing).toContainText("rds:DescribePendingMaintenanceActions");
   await expect(missing.getByRole("link", { name: "creates the update stack" })).toHaveAttribute("href", /InfrastructureVulnerabilities=on/);
-  const dir = process.env.E2E_SHOTS_DIR;
-  if (dir) {
-    fs.mkdirSync(dir, { recursive: true });
-    await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
-    for (const width of [1280, 400]) {
-      await page.setViewportSize({ width, height: 900 });
-      await missing.scrollIntoViewIfNeeded();
-      const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-      expect(wide, `aws switch at ${width} scrolls sideways`).toBeLessThanOrEqual(0);
-      await page.screenshot({ path: path.join(dir, `aws-infrastructure-switch-${width}.png`), fullPage: true });
-    }
-  }
+  await missing.scrollIntoViewIfNeeded();
+  await shoot(page, "aws-infrastructure-switch");
 });

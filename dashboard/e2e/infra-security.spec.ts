@@ -1,7 +1,6 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
-import fs from "node:fs";
-import path from "node:path";
-import { ACCOUNT_MISSING, INFRA_FEEDS, INFRA_INSIGHTS, INFRA_RESOURCES, infraOverview } from "./infra-data";
+import { shoot } from "./infra-shots";
+import { ACCOUNT_MISSING, INFRA_FEEDS, INFRA_INSIGHTS, INFRA_RESOURCES, infraFinding, infraOverview } from "./infra-data";
 
 // Infrastructure vulnerabilities: Security › Infrastructure grouped by fix
 // (pull requests, runbook cards, AWS-managed rows collapsed at the bottom),
@@ -61,22 +60,6 @@ async function mockApi(page: Page, init: Partial<Db> = {}): Promise<Db> {
 
 const call = (db: Db, c: string) => db.calls.filter((x) => x.call === c);
 
-const SHOTS = process.env.E2E_SHOTS_DIR;
-async function shoot(page: Page, name: string) {
-  if (!SHOTS) return;
-  fs.mkdirSync(SHOTS, { recursive: true });
-  await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
-  for (const width of [1280, 400]) {
-    await page.setViewportSize({ width, height: width === 1280 ? 900 : 860 });
-    await page.waitForTimeout(300);
-    // Nothing may scroll the page sideways at either width.
-    const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-    expect(wide, `${name} at ${width} scrolls sideways`).toBeLessThanOrEqual(0);
-    await page.screenshot({ path: path.join(SHOTS, `${name}-${width}.png`), fullPage: true });
-  }
-  await page.setViewportSize({ width: 1280, height: 800 });
-}
-
 test.describe("Infrastructure vulnerabilities", () => {
   test("the Infrastructure tab groups by fix: PRs, a runbook card and AWS-managed rows that never count", async ({ page }) => {
     const db = await mockApi(page);
@@ -123,6 +106,8 @@ test.describe("Infrastructure vulnerabilities", () => {
     await expect(db1).toContainText("RDS > Databases > orders > Maintenance & backups > Pending maintenance > Apply");
     await expect(db1.getByTestId("apply-by")).toContainText("Apply by");
     await expect(db1).toContainText("Coderhelm never runs this.");
+    // A runbook's target is an action, not a version: no "from to" line.
+    await expect(db1.getByTestId("from-to")).toHaveCount(0);
     await shoot(page, "security-infrastructure");
 
     // AWS-managed, collapsed at the bottom with the bulletin's reason.
@@ -204,5 +189,26 @@ test.describe("Infrastructure vulnerabilities", () => {
     await shoot(page, "insights-infrastructure-running");
     await page.getByRole("searchbox", { name: "Search resources" }).or(page.getByLabel("Search resources")).first().fill("thumbs");
     await expect(rows).toHaveCount(1);
+  });
+
+  test("with Inspector on, a finding shows a known exploit, Inspector's reachability and its finding as a plain source", async ({ page }) => {
+    const withInspector = infraOverview({
+      findings: [
+        infraFinding({
+          id: "f_insp",
+          tier: "P0",
+          inspector: { exploit_available: true, reachable: true, findings: 3 },
+          sources: [{ id: "arn:aws:inspector2:us-east-1:111122223333:finding/0123abcd", kind: "inspector", url: "https://console.aws.amazon.com/inspector", severity: "critical" }],
+        }),
+      ],
+    });
+    await mockApi(page, { overview: withInspector });
+    await page.goto("/security/infrastructure?finding=f_insp");
+    const row = page.getByRole("list", { name: "Infrastructure findings" }).getByTestId("infra-row").first();
+    await expect(row.getByTestId("chip-exploit")).toHaveText("Exploit known");
+    await expect(row.getByTestId("chip-reachable")).toHaveText("Reachable (Inspector)");
+    await expect(row.getByTestId("source-inspector")).toContainText("Amazon Inspector arn:aws:inspector2");
+    await expect(row.getByRole("link", { name: /inspector2/ })).toHaveCount(0);
+    await shoot(page, "security-infrastructure-inspector");
   });
 });

@@ -96,6 +96,34 @@ export function dayWords(day: string): string {
   return new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).toLocaleDateString(undefined, { dateStyle: "medium", timeZone: "UTC" });
 }
 
+/** "16.4 to 16.6" says something; a runbook's "16.4 to system-update" doesn't. */
+export function showFromTo(f: InfraFinding): boolean {
+  const to = f.fix.to?.trim() ?? "";
+  if (!to) return false;
+  if (f.fix.kind === "runbook" && f.sources.some((s) => s.kind === "maintenance" && s.id.split(":").includes(to))) return false;
+  return to !== f.fix.summary && !/^(system-update|db-upgrade|os-patch|service-update|service-software)$/.test(to);
+}
+
+/** Inspector's word on a finding, when Inspector is on. */
+export function InspectorChips({ f }: { f: InfraFinding }) {
+  const i = f.inspector;
+  if (!i) return null;
+  return (
+    <>
+      {i.exploit_available && (
+        <span title="Amazon Inspector knows of a working exploit." data-testid="chip-exploit">
+          <Chip tone="danger">Exploit known</Chip>
+        </span>
+      )}
+      {i.reachable === true && (
+        <span title="Amazon Inspector found a network path to the vulnerable port." data-testid="chip-reachable">
+          <Chip tone="attention">Reachable (Inspector)</Chip>
+        </span>
+      )}
+    </>
+  );
+}
+
 /** What opens under a finding's row. */
 export function FindingDetails({ f }: { f: InfraFinding }) {
   const fix = f.fix;
@@ -108,7 +136,7 @@ export function FindingDetails({ f }: { f: InfraFinding }) {
       ) : (
         <DetailBlock title="The fix">
           <p className="text-sm text-zinc-200">{fix.summary}</p>
-          {(fix.from || fix.to) && (
+          {showFromTo(f) && (
             <p className="mt-1 text-xs text-zinc-400 [overflow-wrap:anywhere]" data-testid="from-to">
               {fix.from || "?"} to {fix.to || "?"}
             </p>
@@ -143,13 +171,13 @@ export function FindingDetails({ f }: { f: InfraFinding }) {
       <DetailBlock title="Advisories">
         <div className="flex min-w-0 flex-wrap gap-x-3 gap-y-1">
           {f.sources.filter((s) => s.kind !== "maintenance").map((s) =>
-            s.url ? (
+            s.url && s.kind !== "inspector" ? (
               <OutLink key={s.id} href={s.url}>
                 {s.id}
               </OutLink>
             ) : (
-              <span key={s.id} className="text-zinc-300 [overflow-wrap:anywhere]">
-                {s.id}
+              <span key={s.id} className="text-zinc-300 [overflow-wrap:anywhere]" data-testid={s.kind === "inspector" ? "source-inspector" : undefined}>
+                {s.kind === "inspector" ? `Amazon Inspector ${s.id}` : s.id}
               </span>
             ),
           )}

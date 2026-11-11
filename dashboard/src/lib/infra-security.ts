@@ -5,7 +5,8 @@
 // this file is the dashboard's half of that contract.
 
 import type { Tone } from "@/components/list/status";
-import { request } from "./api";
+import { ApiError, httpErrorMessage, request } from "./api";
+import { apiBase } from "./runtime-config";
 import { SHAPE_ERROR, type Tier } from "./security";
 
 export type InfraKind =
@@ -75,7 +76,7 @@ export interface InfraFinding {
   fix: InfraFix;
   status: InfraStatus;
   pr: { number: number; url: string; state: "open" | "merged" | "closed" } | null;
-  inspector?: { exploit_available: boolean; reachable: boolean | null } | null;
+  inspector?: { exploit_available: boolean; reachable: boolean | null; findings?: number } | null;
   first_seen_at: string;
   updated_at: string;
   fixed_at?: string | null;
@@ -171,6 +172,16 @@ export interface InfraInsights {
   aws_managed: number;
 }
 
+export type HealthMode = "off" | "api" | "eventbridge";
+
+export interface InfraConfigReply {
+  config: { inspector: boolean; health: HealthMode };
+  /** "About $1.25 per instance a month, ..." as the server words it. */
+  inspector_cost: string;
+  /** Which AWS support plan the Health API needs. */
+  health_plan: string;
+}
+
 // A reply missing the parts a page reads is an error the page shows, never a crash.
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const fail = (): never => {
@@ -219,6 +230,25 @@ export const infraApi = {
       if (!isObj(r) || typeof r.open !== "number") fail();
       return r as unknown as InfraInsights;
     }),
+  config: () =>
+    request<unknown>("/api/security/infrastructure/config").then((r) => {
+      if (!isObj(r) || !isObj(r.config)) fail();
+      const o = r as Record<string, unknown>;
+      const c = o.config as Record<string, unknown>;
+      const health: HealthMode = c.health === "api" || c.health === "eventbridge" ? c.health : "off";
+      return {
+        config: { inspector: c.inspector === true, health },
+        inspector_cost: typeof o.inspector_cost === "string" ? o.inspector_cost : "",
+        health_plan: typeof o.health_plan === "string" ? o.health_plan : "",
+      } satisfies InfraConfigReply;
+    }),
+  saveConfig: (config: InfraConfigReply["config"]) => request<unknown>("/api/security/infrastructure/config", json("PUT", config)),
+  /** The EventBridge rule template for AWS Health, as YAML. */
+  healthTemplate: async () => {
+    const res = await fetch(`${apiBase()}/api/security/infrastructure/health-template`, { credentials: "include", cache: "no-store" });
+    if (!res.ok) throw new ApiError(httpErrorMessage(res.status), res.status);
+    return res.text();
+  },
   check: () => request<{ status: string }>("/api/security/infrastructure/check", json("POST")),
   fix: (id: string) =>
     request<{ status: "started" | "queued" | "skipped"; reason: string | null }>(`/api/security/infrastructure/findings/${encodeURIComponent(id)}/fix`, json("POST")),

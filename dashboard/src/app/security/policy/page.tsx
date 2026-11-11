@@ -34,6 +34,7 @@ import {
   type Tier,
 } from "@/lib/security";
 import { TierPill } from "../parts";
+import { InfraPolicySection } from "./infra";
 
 const TIER_WHEN: Record<Tier, string> = {
   P0: "Exploited and loaded, or critical and reachable, or a malicious package.",
@@ -415,6 +416,8 @@ export default function SecurityPolicyPage() {
             <SettingsSection id="ignore" title="Ignored" description="Every ignore needs a reason and an end date, so nothing is ignored forever by accident.">
               <IgnoreList rules={c.ignore} onChange={(r) => set("ignore", r)} repos={teamRepos} by={me?.email ?? ""} unsaved={form.isDirty("ignore")} />
             </SettingsSection>
+
+            <InfraPolicySection readOnly={readOnly} />
           </fieldset>
 
           {!readOnly && (

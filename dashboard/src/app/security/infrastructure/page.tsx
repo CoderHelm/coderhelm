@@ -32,7 +32,7 @@ import {
   type InfraOverview,
 } from "@/lib/infra-security";
 import { TierPill } from "../parts";
-import { ExposureText, FindingDetails, FixChip, MissingReads } from "./parts";
+import { ExposureText, FindingDetails, FixChip, InspectorChips, MissingReads } from "./parts";
 
 export default function SecurityInfrastructurePage() {
   return (
@@ -286,6 +286,11 @@ function FindingRow({ f, admin, dryRun, defaultOpen }: { f: InfraFinding; admin:
         aws ? null : <ExposureText key="x" exposure={f.exposure} />,
         f.cves[0] ?? f.sources[0]?.id,
         f.kev ? <span className="text-red-300">on exploited list</span> : null,
+        f.inspector && (f.inspector.exploit_available || f.inspector.reachable) ? (
+          <span key="insp" className="inline-flex flex-wrap gap-1.5">
+            <InspectorChips f={f} />
+          </span>
+        ) : null,
       ]}
       summary={aws ? f.fix.reason : f.fix.summary}
       chips={

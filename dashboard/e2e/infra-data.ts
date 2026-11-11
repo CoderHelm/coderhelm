@@ -89,7 +89,7 @@ export const INFRA_FINDINGS = [
       summary: "Apply system update in AWS",
       location: null,
       from: "16.4",
-      to: "system-update",
+      to: "",
       cli: [
         "aws rds apply-pending-maintenance-action --resource-identifier arn:aws:rds:us-east-1:111122223333:cluster:orders --apply-action system-update --opt-in-type next-maintenance --region us-east-1",
       ],

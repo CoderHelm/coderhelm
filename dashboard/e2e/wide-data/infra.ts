@@ -34,5 +34,7 @@ export const infraData: Handler = ({ method, path }) => {
   if (path === "/api/security/infrastructure/sources") return { feeds: INFRA_FEEDS.map((f) => (f.error ? { ...f, error: `${f.error} ${TOKEN}` } : f)) };
   if (path === "/api/security/infrastructure/resources") return { accounts: [ACCOUNT_MISSING], resources, count: resources.length };
   if (path === "/api/security/infrastructure/insights") return INFRA_INSIGHTS;
+  if (path === "/api/security/infrastructure/config")
+    return { config: { inspector: true, health: "eventbridge" }, inspector_cost: `Billed by AWS: about $1.25 per instance a month. ${TOKEN}`, health_plan: `${SENTENCE} ${TOKEN}` };
   return undefined;
 };

@@ -50,6 +50,7 @@ const SCOPES: { title: string; detail: string }[] = [
   { title: "Read metrics and Airflow", detail: "CloudWatch metrics around a deploy, and Airflow runs and task logs as its Viewer role." },
   { title: "Describe ECS services and tasks", detail: "Which tasks behind a failing log group run, since when and how they start." },
   { title: "Find the code behind a log group", detail: "Function, image and stack tags, so a fix goes to the right repository." },
+  { title: "Read which versions run (when switched on)", detail: "AMIs, node groups, database and cache updates, for Infrastructure vulnerabilities. Never Lambda settings or user data." },
 ];
 const CANNOT = [
   "Change, delete or write anything in your account",
