@@ -75,6 +75,8 @@ export interface RepoInventory {
   packages: number;
   ecosystems: Record<string, number>;
   read_at: string | null;
+  /** When the list is read again (empty until it was read once). */
+  next_read?: string;
   state: "ok" | "graph_off" | "error" | "not_read";
   reason: string;
   /** Packages with a range or partial version, which can't be matched. */
