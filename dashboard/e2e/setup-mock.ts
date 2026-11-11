@@ -426,19 +426,26 @@ export function autoDoneRun(): Record<string, unknown> {
       items = [
         ...items,
         item({ setting_id: "stale_prs.dry_run", feature: "stale_prs", title: "Dry run", current: { value: true, set: false }, recommended: true, source: "default" }),
+        item({ setting_id: "auto_merge.dry_run", feature: "auto_merge", title: "Dry run", current: { value: false, set: false }, recommended: true, source: "default" }),
       ];
     }
     const changes = items
       .filter((it) => !(it.current as { set: boolean }).set && JSON.stringify((it.current as { value: unknown }).value) !== JSON.stringify(it.recommended))
       .map((it) => ({ setting_id: it.setting_id, before: { value: (it.current as { value: unknown }).value, stored: false, row: null }, after: it.recommended, at: iso(0.01), evidence: it.evidence, row_created: false, undone: false }));
     const kept = items.filter((it) => (it.current as { set: boolean }).set && JSON.stringify((it.current as { value: unknown }).value) !== JSON.stringify(it.recommended)).length;
-    const previews = r.repo === "acme/web-app" ? 1 : 0;
-    const turned = changes.length - previews;
+    // Stale closing and auto-merge start as previews; their dry run switches are part of the preview, not settings of their own.
+    const previews = r.repo === "acme/web-app" ? 2 : 0;
+    const turned = changes.filter((c) => !/\.dry_run$/.test(c.setting_id as string)).length - previews;
     return {
       ...r,
       items: items.map((it) => ({ ...it, decision: (it.current as { set: boolean }).set ? "keep" : "use" })),
       changes,
-      summary: { changed: turned, kept, previews, text: `Turned on ${turned} ${turned === 1 ? "setting" : "settings"}, kept ${kept} of yours${previews ? `, ${previews} is a preview you can switch on` : ""}` },
+      summary: {
+        changed: turned,
+        kept,
+        previews,
+        text: `Turned on ${turned} ${turned === 1 ? "setting" : "settings"}, kept ${kept} of yours${previews ? `, ${previews} ${previews === 1 ? "is a preview" : "are previews"} you can switch on` : ""}`,
+      },
     };
   });
   return {

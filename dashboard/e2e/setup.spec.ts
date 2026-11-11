@@ -135,10 +135,13 @@ test.describe("Setup", () => {
     await expect(page.getByTestId("analyze-step")).toBeVisible();
     await expect(page.getByTestId("auto-results")).toBeVisible({ timeout: 20_000 });
     const web = page.locator('[data-testid="auto-repo"][data-repo="acme/web-app"]');
-    await expect(web.getByTestId("auto-summary")).toHaveText("Turned on 8 settings, kept 3 of yours, 1 is a preview you can switch on");
+    await expect(web.getByTestId("auto-summary")).toHaveText("Turned on 7 settings, kept 3 of yours, 2 are previews you can switch on");
     // Previews are open; each change lists its evidence once opened.
-    await expect(web.getByTestId("preview-item")).toHaveCount(1);
+    await expect(web.getByTestId("preview-item")).toHaveCount(2);
     await expect(web.locator('[data-testid="preview-item"][data-id="stale_prs.enabled"]')).toContainText("closed 2 in the last 14 days");
+    // Auto-merge waits as a preview too, with what it would have merged, and is not in "Turned on".
+    await expect(web.locator('[data-testid="preview-item"][data-id="auto_merge.enabled"]')).toContainText("Would have merged 7 pull requests");
+    await expect(web.locator('[data-testid="changed-item"][data-id="auto_merge.enabled"]')).toHaveCount(0);
     await web.getByTestId("group-changed").getByRole("button").first().click();
     await expect(web.locator('[data-testid="changed-item"][data-id="tests.e2e"]')).toContainText("Playwright in package.json");
     // No guided Apply step, and nothing asked to be applied separately.
@@ -165,7 +168,7 @@ test.describe("Setup", () => {
     await web.locator('[data-testid="changed-item"][data-id="reviewer.enabled"]').getByTestId("undo-item").click();
     await expect.poll(() => calls(db, "POST /api/setup/runs/run_03/undo").length).toBe(1);
     expect(calls(db, "POST /api/setup/runs/run_03/undo")[0].body).toEqual({ items: [{ repo: "acme/web-app", setting_id: "reviewer.enabled" }] });
-    await expect(web.getByTestId("auto-summary")).toHaveText("Turned on 7 settings, kept 3 of yours, 1 is a preview you can switch on, 1 undone");
+    await expect(web.getByTestId("auto-summary")).toHaveText("Turned on 6 settings, kept 3 of yours, 2 are previews you can switch on, 1 undone");
     await web.getByTestId("group-undone").getByRole("button").click();
     await expect(web.locator('[data-testid="undone-item"][data-id="reviewer.enabled"]')).toContainText("is back to");
     // The rest of the run stays.

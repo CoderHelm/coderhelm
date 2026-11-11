@@ -11,6 +11,11 @@ const DIR = process.env.E2E_SHOTS_DIR || path.join("test-results", "setup-shots"
 async function shoot(page: Page, name: string, full = true) {
   fs.mkdirSync(DIR, { recursive: true });
   await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
+  if (full) {
+    // A full-page picture starts at the top, and shows the fixed Apply bar where it ends up: after the last row.
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.addStyleTag({ content: "[data-testid=apply-bar-spacer]{height:16px!important}[data-testid=apply-bar]{margin:0!important}[data-testid=apply-bar]:not(:has(*)){}.fixed:has(>[data-testid=apply-bar]){position:static!important;padding:0!important}" });
+  }
   await page.waitForTimeout(350);
   await page.screenshot({ path: path.join(DIR, `${name}.png`), fullPage: full });
 }
@@ -56,6 +61,11 @@ for (const width of [1280, 400]) {
       await page.goto("/setup/run?id=run_03");
       await expect(page.getByTestId("review-step")).toBeVisible();
       await shoot(page, `review-${width}`);
+      // On screen: the bar is fixed to the bottom, and the last row scrolls clear of it.
+      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+      await shoot(page, `review-bottom-${width}`, false);
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await shoot(page, `review-top-${width}`, false);
       await page.getByTestId("choice-use_recommended").click();
       await shoot(page, `review-use-recommended-${width}`);
       await page.getByTestId("apply").click();
@@ -97,6 +107,8 @@ for (const width of [1280, 400]) {
       const web = page.locator('[data-testid="auto-repo"][data-repo="acme/web-app"]');
       await web.getByTestId("group-changed").getByRole("button").first().click();
       await shoot(page, `auto-results-${width}`);
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await shoot(page, `auto-results-top-${width}`, false);
     });
 
     test("applying", async ({ page }) => {

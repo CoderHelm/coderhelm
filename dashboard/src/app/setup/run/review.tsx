@@ -562,13 +562,24 @@ function Editor({ item, value, labelledBy, onChange }: { item: PlanItem; value: 
 }
 
 /**
- * Stuck to the bottom: what applying changes, and the Apply button. When a
- * value someone chose would be replaced, Apply first opens a confirm here, in
- * the page, listing each one.
+ * Fixed to the bottom of the screen: what applying changes, and the Apply
+ * button. A spacer of the bar's own height ends the page, so the last row can
+ * always scroll clear of it and the bar never sits over content. When a value
+ * someone chose would be replaced, Apply first opens a confirm here, in the
+ * page, listing each one.
  */
 function ApplyBar({ summary, onApply, applying, problem }: { summary: ReturnType<typeof summarize>; onApply: () => void; applying: boolean; problem: string | null }) {
   const [confirming, setConfirming] = useState(false);
   const headingRef = useRef<HTMLHeadingElement | null>(null);
+  const barRef = useRef<HTMLDivElement | null>(null);
+  const [barHeight, setBarHeight] = useState(88);
+  useEffect(() => {
+    const el = barRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => setBarHeight(el.offsetHeight));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const n = summary.overwrites.length;
   useEffect(() => {
     if (confirming) headingRef.current?.focus();
@@ -582,7 +593,10 @@ function ApplyBar({ summary, onApply, applying, problem }: { summary: ReturnType
   const apply = () => (n > 0 && !confirming ? setConfirming(true) : onApply());
 
   return (
-    <div role="region" aria-label="Apply" className="sticky bottom-4 z-10 mt-8 rounded-lg border border-zinc-600 bg-zinc-900/95 shadow-xl backdrop-blur" data-testid="apply-bar">
+    <>
+      <div aria-hidden="true" style={{ height: barHeight + 32 }} data-testid="apply-bar-spacer" />
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-20 px-4 pb-4 md:left-56 md:px-8">
+    <div ref={barRef} role="region" aria-label="Apply" className="pointer-events-auto mx-auto max-w-6xl rounded-lg border border-zinc-600 bg-zinc-900/95 shadow-xl backdrop-blur" data-testid="apply-bar">
       {confirming && (
         <div className="max-h-[50vh] overflow-y-auto border-b border-zinc-700 px-4 py-3" data-testid="overwrite-confirm">
           <h2 ref={headingRef} tabIndex={-1} className="text-sm font-semibold text-zinc-50 focus:outline-none">
@@ -632,6 +646,8 @@ function ApplyBar({ summary, onApply, applying, problem }: { summary: ReturnType
         </div>
       </div>
     </div>
+      </div>
+    </>
   );
 }
 
