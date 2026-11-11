@@ -1,10 +1,14 @@
 import Link from "next/link";
 import { SITE, featureMenu, navPages } from "@/content/site";
 import { Logo } from "./Logo";
+import { MenuCloser } from "./MenuCloser";
 
 // Server rendered. The Features menu and the phone menu are <details>
-// elements, so the nav works with no JavaScript at all. Each page renders its
-// own Nav (keyed by page), so an open menu closes on the next page.
+// elements, so the nav works with no JavaScript at all; MenuCloser adds Escape
+// and a press outside to close them. Each page renders its own Nav (keyed by
+// page), so an open menu closes on the next page. The summaries are not
+// selectable: quick repeated clicks on one count as a triple click, which
+// selects the whole <details> block, the open panel's links included.
 export default function Nav() {
   const links = navPages();
   const groups = featureMenu();
@@ -21,8 +25,8 @@ export default function Nav() {
 
         <ul className="hidden items-center gap-7 lg:flex">
           <li>
-            <details className="group relative">
-              <summary className="flex cursor-pointer list-none items-center gap-1 text-sm text-text-secondary transition-colors hover:text-text-primary group-open:text-text-primary [&::-webkit-details-marker]:hidden">
+            <details data-menu className="group relative">
+              <summary className="flex cursor-pointer select-none list-none items-center gap-1 text-sm text-text-secondary transition-colors hover:text-text-primary group-open:text-text-primary [&::-webkit-details-marker]:hidden">
                 Features
                 <svg className="h-3.5 w-3.5 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 9l6 6 6-6" />
@@ -67,8 +71,8 @@ export default function Nav() {
           </a>
         </div>
 
-        <details className="group relative lg:hidden">
-          <summary className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-md text-text-secondary hover:text-text-primary [&::-webkit-details-marker]:hidden" aria-label="Menu">
+        <details data-menu className="group relative lg:hidden">
+          <summary className="flex h-10 w-10 cursor-pointer select-none list-none items-center justify-center rounded-md text-text-secondary hover:text-text-primary [&::-webkit-details-marker]:hidden" aria-label="Menu">
             <svg className="h-5 w-5 group-open:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeWidth={2} d="M4 7h16M4 12h16M4 17h16" />
             </svg>
@@ -116,6 +120,7 @@ export default function Nav() {
           </div>
         </details>
       </nav>
+      <MenuCloser />
     </header>
   );
 }
