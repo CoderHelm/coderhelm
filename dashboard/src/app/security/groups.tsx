@@ -5,7 +5,7 @@
 // date; the row expands to list them all. Searched, filtered and sorted on
 // the server (GET /api/security/groups).
 
-import { Fragment, useCallback, useState } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ListEmpty,
@@ -21,17 +21,22 @@ import {
   type Tone,
 } from "@/components/list";
 import { ChevronRightIcon } from "@/components/icons";
-import { focusRing, linkButton, primaryButton } from "@/components/ui";
+import { Select } from "@/components/select";
+import { focusRing, linkButton, primaryButton, smallSecondaryButton } from "@/components/ui";
 import {
   TIERS,
   cannotFix,
   epssText,
   fixWords,
   isActive,
+  isMajor,
+  prCount,
   repoName,
   securityApi,
   type FindingGroup,
   type GroupFilter,
+  type Bundle,
+  type Combine,
   type SecurityOverview,
   type Tier,
 } from "@/lib/security";
@@ -42,7 +47,12 @@ export const STATUSES = ["open", "fixed", "dismissed", "all"] as const;
 export type StatusFilter = (typeof STATUSES)[number];
 export const SORTS = ["tier", "due", "package"] as const;
 export type SortKey = (typeof SORTS)[number];
-const TIER_TONE: Record<Tier, Tone> = { P0: "danger", P1: "attention", P2: "waiting", P3: "muted" };
+const TIER_TONE: Record<Tier, Tone> = {
+  P0: "danger",
+  P1: "attention",
+  P2: "waiting",
+  P3: "muted",
+};
 
 export interface GroupListFilter {
   status: StatusFilter;
@@ -66,7 +76,7 @@ export function GroupsList({
   admin?: boolean;
 }) {
   const [picked, setPicked] = useState<Record<string, boolean>>({});
-  const [asking, setAsking] = useState(false);
+  const [asking, setAsking] = useState<Combine | null>(null);
   const teamRepos = useTeamRepos();
   const scopedRepos = (overview.repos ?? []).map((r) => r.repo);
   const repos = scopedRepos.length > 0 ? scopedRepos : teamRepos;
@@ -85,15 +95,74 @@ export function GroupsList({
     },
     [status, tier, repo, q, sort],
   );
-  const { items, next, loading, loadingMore, error, moreFailed, loadMore, reload } = usePagedList<FindingGroup>(fetchPage, [status, tier, repo, q, sort]);
+  const { items: page, next, loading, loadingMore, error, moreFailed, loadMore, reload } = usePagedList<FindingGroup>(fetchPage, [status, tier, repo, q, sort]);
+  // By tier, the ones still being checked sort below the settled ones of the same tier.
+  const items = sort === "tier" ? settledFirst(page) : page;
   const chosen = items.filter((g) => picked[g.key] && !cannotFix(g));
+  const fixable = items.filter((g) => !cannotFix(g));
+  // The row a shift-click selects from, and the row `x` toggles.
+  const anchor = useRef<string | null>(null);
+  const [active, setActive] = useState<string | null>(null);
+  const toggle = (k: string, range = false) => {
+    const start = range ? anchor.current : null;
+    setPicked((p) => {
+      const on = !p[k];
+      const keys = items.map((g) => g.key);
+      const from = start ? keys.indexOf(start) : -1;
+      const to = keys.indexOf(k);
+      if (from < 0 || to < 0) return { ...p, [k]: on };
+      const [a, b] = from < to ? [from, to] : [to, from];
+      const span = items.slice(a, b + 1).filter((g) => !cannotFix(g));
+      return { ...p, ...Object.fromEntries(span.map((g) => [g.key, on])) };
+    });
+    anchor.current = k;
+  };
+  const selectOnly = (rows: FindingGroup[]) => {
+    setPicked(Object.fromEntries(rows.filter((g) => !cannotFix(g)).map((g) => [g.key, true])));
+    anchor.current = null;
+  };
   const pick = admin
     ? {
         picked,
-        toggle: (k: string) => setPicked((p) => ({ ...p, [k]: !p[k] })),
-        all: (on: boolean) => setPicked(on ? Object.fromEntries(items.filter((g) => !cannotFix(g)).map((g) => [g.key, true])) : {}),
+        toggle,
+        all: (on: boolean) => (on ? selectOnly(items) : setPicked({})),
+        setActive,
       }
     : null;
+  const busy = asking !== null;
+  // x toggles the row under the pointer or with focus; Esc clears.
+  useEffect(() => {
+    if (!admin || busy) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      const typing =
+        !!t && (t.isContentEditable || /^(TEXTAREA|SELECT)$/.test(t.tagName) || (t.tagName === "INPUT" && (t as HTMLInputElement).type !== "checkbox"));
+      if (typing) return;
+      if (e.key === "Escape" && Object.values(picked).some(Boolean)) {
+        setPicked({});
+        anchor.current = null;
+      } else if ((e.key === "x" || e.key === "X") && active) {
+        const row = items.find((g) => g.key === active);
+        if (row && !cannotFix(row)) {
+          e.preventDefault();
+          toggle(active, e.shiftKey);
+        }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+  const repoRows = (r: string) => fixable.filter((g) => g.repo === r);
+  const fixableRepos = [...new Set(fixable.map((g) => g.repo))];
+  const urgent = fixable.filter((g) => g.tier === "P0" || g.tier === "P1");
+  const bundle: Bundle = overview.bundle ?? "per_package";
+  const closeAsk = () => {
+    setAsking(null);
+    setPicked({});
+    reload();
+  };
+  const names = Object.fromEntries(items.flatMap((g) => g.finding_ids.map((id) => [id, g.package])));
   const g = overview.groups;
   const c = overview.counts;
   const filtered = status !== "open" || !!tier || !!repo || !!q;
@@ -126,7 +195,12 @@ export function GroupsList({
             { value: "", label: "Every tier" },
             ...TIERS.map((t) => {
               const key = t.toLowerCase() as "p0" | "p1" | "p2" | "p3";
-              return { value: t, label: t, tone: TIER_TONE[t], count: status === "open" ? (g ? g[key] : c[key]) : undefined };
+              return {
+                value: t,
+                label: t,
+                tone: TIER_TONE[t],
+                count: status === "open" ? (g ? g[key] : c[key]) : undefined,
+              };
             }),
           ]}
         />
@@ -148,11 +222,53 @@ export function GroupsList({
           </button>
         )}
       </div>
-      {g && status === "open" && (
-        <p className="mt-2 text-xs text-zinc-400" data-testid="group-count">
-          {g.open} fix{g.open === 1 ? "" : "es"} for {c.open} advisor{c.open === 1 ? "y" : "ies"}
-        </p>
-      )}
+      <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+        {g && status === "open" && (
+          <p className="text-xs text-zinc-400" data-testid="group-count">
+            {g.open} fix{g.open === 1 ? "" : "es"} for {c.open} advisor
+            {c.open === 1 ? "y" : "ies"}
+          </p>
+        )}
+        {admin && !loading && fixable.length > 0 && (
+          <div className="flex min-w-0 flex-wrap items-center gap-2 sm:ml-auto" role="group" aria-label="Quick select" data-testid="quick-select">
+            <button type="button" className={`${smallSecondaryButton} gap-1.5`} onClick={() => selectOnly(fixable)} data-testid="select-fixable">
+              Select everything fixable <span className="tabular-nums text-zinc-400">{fixable.length}</span>
+            </button>
+            <button
+              type="button"
+              className={`${smallSecondaryButton} gap-1.5`}
+              onClick={() => selectOnly(urgent)}
+              disabled={urgent.length === 0}
+              data-testid="select-urgent"
+            >
+              Select P0 and P1 <span className="tabular-nums text-zinc-400">{urgent.length}</span>
+            </button>
+            {repo || fixableRepos.length === 1 ? (
+              <button
+                type="button"
+                className={`${smallSecondaryButton} gap-1.5`}
+                onClick={() => selectOnly(repoRows(repo || fixableRepos[0]))}
+                data-testid="select-repo"
+              >
+                Select this repo <span className="tabular-nums text-zinc-400">{repoRows(repo || fixableRepos[0]).length}</span>
+              </button>
+            ) : (
+              <Select
+                size="sm"
+                value=""
+                placeholder="Select a repo…"
+                aria-label="Select every fix in a repo"
+                onChange={(r) => r && selectOnly(repoRows(r))}
+                options={fixableRepos.map((r) => ({
+                  value: r,
+                  label: `${repoName(r)} (${repoRows(r).length})`,
+                }))}
+                data-testid="select-repo"
+              />
+            )}
+          </div>
+        )}
+      </div>
 
       <div className="mt-4">
         {loading ? (
@@ -170,42 +286,204 @@ export function GroupsList({
         )}
         {!loading && !error && <LoadMore hasMore={!!next} loading={loadingMore} failed={moreFailed} onClick={loadMore} />}
       </div>
-      {admin && chosen.length > 0 && (
-        <div className="sticky bottom-3 z-20 mt-4" data-testid="bulk-bar">
-          {asking ? (
-            <FixRequest
-              ids={chosen.flatMap((g) => g.finding_ids)}
-              onCancel={() => {
-                setAsking(false);
-                setPicked({});
-                reload();
-              }}
-            />
-          ) : (
-            <div className="flex min-w-0 flex-wrap items-center gap-3 rounded-lg border border-zinc-700 bg-zinc-900/95 px-4 py-3 text-sm shadow-xl backdrop-blur">
-              <p className="min-w-0 flex-1 text-zinc-200 [overflow-wrap:anywhere]" data-testid="bulk-summary">
-                {bulkWords(chosen)}
-              </p>
-              <button type="button" className={`${linkButton} !text-xs`} onClick={() => setPicked({})}>
-                Clear
-              </button>
-              <button type="button" className={primaryButton} onClick={() => setAsking(true)} data-testid="bulk-open">
-                Open fix PRs
-              </button>
-            </div>
-          )}
-        </div>
+      {admin && (chosen.length > 0 || busy) && (
+        <BulkBar
+          chosen={chosen}
+          bundle={bundle}
+          asking={asking}
+          names={names}
+          onAsk={setAsking}
+          onClear={() => setPicked({})}
+          onClose={closeAsk}
+          onRemove={(ids) =>
+            setPicked((p) => ({
+              ...p,
+              ...Object.fromEntries(chosen.filter((c) => c.finding_ids.every((id) => ids.includes(id))).map((c) => [c.key, false])),
+            }))
+          }
+        />
       )}
     </section>
   );
 }
 
-/** "3 selected (7 advisories): these become 3 PRs (tar, protobufjs, qs)". */
-export function bulkWords(chosen: FindingGroup[]): string {
+/** Within each tier, settled rows first, then those still being checked; otherwise the server's order. */
+export function settledFirst(rows: FindingGroup[]): FindingGroup[] {
+  const rank = (g: FindingGroup) => TIERS.indexOf(g.tier) * 2 + (g.tier_provisional ? 1 : 0);
+  return rows
+    .map((g, i) => ({ g, i }))
+    .sort((a, b) => (a.g.tier === b.g.tier ? rank(a.g) - rank(b.g) || a.i - b.i : a.i - b.i))
+    .map((x) => x.g);
+}
+
+/**
+ * The selection in a line: "14 fixes selected in web-app: 1 pull request ·
+ * 31 advisories · 2 major upgrades". `how` is how they would combine.
+ */
+export function bulkWords(chosen: FindingGroup[], how: Combine = "one_pr", bundle: Bundle = "per_package"): string {
   const advisories = chosen.reduce((n, g) => n + g.advisories.length, 0);
-  const names = [...new Set(chosen.map((g) => g.package))];
-  const shown = names.slice(0, 4).join(", ") + (names.length > 4 ? `, and ${names.length - 4} more` : "");
-  return `${chosen.length} selected (${advisories} advisor${advisories === 1 ? "y" : "ies"}): these become ${chosen.length} PR${chosen.length === 1 ? "" : "s"} (${shown})`;
+  const majors = chosen.filter((g) => isMajor(g.version, g.fixed_version)).length;
+  const repos = [...new Set(chosen.map((g) => g.repo))];
+  const prs = prCount(chosen, how, bundle);
+  const where = repos.length === 1 ? repoName(repos[0]) : `${repos.length} repos`;
+  const parts = [`${prs} pull request${prs === 1 ? "" : "s"}`, `${advisories} advisor${advisories === 1 ? "y" : "ies"}`];
+  if (majors > 0) parts.push(`${majors} major upgrade${majors === 1 ? "" : "s"}`);
+  const checking = chosen.filter((g) => g.tier_provisional).length;
+  if (checking > 0) parts.push(`${checking} still being checked`);
+  return `${chosen.length} fix${chosen.length === 1 ? "" : "es"} selected in ${where}: ${parts.join(" · ")}`;
+}
+
+/**
+ * The selection's bar, fixed to the bottom of the screen over the list's
+ * width, with a spacer of its height after the list so it never covers the
+ * last row. It turns into the review panel, then the result.
+ */
+function BulkBar({
+  chosen,
+  bundle,
+  asking,
+  names,
+  onAsk,
+  onClear,
+  onClose,
+  onRemove,
+}: {
+  chosen: FindingGroup[];
+  bundle: Bundle;
+  asking: Combine | null;
+  names: Record<string, string>;
+  onAsk: (c: Combine) => void;
+  onClear: () => void;
+  onClose: () => void;
+  onRemove: (ids: string[]) => void;
+}) {
+  const spacer = useRef<HTMLDivElement>(null);
+  const bar = useRef<HTMLDivElement>(null);
+  const [box, setBox] = useState<{
+    left: number;
+    width: number;
+    height: number;
+  } | null>(null);
+  const [menu, setMenu] = useState(false);
+  const [ids, setIds] = useState<string[]>([]);
+  useLayoutEffect(() => {
+    const measure = () => {
+      const host = spacer.current?.parentElement;
+      if (!host || !bar.current) return;
+      const r = host.getBoundingClientRect();
+      const height = bar.current.getBoundingClientRect().height;
+      setBox((b) => (b && b.left === r.left && b.width === r.width && b.height === height ? b : { left: r.left, width: r.width, height }));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (bar.current) ro.observe(bar.current);
+    if (spacer.current?.parentElement) ro.observe(spacer.current.parentElement);
+    window.addEventListener("resize", measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, []);
+  useEffect(() => {
+    if (!menu) return;
+    const close = (e: KeyboardEvent | MouseEvent) => {
+      if (e instanceof KeyboardEvent && e.key !== "Escape") return;
+      if (e instanceof MouseEvent && bar.current?.contains(e.target as Node)) return;
+      setMenu(false);
+    };
+    window.addEventListener("keydown", close, true);
+    window.addEventListener("mousedown", close);
+    return () => {
+      window.removeEventListener("keydown", close, true);
+      window.removeEventListener("mousedown", close);
+    };
+  }, [menu]);
+  const ask = (c: Combine) => {
+    setIds(chosen.flatMap((g) => g.finding_ids));
+    setMenu(false);
+    onAsk(c);
+  };
+  const one = prCount(chosen, "one_pr");
+  const perPackage = prCount(chosen, "per_package");
+  return (
+    <>
+      <div ref={spacer} aria-hidden="true" className="mt-4" style={{ height: (box?.height ?? 0) + 16 }} data-testid="bulk-bar-spacer" />
+      <div
+        className="pointer-events-none fixed bottom-0 z-30 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+        style={box ? { left: box.left, width: box.width } : { left: 16, right: 16 }}
+      >
+        <div ref={bar} className="pointer-events-auto" data-testid="bulk-bar">
+          {asking ? (
+            <FixRequest ids={ids} combine={asking} names={names} onCancel={onClose} onRemove={onRemove} />
+          ) : (
+            <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-zinc-700 bg-zinc-900/95 px-4 py-3 text-sm shadow-2xl backdrop-blur">
+              <div className="min-w-0 flex-1 basis-64">
+                <p className="text-zinc-100 [overflow-wrap:anywhere]" data-testid="bulk-summary" aria-live="polite">
+                  {bulkWords(chosen, "one_pr", bundle)}
+                </p>
+                <p className="mt-0.5 hidden text-xs text-zinc-400 md:block">
+                  <kbd className="font-sans">x</kbd> selects a row · shift-click selects a range · <kbd className="font-sans">Esc</kbd> clears
+                </p>
+              </div>
+              <div className="ml-auto flex items-center gap-3">
+                <button type="button" className={`${linkButton} !text-xs`} onClick={onClear}>
+                  Clear
+                </button>
+                <div className="relative flex">
+                  <button type="button" className={`${primaryButton} rounded-r-none`} onClick={() => ask("one_pr")} data-testid="bulk-open">
+                    {one === 1 ? "Fix in one PR" : `Fix in ${one} PRs, one per repo`}
+                  </button>
+                  <button
+                    type="button"
+                    className={`inline-flex min-h-9 items-center justify-center rounded-r-lg border-l border-zinc-300 bg-white px-2 text-zinc-900 transition-colors hover:bg-zinc-200 motion-reduce:transition-none ${focusRing}`}
+                    onClick={() => setMenu((m) => !m)}
+                    aria-haspopup="menu"
+                    aria-expanded={menu}
+                    aria-label="Other ways to open the PRs"
+                    data-testid="bulk-more"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 16 16"
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M4 6l4 4 4-4" />
+                    </svg>
+                  </button>
+                  {menu && (
+                    <div
+                      role="menu"
+                      className="absolute bottom-full right-0 mb-2 w-64 overflow-hidden rounded-lg border border-zinc-700 bg-zinc-900 py-1 shadow-2xl"
+                      data-testid="bulk-menu"
+                    >
+                      <button
+                        type="button"
+                        role="menuitem"
+                        autoFocus
+                        className={`block w-full px-3 py-2 text-left text-sm text-zinc-100 hover:bg-zinc-800 ${focusRing}`}
+                        onClick={() => ask("per_package")}
+                        data-testid="bulk-per-package"
+                      >
+                        One PR per package
+                        <span className="block text-xs text-zinc-400">
+                          {perPackage} pull request{perPackage === 1 ? "" : "s"}, for people who want them split
+                        </span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
 }
 
 function detailHref(id: string) {
@@ -220,7 +498,10 @@ function PackageCell({ g }: { g: FindingGroup }) {
   return (
     <div className="min-w-0">
       <p className="truncate" title={label}>
-        <Link href={detailHref(lead?.finding_id ?? g.finding_ids[0])} className="font-mono text-sm font-medium text-zinc-100 underline-offset-4 hover:underline">
+        <Link
+          href={detailHref(lead?.finding_id ?? g.finding_ids[0])}
+          className="font-mono text-sm font-medium text-zinc-100 underline-offset-4 hover:underline"
+        >
           {g.package} {g.version}
         </Link>
         <span className="text-sm text-zinc-400" data-testid="fix-words">
@@ -240,7 +521,18 @@ function PackageCell({ g }: { g: FindingGroup }) {
 
 function FixCell({ g }: { g: FindingGroup }) {
   if (g.pr) {
-    const state = g.pr.state === "merged" ? "merged" : g.pr.state === "closed" ? "closed" : g.pr.ci === "passing" ? "CI passing" : g.pr.ci === "failing" ? "fixing CI" : g.pr.ci ? "CI running" : null;
+    const state =
+      g.pr.state === "merged"
+        ? "merged"
+        : g.pr.state === "closed"
+          ? "closed"
+          : g.pr.ci === "passing"
+            ? "CI passing"
+            : g.pr.ci === "failing"
+              ? "fixing CI"
+              : g.pr.ci
+                ? "CI running"
+                : null;
     return (
       <span className="inline-flex flex-wrap items-center gap-x-1.5" data-testid="fix-state">
         <a href={g.pr.url} target="_blank" rel="noreferrer" className={`${linkButton} !text-xs`}>
@@ -257,7 +549,9 @@ function FixCell({ g }: { g: FindingGroup }) {
       </span>
     );
   }
-  const lockOnly = g.manifests.length > 0 && g.manifests.every((m) => /(^|\/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|poetry\.lock|Cargo\.lock|go\.sum|Gemfile\.lock|composer\.lock)$/.test(m));
+  const lockOnly =
+    g.manifests.length > 0 &&
+    g.manifests.every((m) => /(^|\/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|poetry\.lock|Cargo\.lock|go\.sum|Gemfile\.lock|composer\.lock)$/.test(m));
   const words = g.status === "fixing" ? "Working on the fix" : !g.fixed_version ? "No fix yet" : lockOnly ? "Lockfile update" : `Upgrade to ${g.fixed_version}`;
   return (
     <span className="text-xs text-zinc-400" data-testid="fix-state">
@@ -308,8 +602,11 @@ function Expander({ g, open, onToggle }: { g: FindingGroup; open: boolean; onTog
 
 interface Pick {
   picked: Record<string, boolean>;
-  toggle: (k: string) => void;
+  /** `range`: shift-click, from the last row picked to this one. */
+  toggle: (k: string, range?: boolean) => void;
   all: (on: boolean) => void;
+  /** The row `x` toggles: under the pointer, or with focus. */
+  setActive: (k: string | null) => void;
 }
 
 function PickBox({ g, pick }: { g: FindingGroup; pick: Pick }) {
@@ -321,7 +618,11 @@ function PickBox({ g, pick }: { g: FindingGroup; pick: Pick }) {
         className="h-4 w-4 accent-zinc-200 disabled:opacity-40"
         checked={!why && !!pick.picked[g.key]}
         disabled={!!why}
-        onChange={() => pick.toggle(g.key)}
+        onClick={(e) => {
+          e.preventDefault();
+          pick.toggle(g.key, e.shiftKey);
+        }}
+        onChange={() => {}}
         aria-label={why ? `${g.package} ${g.version}: ${why}` : `Select ${g.package} ${g.version}`}
         data-testid="pick"
       />
@@ -374,7 +675,13 @@ function GroupsTable({ rows, showRepo, pick }: { rows: FindingGroup[]; showRepo:
           <tbody className="divide-y divide-zinc-800">
             {rows.map((g) => (
               <Fragment key={g.key}>
-                <tr className="align-top" data-testid="finding-row" data-key={g.key}>
+                <tr
+                  className={`align-top ${pick?.picked[g.key] && !cannotFix(g) ? "bg-zinc-800/40" : ""}`}
+                  data-testid="finding-row"
+                  data-key={g.key}
+                  onMouseEnter={pick ? () => pick.setActive(g.key) : undefined}
+                  onFocus={pick ? () => pick.setActive(g.key) : undefined}
+                >
                   {pick && (
                     <td className="py-3 pl-4">
                       <PickBox g={g} pick={pick} />
@@ -423,7 +730,14 @@ function GroupsTable({ rows, showRepo, pick }: { rows: FindingGroup[]; showRepo:
       {/* Below `lg:` one card per fix, so nothing hides off the right edge. */}
       <ul aria-label="Findings" className="divide-y divide-zinc-800 lg:hidden">
         {rows.map((g) => (
-          <li key={g.key} className="min-w-0 space-y-2 px-4 py-3" data-testid="finding-card" data-key={g.key}>
+          <li
+            key={g.key}
+            className={`min-w-0 space-y-2 px-4 py-3 ${pick?.picked[g.key] && !cannotFix(g) ? "bg-zinc-800/40" : ""}`}
+            data-testid="finding-card"
+            data-key={g.key}
+            onMouseEnter={pick ? () => pick.setActive(g.key) : undefined}
+            onFocus={pick ? () => pick.setActive(g.key) : undefined}
+          >
             <div className="flex min-w-0 items-start gap-2">
               {pick && <PickBox g={g} pick={pick} />}
               <TierPill tier={g.tier} provisional={g.tier_provisional} />

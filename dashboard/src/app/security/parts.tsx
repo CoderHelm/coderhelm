@@ -3,6 +3,7 @@
 // Pieces the Security pages share: the tier and verdict tags, the fix state
 // and the deadline countdown, and the banner for a missing GitHub permission.
 
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Callout } from "@/components/callout";
 import { Chip, TONES } from "@/components/list";
@@ -21,17 +22,45 @@ import {
   type Verdict,
 } from "@/lib/security";
 
+/** What a tier still being checked says, on hover and to a screen reader. */
+export function provisionalWords(tier: Tier): string {
+  return `Likely ${tier}. Still checking whether your code uses this package; the tier can change.`;
+}
+
+/**
+ * The tier. While the verdict is still being checked it is a muted, low-contrast
+ * outline of the same size with a clock in it, never a question mark; once
+ * the check settles it turns solid (a short fade, none with reduced motion).
+ */
 export function TierPill({ tier, provisional }: { tier: Tier; provisional?: boolean }) {
   const look = TIER_LOOK[tier] ?? TIER_LOOK.P3;
+  const was = useRef(provisional);
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
+    if (was.current && !provisional) setSettled(true);
+    was.current = provisional;
+  }, [provisional]);
+  if (provisional) {
+    const words = provisionalWords(tier);
+    return (
+      <span title={words} data-testid="tier-pill" data-tier={tier} data-provisional="true" className="inline-flex">
+        <span className="sr-only">{words}</span>
+        <span
+          aria-hidden="true"
+          className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-zinc-700 bg-transparent px-2 py-0.5 text-xs font-medium text-zinc-300"
+        >
+          <svg viewBox="0 0 16 16" className="h-3 w-3 shrink-0 text-zinc-400" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+            <circle cx="8" cy="8" r="6.2" />
+            <path d="M8 4.6V8l2.3 1.5" />
+          </svg>
+          {tier}
+        </span>
+      </span>
+    );
+  }
   return (
-    <span
-      title={provisional ? `${look.words}, for now: the verdict is still being checked` : look.words}
-      data-testid="tier-pill"
-      data-tier={tier}
-      data-provisional={provisional ? "true" : undefined}
-      className={provisional ? "opacity-70" : undefined}
-    >
-      <Chip tone={look.tone}>{provisional ? `${tier}?` : tier}</Chip>
+    <span title={look.words} data-testid="tier-pill" data-tier={tier} className={`inline-flex ${settled ? "tier-settle" : ""}`}>
+      <Chip tone={look.tone}>{tier}</Chip>
     </span>
   );
 }

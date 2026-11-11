@@ -12,6 +12,16 @@ export const TIERS: Tier[] = ["P0", "P1", "P2", "P3"];
 export type Verdict = "reachable" | "not_reachable" | "not_loaded" | "unknown" | "pending";
 export type FindingStatus = "open" | "fixing" | "pr_open" | "fixed" | "dismissed" | "withdrawn" | "no_fix";
 export type OpenPrs = "now" | "hour" | "daily" | "weekly" | "off";
+/** How fixes become pull requests: one per repo (the fewest), per repo and ecosystem, or per package. */
+export type Bundle = "per_repo" | "per_repo_ecosystem" | "per_package";
+/** How a person's picked fixes combine: one PR per repo whatever the policy says, one per package, or as the policy says. */
+export type Combine = "one_pr" | "per_package" | "policy";
+
+export const BUNDLE_LABEL: Record<Bundle, string> = {
+  per_repo: "One PR per repo (fewest PRs, recommended)",
+  per_repo_ecosystem: "One per ecosystem",
+  per_package: "One per package",
+};
 
 /**
  * The capability that changes the policy, dismisses, reopens and starts a
@@ -22,6 +32,8 @@ export const SECURITY_ADMIN = "agent_settings";
 export interface SecurityOverview {
   enabled: boolean;
   dry_run: boolean;
+  /** The policy's pull request choice (older servers: absent, one per package). */
+  bundle?: Bundle;
   counts: {
     open: number;
     p0: number;
@@ -218,6 +230,8 @@ export interface SecurityConfig {
   reachability_labels: boolean;
   ecosystem_labels: boolean;
   major_bumps: "fix_in_pr" | "issue_only";
+  /** How fixes become pull requests. */
+  bundle: Bundle;
   adopt_bot_prs: boolean;
   repos: "all" | string[];
   ignore: IgnoreRule[];
@@ -248,6 +262,7 @@ export const SECURITY_DEFAULTS: SecurityConfig = {
   reachability_labels: true,
   ecosystem_labels: true,
   major_bumps: "fix_in_pr",
+  bundle: "per_repo",
   adopt_bot_prs: true,
   repos: "all",
   ignore: [],
@@ -273,6 +288,46 @@ export interface PreviewItem {
 export interface SecurityPreview {
   would_open: PreviewItem[];
   would_post: PreviewItem[];
+  /** One entry per pull request (older servers: absent). */
+  prs?: PlanUnit[];
+  /** New pull requests it would open (fixes that join an open PR don't count). */
+  pr_count?: number;
+}
+
+/** One package bump in a planned pull request. */
+export interface PlanBump {
+  package: string;
+  from: string;
+  to: string;
+  major: boolean;
+  manifest: string;
+  verdict: Verdict;
+  tier: Tier | null;
+  finding_ids: string[];
+  advisories: string[];
+}
+
+/** One pull request a request or the policy would open, or the open one it adds to. */
+export interface PlanUnit {
+  unit: string;
+  ticket?: string;
+  repo: string;
+  title: string;
+  branch?: string;
+  labels?: string[];
+  tier?: Tier | null;
+  bundle?: boolean;
+  finding_ids: string[];
+  advisories?: number;
+  majors?: number;
+  bumps?: PlanBump[];
+  /** The open security PR these fixes are added to, instead of a new one. */
+  joins?: { number: number; url: string } | null;
+  estimated_tokens?: number;
+  /** One package's name, or "14 packages". */
+  package: string;
+  from: string;
+  to: string;
 }
 
 export interface FindingFilter {
@@ -373,14 +428,21 @@ export function groupsQuery(f: GroupFilter): string {
 }
 
 export interface FixPlan {
-  units: { unit: string; repo: string; package: string; from: string; to: string; finding_ids: string[]; title: string }[];
+  units: PlanUnit[];
   skipped: { finding_id: string; reason: string; pr_url?: string }[];
   runs_today: number;
   runs_limit: number;
+  /** New pull requests (older servers: absent, one per unit). */
+  pr_count?: number;
+  /** Units added to an open PR. */
+  joins?: number;
+  tokens_today?: number;
+  tokens_limit?: number;
+  estimated_tokens?: number;
 }
 
 export interface FixResult {
-  started: { unit: string; ticket: string; repo: string; package: string; finding_ids: string[]; run_id: string | null; runs_url: string }[];
+  started: { unit: string; ticket: string; repo: string; package: string; finding_ids: string[]; run_id: string | null; runs_url: string; joins?: number | null }[];
   queued: { unit: string; ticket: string; repo: string; package: string; finding_ids: string[]; reason: string }[];
   skipped: { finding_id: string; reason: string; pr_url?: string }[];
   runs_today: number;
@@ -408,8 +470,9 @@ export function cannotFix(f: { status: FindingStatus; fixed_version: string | nu
 }
 
 export const securityApi = {
-  fixPlan: (finding_ids: string[]) => request<unknown>("/api/security/fix/plan", json("POST", { finding_ids })).then(checkFixPlan),
-  fix: (finding_ids: string[], raise_limit = false) => request<unknown>("/api/security/fix", json("POST", { finding_ids, raise_limit })).then(checkFixResult),
+  fixPlan: (finding_ids: string[], combine: Combine = "policy") => request<unknown>("/api/security/fix/plan", json("POST", { finding_ids, combine })).then(checkFixPlan),
+  fix: (finding_ids: string[], raise_limit = false, combine: Combine = "policy") =>
+    request<unknown>("/api/security/fix", json("POST", { finding_ids, raise_limit, combine })).then(checkFixResult),
   groups: (f: GroupFilter) => request<unknown>(`/api/security/groups?${groupsQuery(f)}`).then(checkGroups),
   insights: (days = 30) => request<unknown>(`/api/security/insights?days=${days}`).then(checkInsights),
   overview: () => request<unknown>("/api/security/overview").then(checkOverview),
@@ -461,6 +524,29 @@ export const OPEN_PRS_LABEL: Record<OpenPrs, string> = {
   weekly: "Once a week, grouped",
   off: "Never",
 };
+
+/**
+ * How many pull requests picked fixes become: one per repo for one PR (or a
+ * policy that bundles per repo), one per repo and ecosystem, or one per
+ * package. A pull request lives in one repo, so two repos are two.
+ */
+export function prCount(chosen: Pick<FindingGroup, "repo" | "ecosystem" | "key">[], how: Combine, bundle: Bundle = "per_package"): number {
+  const mode: Bundle = how === "one_pr" ? "per_repo" : how === "per_package" ? "per_package" : bundle;
+  const key = (g: Pick<FindingGroup, "repo" | "ecosystem" | "key">) =>
+    mode === "per_repo" ? g.repo.toLowerCase() : mode === "per_repo_ecosystem" ? `${g.repo.toLowerCase()}|${g.ecosystem.toLowerCase()}` : `${g.repo.toLowerCase()}|${g.key}`;
+  return new Set(chosen.map(key)).size;
+}
+
+/** Whether a fix moves to a new major version (its breaking changes may need code changes). */
+export function isMajor(from: string, to: string | null): boolean {
+  if (!to) return false;
+  const major = (v: string) => {
+    const parts = v.replace(/^[^0-9]*/, "").split(".").map((p) => parseInt(p, 10) || 0);
+    return parts[0] === 0 ? [0, parts[1] ?? 0] : [parts[0], 0];
+  };
+  const [a, b] = [major(from), major(to)];
+  return a[0] !== b[0] || a[1] !== b[1];
+}
 
 /** A finding that is still waiting on someone: it counts down to its deadline. */
 export function isActive(f: Pick<Finding, "status">): boolean {
