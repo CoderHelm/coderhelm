@@ -331,11 +331,22 @@ function FixBlock({ f }: { f: Finding }) {
           <OutLink href={f.dependabot_alert.url}>Dependabot alert #{f.dependabot_alert.number}</OutLink> closes when the fix merges.
         </p>
       )}
+      {f.private_report && (
+        <p className="text-zinc-300" data-testid="private-report">
+          A private report against this repository&apos;s own code. Coderhelm keeps it here only: it is never posted to a channel and never fixed in a
+          public pull request or issue. Publishing the advisory on GitHub makes it public.
+        </p>
+      )}
     </section>
   );
 }
 
-const SOURCE_WORD: Record<string, string> = { dependabot: "Dependabot", osv: "OSV", github_advisory: "GitHub advisories" };
+const SOURCE_WORD: Record<string, string> = {
+  dependabot: "Dependabot",
+  osv: "OSV",
+  github_advisory: "GitHub advisories",
+  repository_advisory: "the repository's own security advisory",
+};
 
 function AdvisoryBlock({ f }: { f: Finding }) {
   const a = f.advisory;

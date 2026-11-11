@@ -39,6 +39,13 @@ The session shows every step the reviewer took, grouped the way it worked: the s
 
 When the review is done, the check ends as neutral if the review has findings, and as success when it found nothing. The check needs the **Checks** permission on the GitHub App. Without it, reviews work as before, just with no check on the pull request.
 
+## What it reads from GitHub
+
+- **CI on the pull request.** Both check runs and commit statuses, so CI that reports through statuses (an external CI server, a preview deploy bot) counts: a red status is a failing check, and a pending one is CI still running. Without **Commit statuses: read**, CoderHelm reads check runs only and says so where it decides, for example "CI was read from check runs only because CoderHelm can't read Commit statuses on this installation; add Commit statuses: read to the GitHub App."
+- **GitHub Code Quality findings.** When a repository runs GitHub Code Quality, the open findings on the files a pull request changes are given to the reviewer, so it never reports one a second time, and it says "fixes N code quality findings" when the change fixes some. This needs **Code quality: read**; without it, or with Code Quality off, reviews work as before.
+- **Deploys.** Analytics counts where CoderHelm's runs deployed from GitHub's deployments when a repository records them, and reads the workflow otherwise. Without **Deployments: read**, the Analytics page says deploys were inferred from workflow names and jobs.
+- **CI logs.** When its own pull request fails CI, CoderHelm reads the failing jobs' logs from the newest attempt, with the step each failed in, and is told which jobs failed once and passed when re-run, so it doesn't chase a flaky one. Without **Actions: read**, it reads check annotations instead and says so.
+
 ## Talk to it on a pull request
 
 | Comment | What happens |

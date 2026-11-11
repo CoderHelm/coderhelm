@@ -3631,6 +3631,8 @@ export interface AnalyticsComparison {
   deploys_backfill: "done" | "running";
   /** Repositories whose workflow runs Coderhelm can't read. */
   deploys_no_access: string[];
+  /** When some of this period's deploys were read from workflow names and jobs because Coderhelm can't read GitHub's Deployments: a sentence saying so (older servers: absent). */
+  deploys_source_note?: string | null;
   /** Repositories the count gave up on after GitHub kept failing, with why (older servers: absent). */
   deploys_not_read?: { repo: string; reason: string }[];
   /** While earlier deploys are read: repositories read so far, of all (null once done, or before the first pass reports). */

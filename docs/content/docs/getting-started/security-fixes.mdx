@@ -17,6 +17,7 @@ Security fixes are off for new teams. Turn them on in **Security**, then **Polic
 | **OSV.dev** | The main advisory database, covering the common package ecosystems. CoderHelm asks OSV's API about the packages and versions in your stored dependency lists. |
 | **Dependabot alerts** | The fastest signal when Dependabot alerts are on for a repository. CoderHelm hears about each alert as it is created, fixed, dismissed or withdrawn, and reads its direct or indirect and runtime or development details. |
 | **GitHub advisories** | Every new GitHub advisory is checked against the stored dependency list of each repository, including repositories where Dependabot alerts are off. |
+| **Your repository's own advisories** | Advisories a repository publishes about its own code, and private vulnerability reports sent to it. Each is a finding in the repository's code, and triage looks for the functions it names. A report still in triage or draft is private: the team sees it in CoderHelm, but it is never posted to a channel and never fixed in a public pull request or issue. This needs **Repository security advisories: read** on the GitHub App; without it the other sources work as before. |
 | **CISA's known exploited list** | Vulnerabilities being exploited now. Its due date for each one can become the deadline. |
 | **FIRST EPSS** | A daily score for how likely each vulnerability is to be exploited in the next 30 days. |
 
