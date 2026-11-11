@@ -43,12 +43,12 @@ By default a document's title is its first `title`, `name`, `heading` or `label`
 
 ## How much a source keeps
 
-A source keeps up to **50,000 items** by default. Admins and owners change the number under **Sync limits** on the **Knowledge** page, from 1,000 to 100,000; everyone else can see it there. The number is a cost choice: the dialog shows what embedding a full source costs the first time, and how much of your team's monthly token limit is left. One knowledge base holds up to 100,000 synced items across all its sources.
+A source keeps up to **50,000 items** by default; there is no fixed cap of 1,000. Admins and owners change **Items per source** under **Sync limits** on the **Knowledge** page (or **Raise the limit** on a source), from 1,000 to 100,000; everyone else can see the number there, with "Admins and owners can change this." The number is a cost choice: the dialog shows what embedding a full source of that size costs the first time, in tokens and dollars, that later syncs embed only what changed, and how much of your team's monthly token limit is left. One knowledge base holds up to 100,000 synced items across all its sources.
 
-- **Large first syncs wait for an admin.** When a new source covers more than 2,000 items, its card shows the estimate first (for example "About 4,812 documents to embed: about 3.9M tokens") and an admin starts it with **Start sync**. If the estimate is more than your team has left this month, it says so instead of starting.
+- **Large first syncs wait for an admin.** When a new source covers more than 2,000 items, its card shows the estimate first (for example "About 4,812 documents to embed: about 3.9M tokens", with the cost in dollars and the tokens left this month) and an admin starts it with **Start sync**. If the estimate is more than your team has left this month, it says so instead of starting.
 - **Embeddings count against your token limit.** Indexing a source counts against the team's monthly token limit set on the budget settings. When the limit is reached, the sync stops and says so; what is already indexed stays searchable.
 - **Big syncs run in steps.** A sync brings in as much as fits in one run, remembers where it stopped, and carries on by itself until it is done. You don't need to press anything. If an app asks CoderHelm to slow down, the sync waits and continues.
-- **Nothing is cut silently.** A source that covers more than it keeps says so on its card, with the real numbers ("Holds 50,000 of 63,210 documents; the rest aren't searchable") and a **Raise the limit** button for admins.
+- **Nothing is cut silently.** A source that covers more than it keeps says so on its card, with the real numbers ("Holds 50,000 of 63,210 documents; the rest aren't searchable"), whether that is the per source limit or the knowledge base's own cap of 100,000, and a **Raise the limit** button for admins.
 
 ## Staying up to date
 
@@ -112,6 +112,8 @@ The knowledge base's page then says **Connected in place: searched live in your 
 - **Citations.** A citation names the document and links to it: the original page for a web, Confluence or SharePoint source, or the object in the S3 console for an S3 document (it opens only for people who can sign in to that AWS account).
 - **When it can't be searched.** Your other knowledge bases still answer, and Chat says which one couldn't be searched and why.
 - **Who can read it.** Like any knowledge base, everyone who can read it in CoderHelm sees what the search returns, even documents they couldn't open where they came from. Agents search the knowledge bases attached to them, so anyone who can start a run reaches them too.
+
+To go the other way, and let Bedrock agents search your CoderHelm knowledge or copy it into a Bedrock knowledge base, see [Amazon Bedrock](/bedrock).
 
 CoderHelm never asks you to name its own account in a Bedrock resource policy: a grant to a shared role would let anyone who learned your knowledge base's ARN search it through another team. Access always goes through your own role and your team's private ID.
 

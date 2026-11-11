@@ -528,6 +528,106 @@ function SetupFrame() {
   );
 }
 
+function KnowledgeFrame() {
+  const tiles = [
+    { k: "Pages searchable", v: "1,284", n: "2 couldn't read" },
+    { k: "Passages", v: "9,870", n: "What a search ranks" },
+    { k: "Freshness", v: "4 min ago", n: "Live updates on" },
+    { k: "Searched this week", v: "312", n: "+19% on last week" },
+  ];
+  const sources = [
+    { name: "Engineering wiki", how: "Notion · team sign-in", state: "Up to date, checked 4 minutes ago", tone: "ok" as const },
+    { name: "Platform space", how: "Confluence · saved API token", state: "Syncing (265 of 4,812)", tone: "info" as const },
+    { name: "Runbooks", how: "Amazon S3 · imported", state: "Up to date, checked 1 hour ago", tone: "ok" as const },
+  ];
+  return (
+    <Window url="app.coderhelm.com/knowledge/base" label="Knowledge base">
+      <div className="grid grid-cols-1 gap-4 [&>*]:min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[15px] font-medium text-text-primary">Engineering handbook</span>
+          <Pill tone="ok">Up to date</Pill>
+          <Pill tone="info">Source of truth</Pill>
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {tiles.map((t) => (
+            <div key={t.k} className="min-w-0 rounded-lg border border-line p-2.5">
+              <p className="text-[11px] text-text-muted">{t.k}</p>
+              <p className="mt-0.5 text-[15px] font-medium text-text-primary">{t.v}</p>
+              <p className="truncate text-[11px] text-text-muted">{t.n}</p>
+            </div>
+          ))}
+        </div>
+        <div className="rounded-lg border border-line p-3">
+          <p className="text-text-primary">Ask this knowledge base</p>
+          <div className="mt-2 rounded-md border border-line bg-white/[0.02] px-3 py-1.5 text-text-secondary">How do we roll back a deploy?</div>
+          <p className="mt-2 leading-relaxed text-text-secondary">
+            Run the rollback job with the previous release tag, then check the health page <span className="font-mono text-[11px] text-accent-text">[1]</span>. Database changes are never rolled back on their own <span className="font-mono text-[11px] text-accent-text">[2]</span>.
+          </p>
+          <p className="mt-1.5 text-[11px] text-text-muted">[1] Deploy runbook, Rollback · [2] Release policy · Continue in Chat</p>
+        </div>
+        <div className="grid gap-2">
+          {sources.map((s) => (
+            <div key={s.name} className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-line px-3 py-2">
+              <span className="text-text-primary">{s.name}</span>
+              <span className="text-[12px] text-text-muted">{s.how}</span>
+              <span className="ml-auto inline-flex items-baseline gap-1.5 text-[12px] text-text-secondary">
+                <span aria-hidden="true" className={`inline-block h-2 w-2 flex-none rounded-full ${s.tone === "ok" ? "bg-ok" : "bg-accent"}`} />
+                <span>{s.state}</span>
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </Window>
+  );
+}
+
+function InfraFrame() {
+  const rows = [
+    { name: "web-asg", kind: "Auto Scaling group · 3 instances", fix: "Fix PR", tier: "P1", note: "Amazon Linux 2023 is fixed in 2023.12.20261102. Internet facing.", tone: "bad" as const },
+    { name: "prod-ng", kind: "EKS node group", fix: "Fix PR", tier: "P2", note: "Sets release_version to the fixed EKS image.", tone: "warn" as const },
+    { name: "orders", kind: "Aurora PostgreSQL cluster", fix: "Runbook", tier: "P2", note: "OS update pending in RDS, apply by Nov 24.", tone: "warn" as const },
+  ];
+  return (
+    <Window url="app.coderhelm.com/security/infrastructure" label="Infrastructure">
+      <div className="grid grid-cols-1 gap-3 [&>*]:min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-text-primary">Linux kernel use after free in IPv4 TCP</span>
+          <span className="font-mono text-[11px] text-text-muted">2026-160-AWS</span>
+        </div>
+        {rows.map((r) => (
+          <div key={r.name} className="min-w-0 rounded-lg border border-line p-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Pill tone={r.tone}>{r.tier}</Pill>
+              <Pill tone={r.fix === "Fix PR" ? "info" : "muted"}>{r.fix}</Pill>
+              <span className="min-w-0 font-mono text-[12px] text-text-primary">{r.name}</span>
+              <span className="text-[12px] text-text-muted">{r.kind}</span>
+            </div>
+            <p className="mt-1.5 text-[12px] text-text-secondary">{r.note}</p>
+            {r.fix === "Runbook" && (
+              <div className="mt-2 overflow-x-auto rounded-md bg-white/[0.03] px-3 py-2 font-mono text-[11px] text-text-secondary">
+                <div className="whitespace-pre">aws rds apply-pending-maintenance-action --apply-action system-update</div>
+              </div>
+            )}
+            {r.name === "web-asg" && (
+              <div className="mt-2 flex items-start gap-2 text-[12px] text-text-muted">
+                <Bot />
+                <p className="min-w-0 pt-0.5">
+                  Opened <b className="text-text-primary">#2210</b> in example/infra: aws_launch_template.web <span className="ml-1 inline-block align-middle"><Pill tone="ok">CI passing</Pill></span>
+                </p>
+              </div>
+            )}
+          </div>
+        ))}
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-line px-3 py-2 text-[12px] text-text-muted">
+          <Pill tone="muted">AWS-managed</Pill>
+          <span className="min-w-0">ECS service api on Fargate, Lambda thumbs: AWS patches them, never counted as open</span>
+        </div>
+      </div>
+    </Window>
+  );
+}
+
 const FRAMES: Record<FrameId, () => ReactNode> = {
   maintain: MaintainFrame,
   review: ReviewFrame,
@@ -543,6 +643,8 @@ const FRAMES: Record<FrameId, () => ReactNode> = {
   secfix: SecFixFrame,
   stale: StaleFrame,
   setup: SetupFrame,
+  knowledge: KnowledgeFrame,
+  infra: InfraFrame,
 };
 
 export function Frame({ id, caption, priority = false, hideCaption = false }: { id: FrameId; caption: string; priority?: boolean; hideCaption?: boolean }) {

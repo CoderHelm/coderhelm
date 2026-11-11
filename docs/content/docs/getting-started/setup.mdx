@@ -5,7 +5,7 @@ description: How CoderHelm reads each repository, recommends a value for every s
 
 **Setup** is the first item in the dashboard's left menu. You pick repositories, CoderHelm reads each one and recommends a value for every setting it manages, and then either turns them on for you or shows you each one first. Every run is saved to the audit log and can be undone.
 
-Running Setup needs the **Run Setup** permission, which admins have, and each change also needs the permission its own settings page needs. Anyone on the team can see the state of each repository. A setting that needs a permission you don't have is marked "needs" with that permission's name, and stays as it is.
+Running Setup is an admin capability by default, and a [custom role](/concepts/roles) can include it. Each change also needs the permission its own settings page needs. Anyone who may change any setting sees Setup in the menu and the state of each repository. A setting that needs a permission you don't have is marked "needs" with that permission's name, and stays as it is.
 
 ## Two ways to run it
 
@@ -18,7 +18,7 @@ Running Setup needs the **Run Setup** permission, which admins have, and each ch
 
 **Do it for me** is the recommended choice. Use **Review each setting** when you want to see every value before anything changes.
 
-Both start the same way, from the Setup page, from a repository's row, or from **Set up repos** in the command menu (Command K on a Mac, Ctrl K elsewhere).
+Both start the same way, from the Setup page, from a repository's row, or from **Set up repos** in the command menu (Command K on a Mac, Ctrl K elsewhere). The first step picks **Which repos**: the ones not set up yet, all of them, or the ones you pick, with **Only what's new** to look at new recommendations only. The button says what happens: **Set up 3 repos for me** or **Analyze 3 repos**. Do it for me then reads and applies in one step and shows the results; Review each setting reads, shows the Review step, then applies.
 
 ## What CoderHelm reads
 
@@ -64,9 +64,9 @@ The results page shows each repository:
 
 Setup changes CoderHelm's own settings only. It opens no pull requests in your repositories; the test setup pull request is still opened from the **Tests** page.
 
-If a repository fails, its reason shows on its row, and **Retry** runs again for the failed repositories only.
+If a repository fails, its reason shows on its row, and **Retry the failed repo** (or **Retry the 2 failed**) runs again for the failed repositories only. On the Setup page, a failed repository's row has **Try again**.
 
-**Undo** next to a change puts that one setting back. **Undo this run** puts back every setting the run changed. A setting someone changed again after the run is left as it is and listed. Every change, and every undo, is recorded in the audit log.
+On the results of **Do it for me**, **Undo** next to a change puts that one setting back. **Undo this run**, on the results of either way, puts back every setting the run changed, after you confirm. A setting someone changed again after the run is left as it is and listed. Every change, and every undo, is recorded in the audit log.
 
 ## New recommendations and new repositories
 
@@ -89,4 +89,4 @@ A newly connected repository starts as **Not set up**. The team setting **Set up
 
 ## On the settings pages
 
-On the reviewer, stale pull request, tests, security and workflow settings pages, a setting whose value is what Setup recommends is marked **Recommended**, and one changed by hand after Setup applied it is marked **Custom**. **Review in Setup** at the top of those pages opens Setup for that repository.
+On the reviewer, stale pull request, tests, security, workflow, instructions and alerts settings pages, a setting whose value is what Setup recommends is marked **Recommended**, and one changed by hand after Setup applied it is marked **Custom**. **Review in Setup** at the top of those pages (all of them except stale pull requests) opens Setup: for the repository you picked on the page, or for every repository on a team-wide page.

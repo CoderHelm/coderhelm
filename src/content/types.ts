@@ -19,11 +19,13 @@ export type FrameId =
   | "merge"
   | "secfix"
   | "stale"
-  | "setup";
+  | "setup"
+  | "knowledge"
+  | "infra";
 
 // Screenshots of the dashboard in public/shots/, taken from its end to end
 // tests' made up data (see src/content/shots.ts).
-export type ShotId = "chat" | "knowledge" | "setup";
+export type ShotId = "chat" | "knowledge" | "setup" | "kbBase" | "kbUsage" | "setupResults" | "infra";
 
 // Small pictures for the bento cells on the home page.
 export type MiniId = "lookup" | "skills" | "plans" | "security";

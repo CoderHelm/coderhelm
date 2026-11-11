@@ -37,6 +37,8 @@ export const SITE = {
     "Works with: GitHub (GitHub App), Jira (Forge app), Microsoft Teams, AWS (CloudWatch alarms through SNS, CloudWatch Logs, PostgreSQL, Redshift), GraphQL APIs, Playwright, JUnit and Cucumber reports, and 17 MCP servers.",
     "Starts a run when: a GitHub issue is assigned to CoderHelm, gets the `coderhelm` label, or gets a `/coderhelm` or `@coderhelm` comment; a Jira ticket is assigned to CoderHelm or gets the `coderhelm` label.",
     "Reviews any pull request that gets the review label (`ch-review` by default) once a repository turns the reviewer on.",
+    "Setup: the first item in the dashboard's left menu. Do it for me reads each repository and turns on a recommended value for every setting, labelled detected, inferred or default with its evidence. It keeps settings someone already chose, starts anything that closes or merges as a preview, and any change or a whole run can be undone. New recommendations from a release never turn themselves on.",
+    "Infrastructure vulnerabilities: off until an admin switches it on for a connected AWS account. Once a day it reads, read only, the AMIs, kernels, EKS node groups, databases, caches and OpenSearch domains running there, and matches them by version against AWS's security bulletins and the Amazon Linux and Bottlerocket advisories, with no model. Each fix is a pull request in the code that defines the resource, a runbook step in AWS that CoderHelm never runs, or AWS-managed and never counted as open.",
     "Stale pull requests: off by default. Once a team turns it on, CoderHelm marks a pull request stale after 21 days with no activity from a person and closes it 7 days later if nothing happened, with a comment that says how to reopen. Its own comments and other bots never count as activity; exempt labels, drafts, chosen authors and pull requests CoderHelm is working on are never touched; it starts as a dry run and keeps the branch.",
     "Learning: it scores its own work from what happens next (a pull request merged as written or edited, closed or reverted; CI passing on the first try or needing fixes; review comments acted on or dismissed; thumbs up or down), reads the best and worst past examples from the repository before a change or a review, and turns justified pushback on a review into a lesson. Lessons, memories, examples and behavior changes are listed with their evidence, and admins can delete or turn off any of them.",
     "Not: a code editor or IDE plugin. It works through issues, tickets and pull requests.",
@@ -60,6 +62,9 @@ export const SITE = {
     "Chat that reads your repositories and cites file paths and lines",
     "Knowledge from Notion, Confluence, Google Drive, Sanity, GitHub, websites and files",
     "Import your knowledge base from S3, a Bedrock knowledge base or a Notion or Confluence export, or connect Bedrock or any MCP search tool in place",
+    "Ask a knowledge base on its own page, with passages only search and usage",
+    "Repository setup that recommends every setting with its reason, keeps yours and can undo any change",
+    "Infrastructure vulnerability checks for AMIs, kernels, EKS nodes, databases and caches on AWS",
     "Agent permissions: allow, ask or deny, with approvals",
     "Custom roles and monthly token limits",
     "Public REST API with team API keys",
@@ -69,8 +74,8 @@ export const SITE = {
   ],
   sameAs: ["https://github.com/CoderHelm"],
   ctaNote: "CoderHelm is in open beta. Sign up and bring your own Anthropic API key.",
-  updated: "2026-11-10",
-  updatedLabel: "November 10, 2026",
+  updated: "2026-11-11",
+  updatedLabel: "November 11, 2026",
   year: 2026,
 } as const;
 
@@ -104,7 +109,7 @@ const home: Page = {
                   text: "Pick your repositories and click Do it for me. CoderHelm reads each one: its tests, workflows, labels, branch protection, AGENTS.md and recent pull requests. It turns on the reviewer, tests, CI labels and the rest with the reason for each, and keeps any setting you already chose. Anything that closes or merges starts as a preview you switch on in one click. Any change can be undone, or review each setting first.",
                   frame: "setup",
                   caption: "A Setup run in the CoderHelm dashboard: what it turned on for each repository with the evidence, what it kept, and a preview waiting to be switched on.",
-                  href: "https://docs.coderhelm.com/getting-started/setup/",
+                  href: "/setup/",
                   linkLabel: "How Setup works",
                 },
               ],
@@ -206,7 +211,7 @@ const home: Page = {
                   id: "security-fixes",
                   title: "Fix what your code reaches",
                   heading: "Security fixes for what your code reaches, not for every package that is present.",
-                  text: "When an advisory touches one of your dependencies, CoderHelm reads your code to see whether it calls the vulnerable part, and shows the files and lines. Each finding gets a tier and a deadline. It opens one pull request per repository with every fix in it, gets CI green, and posts the urgent ones to your alerts channel. It checks what you run on AWS too, and says which fixes AWS makes for you.",
+                  text: "When an advisory touches one of your dependencies, CoderHelm reads your code to see whether it calls the vulnerable part, and shows the files and lines. Each finding gets a tier and a deadline. It opens one pull request per repository with every fix in it, gets CI green, and posts the urgent ones to your alerts channel. It checks [what you run on AWS](/infrastructure-vulnerabilities/) too, and says which fixes AWS makes for you.",
                   frame: "secfix",
                   caption: "A finding CoderHelm marked reachable, with the lines that call the vulnerable code, its deadline and the fix pull request with CI passing.",
                   href: "/security-fixes/",
@@ -246,7 +251,7 @@ const home: Page = {
             "When nothing in your sources supports an answer, it says so",
           ],
         },
-        { type: "actions", items: [{ label: "How Chat works", href: "/chat/" }] },
+        { type: "actions", items: [{ label: "How Chat works", href: "/chat/" }, { label: "Knowledge bases", href: "/knowledge/" }] },
         { type: "shot", shot: "chat", caption: "Chat answering a question about a repository: what it read, then an answer with numbered citations. Example data." },
       ],
     },
@@ -400,6 +405,105 @@ const home: Page = {
       ],
     },
   ],
+};
+
+const setup: Page = {
+  slug: "setup",
+  path: "/setup/",
+  navLabel: "Setup",
+  title: "Set up every repository in one click, with the reason for each setting",
+  description:
+    "CoderHelm's Setup reads each repository, recommends a value for every setting with the evidence behind it, keeps the settings you already chose, starts anything that closes or merges as a preview, and can undo any change.",
+  eyebrow: "Setup",
+  h1: "Pick your repositories. Click Do it for me.",
+  lede:
+    "CoderHelm reads each repository the way a new teammate would: its tests, workflows, labels, branch protection, agent notes and recent pull requests. Then it turns on the settings that fit how the repository already works, says why for each one, and leaves the ones you chose alone.",
+  heroFrame: { id: "setup", caption: "A Setup run: what it turned on for a repository with the evidence for each, and a preview waiting to be switched on." },
+  sections: [
+    {
+      id: "how",
+      heading: "How it works",
+      blocks: [
+        {
+          type: "steps",
+          items: [
+            { title: "Pick the repositories", text: "Open Setup, the first item in the left menu, and pick the repositories. The token estimate shows before anything starts, and a run that doesn't fit what is left of your monthly limits can't start." },
+            { title: "It reads each one", text: "Every setting gets a recommendation with where it came from and the evidence beside it, with a link to the file when there is one. Reading changes nothing." },
+            { title: "It turns them on", text: "Do it for me applies the recommendations at once. Or choose Review each setting to see every value first and pick Use, Keep or Edit for each." },
+          ],
+        },
+      ],
+    },
+    {
+      id: "reasons",
+      heading: "Every recommendation says where it came from",
+      blocks: [
+        {
+          type: "table",
+          head: ["Label", "Meaning", "For example"],
+          rows: [
+            ["Detected", "Read straight from the repository or GitHub", "The test runner in `package.json`, the workflows that run end to end tests, the labels a workflow reacts to, branch protection and its required checks, `CODEOWNERS`, `AGENTS.md`"],
+            ["Inferred", "A judgment from those facts and the last 50 merged pull requests", "The review focus, whether to require tests, coder instructions, which CI labels to add, when a pull request counts as stale"],
+            ["Default", "Nothing in the repository says otherwise", "CoderHelm's own default"],
+          ],
+        },
+        { type: "p", text: "It sets up the reviewer, stale pull requests, tests, security fixes and workflow settings. It changes CoderHelm's own settings only and opens no pull requests in your repositories." },
+      ],
+    },
+    {
+      id: "safe",
+      heading: "Nothing changes by surprise",
+      blocks: [
+        {
+          type: "cards",
+          items: [
+            { title: "Keeps your settings", text: "Keep my settings is on by default: a setting someone already chose stays as it is. Switching it off reads Replace mine with recommended, and the page warns you before you start." },
+            { title: "Previews for anything that closes or merges", text: "Closing stale pull requests starts as a dry run, and auto merge stays off until you pick it yourself. Each shows what it would have done over the last 14 days. Switch on makes it real in one click." },
+            { title: "Undo one setting or a whole run", text: "On the results, Undo next to a change puts that one setting back, and Undo this run puts back everything the run changed. A setting someone changed again since is left as it is and listed." },
+            { title: "Custom stays custom", text: "A setting changed by hand after Setup applied it is marked Custom, and later runs leave it alone unless you choose to replace it." },
+            { title: "Retry what failed", text: "A repository that fails shows its reason on its row, and one button runs again for the failed repositories only." },
+            { title: "Every change on the record", text: "Each run, each change and each undo is written to the audit log." },
+          ],
+        },
+        { type: "shot", shot: "setupResults", caption: "The results of a Do it for me run: two previews to switch on, with what each would have done, then each change with its evidence and Undo. Example data." },
+      ],
+    },
+    {
+      id: "new",
+      heading: "New recommendations, never switched on for you",
+      blocks: [
+        {
+          type: "p",
+          text: "When a CoderHelm release adds a recommendation, Setup lists it under New recommendations and the left menu shows a badge, which also counts repositories not set up yet. Nothing new turns itself on: review it on every repository or dismiss it for the whole team.",
+        },
+        {
+          type: "list",
+          items: [
+            "A newly connected repository starts as Not set up",
+            "Set up new repos on their own, off by default, applies the choices from your last reviewed run to new repositories and lists what it changed",
+            "The reviewer, stale pull request, tests, security, workflow, instructions and alerts settings pages mark a value Recommended or Custom, and most link back with Review in Setup",
+          ],
+        },
+        { type: "actions", items: [{ label: "How Setup works in the docs", href: "https://docs.coderhelm.com/getting-started/setup/" }] },
+      ],
+    },
+    {
+      id: "setup-faq",
+      heading: "FAQ",
+      blocks: [
+        {
+          type: "faq",
+          items: [
+            { q: "Will it overwrite settings we already chose?", a: "No, not unless you ask it to. Keep my settings is on by default, and when you switch it off the page lists each value it would replace and asks before it applies." },
+            { q: "Can it turn on auto merge on its own?", a: "No. Auto merge is only recommended where branch protection requires checks, and no choice turns it on for you, not even Use recommended everywhere. It stays off until you pick it." },
+            { q: "Who can run it?", a: "Admins, and anyone whose [custom role](https://docs.coderhelm.com/concepts/roles/) may run Setup. Each change also needs the permission its own settings page needs; a setting you can't change is marked with the permission it needs and stays as it is." },
+            { q: "Does it cost tokens?", a: "Reading uses tokens from your team's monthly budget. The estimate shows before it starts, and next to what it has used while it reads." },
+          ],
+        },
+      ],
+    },
+  ],
+  related: ["reviewer", "stale-pull-requests", "tests"],
 };
 
 const pullRequests: Page = {
@@ -877,11 +981,105 @@ const securityFixes: Page = {
             ["AWS-managed", "Fargate, Lambda, the EKS control plane: AWS patches them, the bulletin says so, and they never count as open."],
           ],
         },
-        { type: "p", text: "One row per fix, however many advisories it clears, and it closes only when the next read of the account shows the fix running. See the [docs](https://docs.coderhelm.com/getting-started/infrastructure-vulnerabilities/) for the permissions and a worked example." },
+        { type: "p", text: "One row per fix, however many advisories it clears, and it closes only when the next read of the account shows the fix running. See [infrastructure vulnerabilities](/infrastructure-vulnerabilities/), and the [docs](https://docs.coderhelm.com/getting-started/infrastructure-vulnerabilities/) for the permissions and a worked example." },
       ],
     },
   ],
-  related: ["alerts", "maintenance", "self-host"],
+  related: ["infrastructure-vulnerabilities", "alerts", "maintenance"],
+};
+
+const infraVulns: Page = {
+  slug: "infrastructure-vulnerabilities",
+  path: "/infrastructure-vulnerabilities/",
+  navLabel: "AWS vulnerabilities",
+  title: "Vulnerabilities in what you run on AWS, and who has to fix them",
+  description:
+    "CoderHelm checks the AMIs, kernels, container base images, EKS nodes, databases and caches in your AWS accounts against AWS's security bulletins, opens the fix pull request or shows the exact AWS step, and marks what AWS patches for you.",
+  eyebrow: "Infrastructure vulnerabilities",
+  h1: "Know which fixes are yours, and which ones AWS makes.",
+  lede:
+    "A security bulletin lists every service it touches. CoderHelm reads what actually runs in your AWS accounts, says for each resource whether you have to act, and hands you the fix: a pull request in the code that defines it, or the exact step to run in AWS.",
+  heroFrame: { id: "infra", caption: "One AWS bulletin across a team's account: a fix pull request for the instances, one for the node group, a runbook for the database, and what AWS patches on its own." },
+  sections: [
+    {
+      id: "how",
+      heading: "From a bulletin to a fix that is running",
+      blocks: [
+        {
+          type: "steps",
+          items: [
+            { title: "Read the bulletins", text: "Once a day, AWS's security bulletins, the Amazon Linux and Bottlerocket advisories, Lambda runtime end dates and AWS's latest images. Nothing about your accounts is sent to read them." },
+            { title: "Read your account", text: "Once a day, through the same read only role CoderHelm already uses: describe and list calls only. It matches by version, with no model, so it costs no tokens." },
+            { title: "Close on the next read", text: "A finding closes only when the next read of the account shows the fix running, such as the new AMI on every instance. A merged pull request that never rolled out stays open." },
+          ],
+        },
+      ],
+    },
+    {
+      id: "what",
+      heading: "What it checks",
+      blocks: [
+        {
+          type: "table",
+          head: ["Resource", "What it reads"],
+          rows: [
+            ["EC2 instances and Auto Scaling groups", "The AMI and its release, the installed kernel for instances managed by Systems Manager, and whether the internet can reach them"],
+            ["Container images", "The base image in a Dockerfile `FROM`, and ECR's own scan results for the images your services run"],
+            ["EKS node groups", "Each node group's release version and AMI type, and whether the cluster uses Auto Mode"],
+            ["Databases and caches", "RDS and Aurora engine versions and the OS updates AWS has waiting, ElastiCache service updates and OpenSearch software updates"],
+            ["Lambda functions", "Runtimes, read from your Terraform: a deprecated runtime gets no more patches"],
+          ],
+        },
+        { type: "p", text: "It never reads Lambda function settings, which hold environment variables, or user data, and it never changes anything in your account." },
+      ],
+    },
+    {
+      id: "fixes",
+      heading: "Three kinds of fix, one row each",
+      blocks: [
+        {
+          type: "table",
+          head: ["Fix", "When", "What you get"],
+          rows: [
+            ["Fix PR", "The change is in the code that defines the resource", "A pull request that points the AMI at AWS's latest image, sets a node group's release version, changes a Lambda runtime or bumps a Dockerfile base image, with the rollout step when one is needed"],
+            ["Runbook", "The change happens in AWS", "The exact AWS CLI command, the path in the AWS console and AWS's apply by date. CoderHelm never runs it"],
+            ["AWS-managed", "AWS patches it itself", "The bulletin's reason, collapsed at the bottom. Never counted as open"],
+          ],
+        },
+        { type: "p", text: "One row is one fix: one AMI, one node group, one database, however many advisories it clears. Urgency uses the same tiers as [security fixes](/security-fixes/), with whether the internet can reach the resource in place of whether your code reaches the vulnerable part." },
+        { type: "shot", shot: "infra", caption: "Security, Infrastructure: what needs action now, then one row per fix with its tier, the kind of fix and the resource. Example data." },
+      ],
+    },
+    {
+      id: "where",
+      heading: "Where it shows",
+      blocks: [
+        {
+          type: "cards",
+          items: [
+            { title: "Off until you switch it on", text: "An admin switches it on for each connected AWS account, in Settings, Integrations, AWS. When the role lacks the reads, one link adds exactly those permissions." },
+            { title: "Security, Infrastructure", text: "Every open finding with its tier, fix and evidence, filtered by tier or by fix, Check accounts now for admins, and each source with when it was last read." },
+            { title: "Insights, Infrastructure", text: "Running in AWS, beside the review of your infrastructure code: every resource with its versions, where it is defined and its open findings. Fixed findings and time to fix show in Analytics." },
+          ],
+        },
+      ],
+    },
+    {
+      id: "infra-faq",
+      heading: "FAQ",
+      blocks: [
+        {
+          type: "faq",
+          items: [
+            { q: "Does it change anything in my AWS account?", a: "No. It reads with describe and list calls only. Fixes in code arrive as pull requests a person reviews, and steps in AWS are shown for a person to run." },
+            { q: "Does it cost tokens?", a: "No. Matching is by version, with no model. Only the fix pull requests it opens use tokens, within the same daily limits as dependency fixes." },
+            { q: "Can it use Amazon Inspector or AWS Health?", a: "Both are optional, switched on in the Security policy. When Inspector is on and CoderHelm may read its findings, they take the place of its own matching for what Inspector covers. AWS Health names your affected resources for some bulletins. See the [docs](https://docs.coderhelm.com/getting-started/infrastructure-vulnerabilities/) for the permissions and a worked example." },
+          ],
+        },
+      ],
+    },
+  ],
+  related: ["security-fixes", "alerts", "self-host"],
 };
 
 const tests: Page = {
@@ -1109,6 +1307,149 @@ const security: Page = {
   related: ["security-fixes", "data-sources", "self-host"],
 };
 
+const knowledge: Page = {
+  slug: "knowledge",
+  path: "/knowledge/",
+  navLabel: "Knowledge",
+  title: "Knowledge bases your agents and Chat can search and cite",
+  description:
+    "Keep pages from Notion, Confluence, Google Drive, Sanity, GitHub, websites and files in sync, import the knowledge base you already have, or connect Amazon Bedrock or any MCP search tool in place. Ask a base on its own page and see which searches used it.",
+  eyebrow: "Knowledge",
+  h1: "Your team's docs, searchable by every agent, cited in every answer.",
+  lede:
+    "A knowledge base holds your specs, runbooks and policies. CoderHelm keeps it in sync with the apps your team writes in, Chat answers from it with a citation on every claim, and the coder follows your runbook instead of guessing.",
+  heroFrame: { id: "knowledge", caption: "A knowledge base fed by Notion, Confluence and an S3 import: its status, tiles, a cited answer from this base only, and how each source stands." },
+  sections: [
+    {
+      id: "how",
+      heading: "How it works",
+      blocks: [
+        {
+          type: "steps",
+          items: [
+            { title: "Bring it in", text: "Pick the app, sign in and tick what to bring in. Ticking a page, space or folder includes everything inside it, and what is added there later. Pages start arriving at once." },
+            { title: "It stays current", text: "Only what changed is fetched and indexed again, down to the passage. Pages that are deleted, moved out or no longer shared are removed. CoderHelm only ever reads from your apps." },
+            { title: "Agents and Chat use it", text: "Attach a base to the whole team or to some agents: the planner, coder, reviewer and plan chat get a tool to search it. Chat reads it for anyone who may, and cites each page with a link to where it lives." },
+          ],
+        },
+      ],
+    },
+    {
+      id: "sources",
+      heading: "Where your knowledge comes from",
+      blocks: [
+        {
+          type: "table",
+          head: ["Source", "What it brings in", "Changes arrive"],
+          rows: [
+            ["Notion", "Pages and databases", "Within moments with Notion webhooks, otherwise every hour"],
+            ["Confluence", "Spaces or page trees", "Every hour"],
+            ["Google Drive", "Folders or files: Docs, Sheets, Slides, PDF, Word, Excel and more", "Every hour"],
+            ["Sanity", "Published documents. Sign in with Sanity, or use an API token", "Every 15 minutes signed in, the moment they publish with a token"],
+            ["GitHub", "Markdown and text files on the default branch", "On every push"],
+            ["Websites", "Public pages or a sitemap", "Every hour"],
+            ["Files", "PDF, Word, Markdown, text, CSV, Excel and HTML uploads", "When you upload them"],
+          ],
+        },
+      ],
+    },
+    {
+      id: "bring",
+      heading: "Bring the knowledge base you already have",
+      blocks: [
+        {
+          type: "cards",
+          items: [
+            { title: "Import from Amazon S3", text: "Pick an account, a bucket and folders. When the read only role can't read it yet, one link updates the role for just that bucket. Each sync reads only what changed." },
+            { title: "Import a Bedrock knowledge base", text: "Paste its ARN and tick its S3 data sources. CoderHelm reads the documents behind it and indexes them itself. Nothing in Bedrock changes." },
+            { title: "Import an export", text: "Upload a `.zip` of a Notion export, a Confluence HTML export or a docs folder. Upload a newer export later and only what changed is read again." },
+            { title: "Connect Bedrock in place", text: "Paste a Bedrock knowledge base's ARN and it is searched live in your AWS account, through your own role. No documents, passages or vectors are copied." },
+            { title: "Connect any MCP search tool", text: "Pick a search tool your team runs through its MCP server. One test search runs before anything is saved, and each person can search with their own sign in." },
+            { title: "Use your knowledge in Bedrock", text: "Let Bedrock agents search your CoderHelm knowledge live through an AgentCore Gateway, or copy it into a Bedrock knowledge base. A self hosted install sets up a new one with one stack." },
+          ],
+        },
+      ],
+    },
+    {
+      id: "base",
+      heading: "One page answers: is it healthy, and does it answer well?",
+      blocks: [
+        {
+          type: "p",
+          text: "Each base has one status, Up to date, Syncing or Needs attention, then four tiles: pages searchable, passages, freshness and searches this week. A problems banner shows only when something is wrong, with each fix, and pages already brought in stay searchable.",
+        },
+        {
+          type: "list",
+          items: [
+            "Connections: how each source connects (the team's sign in, a person's own, a saved token, the GitHub App, your AWS role, public pages or an export), whose it is, whether its token still works, and what happens if that person leaves",
+            "Content: every page as a tree by source and folder, filtered by state, by when it was updated and by source, each linking to the original",
+            "Left out, never hidden: pages that couldn't be read or were skipped (no text, a file type that isn't read, too large) say why, and can be picked and read again",
+            "Sync history: every sync for 90 days, what started it, how long it took and what it added, updated, removed or skipped",
+          ],
+        },
+      ],
+    },
+    {
+      id: "ask",
+      heading: "Ask it, right on its page",
+      blocks: [
+        {
+          type: "cards",
+          items: [
+            { title: "A cited answer from this base only", text: "Ask a question and get an answer from this base's pages, through Chat. The thread is saved in your Chat history, and Continue in Chat picks it up." },
+            { title: "Passages only, at no AI cost", text: "See what a search finds instead of an answer: the ranked passages, a score against the best match, whether the last answer cited each, and a link to the original." },
+            { title: "Suggested questions", text: "Questions written from the base's own page titles, one click each, so you can check it answers well before your team relies on it." },
+          ],
+        },
+        { type: "shot", shot: "kbBase", caption: "A knowledge base page: one status, four tiles, a problems banner and Ask this knowledge base with Passages only on. Example data." },
+      ],
+    },
+    {
+      id: "usage",
+      heading: "See which searches used it",
+      blocks: [
+        {
+          type: "p",
+          text: "Usage counts the searches this week from Chat, agent runs, MCP and API keys and the page itself, lists the most cited pages and the runs and chats that used it, and shows the questions it had no good answer for, so you know which page to add. Pages no search found in 90 days are candidates to leave out.",
+        },
+        { type: "shot", shot: "kbUsage", caption: "Usage: searches by where they came from, the most cited pages, where it was used and the questions it couldn't answer. Example data." },
+      ],
+    },
+    {
+      id: "limits",
+      heading: "No small cap. A cost you choose.",
+      blocks: [
+        {
+          type: "list",
+          items: [
+            "A source keeps up to 50,000 items by default, and admins choose anything from 1,000 to 100,000 under Sync limits, with what a full first sync costs",
+            "One knowledge base holds up to 100,000 synced items across its sources; connected in place, a search tool or Bedrock base has no size limit here",
+            "A first sync of more than 2,000 items shows its estimate and waits for an admin to press Start sync",
+            "Indexing counts against your team's monthly token limit, and big syncs carry on by themselves until they are done",
+            "Nothing is cut silently: a source that covers more than it keeps says so with the real numbers, and admins can raise the limit",
+          ],
+        },
+      ],
+    },
+    {
+      id: "kb-faq",
+      heading: "FAQ",
+      blocks: [
+        {
+          type: "faq",
+          items: [
+            { q: "Who can read what is in a knowledge base?", a: "Each base has a read role (everyone, members or admins), and can be narrowed to some people or roles. Everyone who can read the base can read every page in it, even pages they can't open in the app, and the dialog says so when you add a source." },
+            { q: "Does CoderHelm change anything in Notion, Confluence or Drive?", a: "No. It only reads: nothing is changed, created or deleted in the app." },
+            { q: "How does the coder use it?", a: "Agents attached to a base get a tool to search it while they plan, write and review, for whoever started the run, so a plan can follow your runbook instead of guessing. A base limited to some people is only searched in runs one of them started." },
+            { q: "Can we keep our knowledge in our own AWS account?", a: "Yes. Connect a Bedrock knowledge base in place and nothing is copied, or [self-host](/self-host/) all of CoderHelm. See the [docs](https://docs.coderhelm.com/concepts/knowledge-sources/) for every source." },
+          ],
+        },
+      ],
+    },
+  ],
+  related: ["chat", "skills", "data-sources"],
+};
+
 const chat: Page = {
   slug: "chat",
   path: "/chat/",
@@ -1171,11 +1512,11 @@ const chat: Page = {
           ],
         },
         { type: "shot", shot: "knowledge", caption: "A knowledge base fed by several apps, each card showing whether it is up to date. Example data." },
-        { type: "p", text: "CoderHelm only ever reads from these apps: nothing is changed, created or deleted there." },
+        { type: "p", text: "CoderHelm only ever reads from these apps: nothing is changed, created or deleted there. Import the knowledge base you already have, connect Bedrock or any MCP search tool in place, and see what each base answers on [its own page](/knowledge/)." },
       ],
     },
   ],
-  related: ["pull-requests", "skills", "security"],
+  related: ["knowledge", "pull-requests", "skills"],
 };
 
 const selfHost: Page = {
@@ -1287,15 +1628,18 @@ function legal(slug: string, navLabel: string, title: string, description: strin
 
 export const pages: Page[] = [
   home,
+  setup,
   pullRequests,
   reviewer,
   stalePrs,
   maintenance,
   alerts,
   securityFixes,
+  infraVulns,
   tests,
   dataSources,
   skills,
+  knowledge,
   chat,
   selfHost,
   security,
@@ -1316,9 +1660,9 @@ export function mdPath(page: Page): string {
 // The header: a Features menu with every feature page in groups, then a few
 // pages that stand on their own.
 export const featureGroups: { title: string; slugs: string[] }[] = [
-  { title: "Write and review", slugs: ["pull-requests", "reviewer", "stale-pull-requests", "maintenance"] },
-  { title: "In production", slugs: ["alerts", "security-fixes", "tests"] },
-  { title: "Context", slugs: ["chat", "data-sources", "skills"] },
+  { title: "Write and review", slugs: ["setup", "pull-requests", "reviewer", "stale-pull-requests", "maintenance"] },
+  { title: "In production", slugs: ["alerts", "security-fixes", "infrastructure-vulnerabilities", "tests"] },
+  { title: "Context", slugs: ["chat", "knowledge", "data-sources", "skills"] },
 ];
 
 export function featureMenu(): { title: string; pages: Page[] }[] {
