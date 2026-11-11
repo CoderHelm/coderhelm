@@ -24,6 +24,15 @@ After the pull request is open, two more stages can run:
 - **CI fix**: if your CI fails on the pull request, CoderHelm reads the failure and pushes a fix. It gives up after 8 automatic fix pushes, so a broken pipeline can't loop forever.
 - **Feedback**: comment on the pull request (or the ticket) and CoderHelm makes the change you asked for.
 
+## Which branch the pull request targets
+
+By default the `coderhelm/` branch starts from your repository's default branch, and the pull request targets it. Two things change that:
+
+- **The ticket names a branch.** Write it in one line, such as `Base branch: release-2`, `Open the PR against release-2` or `Branch from release-2`. Use this for long-lived feature or release branches. If the branch exists, the run starts from it and the pull request targets it. A negated line, such as "never open the PR against main", only says which branch to avoid. If the named branch doesn't exist, or the ticket names two different branches, the run log says so and the run uses the default branch.
+- **The ticket depends on another open pull request.** Say so in a line such as "depends on #123", or link the ticket it builds on. The run then builds on that pull request's branch and targets it (a stacked pull request).
+
+Write the branch name exactly as it appears in the repository. If several tickets share one feature branch, say in each ticket which screens or files it owns. Otherwise parallel runs can each create the same placeholder, and their pull requests collide.
+
 ## When a run stops
 
 A run can end without a pull request. The run page always says why in plain words, for example "The ticket doesn't say which page to change". Answer on the ticket and the run starts again. You can also **Retry**, **Reset and re-run** from scratch, or **Cancel** from the run page.
@@ -32,7 +41,7 @@ New runs also pause when your team reaches a [token limit](/concepts/token-limit
 
 ## Make runs better
 
-- Write tickets with a clear goal and a way to check it.
+- Write tickets with a clear goal and a way to check it. Name the exact file, component or screen when you know it, and the branch when it isn't the default.
 - Add [skills](/concepts/skills) with your team's conventions.
 - Pin [memories](/concepts/memories) for things every change should know.
 - Set team and repository instructions in **Settings**.
