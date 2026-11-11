@@ -14,7 +14,7 @@ import type { RunMode } from "@/lib/setup";
 export const MODE_WORDS: Record<RunMode, { title: string; body: string; action: string }> = {
   auto: {
     title: "Do it for me",
-    body: "Coderhelm reads each repo and turns on the recommended settings. Your own settings stay as they are. Anything that closes or merges starts as a preview. You can undo it.",
+    body: "Coderhelm reads each repo and sets what fits it. Anything someone chose for a repo stays, and the ones the repo itself argues against are shown first. Anything that closes or merges starts as a preview. You can undo it.",
     action: "Do it for me",
   },
   guided: {

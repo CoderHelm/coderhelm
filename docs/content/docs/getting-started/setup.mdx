@@ -12,7 +12,7 @@ Running Setup is an admin capability by default, and a [custom role](/concepts/r
 | | Do it for me | Review each setting |
 | --- | --- | --- |
 | **What you do** | Pick the repositories and click once | Pick the repositories, then choose Use, Keep or Edit for each recommendation |
-| **Your own settings** | Stay as they are (you can switch this off) | You see each one next to the recommendation |
+| **Your own settings** | A value someone chose for a repository stays (you can switch this off); one the repository argues against is listed first as worth a look | You see each one next to the recommendation |
 | **Settings that close or merge** | Start as a preview that changes nothing until you switch it on | You see what each would have done; auto-merge turns on only when you pick Use for it |
 | **When it finishes** | A results page with what changed, what was kept and what waits as a preview | A results page with what changed on each repository |
 
@@ -36,9 +36,9 @@ Reading uses tokens from your team's monthly budget. The estimate shows as soon 
 
 ## Your settings are not overwritten by surprise
 
-**Keep my settings** is on by default. A setting someone already chose stays as it is; only settings nobody has set get the recommendation.
+Only a value someone chose for that repository counts as yours: one saved for the repository itself, the repository named in a team list (such as the security policy's or the Tests page's repositories), or a team-wide value someone changed from its default. A repository missing from a team list, a default, and a value an earlier Setup run wrote on its own are not choices.
 
-- In **Do it for me**, switching it off reads **Replace mine with recommended**, and the page warns you before you start.
+- In **Do it for me**, **Keep what someone chose** is on by default: everything else takes the recommendation. A choice the repository's own files argue against (for example, test results off while a workflow runs tests) is kept and listed first as **Worth a look**, with the file. Switching it off reads **Replace mine with recommended**, and the page warns you before you start.
 - In **Review each setting**, the choice at the top of the Review step is **Keep my settings**, **Use recommended everywhere** or **Decide one by one**. When applying would replace a value someone chose, the page lists each one and asks before it applies.
 
 A setting someone changes by hand after Setup applied it is marked **Custom**. Later runs leave it alone unless you choose to replace it.
@@ -59,8 +59,10 @@ Anything that closes or merges starts as a preview, in both ways of running Setu
 
 The results page shows each repository:
 
-- a one-line summary, such as "Turned on 9 settings, kept 3 of yours, 2 are previews you can switch on";
-- lists of what was turned on, what was kept and what waits as a preview, each with its evidence.
+- a one-line summary, such as "Turned on 9, 2 worth a look, 2 previews to switch on, kept 3 settings someone chose", whose numbers are the lists under it;
+- lists of what is worth a look, what was turned on, what was kept and what waits as a preview, each with its evidence. Each kept setting says who set it, where and when (or that it was set before Setup tracked who), and has **Use recommended**; **Use recommended for all** takes a whole list. Each is recorded like any other change, with its own **Undo**.
+
+Team-wide settings (one value for every repository, such as the alert budget, git conventions and the security policy's fix pull requests) are listed once, in their own section, never inside one repository's result.
 
 Setup changes CoderHelm's own settings only. It opens no pull requests in your repositories; the test setup pull request is still opened from the **Tests** page.
 
@@ -75,6 +77,10 @@ When a CoderHelm release adds a recommendation, Setup lists it under **New recom
 The badge counts new recommendations plus repositories not set up yet.
 
 A newly connected repository starts as **Not set up**. The team setting **Set up new repos on their own** (off by default) applies the choices from your last reviewed run to new repositories and lists what it changed on the Setup page.
+
+## What each repository has on
+
+Open a repository's row on the Setup page to see every feature: on, a preview, off or not used here (nothing in the repository for it to work on, such as release notes with no release tags; these don't count against the total), each with its settings in words, whether they match the recommendation, why, and a link to its settings page. The row itself reads, for example, "5 on · 2 previews · 4 off", with the reasons in one line under it.
 
 ## Repository states
 
