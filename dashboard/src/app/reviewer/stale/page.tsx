@@ -19,6 +19,7 @@ import {
   exemptRows,
   isMarked,
   isUpNext,
+  otherRepoModes,
   plansOf,
   plural,
   rowsOf,
@@ -31,7 +32,6 @@ import { Page, PageHeader } from "@/components/page";
 import { Tabs } from "@/components/tabs";
 import { useToast } from "@/components/toast";
 import { Disclosure } from "@/components/disclosure";
-import { EmptyState } from "@/components/empty-state";
 import { Code } from "@/components/settings";
 import { SettingsScope } from "@/components/settings-scope";
 import { buttonClass, linkButton, primaryButton } from "@/components/ui";
@@ -186,7 +186,7 @@ function StalePage() {
     try {
       // On as a dry run: nothing changes on GitHub until someone turns the dry run off.
       await api.saveStaleConfig({ ...config.team, enabled: true, dry_run: true });
-      toast("Turned on as a dry run. Nothing changes on GitHub until you turn the dry run off.");
+      toast("Turned on as Preview only. Nothing changes on GitHub until you pick On.");
       setParams({ view: "next" });
       reload();
     } catch (e) {
@@ -232,13 +232,10 @@ function StalePage() {
   };
 
   // The header's one action follows the state. Settings is never one: the
-  // Settings tab right below is the way there.
+  // Settings tab right below is the way there. Off, the banner under the
+  // header carries the way to turn it on.
   const primary =
-    state === "off" && admin ? (
-      <button type="button" className={primaryButton} onClick={turnOn} disabled={busy === "turn-on" || !config} data-testid="stale-primary">
-        {busy === "turn-on" ? "Turning on…" : "Turn on"}
-      </button>
-    ) : state === "dry_run" ? (
+    state === "dry_run" ? (
       <Link href={tabHref("next")} className={primaryButton} data-testid="stale-primary" aria-current={view === "next" ? "page" : undefined}>
         Preview what it would close
       </Link>
@@ -276,16 +273,30 @@ function StalePage() {
         actions={primary}
       />
 
+      {state === "off" && view !== "settings" && (
+        <OffBanner
+          admin={admin}
+          busy={busy === "turn-on"}
+          onTurnOn={turnOn}
+          settingsHref={tabHref("settings")}
+          others={otherRepoModes(config?.repo_configs, "off").filter((g) => !repo)}
+        />
+      )}
+
       <Tabs label="Stale pull request views" value={view} items={tabs} />
 
       <div className="mt-6 min-w-0" data-testid="stale-view" data-view={view}>
         {view === "settings" ? (
           <div className="min-w-0 space-y-6">
             <SettingsScope repos={repoNames.map((name) => ({ name }))} value={repo} onChange={(r) => setParams({ repo: r })} />
-            <StaleSection key={repo || "all"} repo={repo} readOnly={readOnly} onSaved={reload} />
+            <StaleSection
+              key={repo || "all"}
+              repo={repo}
+              readOnly={readOnly}
+              onSaved={reload}
+              counts={loaded ? { marked: marked.length, next: upNext.length, nextHref: tabHref("next"), markedHref: tabHref("stale") } : undefined}
+            />
           </div>
-        ) : state === "off" ? (
-          <OffPanel admin={admin} busy={busy === "turn-on"} onTurnOn={turnOn} settingsHref={tabHref("settings")} />
         ) : (
           <>
             <ListToolbar
@@ -310,27 +321,31 @@ function StalePage() {
               shownMarked.length ? (
                 <List label="Marked stale">
                   {shownMarked.map((r) => (
-                    <PlanRow key={`${r.repo}#${r.pr}`} r={r} admin={admin} busy={busy === `keep-${r.repo}-${r.pr}`} onKeep={() => keep(r, true)} />
+                    <PlanRow key={`${r.repo}#${r.pr}`} r={r} state={state} admin={admin} busy={busy === `keep-${r.repo}-${r.pr}`} onKeep={() => keep(r, true)} />
                   ))}
                 </List>
               ) : (
-                <ListEmpty title={filtered ? "No marked pull requests match" : "Nothing is marked stale"} onClear={filtered ? clear : undefined}>
-                  {state === "dry_run"
-                    ? "A dry run marks nothing. What it would mark is under Would mark or close."
-                    : "No open pull request has gone quiet long enough. Marked ones show here with the day they close."}
-                </ListEmpty>
+                <div data-testid="stale-empty-stale"><ListEmpty title={filtered ? "No marked pull requests match" : "Nothing is marked stale"} onClear={filtered ? clear : undefined}>
+                  {state === "off"
+                    ? "No open pull request carries the stale label. One marked earlier, or labeled by hand, shows here."
+                    : state === "dry_run"
+                      ? "Preview only marks nothing. What it would mark is under Would mark or close."
+                      : "No open pull request has gone quiet long enough. Marked ones show here with the day they close."}
+                </ListEmpty></div>
               )
             ) : view === "next" ? (
               shownNext.length ? (
                 <List label={nextLabel}>
                   {shownNext.map((r) => (
-                    <PlanRow key={`${r.repo}#${r.pr}`} r={r} admin={admin} busy={busy === `keep-${r.repo}-${r.pr}`} onKeep={() => keep(r, true)} />
+                    <PlanRow key={`${r.repo}#${r.pr}`} r={r} state={state} admin={admin} busy={busy === `keep-${r.repo}-${r.pr}`} onKeep={() => keep(r, true)} />
                   ))}
                 </List>
               ) : (
-                <ListEmpty title={filtered ? "Nothing matches" : "Nothing to mark or close"} onClear={filtered ? clear : undefined}>
-                  No open pull request has gone quiet long enough. Check now to read GitHub again; it changes nothing.
-                </ListEmpty>
+                <div data-testid="stale-empty-next"><ListEmpty title={filtered ? "Nothing matches" : "Nothing to mark or close"} onClear={filtered ? clear : undefined}>
+                  {state === "off"
+                    ? "No open pull request has gone quiet long enough to be marked if it were turned on. Check now to read GitHub again; it changes nothing."
+                    : "No open pull request has gone quiet long enough. Check now to read GitHub again; it changes nothing."}
+                </ListEmpty></div>
               )
             ) : view === "closed" ? (
               shownClosed.length ? (
@@ -355,9 +370,11 @@ function StalePage() {
                   ))}
                 </List>
               ) : (
-                <ListEmpty title={filtered ? "No closed pull requests match" : "Nothing closed yet"} onClear={filtered ? clear : undefined}>
-                  Pull requests closed as stale in the last 90 days show here, with a link to reopen each one.
-                </ListEmpty>
+                <div data-testid="stale-empty-closed"><ListEmpty title={filtered ? "No closed pull requests match" : "Nothing closed yet"} onClear={filtered ? clear : undefined}>
+                  {state === "on"
+                    ? "Pull requests closed as stale in the last 90 days show here, with a link to reopen each one."
+                    : `${state === "off" ? "Cleanup is off" : "Preview only"}, so nothing is closed. Once it is On, pull requests closed as stale show here with a link to reopen each one.`}
+                </ListEmpty></div>
               )
             ) : shownExempt.length + shownKept.length ? (
               <List label="Exempt">
@@ -396,9 +413,9 @@ function StalePage() {
                 ))}
               </List>
             ) : (
-              <ListEmpty title={filtered ? "Nothing exempt matches" : "Nothing exempt"} onClear={filtered ? clear : undefined}>
+              <div data-testid="stale-empty-exempt"><ListEmpty title={filtered ? "Nothing exempt matches" : "Nothing exempt"} onClear={filtered ? clear : undefined}>
                 Pull requests with an exempt label, by an exempt author, drafts, and ones kept open show here.
-              </ListEmpty>
+              </ListEmpty></div>
             )}
             <div className="mt-6 max-w-2xl">
               <Disclosure summary="Keep one open from GitHub">
@@ -414,12 +431,15 @@ function StalePage() {
   );
 }
 
-function PlanRow({ r, admin, busy, onKeep }: { r: StaleRow; admin: boolean; busy: boolean; onKeep: () => void }) {
+function PlanRow({ r, state, admin, busy, onKeep }: { r: StaleRow; state: StaleState | null; admin: boolean; busy: boolean; onKeep: () => void }) {
   const quiet = daysQuiet(r);
   const days = daysUntil(closesAt(r));
   const would = r.dry_run;
-  const chip =
-    r.action === "mark" ? (
+  // A marked one while nothing acts: it carries the label, and nothing closes it.
+  const idle = isMarked(r) && (state === "off" || state === "dry_run");
+  const chip = idle ? (
+    <Chip tone="muted">{state === "off" ? "Nothing closes it" : "Preview: not closed"}</Chip>
+  ) : r.action === "mark" ? (
       <Chip tone="waiting">{would ? "Would mark" : "Marks next"}</Chip>
     ) : r.action === "close" ? (
       <Chip tone="danger">{would ? "Would close" : "Closing now"}</Chip>
@@ -430,7 +450,7 @@ function PlanRow({ r, admin, busy, onKeep }: { r: StaleRow; admin: boolean; busy
     );
   return (
     <ListRow
-      status={{ tone: r.action === "close" ? "danger" : "waiting" }}
+      status={{ tone: idle ? "muted" : r.action === "close" ? "danger" : "waiting" }}
       title={`#${r.pr} ${r.title}`}
       titleText={r.title}
       externalHref={r.url}
@@ -440,7 +460,14 @@ function PlanRow({ r, admin, busy, onKeep }: { r: StaleRow; admin: boolean; busy
         quiet !== null ? `quiet ${plural(quiet, "day")}` : "",
         r.action === "mark" && days !== null ? closesWords(days, would).toLowerCase() : "",
       ]}
-      summary={r.last_what ? `Last activity: ${r.last_what}, ${formatDate(r.last_activity)}` : undefined}
+      summary={
+        [
+          r.last_what ? `Last activity: ${r.last_what}, ${formatDate(r.last_activity)}.` : "",
+          idle ? (state === "off" ? "Cleanup is off, so nothing closes it." : "Preview only, so nothing closes it.") : "",
+        ]
+          .filter(Boolean)
+          .join(" ") || undefined
+      }
       summaryTone="muted"
       chips={chip}
       actions={
@@ -451,30 +478,52 @@ function PlanRow({ r, admin, busy, onKeep }: { r: StaleRow; admin: boolean; busy
         ) : undefined
       }
       testId="stale-row"
-      data={{ action: r.action, repo: r.repo }}
+      data={idle ? { action: r.action, repo: r.repo, idle: "true" } : { action: r.action, repo: r.repo }}
     />
   );
 }
 
-function OffPanel({ admin, busy, onTurnOn, settingsHref }: { admin: boolean; busy: boolean; onTurnOn: () => void; settingsHref: string }) {
+/** Off: one compact line above the tabs, with the way to turn it on. The lists below still show. */
+function OffBanner({
+  admin,
+  busy,
+  onTurnOn,
+  settingsHref,
+  others,
+}: {
+  admin: boolean;
+  busy: boolean;
+  onTurnOn: () => void;
+  settingsHref: string;
+  others: { state: StaleState; repos: string[] }[];
+}) {
   return (
-    <EmptyState
-      title="Stale pull request cleanup is off"
-      action={
-        admin ? (
-          <button type="button" className={primaryButton} onClick={onTurnOn} disabled={busy}>
-            {busy ? "Turning on…" : "Turn on as a dry run"}
-          </button>
-        ) : (
-          <Link href={settingsHref} className={linkButton}>
-            See the settings
-          </Link>
-        )
-      }
-      testId="stale-off"
+    <div
+      role="status"
+      className="mb-2 mt-4 flex min-w-0 flex-col gap-3 rounded-lg border border-zinc-800 bg-zinc-900/60 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+      data-testid="stale-off"
     >
-      Turned on, it starts as a dry run: it lists what it would mark and close, and changes nothing on GitHub until you turn the dry run off.
-      {admin ? "" : " Only admins can turn it on."}
-    </EmptyState>
+      <div className="min-w-0 space-y-1">
+        <p className="font-medium text-zinc-100">Stale pull request cleanup is off</p>
+        <p className="text-zinc-400">
+          Nothing is labeled, commented on or closed. The lists below show what carries the stale label now and what it would do once it is turned on.
+          {admin ? "" : " Only admins can turn it on."}
+        </p>
+        {others.map((g) => (
+          <p key={g.state} className="text-zinc-400" data-testid="stale-off-others">
+            {STATE_WORD[g.state]} on {g.repos.length > 3 ? plural(g.repos.length, "repository", "repositories") : g.repos.map(shortRepo).join(", ")}, which {g.repos.length === 1 ? "has its" : "have their"} own settings.
+          </p>
+        ))}
+      </div>
+      {admin ? (
+        <button type="button" className={`${primaryButton} shrink-0 self-start sm:self-auto`} onClick={onTurnOn} disabled={busy} data-testid="stale-turn-on">
+          {busy ? "Turning on…" : "Turn on Preview only"}
+        </button>
+      ) : (
+        <Link href={settingsHref} className={`${linkButton} shrink-0 !text-sm`}>
+          See the settings
+        </Link>
+      )}
+    </div>
   );
 }

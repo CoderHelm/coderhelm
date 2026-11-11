@@ -6,19 +6,21 @@
 // inherits the team's settings until it is given its own. The rules live in
 // coderhelm-platform's common::stale_prs.
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
+import Link from "next/link";
 import { api, type StaleConfig, type StaleConfigView } from "@/lib/api";
+import { STATE_WORD, modeHelp, otherRepoModes, plural, staleState, timingLine, withMode, type StaleState } from "@/lib/stale";
 import { useToast } from "@/components/toast";
 import { Skeleton } from "@/components/skeleton";
 import { Problem } from "@/components/problem";
-import { monoInputClass } from "@/components/ui";
+import { linkButton, monoInputClass } from "@/components/ui";
+import { Chip } from "@/components/list";
 import { ScopeBadge } from "@/components/settings-scope";
 import { Field, SaveBar, SettingsRow, SettingsSection, Switch, useDirtyForm } from "@/components/settings";
-import { useSetupMarks } from "@/components/setup-marks";
 
 export const STALE_DEFAULTS: StaleConfig = {
   enabled: false,
-  stale_days: 21,
+  stale_days: 7,
   close_days: 7,
   label: "stale",
   warn_message: "",
@@ -43,16 +45,56 @@ const list = (s: string) =>
     .map((x) => x.trim())
     .filter(Boolean);
 
-/** One sentence: what the cleanup does with these settings. */
+/** One sentence: what the cleanup does with these settings, in the mode's own words. */
 export function staleSummary(c: StaleConfig): string {
-  if (!c.enabled) return "Off. Coderhelm never marks or closes pull requests here.";
+  const mode = staleState(c);
+  if (mode === "off") return "Off: nothing happens. Coderhelm never labels, comments on or closes a pull request.";
+  if (mode === "dry_run") return "Preview only: nothing changes on GitHub.";
   const what = c.scope === "own" ? "Coderhelm's own pull requests" : "pull requests";
-  const base = `Marks ${what} stale after ${c.stale_days} days without activity and closes them ${c.close_days} days later.`;
-  return c.dry_run ? `Dry run: shows what it would do and changes nothing. ${base}` : base;
+  return `On: marks ${what} stale after ${plural(c.stale_days, "day")} with no activity and closes them ${plural(c.close_days, "day")} later.`;
+}
+
+const MODES: StaleState[] = ["off", "dry_run", "on"];
+
+/** Off, Preview only or On: one choice, each with a plain line under it. */
+function ModeChoice({ value, onChange, timing, labelledBy, disabled }: { value: StaleState; onChange: (m: StaleState) => void; timing: Pick<StaleConfig, "stale_days" | "close_days" | "max_closes_per_run">; labelledBy: string; disabled?: boolean }) {
+  const name = useId();
+  return (
+    <div role="radiogroup" aria-labelledby={labelledBy} className="grid min-w-0 gap-2 sm:grid-cols-3" data-testid="stale-mode">
+      {MODES.map((m) => {
+        const picked = value === m;
+        return (
+          <label
+            key={m}
+            className={`flex min-w-0 cursor-pointer flex-col gap-1 rounded-lg border px-3 py-3 text-sm transition-colors motion-reduce:transition-none ${
+              picked ? "border-zinc-300 bg-zinc-800/80" : "border-zinc-800 hover:border-zinc-600"
+            } ${disabled ? "cursor-not-allowed opacity-70" : ""} has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-zinc-300`}
+            data-testid={`stale-mode-${m}`}
+            data-picked={picked ? "true" : undefined}
+          >
+            <span className="flex flex-wrap items-center gap-2">
+              <input type="radio" name={name} value={m} checked={picked} disabled={disabled} onChange={() => onChange(m)} className="h-4 w-4 accent-emerald-500" />
+              <span className="font-medium text-zinc-100">{STATE_WORD[m]}</span>
+              {m === "dry_run" && <Chip tone="info">Recommended to start</Chip>}
+            </span>
+            <span className="text-zinc-400">{modeHelp(m, timing)}</span>
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+
+/** What the page lists, for the sentence at the top of the settings. */
+export interface StaleCounts {
+  marked: number;
+  next: number;
+  nextHref: string;
+  markedHref: string;
 }
 
 /** The settings for all repositories (no repo), or one repository's. `onSaved` runs after a save. */
-export function StaleSection({ repo, readOnly, onSaved }: { repo: string; readOnly: boolean; onSaved?: () => void }) {
+export function StaleSection({ repo, readOnly, onSaved, counts }: { repo: string; readOnly: boolean; onSaved?: () => void; counts?: StaleCounts }) {
   const { toast } = useToast();
   const [view, setView] = useState<StaleConfigView | null>(null);
   const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
@@ -61,8 +103,7 @@ export function StaleSection({ repo, readOnly, onSaved }: { repo: string; readOn
   const [problem, setProblem] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
   const form = useDirtyForm<Form>({ ...STALE_DEFAULTS, own: false }, { disabled: loadState !== "ready" });
-  const setupMarks = useSetupMarks(repo || null);
-  const { values: f, set, reset } = form;
+  const { values: f, set, update, reset } = form;
 
   useEffect(() => {
     let current = true;
@@ -159,35 +200,63 @@ export function StaleSection({ repo, readOnly, onSaved }: { repo: string; readOn
               />
             </div>
           )}
-          <p className="mt-4 text-sm text-zinc-300" data-testid="stale-summary">
-            {target === "repo" && !f.own ? `${repo} uses the settings for all repositories. ` : ""}
-            {staleSummary(effective)}
-          </p>
+          <div className="mt-4 space-y-1 text-sm" data-testid="stale-summary" data-state={staleState(effective)}>
+            <p className="text-zinc-200">
+              {target === "repo" && !f.own ? `${repo} uses the settings for all repositories. ` : ""}
+              {staleSummary(effective)}
+              {counts && staleState(effective) === "dry_run" && (
+                <>
+                  {" "}
+                  <Link href={counts.nextHref} className={`${linkButton} !text-sm`}>
+                    {plural(counts.next, "pull request")} would be marked or closed
+                  </Link>
+                  .
+                </>
+              )}
+              {counts && staleState(effective) === "on" && counts.marked > 0 && (
+                <>
+                  {" "}
+                  <Link href={counts.markedHref} className={`${linkButton} !text-sm`}>
+                    {plural(counts.marked, "pull request")} marked stale
+                  </Link>
+                  .
+                </>
+              )}
+            </p>
+            {target === "team" && view && !view.team_saved && (
+              <p className="text-zinc-500" data-testid="stale-not-set">
+                Not set for all repositories yet, so it is off (the default). Pick a mode and save.
+              </p>
+            )}
+            {target === "team" &&
+              otherRepoModes(view?.repo_configs, staleState(effective)).map((g) => (
+                <p key={g.state} className="text-zinc-400" data-testid="stale-repo-modes" data-state={g.state}>
+                  {STATE_WORD[g.state]} on {g.repos.length > 3 ? plural(g.repos.length, "repository", "repositories") : g.repos.join(", ")}, which {g.repos.length === 1 ? "has its" : "have their"} own settings. Pick one under Settings for to change it.
+                </p>
+              ))}
+          </div>
           <fieldset disabled={readOnly || !editing} className={`mt-4 min-w-0 ${editing ? "" : "opacity-60"}`} data-inherited={editing ? undefined : "true"}>
             <legend className="sr-only">Stale pull request settings</legend>
             <SettingsSection id="stale-settings" title={target === "team" ? "All repositories" : repo}>
               <>
                   <SettingsRow
-                    label="Close stale pull requests"
-                    help="Only on repositories the reviewer is on for. Off by default."
-                    unsaved={form.isDirty("enabled")} setup={setupMarks.mark(["stale_prs.enabled"], form.values.enabled)}
-                    layout="toggle"
-                    control={({ labelId, helpId, inputId }) => (
-                      <Switch id={inputId} checked={v.enabled} onChange={(v) => set("enabled", v)} labelledBy={labelId} describedBy={helpId} testId="stale-enabled" />
+                    label="Mode"
+                    help="What Coderhelm does with pull requests nobody has worked on for a while."
+                    unsaved={form.isDirty("enabled", "dry_run")}
+                    layout="stacked"
+                    control={({ labelId }) => (
+                      <ModeChoice value={staleState(v)} onChange={(m) => update((p) => withMode(p, m))} timing={v} labelledBy={labelId} disabled={readOnly || !editing} />
                     )}
-                  />
-                  <SettingsRow
-                    label="Dry run"
-                    help="Lists what would be marked and closed under Would mark or close, and changes nothing on GitHub. Turn it off once the list looks right."
-                    unsaved={form.isDirty("dry_run")} setup={setupMarks.mark(["stale_prs.dry_run"], form.values.dry_run)}
-                    layout="toggle"
-                    control={({ labelId, helpId, inputId }) => (
-                      <Switch id={inputId} checked={v.dry_run} onChange={(v) => set("dry_run", v)} labelledBy={labelId} describedBy={helpId} testId="stale-dry-run" />
-                    )}
+                    testId="stale-mode-row"
                   />
                   <SettingsRow
                     label="Timing"
-                    help="Activity is a commit, or a person's comment, review, review comment or label change."
+                    help={
+                      <>
+                        <span className="block font-medium text-zinc-200" data-testid="stale-timing-line">{timingLine(v)}</span>
+                        <span className="block">Activity is a commit, or a person&apos;s comment, review, review comment or label change.</span>
+                      </>
+                    }
                     layout="stacked"
                     control={() => (
                       <div className="grid min-w-0 gap-4 sm:grid-cols-3">

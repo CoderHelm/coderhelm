@@ -12,7 +12,7 @@ const SHOTS_DIR = process.env.E2E_SHOTS_DIR || path.join("test-results", "shots"
 
 const DEFAULTS = {
   enabled: false,
-  stale_days: 21,
+  stale_days: 7,
   close_days: 7,
   label: "stale",
   warn_message: "This pull request has had no activity for {stale_days} days, so Coderhelm marked it stale.",
@@ -57,6 +57,29 @@ function plans(dryRun: boolean) {
   ];
 }
 
+/** Cleanup off: two pull requests still carry the stale label (marked earlier, or by hand), six would be marked or closed. */
+function offPlans() {
+  const item = (repo: string, pr: number, title: string, action: string, quiet: number, next: number | null, what = "a comment") => ({
+    pr, title, author: "dev", url: `https://github.com/${repo}/pull/${pr}`, action,
+    why: action === "wait" ? "it carries the stale label" : "no activity", last_activity: at(-quiet), last_what: what,
+    next_at: next === null ? undefined : at(next), repo, days_quiet: quiet, closes_at: next === null ? null : at(next),
+  });
+  return [
+    { repo: "acme/web", computed_at: at(-0.05), dry_run: true, enabled: false, stopped: "", items: [
+      item("acme/web", 41, "Label marked by hand", "wait", 30, 2, "a review"),
+      item("acme/web", 42, "Draft of the new nav", "mark", 12, 7),
+      item("acme/web", 43, "Bump the icons", "mark", 9, 7),
+      item("acme/web", 44, "Old spike", "close", 40, 0, "a commit"),
+    ] },
+    { repo: "acme/api", computed_at: at(-0.1), dry_run: true, enabled: false, stopped: "", items: [
+      item("acme/api", 51, "Marked before it was turned off", "wait", 20, 4, "a commit"),
+      item("acme/api", 52, "Retry the webhook", "mark", 8, 7),
+      item("acme/api", 53, "Tidy the logs", "mark", 10, 7),
+      item("acme/api", 54, "Abandoned refactor", "close", 33, 0),
+    ] },
+  ];
+}
+
 interface Backend {
   role: string;
   team: Cfg | null;
@@ -67,20 +90,30 @@ interface Backend {
   kept: { repo: string; pr: number; title: string; url: string; by: string; via: string; at: string }[];
   failActivity: boolean;
   activityCalls: number;
+  plans: unknown[] | null;
+  log: boolean;
+  kept_on: boolean;
 }
 
-async function mockApi(page: Page, opts: { role?: string; team?: Partial<Cfg> | null } = {}): Promise<Backend> {
+async function mockApi(
+  page: Page,
+  opts: { role?: string; team?: Partial<Cfg> | null; plans?: unknown[]; empty?: boolean; repos?: Record<string, Partial<Cfg>> } = {},
+): Promise<Backend> {
   const db: Backend = {
     role: opts.role ?? "admin",
     team: opts.team === null || opts.team === undefined ? null : { ...DEFAULTS, ...opts.team },
-    repos: {},
+    repos: Object.fromEntries(Object.entries(opts.repos ?? {}).map(([r, c]) => [r, { ...DEFAULTS, ...c }])),
     puts: [],
     previews: [],
     keeps: [],
     kept: [{ repo: "acme/api", pr: 2, title: "Long-running migration", url: "https://github.com/acme/api/pull/2", by: "ana", via: "comment", at: at(-3) }],
     failActivity: false,
     activityCalls: 0,
+    plans: opts.empty ? [] : opts.plans ?? null,
+    log: !opts.empty,
+    kept_on: !opts.empty,
   };
+  if (opts.empty) db.kept = [];
   const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
   await page.route((url) => url.hostname !== "localhost", (route) => route.abort());
   await page.route((url) => url.hostname === "localhost" && /^\/(api|auth)\//.test(url.pathname), async (route) => {
@@ -98,7 +131,8 @@ async function mockApi(page: Page, opts: { role?: string; team?: Partial<Cfg> | 
       const team = db.team ?? DEFAULTS;
       const r = url.searchParams.get("repo");
       const own = r ? db.repos[r] ?? null : null;
-      return json(route, { team, team_saved: !!db.team, repo: own, effective: own ?? team, defaults: DEFAULTS });
+      const repo_configs = r ? [] : Object.entries(db.repos).filter(([, c]) => c).map(([repo, config]) => ({ repo, config }));
+      return json(route, { team, team_saved: !!db.team, repo: own, repo_saved: !!own, effective: own ?? team, repo_configs, defaults: DEFAULTS });
     }
     if (p === "/api/reviewer/stale/config" && method === "PUT") {
       if (db.role !== "admin") return json(route, { error: "forbidden" }, 403);
@@ -114,9 +148,9 @@ async function mockApi(page: Page, opts: { role?: string; team?: Partial<Cfg> | 
       const team = db.team ?? DEFAULTS;
       return json(route, {
         plan: null,
-        plans: team.enabled ? plans(team.dry_run) : [],
+        plans: db.plans ?? (team.enabled ? plans(team.dry_run) : []),
         kept_open: db.kept,
-        log: [
+        log: !db.log ? [] : [
           { at: at(-1), repo: "acme/web", pr: 7, action: "closed", title: "Try the new parser", url: "https://github.com/acme/web/pull/7", author: "fay", why: "marked stale 7 days ago with no activity since", by: "Coderhelm", run_id: "run-7" },
           { at: at(-2), repo: "acme/web", pr: 6, action: "unstaled", title: "Docs", url: "https://github.com/acme/web/pull/6", author: "ana", why: "a comment after it was marked", by: "Coderhelm", run_id: "" },
           { at: at(-4), repo: "acme/api", pr: 5, action: "closed", title: "Drop the old client", url: "https://github.com/acme/api/pull/5", author: "gus", why: "marked stale 7 days ago with no activity since", by: "Coderhelm", run_id: "" },
@@ -167,26 +201,29 @@ test("Stale PRs is a Code review tab, beside Reviewer, Tests and Releases", asyn
   await expect(page.getByRole("heading", { level: 1, name: "Stale pull requests" })).toBeVisible();
 });
 
-test("a dry run: the state, its action, and what it would mark or close across every repo", async ({ page }) => {
+test("preview only: the state, its action, and what it would mark or close across every repo", async ({ page }) => {
   const db = await mockApi(page, { team: { enabled: true, dry_run: true } });
   await page.goto("/reviewer/stale");
   await expect(page.getByTestId("stale-state")).toHaveAttribute("data-state", "dry_run");
-  await expect(page.getByTestId("stale-state")).toContainText("Dry run");
-  await expect(page.getByTestId("stale-applies")).toContainText("Dry run: shows what it would do and changes nothing.");
+  await expect(page.getByTestId("stale-state")).toContainText("Preview only");
+  await expect(page.getByTestId("stale-applies")).toContainText("Preview only: nothing changes on GitHub.");
+  await expect(page.getByTestId("stale-off")).toHaveCount(0);
 
   // Marked stale now: the ones waiting out the grace period, soonest first, with the day each closes.
   const rows = page.getByTestId("stale-row");
   await expect(rows).toHaveCount(2);
   await expect(rows.first()).toContainText("#9 Old refactor");
-  await expect(rows.first()).toContainText("Closes tomorrow");
+  // Preview only closes nothing, so a marked one says so instead of a closing day.
+  await expect(rows.first()).toContainText("Preview: not closed");
+  await expect(rows.first()).toContainText("Preview only, so nothing closes it.");
   await expect(rows.first()).toContainText("web");
   await expect(rows.first()).toContainText("bo");
   await expect(rows.first()).toContainText("quiet 25 days");
-  await expect(rows.nth(1)).toContainText("Closes in 3 days");
+  await expect(rows.nth(1)).toContainText("#31 Try the new cache");
   for (const w of [1280, 400]) {
     await page.setViewportSize({ width: w, height: 900 });
     await noSidewaysScroll(page);
-    await shot(page, `stale-dry-run-${w}`);
+    await shot(page, `stale-preview-${w}`);
   }
   await page.setViewportSize({ width: 1280, height: 800 });
 
@@ -200,7 +237,7 @@ test("a dry run: the state, its action, and what it would mark or close across e
   for (const w of [1280, 400]) {
     await page.setViewportSize({ width: w, height: 900 });
     await noSidewaysScroll(page);
-    await shot(page, `stale-dry-run-preview-${w}`);
+    await shot(page, `stale-preview-preview-${w}`);
   }
   await page.setViewportSize({ width: 1280, height: 800 });
 
@@ -271,22 +308,164 @@ test("on: closing now, recently closed with a Reopen link, and what is exempt", 
   await expect(page.getByTestId("stale-section")).toBeVisible();
 });
 
-test("off: the state says so, and Turn on starts a dry run", async ({ page }) => {
-  const db = await mockApi(page, { team: null });
+test("off: a banner above the tabs, and every tab still lists what its count says", async ({ page }) => {
+  const db = await mockApi(page, { team: null, plans: offPlans() });
   await page.goto("/reviewer/stale");
   await expect(page.getByTestId("stale-state")).toHaveAttribute("data-state", "off");
-  await expect(page.getByTestId("stale-off")).toContainText("Stale pull request cleanup is off");
-  for (const w of [1280, 400]) {
+  const banner = page.getByTestId("stale-off");
+  await expect(banner).toContainText("Stale pull request cleanup is off");
+  await expect(banner.getByTestId("stale-turn-on")).toHaveText("Turn on Preview only");
+  // The banner sits above the tabs, and the header has no second Turn on.
+  const bannerBox = (await banner.boundingBox())!;
+  const tabsBox = (await views(page).boundingBox())!;
+  expect(bannerBox.y + bannerBox.height).toBeLessThanOrEqual(tabsBox.y);
+  await expect(page.getByTestId("stale-primary")).toHaveCount(0);
+
+  // Marked stale 2: both rows, with their age, last activity and what happens next.
+  const markedTab = views(page).getByRole("link", { name: /^Marked stale/ });
+  await expect(markedTab).toContainText("2");
+  const rows = page.getByTestId("stale-row");
+  await expect(rows).toHaveCount(2);
+  await expect(rows.first()).toContainText("#41 Label marked by hand");
+  await expect(rows.first()).toContainText("quiet 30 days");
+  await expect(rows.first()).toContainText("Last activity: a review");
+  await expect(rows.first()).toContainText("Cleanup is off, so nothing closes it.");
+  await expect(rows.first()).toContainText("Nothing closes it");
+  await expect(rows.nth(1)).toContainText("#51 Marked before it was turned off");
+  for (const w of [1280, 390]) {
     await page.setViewportSize({ width: w, height: 900 });
     await noSidewaysScroll(page);
-    await shot(page, `stale-off-${w}`);
+    await shot(page, `off-marked-${w}`);
   }
   await page.setViewportSize({ width: 1280, height: 800 });
-  await page.getByTestId("stale-primary").click();
-  await expect(page.getByText(/Turned on as a dry run/)).toBeVisible();
+
+  // Would mark or close 6: the six previews.
+  const nextTab = views(page).getByRole("link", { name: /^Would mark or close/ });
+  await expect(nextTab).toContainText("6");
+  await nextTab.click();
+  await expect(rows).toHaveCount(6);
+  await expect(page.locator('[data-testid="stale-row"][data-action="mark"]')).toHaveCount(4);
+  await expect(page.locator('[data-testid="stale-row"][data-action="close"]')).toHaveCount(2);
+  await expect(page.locator('[data-testid="stale-row"][data-action="close"]').first()).toContainText("Would close");
+  await expect(banner).toBeVisible();
+  for (const w of [1280, 390]) {
+    await page.setViewportSize({ width: w, height: 900 });
+    await noSidewaysScroll(page);
+    await shot(page, `off-next-${w}`);
+  }
+  await page.setViewportSize({ width: 1280, height: 800 });
+
+  // Recently closed and Exempt list too: never the off card in place of a list.
+  await views(page).getByRole("link", { name: /^Recently closed/ }).click();
+  await expect(page.getByTestId("stale-closed-row")).toHaveCount(2);
+  await views(page).getByRole("link", { name: /^Exempt/ }).click();
+  await expect(page.getByTestId("stale-kept-row")).toHaveCount(1);
+
+  // Turn on: Preview only, saved, and the page says so in the same words.
+  await banner.getByTestId("stale-turn-on").click();
+  await expect(page.getByText(/Turned on as Preview only/)).toBeVisible();
   expect(db.puts).toEqual([{ config: { ...DEFAULTS, enabled: true, dry_run: true } }]);
   await expect(page).toHaveURL(/view=next/);
   await expect(page.getByTestId("stale-state")).toHaveAttribute("data-state", "dry_run");
+  await expect(page.getByTestId("stale-state")).toContainText("Preview only");
+  await expect(page.getByTestId("stale-off")).toHaveCount(0);
+});
+
+test("empty tabs say what that tab would show, in every state; never the off card", async ({ page }) => {
+  const want: Record<string, Record<string, RegExp>> = {
+    off: { stale: /carries the stale label/, next: /if it were turned on/, closed: /Cleanup is off, so nothing is closed/, exempt: /exempt label/ },
+    dry_run: { stale: /Preview only marks nothing/, next: /Check now to read GitHub again/, closed: /Preview only, so nothing is closed/, exempt: /exempt label/ },
+    on: { stale: /Marked ones show here/, next: /Check now to read GitHub again/, closed: /closed as stale in the last 90 days/, exempt: /exempt label/ },
+  };
+  for (const [state, team] of [
+    ["off", null],
+    ["dry_run", { enabled: true, dry_run: true }],
+    ["on", { enabled: true, dry_run: false }],
+  ] as const) {
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+    await mockApi(page, { team, empty: true });
+    for (const v of ["stale", "next", "closed", "exempt"]) {
+      await page.goto(`/reviewer/stale${v === "stale" ? "" : `?view=${v}`}`);
+      await expect(page.getByTestId("stale-state")).toHaveAttribute("data-state", state);
+      const empty = page.getByTestId(`stale-empty-${v}`);
+      await expect(empty).toContainText(want[state][v]);
+      await expect(page.getByTestId("stale-view").getByTestId("stale-off")).toHaveCount(0);
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/reviewer/stale");
+    await noSidewaysScroll(page);
+    await shot(page, `empty-${state}-390`);
+    await page.setViewportSize({ width: 1280, height: 800 });
+  }
+});
+
+test("settings: one mode, Off, Preview only or On, each with a plain line; saved and read back", async ({ page }) => {
+  const db = await mockApi(page, { team: null, plans: offPlans() });
+  await page.goto("/reviewer/stale?view=settings");
+  const mode = page.getByTestId("stale-mode");
+  // Nothing saved: the form shows off, not a recommendation, and says so.
+  await expect(page.getByTestId("stale-mode-off").getByRole("radio")).toBeChecked();
+  await expect(page.getByTestId("stale-not-set")).toContainText("Not set for all repositories yet, so it is off");
+  await expect(page.getByTestId("stale-summary")).toHaveAttribute("data-state", "off");
+  await expect(page.getByTestId("stale-mode-dry_run")).toContainText("Recommended to start");
+  await expect(page.getByTestId("stale-mode-off")).toContainText("Nothing happens.");
+  await expect(page.getByTestId("stale-mode-dry_run")).toContainText("Nothing is labeled, commented on or closed on GitHub.");
+  await expect(page.getByTestId("stale-mode-on")).toContainText("After 7 days with no activity Coderhelm labels the pull request stale and comments; if nothing happens in the next 7 days it closes it. Up to 10 an hour per repository.");
+  await expect(page.getByTestId("stale-timing-line")).toHaveText("7 days quiet + 7 days to close = closed after 14 days with no activity.");
+  await expect(page.getByTestId("stale-stale_days")).toHaveValue("7");
+  for (const w of [1280, 390]) {
+    await page.setViewportSize({ width: w, height: 900 });
+    await noSidewaysScroll(page);
+    await shot(page, `settings-off-${w}`);
+  }
+  await page.setViewportSize({ width: 1280, height: 800 });
+
+  // Preview only: saved as on + dry run, and read back.
+  await page.getByTestId("stale-mode-dry_run").click();
+  await page.getByTestId("stale-save-bar").getByRole("button", { name: "Save settings" }).click();
+  await expect(page.getByText("Stale pull request settings saved")).toBeVisible();
+  expect(db.puts.at(-1)).toEqual({ config: { ...DEFAULTS, enabled: true, dry_run: true } });
+  await expect(page.getByTestId("stale-mode-dry_run").getByRole("radio")).toBeChecked();
+  await expect(page.getByTestId("stale-not-set")).toHaveCount(0);
+  await expect(page.getByTestId("stale-state")).toHaveAttribute("data-state", "dry_run");
+  const summary = page.getByTestId("stale-summary");
+  await expect(summary).toContainText("Preview only: nothing changes on GitHub. 6 pull requests would be marked or closed.");
+  await expect(summary.getByRole("link", { name: "6 pull requests would be marked or closed" })).toHaveAttribute("href", /view=next/);
+  for (const w of [1280, 390]) {
+    await page.setViewportSize({ width: w, height: 900 });
+    await noSidewaysScroll(page);
+    await shot(page, `settings-preview-${w}`);
+  }
+  await page.setViewportSize({ width: 1280, height: 800 });
+
+  // On: on, no dry run. The timing line follows the numbers.
+  await page.getByTestId("stale-mode-on").click();
+  await page.getByTestId("stale-close_days").fill("3");
+  await expect(page.getByTestId("stale-timing-line")).toHaveText("7 days quiet + 3 days to close = closed after 10 days with no activity.");
+  await page.getByTestId("stale-save-bar").getByRole("button", { name: "Save settings" }).click();
+  await expect.poll(() => db.puts.at(-1)).toEqual({ config: { ...DEFAULTS, enabled: true, dry_run: false, close_days: 3 } });
+  await expect(page.getByTestId("stale-state")).toHaveAttribute("data-state", "on");
+  await expect(page.getByTestId("stale-mode-on").getByRole("radio")).toBeChecked();
+  for (const w of [1280, 390]) {
+    await page.setViewportSize({ width: w, height: 900 });
+    await noSidewaysScroll(page);
+    await shot(page, `settings-on-${w}`);
+  }
+  await page.setViewportSize({ width: 1280, height: 800 });
+
+  // Off again.
+  await page.getByTestId("stale-mode-off").click();
+  await page.getByTestId("stale-save-bar").getByRole("button", { name: "Save settings" }).click();
+  await expect.poll(() => db.puts.at(-1)).toMatchObject({ config: { enabled: false } });
+  await expect(page.getByTestId("stale-state")).toHaveAttribute("data-state", "off");
+});
+
+test("off for all repositories, but repositories with their own settings say so on the page and in settings", async ({ page }) => {
+  await mockApi(page, { team: null, plans: offPlans(), repos: { "acme/web": { enabled: true, dry_run: true } } });
+  await page.goto("/reviewer/stale");
+  await expect(page.getByTestId("stale-off-others")).toContainText("Preview only on web, which has its own settings.");
+  await page.goto("/reviewer/stale?view=settings");
+  await expect(page.getByTestId("stale-repo-modes")).toContainText("Preview only on acme/web, which has its own settings.");
 });
 
 test("settings: one control for all repositories or one, inherited until it is overridden", async ({ page }) => {
@@ -295,7 +474,7 @@ test("settings: one control for all repositories or one, inherited until it is o
   const scope = page.getByTestId("settings-scope");
   await expect(scope).toHaveAttribute("data-scope", "all");
   await expect(scope).toContainText("All repositories");
-  await expect(page.getByTestId("stale-stale_days")).toHaveValue("21");
+  await expect(page.getByTestId("stale-stale_days")).toHaveValue("7");
   await shot(page, "stale-settings-all-1280");
 
   // One repository: the team's values, read only, until it gets its own.
