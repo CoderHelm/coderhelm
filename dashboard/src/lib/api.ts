@@ -977,7 +977,10 @@ export const api = {
     }),
   getRecNotify: () =>
     request<{
+      /** The mode in effect: never saved reads as "team" (the alerts channel). */
       notify_mode: "team" | "custom" | "off";
+      /** Whether a person saved it (older servers leave it out). */
+      saved?: boolean;
       webhooks: WebhooksView;
     }>("/api/recommendations/notify"),
   saveRecNotify: (
@@ -1047,7 +1050,7 @@ export const api = {
     request<RepoResolution>(`/api/log-findings/${encodeURIComponent(id)}/repo${refresh ? "?refresh=1" : ""}`),
   setLogFindingStatus: (id: string, action: "ignore" | "acknowledge" | "reopen") =>
     request<{ ok: boolean }>(`/api/log-findings/${encodeURIComponent(id)}/${action}`, { method: "POST", body: "{}" }),
-  getLogAutofix: () => request<{ autofix: LogAutofix; runs_today: number }>("/api/log-findings/autofix"),
+  getLogAutofix: () => request<LogAutofixState>("/api/log-findings/autofix"),
   saveLogAutofix: (autofix: LogAutofix) =>
     request<{ ok: boolean; autofix: LogAutofix }>("/api/log-findings/autofix", {
       method: "PUT",
@@ -3264,6 +3267,25 @@ export interface LogAutofix {
   overrides: { log_group: string; repo: string; auto: boolean | null; min_severity: LogSeverity | null }[];
   /** Set by the server when it is turned on. */
   enabled_at?: string;
+}
+
+/** Where log findings and their fix PRs post, in words (never a webhook). */
+export interface LogPostsTo {
+  /** In effect: "team" (the production alerts channel), "custom" or "off". */
+  mode: "team" | "custom" | "off";
+  /** False: never saved, so it follows the alerts channel. */
+  saved: boolean;
+  /** "Microsoft Teams", "Slack"; empty when it posts nowhere. */
+  channels: string[];
+  /** The team's alerts channel is on with a channel set. */
+  team_alerts: boolean;
+}
+
+export interface LogAutofixState {
+  autofix: LogAutofix;
+  runs_today: number;
+  /** Older servers leave it out. */
+  posts_to?: LogPostsTo;
 }
 
 export interface CredentialField {
