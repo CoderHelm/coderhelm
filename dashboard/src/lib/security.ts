@@ -324,6 +324,9 @@ export interface PlanUnit {
   /** The open security PR these fixes are added to, instead of a new one. */
   joins?: { number: number; url: string } | null;
   estimated_tokens?: number;
+  /** Whether it starts now; when not, `waits` says why (a daily limit: tomorrow). Older servers: absent. */
+  starts_now?: boolean;
+  waits?: string | null;
   /** One package's name, or "14 packages". */
   package: string;
   from: string;
@@ -387,14 +390,20 @@ export function checkConfig(r: unknown): { config: SecurityConfig; defaults: Sec
   return { config: checkConfigShape(o.config), defaults: o.defaults === undefined ? SECURITY_DEFAULTS : checkConfigShape(o.defaults) };
 }
 
-export function checkGroups(r: unknown): { groups: FindingGroup[]; total: number; next_cursor: string | null } {
+export function checkGroups(r: unknown): { groups: FindingGroup[]; total: number; fixable_total: number | null; next_cursor: string | null } {
   if (!isObj(r) || !Array.isArray(r.groups)) fail();
   const o = r as Record<string, unknown>;
   const groups = (o.groups as unknown[]).map((g) => {
     if (!isObj(g) || typeof g.package !== "string" || typeof g.repo !== "string" || !Array.isArray(g.advisories)) fail();
     return g as unknown as FindingGroup;
   });
-  return { groups, total: typeof o.total === "number" ? o.total : groups.length, next_cursor: typeof o.next_cursor === "string" && o.next_cursor ? o.next_cursor : null };
+  return {
+    groups,
+    total: typeof o.total === "number" ? o.total : groups.length,
+    // Older servers: absent, and "select every fix that matches" isn't offered.
+    fixable_total: typeof o.fixable_total === "number" ? o.fixable_total : null,
+    next_cursor: typeof o.next_cursor === "string" && o.next_cursor ? o.next_cursor : null,
+  };
 }
 
 export function checkInsights(r: unknown): SecurityInsights {
@@ -427,9 +436,41 @@ export function groupsQuery(f: GroupFilter): string {
   return q.toString();
 }
 
+/** Finding ids a request names one by one; past it, the request sends the list's filters. */
+export const MAX_PICKED_IDS = 200;
+
+/** "Every fix the list's filters match", less the findings in `except_ids`: the server resolves the set. */
+export interface FixSelect {
+  all: true;
+  filters: { status: string; tier: string; repo: string; q: string };
+  except_ids: string[];
+}
+
+/** What a fix request names: picked findings, or every fix that matches. */
+export type FixAsk = { finding_ids: string[] } | { select: FixSelect };
+
+/** A filter selection, as the server resolved it. */
+export interface PlanSelection {
+  by_filter: boolean;
+  fixes: number;
+  findings: number;
+  matched: number;
+  left_fixes: number;
+  left_findings: number;
+  limit: number;
+  /** Set when the request takes only the first part of the selection. */
+  note: string | null;
+}
+
 export interface FixPlan {
   units: PlanUnit[];
   skipped: { finding_id: string; reason: string; pr_url?: string }[];
+  /** Package names of the skipped findings. */
+  names?: Record<string, string>;
+  /** Units that start now and units that wait (older servers: absent). */
+  starting_now?: number;
+  waiting?: number;
+  selection?: PlanSelection;
   runs_today: number;
   runs_limit: number;
   /** New pull requests (older servers: absent, one per unit). */
@@ -447,6 +488,7 @@ export interface FixResult {
   skipped: { finding_id: string; reason: string; pr_url?: string }[];
   runs_today: number;
   runs_limit: number;
+  selection?: PlanSelection;
 }
 
 function checkFixPlan(r: unknown): FixPlan {
@@ -470,9 +512,9 @@ export function cannotFix(f: { status: FindingStatus; fixed_version: string | nu
 }
 
 export const securityApi = {
-  fixPlan: (finding_ids: string[], combine: Combine = "policy") => request<unknown>("/api/security/fix/plan", json("POST", { finding_ids, combine })).then(checkFixPlan),
-  fix: (finding_ids: string[], raise_limit = false, combine: Combine = "policy") =>
-    request<unknown>("/api/security/fix", json("POST", { finding_ids, raise_limit, combine })).then(checkFixResult),
+  fixPlan: (ask: FixAsk, combine: Combine = "policy") => request<unknown>("/api/security/fix/plan", json("POST", { ...ask, combine })).then(checkFixPlan),
+  fix: (ask: FixAsk, raise_limit = false, combine: Combine = "policy") =>
+    request<unknown>("/api/security/fix", json("POST", { ...ask, raise_limit, combine })).then(checkFixResult),
   groups: (f: GroupFilter) => request<unknown>(`/api/security/groups?${groupsQuery(f)}`).then(checkGroups),
   insights: (days = 30) => request<unknown>(`/api/security/insights?days=${days}`).then(checkInsights),
   overview: () => request<unknown>("/api/security/overview").then(checkOverview),

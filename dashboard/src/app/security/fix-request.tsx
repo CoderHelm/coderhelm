@@ -9,20 +9,23 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Callout } from "@/components/callout";
 import { focusRing, linkButton, primaryButton, secondaryButton } from "@/components/ui";
-import { VERDICT_LOOK, repoName, securityApi, shortTokens, type Combine, type FixPlan, type FixResult, type PlanUnit } from "@/lib/security";
+import { AlertCircleIcon } from "@/components/icons";
+import { VERDICT_LOOK, repoName, securityApi, shortTokens, type Combine, type FixAsk, type FixPlan, type FixResult, type FixSelect, type PlanUnit } from "@/lib/security";
 import { TierPill } from "./parts";
 
 export function FixRequest({
   ids,
+  select,
   combine = "policy",
-  names = {},
+  names: known = {},
   onCancel,
   onDone,
   onRemove,
 }: {
   ids: string[];
+  /** Instead of `ids`: every fix the list's filters match; the server resolves the set. */
+  select?: FixSelect;
   /** How the picked fixes combine: one PR per repo, one per package, or as the policy says. */
   combine?: Combine;
   /** Finding id to package name, for the rows left out. */
@@ -38,27 +41,30 @@ export function FixRequest({
   const [raise, setRaise] = useState(false);
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<FixResult | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const live = ids.filter((id) => !removed.includes(id));
-  const key = `${combine}|${live.join(",")}`;
+  const ask: FixAsk = select ? { select: { ...select, except_ids: [...select.except_ids, ...removed] } } : { finding_ids: live };
+  const key = JSON.stringify([combine, ask]);
   const heading = useRef<HTMLHeadingElement>(null);
+  const names = { ...known, ...(plan?.names ?? {}) };
 
   useEffect(() => {
     let on = true;
     setError(null);
     setResult(null);
-    const asked = key.split("|")[1];
-    if (!asked) {
+    const [how, asked] = JSON.parse(key) as [Combine, FixAsk];
+    if ("finding_ids" in asked && asked.finding_ids.length === 0) {
       setPlan({ units: [], skipped: [], runs_today: 0, runs_limit: 0 });
       return;
     }
-    securityApi.fixPlan(asked.split(","), combine).then(
+    securityApi.fixPlan(asked, how).then(
       (p) => on && setPlan(p),
       (e) => on && setError(e instanceof Error ? e.message : "The request failed."),
     );
     return () => {
       on = false;
     };
-  }, [key, combine]);
+  }, [key, attempt]);
 
   // Esc backs out, unless the runs are starting.
   useEffect(() => {
@@ -80,7 +86,7 @@ export function FixRequest({
     setSending(true);
     setError(null);
     try {
-      const r = await securityApi.fix(live, raise, combine);
+      const r = await securityApi.fix(ask, raise, combine);
       setResult(r);
       onDone?.(r);
     } catch (e) {
@@ -97,12 +103,21 @@ export function FixRequest({
   if (result) return <FixResults r={result} plan={plan} onClose={onCancel} />;
   if (error && !plan) {
     return (
-      <Callout variant="warning" title="We couldn't work out the fix PRs" testId="fix-request">
-        <p>{error}</p>
-        <button type="button" className={`${secondaryButton} mt-3`} onClick={onCancel}>
-          Close
-        </button>
-      </Callout>
+      <Panel>
+        <div className="space-y-3 p-4">
+          <InlineAlert title="We couldn't work out the fix PRs" testId="fix-error">
+            {error}
+          </InlineAlert>
+          <div className="flex flex-wrap justify-end gap-2">
+            <button type="button" className={secondaryButton} onClick={onCancel}>
+              Close
+            </button>
+            <button type="button" className={primaryButton} onClick={() => setAttempt((n) => n + 1)}>
+              Try again
+            </button>
+          </div>
+        </div>
+      </Panel>
     );
   }
   if (!plan) {
@@ -120,7 +135,11 @@ export function FixRequest({
   const joined = units.filter((u) => u.joins);
   const newPrs = plan.pr_count ?? runs - joined.length;
   const left = Math.max(0, plan.runs_limit - plan.runs_today);
-  const over = Math.max(0, runs - left);
+  // The server says which units wait and why; older servers: from the counts.
+  const waiting = units.filter((u) => u.starts_now === false);
+  const over = plan.waiting !== undefined ? waiting.filter((u) => /tomorrow/.test(u.waits ?? "")).length : Math.max(0, runs - left);
+  const startingNow = plan.starting_now ?? Math.min(runs, left);
+  const repoWaits = waiting.filter((u) => !/tomorrow/.test(u.waits ?? "")).length;
   const majors = units.flatMap((u) => (u.bumps ?? []).filter((b) => b.major));
   const advisories = units.reduce((n, u) => n + (u.advisories ?? u.finding_ids.length), 0);
   const noFix = plan.skipped.filter((s) => /no fixed version/.test(s.reason));
@@ -163,6 +182,13 @@ export function FixRequest({
             ))}
           </ul>
         )}
+        {plan.selection?.note && (
+          <div className="mt-3">
+            <Note tone="amber" testId="fix-selection-note">
+              {plan.selection.note}
+            </Note>
+          </div>
+        )}
         <div className="mt-3 space-y-2 text-sm" data-testid="fix-warnings">
           {majors.length > 0 && (
             <Note tone="amber" testId="warn-major">
@@ -204,9 +230,10 @@ export function FixRequest({
         </div>
         {runs > 0 && (
           <p className={`mt-3 text-sm ${over > 0 || tokensOver ? "text-amber-300" : "text-zinc-300"}`} data-testid="fix-budget">
-            Uses {Math.min(runs, left)} of today&apos;s {plan.runs_limit} fix runs ({plan.runs_today} used so far)
+            Uses {startingNow} of today&apos;s {plan.runs_limit} fix runs ({plan.runs_today} used so far)
             {tokensLimit > 0 && ` · estimated ${shortTokens(estimate)} of ${shortTokens(tokensLimit)} tokens (${shortTokens(tokensToday)} used today)`}.
             {over > 0 && ` ${over} wait${over === 1 ? "s" : ""} for tomorrow unless you raise today's limit.`}
+            {repoWaits > 0 && ` ${repoWaits} wait${repoWaits === 1 ? "s" : ""} for a fix run already working in ${repoWaits === 1 ? "its repo" : "their repos"}.`}
             {tokensOver && " It may pass today's token limit; a run past it waits for tomorrow."} Runs start now, even in preview mode.
           </p>
         )}
@@ -223,9 +250,11 @@ export function FixRequest({
           </label>
         )}
         {error && (
-          <p className="mt-2 text-sm text-red-300" role="alert">
-            {error}
-          </p>
+          <div className="mt-3">
+            <InlineAlert title="The fixes didn't start" testId="fix-error">
+              {error}
+            </InlineAlert>
+          </div>
         )}
       </div>
       <div className="flex flex-wrap items-center gap-2 border-t border-zinc-800 bg-zinc-900 px-4 py-3">
@@ -250,6 +279,21 @@ export function FixRequest({
         </div>
       </div>
     </Panel>
+  );
+}
+
+/** An error in the review, in the flow of the panel: never laid over anything. */
+function InlineAlert({ title, testId, children }: { title: string; testId: string; children: React.ReactNode }) {
+  return (
+    <div role="alert" className="flex min-w-0 gap-2.5 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2.5 text-sm" data-testid={testId}>
+      <span aria-hidden="true" className="mt-0.5 shrink-0 text-red-300">
+        <AlertCircleIcon />
+      </span>
+      <div className="min-w-0">
+        <p className="font-medium text-red-100">{title}</p>
+        <p className="mt-0.5 text-zinc-200 [overflow-wrap:anywhere]">{children}</p>
+      </div>
+    </div>
   );
 }
 
@@ -306,7 +350,21 @@ function UnitCard({ u, onRemove, disabled }: { u: PlanUnit; onRemove: (ids: stri
             {u.joins ? `Adds to PR #${u.joins.number}` : "New pull request"}
           </span>
           <span className="text-xs text-zinc-400">{repoName(u.repo)}</span>
+          {u.starts_now !== undefined && (
+            <span
+              className={`ml-auto rounded px-1.5 py-0.5 text-xs font-medium ${u.starts_now ? "bg-emerald-500/10 text-emerald-200" : "bg-amber-500/15 text-amber-200"}`}
+              title={u.waits ?? undefined}
+              data-testid="fix-when"
+            >
+              {u.starts_now ? "Starts now" : /tomorrow/.test(u.waits ?? "") ? "Waits for tomorrow's limit" : "Waits for the repo's run"}
+            </span>
+          )}
         </div>
+        {u.waits && (
+          <p className="text-xs text-amber-200/90 [overflow-wrap:anywhere]" data-testid="fix-waits">
+            {u.waits}
+          </p>
+        )}
         <p className="font-mono text-[13px] text-zinc-100 [overflow-wrap:anywhere]" data-testid="fix-title">
           {u.title}
         </p>
