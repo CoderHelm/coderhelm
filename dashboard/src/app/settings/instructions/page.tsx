@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { api, type AgentFile } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { RoleGuard } from "@/components/role-guard";
 import { TextareaSkeleton } from "@/components/skeleton";
@@ -43,19 +43,37 @@ function InstructionsPage() {
   const [saving, setSaving] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   // What Coderhelm wrote itself about the team or the repository, read only.
-  const [generated, setGenerated] = useState("");
+  const [generated, setGenerated] = useState<AgentFile>({ content: "" });
+  const [regenerating, setRegenerating] = useState(false);
+  const [loads, setLoads] = useState(0);
 
   useEffect(() => {
-    setGenerated("");
+    setGenerated({ content: "" });
     if (isRepo && !repo) return;
     let live = true;
     (isRepo ? api.getRepoAgents(repo) : api.getGlobalAgents())
-      .then((d) => live && setGenerated(d.content))
+      .then((d) => live && setGenerated(d))
       .catch(() => {});
     return () => {
       live = false;
     };
-  }, [isRepo, repo]);
+  }, [isRepo, repo, loads]);
+
+  const regenerate = async () => {
+    if (!repo) return;
+    setRegenerating(true);
+    try {
+      await api.regenerateRepo(repo);
+      toast("Started. This takes about a minute.");
+      setTimeout(() => {
+        setLoads((n) => n + 1);
+        setRegenerating(false);
+      }, 15000);
+    } catch {
+      toast("Couldn't start it. Try again.", "error");
+      setRegenerating(false);
+    }
+  };
 
   const repoData = repos.find((r) => r.name === repo);
   const generating = isRepo && repoData?.onboard_status === "pending" && !form.values.content;
@@ -136,11 +154,29 @@ function InstructionsPage() {
                   />
                 )}
               </Field>
-              {generated && (
+              {generated.content && (
                 <SettingsDisclosure summary={isRepo ? "What Coderhelm learned about this repository" : "What Coderhelm learned about your team"}>
-                  <p className="text-sm text-zinc-400">Written by Coderhelm and given to agents with your instructions. You can&apos;t edit it here.</p>
+                  <p className="text-sm text-zinc-400">
+                    Written by Coderhelm and given to agents with your instructions. You can&apos;t edit it here.
+                    {isRepo && " Coderhelm writes it again by itself after changes to the files it is read from, such as package.json, CI workflows, the README and review guidelines."}
+                  </p>
+                  {isRepo && <AgentFileUpdated file={generated} />}
+                  {isRepo && generated.out_of_date && (
+                    <Problem
+                      title="Out of date"
+                      tone="warning"
+                      action={
+                        <button type="button" onClick={regenerate} disabled={regenerating} className={secondaryButton}>
+                          {regenerating ? "Writing it again…" : "Write it again from the repository"}
+                        </button>
+                      }
+                    >
+                      This file was saved by hand, so Coderhelm didn&apos;t replace it
+                      {generated.out_of_date_reasons?.length ? ` after ${joinWords(generated.out_of_date_reasons)}` : ""}. Writing it again replaces those edits.
+                    </Problem>
+                  )}
                   <div className="max-h-96 overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
-                    <Markdown>{generated}</Markdown>
+                    <Markdown>{generated.content}</Markdown>
                   </div>
                 </SettingsDisclosure>
               )}
@@ -151,5 +187,41 @@ function InstructionsPage() {
 
       <SaveBar count={form.count} onSave={save} onDiscard={() => { form.discard(); setProblem(null); }} saving={saving} problem={problem} context={isRepo ? repo : undefined} />
     </Page>
+  );
+}
+
+/** "a", "a and b", "a, b and c". */
+function joinWords(words: string[]): string {
+  if (words.length <= 1) return words[0] ?? "";
+  return `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}`;
+}
+
+/** When and why Coderhelm last wrote the file, in a sentence. */
+function updatedLine(file: AgentFile): string | null {
+  if (!file.updated_at) return null;
+  const when = new Date(file.updated_at);
+  if (Number.isNaN(when.getTime())) return null;
+  const date = when.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  const after = file.regenerated_after ?? [];
+  if (file.edited) return `Saved by hand on ${date}.`;
+  switch (file.regenerated_reason) {
+    case "push":
+      return after.length ? `Updated automatically on ${date} after changes to ${joinWords(after)}.` : `Updated automatically on ${date}.`;
+    case "age":
+      return `Updated automatically on ${date}, after new commits to a file more than 30 days old.`;
+    case "manual":
+      return `Written again on ${date} when someone asked.`;
+    default:
+      return `Written on ${date}.`;
+  }
+}
+
+function AgentFileUpdated({ file }: { file: AgentFile }) {
+  const line = updatedLine(file);
+  if (!line) return null;
+  return (
+    <p className="text-sm text-zinc-400" data-testid="agent-file-updated">
+      {line}
+    </p>
   );
 }

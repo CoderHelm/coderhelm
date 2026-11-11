@@ -44,6 +44,8 @@ export interface Backend {
   voice: Record<string, string>;
   instructions: Record<string, string>;
   agents: Record<string, string>;
+  /** When and why each agent file was last written. */
+  agentMeta: Record<string, Record<string, unknown>>;
   repos: { name: string; enabled: boolean; onboard_status?: string; onboard_error?: string }[];
   connections: Record<string, unknown>[];
   routes: Record<string, unknown>[];
@@ -99,6 +101,7 @@ export async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<
     voice: { global: "Short sentences. No emoji.", [WEB]: "Explain UI changes with before and after." },
     instructions: { global: "Prefer named exports.", [WEB]: "" },
     agents: { global: "", [WEB]: "A Next.js app with Playwright tests." },
+    agentMeta: { [WEB]: { updated_at: "2026-11-09T15:00:00Z", regenerated_reason: "push", regenerated_after: ["package.json", "CI"] } },
     repos: [
       { name: WEB, enabled: true, onboard_status: "done" },
       { name: API, enabled: true, onboard_status: "done" },
@@ -159,7 +162,8 @@ export async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<
       }
       const store = db[kind as "voice" | "instructions" | "agents"];
       if (method === "PUT") store[key] = (body as { content: string }).content;
-      return method === "PUT" ? ok(r) : json(r, { content: store[key] ?? "" });
+      const meta = kind === "agents" ? db.agentMeta[key] ?? {} : {};
+      return method === "PUT" ? ok(r) : json(r, { content: store[key] ?? "", ...meta });
     }
     if (/^\/api\/repos\/.+\/regenerate$/.test(p)) return json(r, { status: "started" });
 

@@ -30,3 +30,14 @@ Your team can add its own agents, written as Markdown files in a skill repo. A t
 ## Instructions
 
 Besides skills, admins can set plain-text instructions in **Settings**, for the whole team or one repository: general instructions, rules, the voice for PR descriptions and comments, and git conventions (branch, commit and pull request title templates).
+
+## What CoderHelm learned about a repository
+
+When a repository is turned on, CoderHelm reads it and writes a short guide for its agents: what the repository does, its stack and folders, how it builds and tests, its CI, and the review and contribution guidance it states. You can read it in **Settings**, **Conventions**, under one repository.
+
+The guide refreshes by itself:
+
+- **After changes on the default branch** to the files it is read from: manifests such as `package.json`, `Cargo.toml` or `go.mod`, CI workflows, the README, `AGENTS.md`, `CLAUDE.md`, contribution and review guidelines, Cursor rules, the pull request template, lint, format and test config, or a top-level folder added or removed. CoderHelm waits until 30 minutes after the last such push, so a run of merges causes one refresh, and refreshes each repository at most once a day.
+- **When it is more than 30 days old** and the default branch has new commits since.
+
+The page says when and why it was last written, for example "Updated automatically on November 9, 2026 after changes to package.json and CI". A refresh uses your team's model and counts toward your [token limits](/concepts/token-limits); a team over its limit is skipped until the limit allows. Your own repository instructions are kept apart and read on every refresh, so nothing you wrote there is lost. A guide that someone saved by hand through the API is never replaced by itself: it is marked out of date, with a button to write it again.
