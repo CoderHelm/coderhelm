@@ -3,20 +3,32 @@
 import type { ReactNode } from "react";
 import { StatusDot, type Tone } from "@/components/list/status";
 import { buttonClass, focusRing, linkButton } from "@/components/ui";
-import { KIND_LABEL, READ_SENTENCE, baseHealth, fixLabel, readerWords, type Base, type KnowledgeLimits } from "@/lib/knowledge";
+import { KIND_LABEL, READ_SENTENCE, baseHealth, fixLabel, readerWords, syncCount, type Base, type KnowledgeLimits } from "@/lib/knowledge";
 import { relTime, type PageSource } from "@/lib/knowledge-page";
 
 // The knowledge base page's smaller parts: the one overall status, the
 // four tiles, the problems banner, the in-page nav and Access.
 
+/**
+ * How far a source's sync is, in the card's own words: a first sync counts
+ * documents searchable of the real total ("Syncing (265 of 4,812)"), a later
+ * one the changes it brings in. Never progress against the limit.
+ */
+export function syncWords(s: PageSource): string | null {
+  const c = syncCount(s);
+  if (!c) return null;
+  const n = `${c.done.toLocaleString()} of ${c.total.toLocaleString()}`;
+  return c.first ? `Syncing (${n})` : `Bringing in ${n} change${c.total === 1 ? "" : "s"}`;
+}
+
 /** One status for the whole base, from its sources: a dot and its words. */
 export function overallStatus(base: Base, sources: PageSource[]): { tone: Tone; words: string } | null {
-  const syncing = sources.find((s) => s.status === "syncing" && s.progress?.phase === "fetching" && s.progress.total > 0);
+  const syncing = sources.map(syncWords).find(Boolean);
   if (sources.some((s) => s.status === "error")) {
     const n = sources.filter((s) => s.status === "error").length;
     return { tone: "attention", words: n > 1 ? `${n} sources need attention` : "Needs attention" };
   }
-  if (syncing?.progress) return { tone: "live", words: `Syncing ${Math.min(syncing.progress.done, syncing.progress.total).toLocaleString()} of ${syncing.progress.total.toLocaleString()}` };
+  if (syncing) return { tone: "live", words: syncing };
   const h = baseHealth({ ...base, sources });
   if (!h) return base.ready ? { tone: "success", words: "Ready" } : null;
   const tone: Tone = h.tone === "attention" ? "attention" : h.tone === "live" ? "live" : h.tone === "muted" ? "muted" : "success";
@@ -71,16 +83,14 @@ export function Tiles({ data, sources, onShow }: { data: TileData; sources: Page
     .map((s) => s.next_sync_at)
     .sort()[0];
   const live = sources.filter((s) => s.live_updates).length;
-  const firstSync = sources.find((s) => s.status === "syncing" && !s.last_success_at && s.progress?.total);
+  const firstSync = sources.filter((s) => s.status === "syncing" && !s.last_success_at).map(syncWords).find(Boolean);
   const s = data.searches;
   const change = s && s.last_week > 0 ? Math.round(((s.week - s.last_week) / s.last_week) * 100) : null;
   return (
     <div className="mt-6 grid min-w-0 grid-cols-2 gap-3 lg:grid-cols-4" data-testid="tiles">
       <Tile label="Pages searchable" value={data.searchable.toLocaleString()} testId="tile-pages">
-        {firstSync?.progress ? (
-          <span>
-            Bringing in {firstSync.progress.done.toLocaleString()} of {firstSync.progress.total.toLocaleString()}
-          </span>
+        {firstSync ? (
+          <span data-testid="tile-first-sync">{firstSync}</span>
         ) : data.failed || data.skipped ? (
           <span className="flex flex-wrap gap-x-2">
             {data.failed > 0 && (

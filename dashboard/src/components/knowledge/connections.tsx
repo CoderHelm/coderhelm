@@ -1,11 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { StatusDot } from "@/components/list/status";
 import { Chip, MoreMenu } from "@/components/list";
 import { buttonClass, focusRing } from "@/components/ui";
 import { errorMessage } from "@/lib/data-sources";
-import { KIND_LABEL, fixLabel, itemWord, sourceHealth, truncatedLine, type KnowledgeLimits } from "@/lib/knowledge";
+import { KIND_LABEL, fixLabel, itemWord, sourceHealth, syncCount, syncingLabel, truncatedLine, type KnowledgeLimits } from "@/lib/knowledge";
 import {
   VIA_SHORT,
   dayWords,
@@ -25,7 +26,9 @@ import { SourceLogo } from "./logos";
 // up to date; a row opens into the whole story: how and as whom it
 // connects, its scopes and token health (for the people who manage it),
 // live updates, what was picked, what happens when the person who
-// connected it leaves, and the buttons that act on it.
+// connected it leaves, and the buttons that act on it. While it syncs, the
+// row counts what is searchable against the real total, and its button says
+// the same; a source past its limit says so, with a way to raise it.
 
 export interface ConnectionActions {
   onSync: (s: PageSource) => void;
@@ -37,6 +40,10 @@ export interface ConnectionActions {
   onPause: (s: PageSource, paused: boolean) => void;
   onRemove: (s: PageSource) => void;
   onNewExport: (s: PageSource) => void;
+  /** A large first sync waiting for an admin: start it. */
+  onApprove?: (s: PageSource) => void;
+  /** Opens the team's sync limits. */
+  onRaiseLimit?: () => void;
 }
 
 export function ConnectionRow({
@@ -61,11 +68,12 @@ export function ConnectionRow({
   const health = sourceHealth(s);
   const fix = s.status === "error" ? fixLabel(s) : null;
   const syncing = s.status === "syncing";
+  const count = syncCount(s);
   const place = placeWords(s);
   const panelId = `conn-${s.id}`;
   const tone = health.tone === "attention" ? "attention" : health.tone === "success" ? "success" : health.tone === "muted" ? "muted" : "live";
   return (
-    <li className={`min-w-0 ${s.status === "error" ? "bg-orange-500/[0.04]" : ""}`} data-testid="source-card" data-status={s.status} data-kind={s.kind} data-via={s.via ?? ""}>
+    <li className={`min-w-0 ${s.status === "error" ? "bg-orange-500/[0.04]" : ""}`} data-testid="source-card" data-status={s.status} data-kind={s.kind} data-via={s.via ?? ""} data-items={s.items}>
       <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3.5">
         <SourceLogo kind={s.kind} size="md" />
         <button
@@ -107,7 +115,15 @@ export function ConnectionRow({
         </span>
         {canManage && (
           <span className="flex w-full items-center gap-1.5 pl-[3.25rem] sm:w-auto sm:pl-0" data-testid="row-actions">
-            {fix ? (
+            {s.status === "error" && s.error?.action === "budget" ? (
+              <Link href="/settings/budget/" className={buttonClass("primary", "sm")} data-testid="source-budget">
+                Open the token limit
+              </Link>
+            ) : s.status === "approval" ? (
+              <button type="button" className={buttonClass("primary", "sm")} onClick={() => actions.onApprove?.(s)} data-testid="source-approve">
+                Start sync
+              </button>
+            ) : fix ? (
               <button type="button" className={buttonClass("primary", "sm")} onClick={() => actions.onFix(s)} data-testid="source-fix">
                 {fix}
               </button>
@@ -117,7 +133,7 @@ export function ConnectionRow({
               </button>
             ) : (
               <button type="button" className={buttonClass("secondary", "sm")} onClick={() => actions.onSync(s)} disabled={syncing} data-testid="source-sync">
-                {syncing ? "Checking…" : "Check for changes"}
+                {syncing ? syncingLabel(s) : "Check for changes"}
               </button>
             )}
             <MoreMenu
@@ -140,13 +156,18 @@ export function ConnectionRow({
         )}
       </div>
       {s.truncated && (
-        <p className="px-4 pb-3 pl-[4.25rem] text-xs text-zinc-400" data-testid="source-truncated">
-          {truncatedLine(s.kind, limits)}
-        </p>
+        <div className="px-4 pb-3 pl-[4.25rem] text-xs text-zinc-300" data-testid="source-truncated" data-reason={s.limit_reason || "source"}>
+          <p>{truncatedLine(s, limits)}</p>
+          {canManage && actions.onRaiseLimit && (
+            <button type="button" className="mt-1 text-xs text-zinc-200 underline underline-offset-4 hover:text-white" onClick={actions.onRaiseLimit} data-testid="source-raise-limit">
+              Raise the limit
+            </button>
+          )}
+        </div>
       )}
       {syncing && (
         <div className="px-4 pb-3">
-          <ProgressBar value={s.progress && s.progress.total ? s.progress.done / s.progress.total : 0} indeterminate={!s.progress || !s.progress.total || s.progress.phase !== "fetching"} />
+          <ProgressBar value={count ? count.done / count.total : 0} indeterminate={!count || s.progress?.phase === "waiting" || s.progress?.phase === "removing"} />
         </div>
       )}
       {open && <ConnectionPanel id={panelId} kbId={kbId} source={s} canManage={canManage} limits={limits} actions={actions} />}

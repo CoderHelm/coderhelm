@@ -29,7 +29,7 @@ If a sign-in doesn't finish, the page you land on names the app and says what it
 | GitHub | Repositories, folders or files | Markdown, MDX, text, reStructuredText and AsciiDoc files on the default branch | The CoderHelm GitHub App |
 | Website | Page addresses or a sitemap | Each page's readable text | Nothing: public pages only |
 
-A source keeps up to 1,000 pages. CoderHelm only ever reads: nothing is changed, created or deleted in the app.
+CoderHelm only ever reads: nothing is changed, created or deleted in the app. How many items a source keeps is your team's choice: see [How much a source keeps](#how-much-a-source-keeps).
 
 ### Sanity: signing in or a token
 
@@ -40,6 +40,15 @@ Signing in is the first choice: there is nothing to set up and no key to copy. T
 ### Sanity: turning documents into text
 
 By default a document's title is its first `title`, `name`, `heading` or `label` field and its body is every text field, with Portable Text read as paragraphs and headings. A source's settings can set, per type, which field is the title, which fields are the body, and a link template such as `https://example.com/blog/{slug.current}` so citations open the published page. With `studio_url` set, citations open the document in your Studio instead.
+
+## How much a source keeps
+
+A source keeps up to **50,000 items** by default. Admins and owners change the number under **Sync limits** on the **Knowledge** page, from 1,000 to 100,000; everyone else can see it there. The number is a cost choice: the dialog shows what embedding a full source costs the first time, and how much of your team's monthly token limit is left. One knowledge base holds up to 100,000 synced items across all its sources.
+
+- **Large first syncs wait for an admin.** When a new source covers more than 2,000 items, its card shows the estimate first (for example "About 4,812 documents to embed: about 3.9M tokens") and an admin starts it with **Start sync**. If the estimate is more than your team has left this month, it says so instead of starting.
+- **Embeddings count against your token limit.** Indexing a source counts against the team's monthly token limit set on the budget settings. When the limit is reached, the sync stops and says so; what is already indexed stays searchable.
+- **Big syncs run in steps.** A sync brings in as much as fits in one run, remembers where it stopped, and carries on by itself until it is done. You don't need to press anything. If an app asks CoderHelm to slow down, the sync waits and continues.
+- **Nothing is cut silently.** A source that covers more than it keeps says so on its card, with the real numbers ("Holds 50,000 of 63,210 documents; the rest aren't searchable") and a **Raise the limit** button for admins.
 
 ## Staying up to date
 
@@ -55,21 +64,24 @@ By default a document's title is its first `title`, `name`, `heading` or `label`
 
 Each check is as small as the change:
 
-- A page whose edit time (or revision) is unchanged is not read again.
+- Only items changed since the last check are fetched: CoderHelm compares each app's own edit time or revision (Sanity's `_updatedAt` and revision, Confluence version numbers, Notion and Drive edit times), and a page whose marker is unchanged is not read again.
 - A page that was read but whose text is the same is not indexed again.
 - A changed page re-indexes only the passages whose text changed.
 - A page that was deleted, moved out of what you picked, or is no longer shared with the connection is removed, with its passages.
 
 ## Where a source stands
 
-Each source on a knowledge base's page shows one line: **Up to date, checked 5 minutes ago**, **Bringing in 12 of 40**, **Paused**, or what to do when something is wrong, with a button that does it:
+Each source on a knowledge base's page shows how many documents are searchable now (counted while a sync runs, so it never reads 0 while documents are already in) and one line: **Syncing (265 of 4,812)** on a first sync, **Bringing in 3 of 12 changes** on a later one, **Up to date, checked 5 minutes ago**, **Paused**, or what to do when something is wrong, with a button that does it. While a sync runs, its button shows the same numbers instead of a generic "checking".
 
 | What happened | What you see |
 |---|---|
 | The sign-in expired or was revoked | **Reconnect Notion** |
 | The Sanity sign-in a source syncs with expired, or that person left the team | One sentence saying whose sign-in stopped, and **Sign in again**. Any admin can press it; the source then syncs with their sign-in. The team's owner and admins are told once, in your chat channels and by email. |
 | What you picked was moved or deleted | **Choose pages again** |
-| The app asked CoderHelm to slow down, or didn't answer | **Try again** (it also retries on its own) |
+| The app asked CoderHelm to slow down | Nothing: the sync waits and carries on by itself |
+| The app didn't answer | **Try again** (it also retries on its own) |
+| A large first sync is waiting | Its estimate, and **Start sync** for admins |
+| The source covers more than it keeps | The real numbers, and **Raise the limit** for admins |
 
 A page that couldn't be read says why in the list of pages, and is tried again on the next check.
 
@@ -122,7 +134,7 @@ The knowledge base's page says **Connected in place: searched live through** the
 
 ## Importing a knowledge base you already have
 
-Import copies the documents into CoderHelm and indexes them here, then keeps them in sync: changed documents are read again, duplicates are read once, and documents that are gone are removed. Progress shows as each document comes in. Use it for small and medium collections; for a bigger one, connect it in place instead (a Bedrock knowledge base or a search tool), which has no size limit here.
+Import copies the documents into CoderHelm and indexes them here, then keeps them in sync: changed documents are read again, duplicates are read once, and documents that are gone are removed. Progress shows as each document comes in. An import keeps as many documents as any other source (your team's **Sync limits**). To search a collection bigger than that without copying it, connect it in place instead (a Bedrock knowledge base or a search tool), which has no size limit here.
 
 ### From Amazon S3
 
@@ -148,7 +160,7 @@ To bring in a newer export, choose **Upload a newer export** on the archive's so
 
 ### Limits
 
-An import keeps up to the number of documents the Knowledge page shows (`max_items_per_import`); above that, only the first ones are searchable and the source says so, and suggests connecting the knowledge base in place. Archives have their own size limit (`max_archive_bytes`). Every import is embedded with Titan, like uploads.
+An import keeps up to your team's per-source limit (**Sync limits** on the Knowledge page, 50,000 by default), like any source; above that, the source says how many it holds of how many. Archives have their own size limit (`max_archive_bytes`). Every import is embedded with Titan, like uploads, and counts against your team's monthly token limit.
 
 ## Citations
 
@@ -156,12 +168,12 @@ A passage from a synced page is cited like one from an uploaded file, with its p
 
 ## Cost
 
-Indexing uses Titan embeddings and is recorded on your usage page like every other model call. Because only changed passages are indexed again, keeping a large source up to date costs a small fraction of the first import.
+Indexing uses Titan embeddings and is recorded on your usage page like every other model call, and counts against your team's monthly token limit. A large first sync shows its estimate before it starts. Because only changed passages are indexed again, keeping a large source up to date costs a small fraction of the first import.
 
 ## For developers
 
 Every source type implements one interface with three calls: list what can be picked one level at a time (with a search box), list every item a selection covers with the app's version marker (or, from a cursor, what changed and what was deleted), and fetch one item as text with its title, link and edit time. The sync engine does the rest: comparing, hashing, indexing only what changed, deleting, scheduling, status and citations.
 
-A plugin can add a source type by shipping a connector that answers those three calls; nothing else changes. The endpoints the dashboard uses are under `/api/knowledge/connectors`, `/api/knowledge/{kb_id}/sources` and `/api/knowledge/{kb_id}/archives`, with `/api/knowledge/search-tools` and `/api/knowledge/bedrock/import` for connecting a search tool and importing a Bedrock knowledge base, and providers post change events to `POST /webhooks/knowledge/{token}` (see the [API reference](/api)).
+A plugin can add a source type by shipping a connector that answers those three calls; nothing else changes. The endpoints the dashboard uses are under `/api/knowledge/connectors`, `/api/knowledge/{kb_id}/sources` and `/api/knowledge/{kb_id}/archives`, with `/api/knowledge/settings` for the team's sync limits, with `/api/knowledge/search-tools` and `/api/knowledge/bedrock/import` for connecting a search tool and importing a Bedrock knowledge base, and providers post change events to `POST /webhooks/knowledge/{token}` (see the [API reference](/api)).
 
 Running your own install? Imports from S3 and from a Bedrock knowledge base use the connected account's `CoderHelmLogReader` role with the bucket named in its `ImportBuckets` parameter, exactly as on the hosted service: nothing changes in the install's own permissions and there is no admin step for the install itself. Search tools through MCP need nothing new in AWS. Signing in to Sanity works with nothing to set up. One-click sign-in for Notion, Confluence and Google Drive, and Notion webhooks, need OAuth apps of your own: see [Knowledge sources](/self-host/knowledge-sources) in the self-hosting guide.

@@ -382,8 +382,8 @@ test.describe("bringing in an existing knowledge base", () => {
     await page.goto("/knowledge/base/?id=kb_new");
     const card = page.getByTestId("source-card").filter({ hasText: "Archive upload" });
     await expect(card.getByTestId("archive-file")).toHaveText("Notion export.zip");
-    await expect(card.getByTestId("source-truncated")).toContainText("more than 2,000 documents");
-    await expect(card.getByTestId("source-truncated")).toContainText("Connect the knowledge base in place instead");
+    // An import without its own count says it holds the team's limit and there are more.
+    await expect(card.getByTestId("source-truncated")).toContainText("Holds 2,000 pages; there are more than 2,000, and the rest aren't searchable.");
     await card.getByRole("button", { name: /More for/ }).click();
     await page.getByRole("menuitem", { name: "Upload a newer export" }).click();
     await expect(page.getByRole("alertdialog").or(page.getByRole("dialog"))).toContainText("A Confluence Full Export also includes pages");
