@@ -404,6 +404,41 @@ export const CITATIONS = PASSAGES.map((p, i) => ({
   source_kind: "confluence",
 }));
 
+export function usageFor(db: Backend) {
+  const manage = db.role === "admin" || db.role === "owner";
+  if (db.state !== "healthy")
+    return { week: 0, last_week: 0, by_day: [0, 0, 0, 0, 0, 0, 0], by_surface: {}, top_pages: [], never_found: 0, never_found_sample: [], used_in: [], no_answer: [], no_answer_count: 0, kept_days: 90 };
+  return {
+    week: 63,
+    last_week: 53,
+    by_day: [4, 7, 12, 9, 14, 11, 6],
+    by_surface: { chat: 41, "run:coder": 15, mcp: 5, page: 2 },
+    top_pages: [
+      { file_id: "i1", title: "Backfills runbook", found: 40, cited: 31 },
+      { file_id: "pii", title: "PII policy", found: 25, cited: 19 },
+      { file_id: "i4", title: "Orders table", found: 30, cited: 8 },
+    ],
+    never_found: 212,
+    never_found_sample: [
+      { file_id: "x1", title: "Legacy export notes" },
+      { file_id: "x2", title: "2019 offsite" },
+    ],
+    used_in: [
+      { surface: "run:coder", actor: manage ? "ada@example.com" : "", href: "/runs/detail?id=r4812", at: iso(120) },
+      { surface: "chat", actor: manage ? "ben@example.com" : "", href: null, at: iso(180) },
+      { surface: "chat", actor: "admin@example.com", href: "/chat?thread=th_9", at: iso(240) },
+    ],
+    no_answer: manage
+      ? [
+          { question: "What is the retention for raw events?", times: 3, last_at: iso(60), why: "no_hits" },
+          { question: "Who approves schema changes?", times: 1, last_at: iso(300), why: "rated_down" },
+        ]
+      : [],
+    no_answer_count: 2,
+    kept_days: 90,
+  };
+}
+
 export function connectionFor(s: Src) {
   if (s.via === "sign_in") {
     return {
@@ -510,6 +545,7 @@ export async function mockKnowledge(page: Page, db: Backend, extra?: (p: string,
             visibility_note: "Everyone who can read this knowledge base can read what you add, even if they can't open it in the app it comes from.",
           });
         if (rest === "/sources" && method === "GET") return json(route, { base: baseJson(db), sources: db.sources, uploads_working: false });
+        if (rest === "/usage" && method === "GET") return json(route, db.over.usage ?? usageFor(db));
         if (rest === "/suggestions" && method === "GET") return json(route, { questions: db.items.length ? ["How do we backfill the orders table?", "Where is PII masked?", "Who owns the dbt jobs?"] : [], from: "model", built_at: 0 });
         if (rest === "/search" && method === "POST") {
           if (db.over.askLimited) return json(route, { error: "You've asked 20 questions here in the last hour. Ask again at the top of the hour, or keep going in Chat.", code: "rate_limited" }, 429);

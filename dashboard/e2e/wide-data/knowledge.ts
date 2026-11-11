@@ -271,6 +271,20 @@ export const knowledgeData: Handler = ({ method, path }) => {
   if (path === "/api/knowledge/bedrock-sync") return BEDROCK_SYNC;
   if (/^\/api\/knowledge\/[^/]+\/items$/.test(path)) return ITEMS_PAGE;
   if (/^\/api\/knowledge\/[^/]+\/runs$/.test(path)) return RUNS;
+  if (/^\/api\/knowledge\/[^/]+\/usage$/.test(path))
+    return {
+      week: 1_204_331,
+      last_week: 9,
+      by_day: [1, 2, 3, 400_000, 5, 6, 804_314],
+      by_surface: { chat: 1_000_000, "run:coder": 200_000, [`run:${TOKEN}`]: 4_331, mcp: 0 },
+      top_pages: [{ file_id: "i_1", title: `${TITLE} ${TOKEN}`, found: 1_000_000, cited: 900_000 }],
+      never_found: 1_284,
+      never_found_sample: [{ file_id: "i_9", title: `${TOKEN} ${TITLE}` }],
+      used_in: [{ surface: `run:${TOKEN}`, actor: EMAIL, href: "/runs/detail?id=r1", at: iso(4) }],
+      no_answer: [{ question: `${SENTENCE} ${TOKEN}?`, times: 12, last_at: iso(5), why: "no_source" }],
+      no_answer_count: 12,
+      kept_days: 90,
+    };
   if (/^\/api\/knowledge\/[^/]+\/suggestions$/.test(path)) return { questions: [`${SENTENCE} ${TOKEN}?`, `${TITLE}?`, `What does ${TOKEN} say?`], from: "model", built_at: 0 };
   if (/^\/api\/knowledge\/[^/]+\/sources$/.test(path)) return { base: BASE, sources: SOURCES, uploads_working: true };
   if (/^\/api\/knowledge\/[^/]+\/sources\/[^/]+\/connection$/.test(path)) return CONNECTION;
