@@ -3,9 +3,13 @@ title: Infrastructure vulnerabilities
 description: How CoderHelm checks what runs in your AWS accounts against AWS's security bulletins and the Amazon Linux and Bottlerocket advisories, says which fixes are yours and which AWS makes, and opens the pull request or shows the step in AWS.
 ---
 
-[Security fixes](/getting-started/security-fixes/) checks the packages your code imports. Infrastructure vulnerabilities checks what you actually run on AWS: the AMIs and kernels of your instances, your EKS node groups, your databases and caches. For each one it says whether you have to act, opens the fix pull request or shows the exact step in AWS, and marks what AWS patches for you.
+[Security fixes](/getting-started/security-fixes/) checks the packages your code imports. Infrastructure vulnerabilities checks what you actually run on AWS: the AMIs and kernels of your instances, your EKS clusters and node groups, the container images your services run, your databases, caches and OpenSearch domains, ECS services on Fargate, and the Lambda runtimes in your code. For each one it says whether you have to act, opens the fix pull request or shows the exact step in AWS, and marks what AWS patches for you.
 
-It is off for every AWS account until an admin switches it on, in **Settings**, then **Integrations**, then **AWS**, on the account. Findings show in **Security**, then **Infrastructure**, and what runs in each account shows in **Insights**, then **Infrastructure**, under **Running in AWS**.
+It is off for every AWS account until an admin switches it on, in **Settings**, then **Integrations**, then **AWS**, on the account. Findings show in **Security**, then **Infrastructure**, and what runs in each account shows in **Insights**, then **Infrastructure**, under **Running in AWS**, beside the code review of your infrastructure code. Each resource there lists its versions, where it is defined, what AWS has pending for it and links to its open findings. **Insights**, then **Analytics**, shows the last 30 days: open and fixed findings, the median time to fix, and fix pull requests against steps in AWS.
+
+## The Infrastructure page
+
+Four tiles count what **Needs action now**, the **Fix pull requests**, the **Steps in AWS** and what is **AWS-managed**. Filter the rows by tier or by fix (pull request or in AWS). Each row opens to the fix, where the resource is defined, how to roll it out or what to run in AWS, AWS's date, the advisories and the resources it covers. Admins can open a fix pull request at once with **Open fix PR**, even when security fixes are in a dry run, and read every account again with **Check accounts now**. An account whose role lacks the reads shows **Update the role in AWS**.
 
 ## Where the vulnerabilities come from
 
@@ -19,7 +23,7 @@ These public sources are read once a day for every team. Nothing about your acco
 | **Lambda runtimes** | AWS's deprecation dates for each runtime. A deprecated runtime gets no more patches. |
 | **AWS's latest AMI parameters** | The current ECS, EKS and Bottlerocket images, which a fix points to. |
 
-A source that can't be read, or whose page changed its format, keeps its last good copy, and **Security**, then **Infrastructure**, then **Sources** says it failed and when.
+A source that can't be read, or whose page changed its format, keeps its last good copy. The **Sources** list at the bottom of **Security**, then **Infrastructure**, shows each source (Amazon Linux 2023 and Amazon Linux 2 separately) and your AWS accounts, with when each was last read, and "Last read failed" with the reason when the latest read failed.
 
 ## What it reads in your account
 
@@ -90,7 +94,7 @@ The EKS control plane, load balancers and CloudFront are AWS's as well. They are
 
 ## Inspector and AWS Health
 
-Both are optional, and both depend on something on your AWS account:
+Both are optional, switched on in **Security**, then **Policy**, under **Infrastructure**, and both depend on something on your AWS account:
 
 - **Amazon Inspector** is billed by AWS: about $1.25 per instance a month, $0.09 per container image scan, and $0.30 per Lambda function a month. When you turn it on and CoderHelm may read its findings, they take the place of CoderHelm's own matching for the resources Inspector covers. They also add whether an exploit is known and whether the network can reach the vulnerable port.
-- **AWS Health** names your own affected resources for some bulletins. Its API needs AWS Business Support or higher. Without that plan, a CloudFormation template adds an EventBridge rule in your account that forwards the same Health events.
+- **AWS Health** names your own affected resources for some bulletins. Its API needs AWS Business Support or higher. Without that plan, choose **EventBridge rule in your account**: a CloudFormation template you download adds a rule that forwards the same Health events. With Inspector findings, a row can also say **Exploit known** or **Reachable (Inspector)**.

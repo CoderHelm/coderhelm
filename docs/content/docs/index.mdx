@@ -13,10 +13,13 @@ CoderHelm is an AI coding agent for teams on GitHub and Jira. Assign it an issue
 
 - [Connect GitHub](/getting-started/github)
 - [Connect Jira](/getting-started/jira)
+- [Set up repos](/getting-started/setup)
 - [Your first run](/getting-started/first-run)
 - [Turn on the reviewer](/getting-started/reviewer)
 - [Security fixes](/getting-started/security-fixes)
+- [Infrastructure vulnerabilities](/getting-started/infrastructure-vulnerabilities)
 - [Stale pull requests](/getting-started/stale-pull-requests)
+- [Knowledge bases](/concepts/knowledge)
 
 </Path>
 <Path title="Self-host it" icon="server" href="/self-host/install/" cta="Open the install guide" featured description="Run all of CoderHelm in your own AWS account. The install guide does it from your browser and checks every step against your own install.">
@@ -45,6 +48,15 @@ Releases are published on [GitHub](https://github.com/CoderHelm/coderhelm-platfo
 ## New in CoderHelm
 
 <Tiles>
+<Tile title="Set up repos" href="/getting-started/setup" icon="wrench" badge="new">
+Do it for me reads each repository and turns on what fits, with the reason for each. Your settings stay, and any change can be undone.
+</Tile>
+<Tile title="Infrastructure vulnerabilities" href="/getting-started/infrastructure-vulnerabilities" icon="shield" badge="new">
+AMIs, kernels, EKS nodes, databases and caches checked against AWS's bulletins, with the pull request or the AWS step for each.
+</Tile>
+<Tile title="Knowledge bases" href="/concepts/knowledge" icon="book" badge="new">
+Ask a base on its own page, see which searches used it, and connect Bedrock or any MCP search tool in place.
+</Tile>
 <Tile title="Chat reads your code" href="/concepts/chat" icon="chat" badge="new">
 Ask about your repositories and knowledge. Chat opens the files itself and cites real paths and lines.
 </Tile>
