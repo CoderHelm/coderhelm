@@ -45,12 +45,12 @@ export function SourcesPanel({ o }: { o: SecurityOverview }) {
         {rows.map((s) => {
           const look = STATE_LOOK[s.state] ?? STATE_LOOK.never;
           return (
-            <li key={s.id} className="grid min-w-0 gap-x-4 gap-y-1 px-4 py-3 md:grid-cols-[12rem_minmax(0,1fr)_auto]" data-testid="source-row" data-source={s.id} data-state={s.state}>
+            <li key={s.id} className="grid min-w-0 gap-x-4 gap-y-1 px-4 py-3 lg:grid-cols-[12rem_minmax(0,1fr)_auto]" data-testid="source-row" data-source={s.id} data-state={s.state}>
               <div className="flex min-w-0 flex-wrap items-center gap-2">
                 <span className="font-medium text-zinc-100">{s.name}</span>
                 <Chip tone={look.tone}>{look.label}</Chip>
               </div>
-              <div className="min-w-0 text-sm text-zinc-400">
+              <div className="min-w-0 text-sm text-zinc-400 [overflow-wrap:break-word]">
                 <p>{s.gives}</p>
                 {s.reason && (
                   <p className={`mt-1 ${s.state === "error" ? "text-red-300" : s.state === "needs_permission" ? "text-amber-300" : "text-zinc-400"}`} data-testid="source-reason">
@@ -58,7 +58,7 @@ export function SourcesPanel({ o }: { o: SecurityOverview }) {
                   </p>
                 )}
               </div>
-              <div className="whitespace-nowrap text-xs text-zinc-400 md:text-right">
+              <div className="text-xs text-zinc-400 lg:whitespace-nowrap lg:text-right">
                 <p>{countWords(s)}</p>
                 <p>
                   Last read <When at={s.synced_at} />
@@ -80,14 +80,14 @@ export function SourcesPanel({ o }: { o: SecurityOverview }) {
                 .map(([e, n]) => `${e} ${n.toLocaleString()}`)
                 .join(", ");
               return (
-                <li key={r.repo} className="grid min-w-0 gap-x-4 gap-y-1 px-4 py-3 md:grid-cols-[12rem_minmax(0,1fr)_auto]" data-testid="inventory-row" data-repo={r.repo} data-state={r.state}>
+                <li key={r.repo} className="grid min-w-0 gap-x-4 gap-y-1 px-4 py-3 lg:grid-cols-[12rem_minmax(0,1fr)_auto]" data-testid="inventory-row" data-repo={r.repo} data-state={r.state}>
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <span className="truncate font-medium text-zinc-100" title={r.repo}>
                       {repoName(r.repo)}
                     </span>
                     <Chip tone={look.tone}>{look.label}</Chip>
                   </div>
-                  <div className="min-w-0 text-sm text-zinc-400">
+                  <div className="min-w-0 text-sm text-zinc-400 [overflow-wrap:break-word]">
                     {r.state === "ok" || r.packages > 0 ? (
                       <p>
                         {r.packages.toLocaleString()} package{r.packages === 1 ? "" : "s"}
@@ -99,7 +99,7 @@ export function SourcesPanel({ o }: { o: SecurityOverview }) {
                     {r.dependabot && r.dependabot !== "on" && r.dependabot_reason && <p className="text-amber-300">{r.dependabot_reason}</p>}
                     {r.osv_error && <p className="text-red-300">OSV: {r.osv_error}</p>}
                   </div>
-                  <div className="whitespace-nowrap text-xs text-zinc-400 md:text-right">
+                  <div className="text-xs text-zinc-400 lg:whitespace-nowrap lg:text-right">
                     Read <When at={r.read_at} />
                   </div>
                 </li>
