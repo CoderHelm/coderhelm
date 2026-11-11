@@ -21,6 +21,7 @@ import {
   SECURITY_ADMIN,
   STATUS_LOOK,
   advisoryIds,
+  cannotFix,
   dueIn,
   epssText,
   isActive,
@@ -30,6 +31,7 @@ import {
   type TimelineEvent,
 } from "@/lib/security";
 import { OutLink, TierPill, VerdictPill } from "../parts";
+import { FixRequest } from "../fix-request";
 
 export default function SecurityFindingPage() {
   return (
@@ -121,7 +123,9 @@ function FindingDetail() {
 function FindingView({ f, timeline, admin, reload }: { f: Finding; timeline: TimelineEvent[]; admin: boolean; reload: () => void }) {
   const { toast } = useToast();
   const [dismissing, setDismissing] = useState(false);
+  const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
+  const cannot = cannotFix(f);
   const a = f.advisory;
   const ids = advisoryIds(a);
   const due = isActive(f) ? dueIn(f.due_at) : null;
@@ -172,10 +176,26 @@ function FindingView({ f, timeline, admin, reload }: { f: Finding; timeline: Tim
         }
         actions={
           <>
-            {f.pr && (
-              <a href={f.pr.url} target="_blank" rel="noreferrer" className={primaryButton}>
-                Open PR #{f.pr.number}
+            {f.pr ? (
+              <a href={f.pr.url} target="_blank" rel="noreferrer" className={primaryButton} data-testid="fix-pr-link">
+                PR #{f.pr.number}
+                {f.pr.state === "merged" ? ", merged" : f.pr.state === "closed" ? ", closed" : f.pr.ci === "passing" ? ", CI passing" : f.pr.ci === "failing" ? ", fixing CI" : f.pr.ci ? ", CI running" : ""}
               </a>
+            ) : (
+              admin &&
+              isActive(f) && (
+                <button
+                  type="button"
+                  className={primaryButton}
+                  onClick={() => setAsking(true)}
+                  disabled={!!cannot || asking}
+                  title={cannot ?? "Open a fix pull request for this package version now"}
+                  aria-describedby={cannot ? "fix-cannot" : undefined}
+                  data-testid="open-fix-pr"
+                >
+                  {cannot === "No fixed version yet" ? "No fixed version yet" : "Open fix PR"}
+                </button>
+              )
             )}
             {admin && f.status === "dismissed" && (
               <button type="button" className={secondaryButton} onClick={reopen} disabled={busy} data-testid="reopen">
@@ -190,6 +210,21 @@ function FindingView({ f, timeline, admin, reload }: { f: Finding; timeline: Tim
           </>
         }
       />
+
+      {cannot && admin && !f.pr && isActive(f) && (
+        <p id="fix-cannot" className="mt-2 text-xs text-zinc-400" data-testid="fix-cannot">
+          {cannot === "No fixed version yet" ? "No version of the package fixes this yet. Coderhelm checks again when one is published." : cannot}
+        </p>
+      )}
+      {asking && (
+        <div className="mt-6">
+          <FixRequest
+            ids={[f.id]}
+            onCancel={() => setAsking(false)}
+            onDone={() => reload()}
+          />
+        </div>
+      )}
 
       {dismissing && <DismissForm f={f} onDone={() => {
             setDismissing(false);

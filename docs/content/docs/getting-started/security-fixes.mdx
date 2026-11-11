@@ -5,7 +5,10 @@ description: How CoderHelm checks each advisory that touches your dependencies a
 
 When an advisory is published for a package one of your repositories uses, CoderHelm works out whether your code actually reaches the vulnerable part. It then gives the finding a tier and a deadline, opens a fix pull request and gets its CI green. For urgent findings it also posts a card to the same channel as your production alerts.
 
-Security fixes are off for new teams. Turn them on in **Security**, then **Policy** (admins only). Dry run starts on: CoderHelm finds and checks advisories but opens nothing and posts nothing, and **Preview** shows what it would do.
+Security fixes are off for new teams. Turn them on in **Security**, then **Policy** (admins only), and pick what it does:
+
+- **Open fix PRs (recommended).** CoderHelm opens fix pull requests and posts cards per the policy, within the [daily limits](#daily-limits).
+- **Preview first.** CoderHelm finds, checks and ranks findings but opens nothing and posts nothing. **Preview** shows what it would do, and you can still [open a fix PR by hand](#opening-a-fix-pr-by-hand).
 
 ## Where the advisories come from
 
@@ -21,6 +24,8 @@ OSV and GitHub data are licensed CC-BY, so the dashboard and every pull request 
 
 CoderHelm stores each repository's dependency list when its default branch changes, so a new advisory is a lookup, not a scan of every repository.
 
+The **Sources** panel on the Security page shows each source with what it gives, its state, when it was last read and how many findings came from it, and the dependency list of each repository: its package count, its ecosystems, when it was read, or why it couldn't be. The list comes from GitHub's dependency graph, so a repository with the graph off says so: turn it on in the repository's **Settings**, then **Code security**.
+
 ### What is sent where on a self-hosted install
 
 Your dependency lists are stored in your own AWS account. To check them, the install makes these outbound calls. The OSV call is the only one that carries anything from your repositories, and it is package names and versions, never code:
@@ -32,14 +37,15 @@ Your dependency lists are stored in your own AWS account. To check them, the ins
 
 ## The four verdicts
 
-Each finding goes through cheap checks first: the version ranges, then whether the package is loaded at runtime (a development-only package is not loaded). For the rest, CoderHelm searches the code for where the package and the functions the advisory names are used, and the agent reads those places once and writes a verdict with file and line evidence.
+Each finding goes through cheap checks first: the version ranges, then whether the package is loaded at runtime (a development-only package is not loaded). For the rest, CoderHelm searches the code for where the package and the functions the advisory names are used. When no file names them, the verdict is unknown with that reason, and no model is asked. Otherwise the agent reads those places once per package version, for every advisory it has together, and writes a verdict with file and line evidence. The verdict is reused until the code that uses the package or the advisories change.
 
 | Verdict | Meaning |
 | --- | --- |
 | **Reachable** | Your code calls the vulnerable part of the package. |
 | **Present, not reachable** | The package is loaded, but nothing calls the vulnerable part. |
 | **Not loaded** | Development or test only, never loaded in production. |
-| **Unknown** | The evidence is missing. Unknown is treated as reachable when the service faces the internet. |
+| **Unknown** | The evidence is missing, with the reason (for example, "tar is imported in 3 files, but the advisory names no functions to look for"). |
+| **Checking** | Not read yet. Its tier is provisional until it is. |
 
 Each verdict comes with its evidence: the files and lines that show it, the dependency path, what was checked and how confident CoderHelm is. A verdict never closes an alert on its own. "Not reachable" lowers the tier and shows its evidence; only a person can dismiss a finding.
 
@@ -49,12 +55,31 @@ These are the defaults. You can change when each tier gets a pull request, which
 
 | Tier | When | What CoderHelm does | Due |
 | --- | --- | --- | --- |
-| **P0** | On the exploited list and loaded at runtime; or CVSS 9 or more and reachable (or unknown and facing the internet); or a malicious package | Opens the pull request at once and posts a card | 3 days, or the exploited list's date when sooner |
-| **P1** | CVSS 7 or more and reachable; or an EPSS score of 0.1 or more and loaded at runtime | Opens the pull request within the hour and posts a card | 7 days |
+| **P0** | Evidence only: on the exploited list and loaded at runtime; or CVSS 9 or more and reachable; or a malicious package | Opens the pull request at once and posts a card | 3 days, or the exploited list's date when sooner |
+| **P1** | CVSS 7 or more and reachable; an EPSS score of 0.1 or more; or a high score, a runtime dependency and an unknown verdict | Opens the pull request within the hour and posts a card | 7 days |
 | **P2** | Reachable and medium; or high but not reachable | Opens pull requests once a day, grouped by ecosystem | 30 days |
 | **P3** | Development only, not loaded, or low | One grouped pull request a week, with no notifications | 90 days |
 
 The defaults follow CISA BOD 19-02 (critical in 15 days, high in 30), PCI DSS 4.0.1 requirement 6.3.3 (critical within a month) and FedRAMP's deadlines by exploitability and exposure.
+
+An unknown or still-checking verdict is never P0 on its score alone, and a missing score is never read as a high one.
+
+## Daily limits
+
+Security never runs away with your tokens. These limits are in the policy, with these defaults:
+
+| Limit | Default | What happens past it |
+| --- | --- | --- |
+| Fix runs a day | 3 (0 to 20) | The rest wait, the most urgent first, with "Waiting: today's 3 fix runs are used. Next starts tomorrow." Adopting a Dependabot or Renovate pull request, or opening an issue, doesn't count. Only one fix run per repository at a time. |
+| Fix run tokens a day | 2 million | No new fix run starts until tomorrow. |
+| Reachability check tokens a day | 400,000 | The rest say "waiting for tomorrow's check". |
+| Cards a day | 10 | One digest card says how many more are waiting. |
+
+The Security page shows the day's spend ("Checked 38 packages today, 92k of 400k tokens") and the month's. **Analytics**, then **Security**, shows findings opened and fixed, fix pull requests, the time to fix by tier and the tokens per day, and the usage breakdown lists security checks and security fix runs on their own lines.
+
+## Opening a fix PR by hand
+
+Admins can open a fix pull request from a finding's page (**Open fix PR**), or select rows on the Security page and open them together. CoderHelm shows what it will open first: one pull request per package version, and how many of today's fix runs it uses. It starts at once even in a preview, for those findings only, within the daily limits; past them the rest wait for tomorrow, unless the admin raises today's limit for that request, which is recorded in the audit log. A finding that already has an open pull request links to it instead; one with no fixed version can't be picked and says why.
 
 ## The pull request
 
@@ -91,7 +116,7 @@ The same card is updated when the pull request opens, when CI passes and when it
 
 ## The GitHub App permission to add
 
-Reading Dependabot alerts needs one more permission on the CoderHelm GitHub App: **Dependabot alerts: read**, and the **Dependabot alert** event. Until it has them, the Security page says so. CoderHelm still checks your dependencies against OSV and GitHub's advisories, but it hears about new Dependabot alerts later. Dismissing the Dependabot alert from CoderHelm also needs **Dependabot alerts: write**.
+Reading Dependabot alerts needs one more permission on the CoderHelm GitHub App: **Dependabot alerts: read**, and the **Dependabot alert** event. Until it has them, the Sources panel says which is missing: the App doesn't ask for it, your organization hasn't accepted it yet, or Dependabot alerts are off for a repository. It is checked again on every sweep, so it clears within about 20 minutes of the fix. CoderHelm still checks your dependencies against OSV and GitHub's advisories, but it hears about new Dependabot alerts later. Dismissing the Dependabot alert from CoderHelm also needs **Dependabot alerts: write**.
 
 - **Hosted:** an owner of your GitHub organization opens GitHub, then **Settings**, then **GitHub Apps**, then **CoderHelm**, and accepts the request for new permissions.
 - **Self-hosted:** the App's owner adds **Dependabot alerts: read** under the App's repository permissions and subscribes to the **Dependabot alert** event. Each organization that installed the App then accepts the new permission the same way.

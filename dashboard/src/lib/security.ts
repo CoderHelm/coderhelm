@@ -35,14 +35,103 @@ export interface SecurityOverview {
   };
   median_hours_to_merge_30d: number | null;
   next_due_at: string | null;
+  /** The same counts by fix (a package at one version), what the page shows first. */
+  groups?: { open: number; p0: number; p1: number; p2: number; p3: number; due_7d: number };
+  verdicts?: { settled: number; checking: number };
   sources: {
-    dependabot: "on" | "off" | "no_permission";
+    dependabot: DependabotAccess;
+    dependabot_reason?: string | null;
     osv: { synced_at: string | null; mode: "mirror" | "api" };
     kev_synced_at: string | null;
     epss_synced_at: string | null;
   };
-  /** The GitHub App lacks "Dependabot alerts: read". */
+  /** One row per source, for the Sources panel. */
+  source_rows?: SourceRow[];
+  /** The dependency inventory per repo. */
+  repos?: RepoInventory[];
+  spend?: SecuritySpend;
+  /** The GitHub App lacks "Dependabot alerts: read", or the organization hasn't accepted it. */
   permission_missing: boolean;
+}
+
+export type DependabotAccess = "on" | "off" | "no_permission" | "not_accepted" | "error";
+
+export interface SourceRow {
+  id: "dependabot" | "osv" | "github_advisory" | "kev" | "epss";
+  name: string;
+  gives: string;
+  state: "ok" | "error" | "never" | "off" | "needs_permission";
+  reason: string;
+  synced_at: string | null;
+  count: number;
+  /** CISA's list: how many vulnerabilities it lists. */
+  listed?: number;
+}
+
+export interface RepoInventory {
+  repo: string;
+  packages: number;
+  ecosystems: Record<string, number>;
+  read_at: string | null;
+  state: "ok" | "graph_off" | "error" | "not_read";
+  reason: string;
+  /** Packages with a range or partial version, which can't be matched. */
+  unpinned: number;
+  dependabot: DependabotAccess | null;
+  dependabot_reason: string;
+  osv_error: string | null;
+}
+
+export interface SecuritySpend {
+  triage: { packages_today: number; tokens_today: number; tokens_limit: number; tokens_month: number };
+  fix: { runs_today: number; runs_limit: number; tokens_today: number; tokens_limit: number; tokens_month: number };
+  cards: { today: number; limit: number };
+  tokens_month: number;
+}
+
+/** One fix: a package at one version, with every advisory the bump clears. */
+export interface FindingGroup {
+  key: string;
+  repo: string;
+  ecosystem: string;
+  package: string;
+  version: string;
+  fixed_version: string | null;
+  /** Advisories with no fixed version yet. */
+  no_fix: number;
+  tier: Tier;
+  tier_provisional: boolean;
+  due_at: string;
+  status: FindingStatus;
+  verdict: Verdict;
+  scope: "runtime" | "dev" | "unknown";
+  kev: boolean;
+  malware: boolean;
+  epss: number | null;
+  manifests: string[];
+  pr: Finding["pr"];
+  finding_ids: string[];
+  advisories: { finding_id: string; primary: string; ids: string[]; title: string; tier: Tier; fixed_version: string | null; status: FindingStatus }[];
+  /** Why its fix hasn't started though it's due (a daily limit). */
+  waiting: string | null;
+  evidence: Finding["evidence"];
+}
+
+export interface GroupFilter {
+  status: "open" | "fixed" | "dismissed" | "all";
+  tier?: Tier | "";
+  repo?: string;
+  q?: string;
+  sort?: "tier" | "due" | "package";
+  cursor?: string;
+}
+
+export interface SecurityInsights {
+  days: { date: string; opened: number; fixed: number; prs_opened: number; prs_merged: number; tokens: number }[];
+  totals: { opened: number; fixed: number; prs_opened: number; prs_merged: number; tokens: number; tokens_month: number };
+  median_hours_to_fix: Record<Tier, { fixed: number; median_hours: number | null }>;
+  fix_tokens_month: number;
+  enabled: boolean;
 }
 
 export interface Advisory {
@@ -84,6 +173,9 @@ export interface Finding {
     confidence: "high" | "medium" | "low";
   } | null;
   tier: Tier;
+  /** Still being checked: the tier may change once the verdict is in. */
+  tier_provisional?: boolean;
+  waiting?: string | null;
   due_at: string;
   status: FindingStatus;
   pr: { number: number; url: string; ci: "pending" | "passing" | "failing" | null; state: "open" | "merged" | "closed"; adopted: boolean } | null;
@@ -123,12 +215,23 @@ export interface SecurityConfig {
   adopt_bot_prs: boolean;
   repos: "all" | string[];
   ignore: IgnoreRule[];
+  /** Model tokens reachability checks may spend a day. */
+  triage_tokens_per_day: number;
+  /** Fix runs started a day (adopting a bot's PR or opening an issue doesn't count). */
+  max_fix_runs_per_day: number;
+  /** Model tokens fix runs may spend a day. */
+  max_fix_tokens_per_day: number;
+  /** Cards posted a day; past it, one digest card. */
+  max_cards_per_day: number;
 }
 
-/** The defaults the gateway starts a team with: off, with dry run on. */
+/**
+ * The defaults the gateway starts a team with: off until turned on, and
+ * turned on it opens fix PRs (the recommended choice) within the daily limits.
+ */
 export const SECURITY_DEFAULTS: SecurityConfig = {
   enabled: false,
-  dry_run: true,
+  dry_run: false,
   open_prs: { P0: "now", P1: "hour", P2: "daily", P3: "weekly" },
   post_alerts: { P0: true, P1: true, P2: false, P3: false },
   escalate_half: true,
@@ -142,7 +245,14 @@ export const SECURITY_DEFAULTS: SecurityConfig = {
   adopt_bot_prs: true,
   repos: "all",
   ignore: [],
+  triage_tokens_per_day: 400_000,
+  max_fix_runs_per_day: 3,
+  max_fix_tokens_per_day: 2_000_000,
+  max_cards_per_day: 10,
 };
+
+/** The most each daily limit may be set to (the gateway refuses more). */
+export const LIMIT_MAX = { triage_tokens_per_day: 5_000_000, max_fix_runs_per_day: 20, max_fix_tokens_per_day: 50_000_000, max_cards_per_day: 100 } as const;
 
 export interface PreviewItem {
   finding_id: string;
@@ -216,6 +326,21 @@ export function checkConfig(r: unknown): { config: SecurityConfig; defaults: Sec
   return { config: checkConfigShape(o.config), defaults: o.defaults === undefined ? SECURITY_DEFAULTS : checkConfigShape(o.defaults) };
 }
 
+export function checkGroups(r: unknown): { groups: FindingGroup[]; total: number; next_cursor: string | null } {
+  if (!isObj(r) || !Array.isArray(r.groups)) fail();
+  const o = r as Record<string, unknown>;
+  const groups = (o.groups as unknown[]).map((g) => {
+    if (!isObj(g) || typeof g.package !== "string" || typeof g.repo !== "string" || !Array.isArray(g.advisories)) fail();
+    return g as unknown as FindingGroup;
+  });
+  return { groups, total: typeof o.total === "number" ? o.total : groups.length, next_cursor: typeof o.next_cursor === "string" && o.next_cursor ? o.next_cursor : null };
+}
+
+export function checkInsights(r: unknown): SecurityInsights {
+  if (!isObj(r) || !Array.isArray(r.days) || !isObj(r.totals) || !isObj(r.median_hours_to_fix)) fail();
+  return r as unknown as SecurityInsights;
+}
+
 export function checkPreview(r: unknown): SecurityPreview {
   if (!isObj(r) || !Array.isArray(r.would_open) || !Array.isArray(r.would_post)) fail();
   return r as unknown as SecurityPreview;
@@ -231,7 +356,56 @@ export function findingsQuery(f: FindingFilter): string {
   return q.toString();
 }
 
+export function groupsQuery(f: GroupFilter): string {
+  const q = new URLSearchParams({ status: f.status });
+  if (f.tier) q.set("tier", f.tier);
+  if (f.repo) q.set("repo", f.repo);
+  if (f.q) q.set("q", f.q);
+  if (f.sort && f.sort !== "tier") q.set("sort", f.sort);
+  if (f.cursor) q.set("cursor", f.cursor);
+  return q.toString();
+}
+
+export interface FixPlan {
+  units: { unit: string; repo: string; package: string; from: string; to: string; finding_ids: string[]; title: string }[];
+  skipped: { finding_id: string; reason: string; pr_url?: string }[];
+  runs_today: number;
+  runs_limit: number;
+}
+
+export interface FixResult {
+  started: { unit: string; ticket: string; repo: string; package: string; finding_ids: string[]; run_id: string | null; runs_url: string }[];
+  queued: { unit: string; ticket: string; repo: string; package: string; finding_ids: string[]; reason: string }[];
+  skipped: { finding_id: string; reason: string; pr_url?: string }[];
+  runs_today: number;
+  runs_limit: number;
+}
+
+function checkFixPlan(r: unknown): FixPlan {
+  if (!isObj(r) || !Array.isArray(r.units) || !Array.isArray(r.skipped)) fail();
+  return r as unknown as FixPlan;
+}
+
+function checkFixResult(r: unknown): FixResult {
+  if (!isObj(r) || !Array.isArray(r.started) || !Array.isArray(r.queued) || !Array.isArray(r.skipped)) fail();
+  return r as unknown as FixResult;
+}
+
+/** Why a fix can't be asked for now, in plain words; null when it can. */
+export function cannotFix(f: { status: FindingStatus; fixed_version: string | null; pr: Finding["pr"] }): string | null {
+  if (f.pr && f.pr.state === "open") return `PR #${f.pr.number} is already open`;
+  if (f.status === "fixed") return "Already fixed";
+  if (f.status === "dismissed" || f.status === "withdrawn") return "Dismissed";
+  if (f.status === "fixing") return "A fix run is already working on it";
+  if (!f.fixed_version) return "No fixed version yet";
+  return null;
+}
+
 export const securityApi = {
+  fixPlan: (finding_ids: string[]) => request<unknown>("/api/security/fix/plan", json("POST", { finding_ids })).then(checkFixPlan),
+  fix: (finding_ids: string[], raise_limit = false) => request<unknown>("/api/security/fix", json("POST", { finding_ids, raise_limit })).then(checkFixResult),
+  groups: (f: GroupFilter) => request<unknown>(`/api/security/groups?${groupsQuery(f)}`).then(checkGroups),
+  insights: (days = 30) => request<unknown>(`/api/security/insights?days=${days}`).then(checkInsights),
   overview: () => request<unknown>("/api/security/overview").then(checkOverview),
   findings: (f: FindingFilter) => request<unknown>(`/api/security/findings?${findingsQuery(f)}`).then(checkFindings),
   finding: (id: string) => request<unknown>(`/api/security/findings/${encodeURIComponent(id)}`).then(checkFindingDetail),
@@ -260,7 +434,7 @@ export const VERDICT_LOOK: Record<Verdict, { tone: Tone; label: string; hover: s
   reachable: { tone: "danger", label: "Reachable", hover: "Your code calls the vulnerable part of the package." },
   not_reachable: { tone: "waiting", label: "Present, not reachable", hover: "The package is loaded, but nothing calls the vulnerable part." },
   not_loaded: { tone: "muted", label: "Not loaded", hover: "Only used in development or tests, never loaded in production." },
-  unknown: { tone: "info", label: "Unknown", hover: "Coderhelm couldn't tell. It treats this as reachable when the service faces the internet." },
+  unknown: { tone: "info", label: "Unknown", hover: "Coderhelm couldn't tell from the code. An unknown verdict is at most P1, and only for a runtime dependency with a high score." },
   pending: { tone: "queued", label: "Checking", hover: "Coderhelm is reading the code to decide." },
 };
 
@@ -285,6 +459,32 @@ export const OPEN_PRS_LABEL: Record<OpenPrs, string> = {
 /** A finding that is still waiting on someone: it counts down to its deadline. */
 export function isActive(f: Pick<Finding, "status">): boolean {
   return f.status === "open" || f.status === "fixing" || f.status === "pr_open" || f.status === "no_fix";
+}
+
+/** "Nov 14, in 3 days" / "Nov 9, 2 days overdue": the deadline as a date and the time to it. */
+export function dueDate(iso: string | null | undefined, now = Date.now()): { date: string; text: string; overdue: boolean; soon: boolean } | null {
+  if (!iso) return null;
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return null;
+  const hours = (t - now) / 3_600_000;
+  const date = new Date(t).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  const span = (h: number) => (h < 48 ? `${Math.max(1, Math.round(h))} h` : `${Math.round(h / 24)} days`);
+  if (hours < 0) return { date, text: `${span(-hours)} overdue`, overdue: true, soon: false };
+  return { date, text: `in ${span(hours)}`, overdue: false, soon: hours < 24 };
+}
+
+/** "92k", "2M": tokens in a few characters. */
+export function shortTokens(n: number): string {
+  if (n >= 1_000_000) return `${+(n / 1_000_000).toFixed(n % 1_000_000 === 0 ? 0 : 1)}M`;
+  if (n >= 1000) return `${Math.round(n / 1000)}k`;
+  return String(n);
+}
+
+/** What the fix is, in a few words: "upgrade to 2.0.8", "no fix yet". */
+export function fixWords(g: Pick<FindingGroup, "fixed_version" | "no_fix" | "advisories">): string {
+  if (!g.fixed_version) return "no fix yet";
+  if (g.no_fix > 0) return `upgrade to ${g.fixed_version} (${g.no_fix} of ${g.advisories.length} have no fix yet)`;
+  return `upgrade to ${g.fixed_version}`;
 }
 
 /** "31 h", "5 d", "2 d overdue": the time left before the deadline. */
@@ -339,6 +539,13 @@ export function configProblems(c: SecurityConfig, today = new Date().toISOString
   if (c.labels.length > 20) out.push("There can be at most 20 labels.");
   if (c.labels.some((l) => !l.trim() || l.length > 50)) out.push("Each label must be 1 to 50 characters.");
   if (Array.isArray(c.repos) && c.repos.length === 0) out.push("Pick at least one repo, or choose every repo.");
+  const limit = (v: number, max: number, what: string) => {
+    if (!Number.isInteger(v) || v < 0 || v > max) out.push(`${what} must be a whole number from 0 to ${max.toLocaleString()}.`);
+  };
+  limit(c.max_fix_runs_per_day, LIMIT_MAX.max_fix_runs_per_day, "Fix runs a day");
+  limit(c.max_fix_tokens_per_day, LIMIT_MAX.max_fix_tokens_per_day, "Fix run tokens a day");
+  limit(c.triage_tokens_per_day, LIMIT_MAX.triage_tokens_per_day, "Reachability check tokens a day");
+  limit(c.max_cards_per_day, LIMIT_MAX.max_cards_per_day, "Cards a day");
   c.ignore.forEach((r, i) => {
     const name = r.advisory || `Ignore ${i + 1}`;
     if (!r.advisory.trim()) out.push(`Ignore ${i + 1} needs an advisory ID.`);

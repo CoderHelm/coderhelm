@@ -16,6 +16,7 @@ import { Page, PageHeader, Section } from "@/components/page";
 import { RepoFilter, formatDuration, formatMs } from "@/components/list";
 import { ChartCard, ChartTip, SERIES, Table, axis, delta, shortDay } from "@/components/charts";
 import { DecisionsSection } from "./decisions";
+import { SecuritySection } from "./security";
 
 const PERIODS: { value: `${AnalyticsPeriod}`; label: string }[] = [
   { value: "7", label: "7 days" },
@@ -133,6 +134,7 @@ const TABS = [
   { value: "trends", label: "Compared" },
   { value: "reliability", label: "Reliability" },
   { value: "teams", label: "Teams and repos" },
+  { value: "security", label: "Security" },
   { value: "lookups", label: "Lookups" },
 ] as const;
 type Tab = (typeof TABS)[number]["value"];
@@ -199,8 +201,9 @@ function AnalyticsPage() {
       </div>
 
       {tab === "overview" && <DeliveriesCard />}
+      {tab === "security" && <SecuritySection days={period === "mtd" ? new Date().getUTCDate() : period} />}
 
-      {error ? (
+      {tab === "security" ? null : error ? (
         <div className="mt-6">
           <Problem title="Couldn't load analytics" onRetry={() => void load()} details={error}>
             Your data is not affected. Check your connection and try again.

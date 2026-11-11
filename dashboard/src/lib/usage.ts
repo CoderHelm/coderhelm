@@ -73,6 +73,8 @@ export const FEATURE_LABELS: Record<string, string> = {
   brain: "Chat",
   plan: "Plan tasks",
   log_analysis: "Log analysis",
+  security: "Security checks",
+  security_fix: "Security fix runs",
   release_notes: "Release notes",
   tests: "Test results",
   live_sources: "Live sources",

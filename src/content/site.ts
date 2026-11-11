@@ -827,7 +827,7 @@ const securityFixes: Page = {
             ["P3", "Development only, not loaded, or low", "One grouped pull request a week", "90 days"],
           ],
         },
-        { type: "p", text: "Every part is a setting: when each tier gets a pull request, which tiers post, the days, the labels, and an ignore list where every entry needs a reason and an end date. It starts with a preview that opens nothing." },
+        { type: "p", text: "Every part is a setting: when each tier gets a pull request, which tiers post, the days, the labels, and an ignore list where every entry needs a reason and an end date. Turned on, it opens fix pull requests (the recommended choice) within daily limits on fix runs, tokens and cards, so it never runs away with your budget. Or preview first, which opens nothing, and open fix pull requests by hand. The Security page shows each advisory source, when it was last read and what it found." },
       ],
     },
     {
