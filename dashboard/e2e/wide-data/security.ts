@@ -81,7 +81,61 @@ const CONFIG = {
   adopt_bot_prs: true,
   repos: [REPO, REPO_2],
   ignore: [{ advisory: "GHSA-7fh5-64p2-3v2j", repo: REPO, reason: `Build-time only. ${SENTENCE} ${TOKEN}`, until: "2099-01-31", by: EMAIL }],
+  triage_tokens_per_day: 5_000_000,
+  max_fix_runs_per_day: 20,
+  max_fix_tokens_per_day: 50_000_000,
+  max_cards_per_day: 100,
 };
+
+// One row per fix: the findings as groups, long package names and every state.
+const GROUPS = FINDINGS.map((f, i) => ({
+  key: `${f.repo}|npm|${f.package}|${f.version}|${i}`,
+  repo: f.repo,
+  ecosystem: f.ecosystem,
+  package: f.package,
+  version: f.version,
+  fixed_version: f.fixed_version,
+  no_fix: f.fixed_version ? 0 : 3,
+  tier: f.tier,
+  tier_provisional: i === 2,
+  due_at: f.due_at,
+  status: f.status,
+  verdict: i === 2 ? "pending" : f.verdict,
+  scope: f.scope,
+  kev: f.advisory.kev,
+  malware: f.advisory.malware,
+  epss: f.advisory.epss,
+  manifests: [f.manifest],
+  pr: f.pr,
+  finding_ids: [f.id, `${f.id}_b`, `${f.id}_c`],
+  advisories: [0, 1, 2].map((k) => ({ finding_id: `${f.id}_${k}`, primary: f.advisory.primary, ids: f.advisory.ids, title: f.advisory.title, tier: f.tier, fixed_version: f.fixed_version, status: f.status })),
+  waiting: i === 2 ? `Waiting: today's 20 fix runs are used. Next starts tomorrow. ${TOKEN}` : null,
+  evidence: f.evidence,
+}));
+
+const SOURCE_ROWS = ["dependabot", "osv", "github_advisory", "kev", "epss"].map((id, i) => ({
+  id,
+  name: ["Dependabot alerts", "OSV (by API)", "GitHub advisory feed", "CISA known exploited list", "FIRST EPSS"][i],
+  gives: `${SENTENCE} ${TOKEN}`,
+  state: ["needs_permission", "error", "never", "ok", "ok"][i],
+  reason: i < 3 ? `${SENTENCE} ${LONG_URL}` : "",
+  synced_at: i === 2 ? null : iso(60),
+  count: 123456,
+  listed: i === 3 ? 1484 : undefined,
+}));
+
+const INVENTORY = [REPO, REPO_2].map((repo, i) => ({
+  repo,
+  packages: 123456,
+  ecosystems: { npm: 120000, "GitHub Actions": 3000, "crates.io-with-a-long-ecosystem-name": 456, docker: 2000 },
+  read_at: i ? null : iso(60),
+  state: i ? "graph_off" : "ok",
+  reason: i ? `GitHub's dependency graph is off for this repo; turn it on in the repo's Settings, Code security. ${LONG_URL}` : "",
+  unpinned: 42,
+  dependabot: "not_accepted",
+  dependabot_reason: `${SENTENCE} ${TOKEN}`,
+  osv_error: i ? `OSV answered 503 ${TOKEN}` : null,
+}));
 
 export const securityData: Handler = ({ method, path }) => {
   if (method !== "GET") return undefined;
@@ -92,8 +146,27 @@ export const securityData: Handler = ({ method, path }) => {
       counts: { open: 14, p0: 1, p1: 1, p2: 7, p3: 5, due_7d: 5, fixed_30d: 23, dismissed: 4, noise_removed: 61 },
       median_hours_to_merge_30d: 19,
       next_due_at: iso(-41 * HOUR),
-      sources: { dependabot: "no_permission", osv: { synced_at: iso(60), mode: "api" }, kev_synced_at: iso(60), epss_synced_at: iso(60) },
+      groups: { open: 12345, p0: 1234, p1: 1234, p2: 1234, p3: 1234, due_7d: 1234 },
+      verdicts: { settled: 12345, checking: 12345 },
+      sources: { dependabot: "not_accepted", dependabot_reason: `${SENTENCE} ${LONG_URL}`, osv: { synced_at: iso(60), mode: "api" }, kev_synced_at: iso(60), epss_synced_at: iso(60) },
+      source_rows: SOURCE_ROWS,
+      repos: INVENTORY,
+      spend: {
+        triage: { packages_today: 123456, tokens_today: 4_999_999, tokens_limit: 5_000_000, tokens_month: 123_456_789 },
+        fix: { runs_today: 20, runs_limit: 20, tokens_today: 49_999_999, tokens_limit: 50_000_000, tokens_month: 987_654_321 },
+        cards: { today: 100, limit: 100 },
+        tokens_month: 1_111_111_110,
+      },
       permission_missing: true,
+    };
+  if (path === "/api/security/groups") return { groups: GROUPS, total: 12345, next_cursor: "50" };
+  if (path === "/api/security/insights")
+    return {
+      days: Array.from({ length: 30 }, (_, i) => ({ date: iso((29 - i) * 24 * HOUR).slice(0, 10), opened: 12345, fixed: 1234, prs_opened: 123, prs_merged: 120, tokens: 4_999_999 })),
+      totals: { opened: 370350, fixed: 37020, prs_opened: 3690, prs_merged: 3600, tokens: 149_999_970, tokens_month: 123_456_789 },
+      median_hours_to_fix: { P0: { fixed: 12, median_hours: 20 }, P1: { fixed: 34, median_hours: 52 }, P2: { fixed: 560, median_hours: 700 }, P3: { fixed: 7, median_hours: null } },
+      fix_tokens_month: 987_654_321,
+      enabled: true,
     };
   if (path === "/api/security/findings") return { findings: FINDINGS, next_cursor: "cursor_wide" };
   if (path.startsWith("/api/security/findings/"))

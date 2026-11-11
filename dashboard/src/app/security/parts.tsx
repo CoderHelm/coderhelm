@@ -12,6 +12,7 @@ import {
   STATUS_LOOK,
   TIER_LOOK,
   VERDICT_LOOK,
+  dueDate,
   dueIn,
   isActive,
   type Finding,
@@ -20,22 +21,54 @@ import {
   type Verdict,
 } from "@/lib/security";
 
-export function TierPill({ tier }: { tier: Tier }) {
+export function TierPill({ tier, provisional }: { tier: Tier; provisional?: boolean }) {
   const look = TIER_LOOK[tier] ?? TIER_LOOK.P3;
   return (
-    <span title={look.words} data-testid="tier-pill" data-tier={tier}>
-      <Chip tone={look.tone}>{tier}</Chip>
+    <span
+      title={provisional ? `${look.words}, for now: the verdict is still being checked` : look.words}
+      data-testid="tier-pill"
+      data-tier={tier}
+      data-provisional={provisional ? "true" : undefined}
+      className={provisional ? "opacity-70" : undefined}
+    >
+      <Chip tone={look.tone}>{provisional ? `${tier}?` : tier}</Chip>
     </span>
   );
 }
 
-export function VerdictPill({ verdict, scope }: { verdict: Verdict; scope?: Finding["scope"] }) {
+/**
+ * The verdict: "Checking" is a quiet spinner, "Unknown" carries its reason on
+ * hover, reachable and not reachable say how many code lines back them.
+ */
+export function VerdictPill({
+  verdict,
+  scope,
+  reason,
+  lines,
+}: {
+  verdict: Verdict;
+  scope?: Finding["scope"];
+  reason?: string | null;
+  lines?: number;
+}) {
   const look = VERDICT_LOOK[verdict] ?? VERDICT_LOOK.unknown;
+  if (verdict === "pending") {
+    return (
+      <span title={reason || look.hover} data-testid="verdict-pill" data-verdict={verdict} className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs text-zinc-400">
+        <span aria-hidden="true" className="h-3 w-3 animate-spin rounded-full border border-zinc-600 border-t-zinc-300 motion-reduce:animate-none" />
+        Checking
+      </span>
+    );
+  }
   // A package only used in development reads better as just that.
   const label = verdict === "not_loaded" && scope === "dev" ? "Dev only" : look.label;
+  const count = (verdict === "reachable" || verdict === "not_reachable") && lines ? ` · ${lines} line${lines === 1 ? "" : "s"}` : "";
   return (
-    <span title={look.hover} data-testid="verdict-pill" data-verdict={verdict}>
-      <Chip tone={look.tone}>{label}</Chip>
+    <span title={reason || look.hover} data-testid="verdict-pill" data-verdict={verdict} className="whitespace-nowrap">
+      <Chip tone={look.tone}>
+        {label}
+        {count}
+      </Chip>
     </span>
   );
 }
@@ -77,6 +110,20 @@ function nextStep(f: Finding, config?: SecurityConfig | null): string {
   return mode === "now" ? "PR opening" : "PR within the hour";
 }
 
+/** The deadline as a date and the time to it; coloured only when overdue or under a day. */
+export function DueDate({ due, active = true, now }: { due: string; active?: boolean; now?: number }) {
+  if (!active) return <span className="text-zinc-500">—</span>;
+  const d = dueDate(due, now);
+  if (!d) return <span className="text-zinc-500">—</span>;
+  const tone = d.overdue ? TONES.danger.text : d.soon ? TONES.attention.text : "text-zinc-400";
+  return (
+    <span className="inline-flex flex-col items-end whitespace-nowrap leading-tight" title={new Date(due).toLocaleString()} data-testid="due">
+      <span className="tabular-nums text-zinc-200">{d.date}</span>
+      <span className={`text-xs tabular-nums ${tone}`}>{d.text}</span>
+    </span>
+  );
+}
+
 /** The time left before the deadline, red once it has passed. */
 export function DueText({ f, now }: { f: Pick<Finding, "due_at" | "status">; now?: number }) {
   if (!isActive(f)) return <span className="text-zinc-500">—</span>;
@@ -90,14 +137,14 @@ export function DueText({ f, now }: { f: Pick<Finding, "due_at" | "status">; now
 }
 
 /**
- * The GitHub App can't read Dependabot alerts: say what that costs and how
- * an owner of the GitHub organization grants it.
+ * Dependabot alerts aren't read: one line on why (the organization hasn't
+ * accepted the permission, or the app lacks it) and where to fix it.
  */
-export function PermissionBanner() {
+export function PermissionBanner({ reason }: { reason?: string | null }) {
   return (
     <Callout
       variant="warning"
-      title="Coderhelm can't read your Dependabot alerts yet"
+      title="Dependabot alerts aren't read yet"
       testId="permission-banner"
       actions={
         <Link href="/settings/integrations/github" className={linkButton}>
@@ -106,14 +153,10 @@ export function PermissionBanner() {
       }
     >
       <p>
-        The Coderhelm GitHub App needs one more permission: <b>Dependabot alerts: read</b>. Until it has it, Coderhelm still checks your
-        dependencies against public advisories, but it hears about new Dependabot alerts later and can&apos;t mark them dismissed for you.
+        {reason ||
+          "The GitHub App needs Dependabot alerts: read. An owner of your GitHub organization accepts it in Settings, GitHub Apps, Coderhelm."}{" "}
+        OSV and GitHub&apos;s advisory feed still cover your repos meanwhile.
       </p>
-      <ol className="list-decimal space-y-0.5 pl-5">
-        <li>An owner of your GitHub organization opens GitHub, then Settings, then GitHub Apps, then Coderhelm.</li>
-        <li>GitHub shows a request for new permissions. Review it and accept.</li>
-        <li>On a self-hosted install, the App&apos;s owner first adds the permission and the Dependabot alert event in the App&apos;s settings.</li>
-      </ol>
     </Callout>
   );
 }

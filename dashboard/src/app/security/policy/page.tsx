@@ -20,6 +20,7 @@ import { XIcon } from "@/components/icons";
 import {
   OPEN_PRS_LABEL,
   SECURITY_ADMIN,
+  LIMIT_MAX,
   SECURITY_DEFAULTS,
   TIERS,
   configProblems,
@@ -132,24 +133,60 @@ export default function SecurityPolicyPage() {
         <>
           <fieldset disabled={readOnly} className="mt-6 min-w-0 space-y-6">
             <legend className="sr-only">Security policy</legend>
-            <SettingsSection id="on" title="Security fixes" description="Off for new teams. Start with dry run on to see what it would do.">
+            <SettingsSection id="on" title="Security fixes" description="Off until you turn it on. Turned on, it opens fix pull requests within the daily limits below, or you can preview first.">
               <SettingsRow
                 label="Security fixes"
                 help="Check advisories against your code, open fix pull requests and post urgent ones."
                 unsaved={form.isDirty("enabled")}
                 layout="toggle"
                 control={({ labelId, helpId, inputId }) => (
-                  <Switch id={inputId} checked={c.enabled} onChange={(v) => set("enabled", v)} labelledBy={labelId} describedBy={helpId} testId="sec-enabled" />
+                  <Switch
+                    id={inputId}
+                    checked={c.enabled}
+                    onChange={(v) => {
+                      set("enabled", v);
+                      // Turning it on picks the recommended choice unless one was already chosen here.
+                      if (v && !form.isDirty("dry_run")) set("dry_run", false);
+                    }}
+                    labelledBy={labelId}
+                    describedBy={helpId}
+                    testId="sec-enabled"
+                  />
                 )}
               />
               <SettingsRow
-                label="Dry run"
-                help="Finds and checks advisories, but opens no pull requests and posts nothing. Turn it off once the preview looks right."
+                label="What it does"
                 unsaved={form.isDirty("dry_run")}
                 notDefault={notDefault("dry_run")}
-                layout="toggle"
-                control={({ labelId, helpId, inputId }) => (
-                  <Switch id={inputId} checked={c.dry_run} onChange={(v) => set("dry_run", v)} labelledBy={labelId} describedBy={helpId} testId="sec-dry-run" />
+                layout="stacked"
+                control={() => (
+                  <div id="mode" role="radiogroup" aria-label="What it does" className="grid min-w-0 gap-2 sm:grid-cols-2" data-testid="sec-mode">
+                    {(
+                      [
+                        { dry: false, title: "Open fix PRs", recommended: true, body: "Opens fix pull requests and posts cards per the policy, within the daily limits on runs, tokens and cards." },
+                        { dry: true, title: "Preview first", recommended: false, body: "Finds, checks and ranks findings, but opens nothing and posts nothing. You can still open a fix PR by hand." },
+                      ] as const
+                    ).map((o) => {
+                      const on = c.dry_run === o.dry;
+                      return (
+                        <button
+                          key={o.title}
+                          type="button"
+                          role="radio"
+                          aria-checked={on}
+                          onClick={() => set("dry_run", o.dry)}
+                          className={`min-w-0 rounded-lg border p-3 text-left ${on ? "border-zinc-300 bg-zinc-800/70" : "border-zinc-800 hover:border-zinc-600"} ${focusRing}`}
+                          data-testid={o.dry ? "mode-preview" : "mode-open"}
+                        >
+                          <span className="flex flex-wrap items-center gap-2 text-sm font-medium text-zinc-100">
+                            {o.title}
+                            {o.recommended && <Chip tone="success">Recommended</Chip>}
+                          </span>
+                          <span className="mt-1 block text-xs text-zinc-400">{o.body}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 )}
               />
               <SettingsRow
@@ -293,6 +330,49 @@ export default function SecurityPolicyPage() {
                   <Switch id={inputId} checked={c.use_kev_due} onChange={(v) => set("use_kev_due", v)} labelledBy={labelId} describedBy={helpId} testId="sec-kev-due" />
                 )}
               />
+            </SettingsSection>
+
+            <SettingsSection
+              id="limits"
+              title="Daily limits"
+              description="What Security may spend in a day, so a flood of advisories never runs away with your tokens. The rest wait for the next day, the most urgent first."
+            >
+              {(
+                [
+                  ["max_fix_runs_per_day", "Fix runs a day", "Coding runs that open a fix pull request. Adopting a Dependabot or Renovate PR, or opening an issue, doesn't count. Only one runs per repo at a time.", 0, LIMIT_MAX.max_fix_runs_per_day],
+                  ["max_fix_tokens_per_day", "Fix run tokens a day", "Model tokens those runs may use in a day. Past it, no new run starts until tomorrow.", 0, LIMIT_MAX.max_fix_tokens_per_day],
+                  ["triage_tokens_per_day", "Reachability check tokens a day", "Model tokens for reading how your code uses a vulnerable package: one check per package version, reused until the code or the advisory changes. Past it, the rest say \"waiting for tomorrow's check\".", 0, LIMIT_MAX.triage_tokens_per_day],
+                  ["max_cards_per_day", "Cards a day", "Cards posted to your alerts channel. Past it, one digest card says how many more are waiting.", 0, LIMIT_MAX.max_cards_per_day],
+                ] as const
+              ).map(([key, label, help, min, max]) => {
+                const v = c[key];
+                const bad = !Number.isInteger(v) || v < min || v > max;
+                return (
+                  <SettingsRow
+                    key={key}
+                    label={label}
+                    help={help}
+                    unsaved={form.isDirty(key)}
+                    notDefault={notDefault(key)}
+                    layout="stacked"
+                    control={({ inputId }) => (
+                      <Field
+                        id={inputId}
+                        label={label}
+
+                        type="number"
+                        min={min}
+                        max={max}
+                        value={Number.isFinite(v) ? v : ""}
+                        onChange={(e) => set(key, e.target.value === "" ? Number.NaN : Number(e.target.value))}
+                        error={bad ? `From ${min} to ${max.toLocaleString()}.` : undefined}
+                        controlClassName="sm:w-48"
+                        data-testid={`limit-${key}`}
+                      />
+                    )}
+                  />
+                );
+              })}
             </SettingsSection>
 
             <SettingsSection id="labels" title="Pull request labels" description="Created in the repo if missing.">
