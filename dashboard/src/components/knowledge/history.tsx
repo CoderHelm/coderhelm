@@ -109,7 +109,7 @@ export function History({ kbId, sources, version }: { kbId: string; sources: Pag
           No syncs yet. Each sync is listed here for {kept} days.
         </p>
       ) : (
-        <div className="min-w-0 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/30">
+        <div className="min-w-0 overflow-x-auto rounded-xl border border-zinc-800 bg-zinc-900/30" data-testid="history-scroll">
           <table className="w-full text-sm" data-testid="history-table">
             <thead className="hidden whitespace-nowrap border-b border-zinc-800 text-left text-xs text-zinc-400 sm:table-header-group">
               <tr>
@@ -118,8 +118,7 @@ export function History({ kbId, sources, version }: { kbId: string; sources: Pag
                 <th className="px-2 py-2 font-medium">Trigger</th>
                 <th className="px-2 py-2 font-medium">Took</th>
                 <th className="px-2 py-2 font-medium">Result</th>
-                <th className="px-2 py-2 font-medium">Changes</th>
-                <th className="hidden w-32 px-4 py-2 text-right font-medium xl:table-cell">Passages</th>
+                <th className="px-4 py-2 font-medium">Changes</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800/80">
@@ -128,7 +127,7 @@ export function History({ kbId, sources, version }: { kbId: string; sources: Pag
                   const last = row.runs[0];
                   return (
                     <tr key={`q${i}`} data-testid="history-quiet" className="block sm:table-row">
-                      <td colSpan={7} className="block px-4 py-2.5 text-xs text-zinc-400 sm:table-cell">
+                      <td colSpan={6} className="block px-4 py-2.5 text-xs text-zinc-400 sm:table-cell">
                         {row.runs.length} checks, nothing changed, last {when(last.started_at).replace(/^Today/, "today")}
                       </td>
                     </tr>
@@ -162,8 +161,13 @@ export function History({ kbId, sources, version }: { kbId: string; sources: Pag
                           {RESULT_WORDS[r.result]}
                         </span>
                       </td>
-                      <td className="mt-0.5 block min-w-0 text-zinc-300 sm:mt-0 sm:min-w-[11rem] sm:table-cell sm:px-2 sm:py-2.5">
+                      <td className="mt-0.5 block min-w-0 text-zinc-300 sm:mt-0 sm:w-full sm:min-w-[11rem] sm:table-cell sm:px-4 sm:py-2.5">
                         <Counts r={r} />
+                        {(r.embedded > 0 || r.reused > 0) && (
+                          <span className="block text-xs tabular-nums text-zinc-400" data-testid="history-passages">
+                            Passages: {r.embedded.toLocaleString()} embedded · {r.reused.toLocaleString()} kept
+                          </span>
+                        )}
                         {hasMore && (
                           <button
                             type="button"
@@ -176,13 +180,10 @@ export function History({ kbId, sources, version }: { kbId: string; sources: Pag
                           </button>
                         )}
                       </td>
-                      <td className="hidden whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-zinc-400 xl:table-cell">
-                        {r.embedded || r.reused ? `${r.embedded.toLocaleString()} new · ${r.reused.toLocaleString()} kept` : "None"}
-                      </td>
                     </tr>
                     {isOpen && (
                       <tr className="block sm:table-row" data-testid="history-detail">
-                        <td colSpan={7} className="block bg-zinc-950/40 px-4 py-3 sm:table-cell">
+                        <td colSpan={6} className="block bg-zinc-950/40 px-4 py-3 sm:table-cell">
                           {r.error && (
                             <p className="text-sm text-orange-200">
                               {r.error.message} <span className="text-zinc-300">{r.error.fix}</span>

@@ -230,6 +230,11 @@ test.describe("knowledge base page: sync history and reading pages again", () =>
     await expect(first).toContainText("41 s");
     await expect(first).toContainText("Done");
     await expect(first).toContainText("3 updated");
+    await expect(first.getByTestId("history-passages")).toHaveText("Passages: 18 embedded · 402 kept");
+    // Every column fits inside the card at 1280: nothing runs past its edge.
+    const scroll = history.getByTestId("history-scroll");
+    const fits = await scroll.evaluate((el) => el.scrollWidth <= el.clientWidth + 1);
+    expect(fits, "the history table fits its card").toBe(true);
     const big = history.locator('[data-testid="history-row"][data-result="problems"]');
     await expect(big).toContainText("Done with problems");
     await expect(big).toContainText("410 added · 1 couldn't read · 1 skipped");
@@ -279,6 +284,7 @@ test.describe("knowledge base page: sync history and reading pages again", () =>
     await expect(page.getByTestId("history-problem")).toHaveCount(2);
     await page.getByTestId("history").scrollIntoViewIfNeeded();
     await noSideways(page);
+    await shot(page, "history-400");
   });
 });
 
