@@ -271,6 +271,7 @@ export const knowledgeData: Handler = ({ method, path }) => {
   if (path === "/api/knowledge/bedrock-sync") return BEDROCK_SYNC;
   if (/^\/api\/knowledge\/[^/]+\/items$/.test(path)) return ITEMS_PAGE;
   if (/^\/api\/knowledge\/[^/]+\/runs$/.test(path)) return RUNS;
+  if (/^\/api\/knowledge\/[^/]+\/suggestions$/.test(path)) return { questions: [`${SENTENCE} ${TOKEN}?`, `${TITLE}?`, `What does ${TOKEN} say?`], from: "model", built_at: 0 };
   if (/^\/api\/knowledge\/[^/]+\/sources$/.test(path)) return { base: BASE, sources: SOURCES, uploads_working: true };
   if (/^\/api\/knowledge\/[^/]+\/sources\/[^/]+\/connection$/.test(path)) return CONNECTION;
   if (path.startsWith("/api/knowledge/")) {
