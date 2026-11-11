@@ -1161,9 +1161,9 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(repo ? { repo, config } : { config }),
     }),
-  /** The latest plan for a repository, the actions taken and the pull requests kept open. */
-  getStaleActivity: (repo: string) =>
-    request<StaleActivity>(`/api/reviewer/stale?repo=${encodeURIComponent(repo)}`),
+  /** The latest plan for a repository (every repository's without one), the actions taken and the pull requests kept open. */
+  getStaleActivity: (repo?: string) =>
+    request<StaleActivity>(`/api/reviewer/stale${repo ? `?repo=${encodeURIComponent(repo)}` : ""}`),
   /** Works the plan out again now, changing nothing on GitHub. */
   previewStale: (repo: string) =>
     request<{ queued: boolean }>(`/api/reviewer/stale/preview`, { method: "POST", body: JSON.stringify({ repo }) }),
@@ -1779,6 +1779,32 @@ export interface StalePlanItem {
   last_activity: string;
   last_what: string;
   next_at?: string;
+  /** The repository (added by the list). */
+  repo?: string;
+  /** Whole days since the last activity, as of the read. */
+  days_quiet?: number | null;
+  /** When it closes (RFC 3339): marked and waiting, about to be marked, or closing on the next sweep. */
+  closes_at?: string | null;
+}
+
+/** One repository's latest plan. */
+export interface StalePlan {
+  repo?: string;
+  computed_at: string;
+  dry_run: boolean;
+  enabled?: boolean;
+  stopped: string;
+  items: StalePlanItem[];
+}
+
+export interface StaleKeptOpen {
+  repo?: string;
+  pr: number;
+  title: string;
+  url: string;
+  by: string;
+  via: string;
+  at: string;
 }
 
 export interface StaleLogEntry {
@@ -1795,9 +1821,12 @@ export interface StaleLogEntry {
 }
 
 export interface StaleActivity {
-  plan: { computed_at: string; dry_run: boolean; stopped: string; items: StalePlanItem[] } | null;
+  /** With a repository: its plan. */
+  plan: StalePlan | null;
+  /** Every repository's plan (the one repository's when asked for one). */
+  plans?: StalePlan[];
   log: StaleLogEntry[];
-  kept_open: { pr: number; title: string; url: string; by: string; via: string; at: string }[];
+  kept_open: StaleKeptOpen[];
 }
 
 export interface ReviewerConfig {

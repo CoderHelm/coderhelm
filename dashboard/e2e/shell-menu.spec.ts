@@ -80,7 +80,7 @@ test("settings pages show Settings' own menu in place of the app's, and destinat
 
   await page.goto("/tests");
   const tabs = page.getByRole("navigation", { name: "Code review pages" });
-  await expect(tabs.getByRole("link")).toHaveText(["Reviewer", "Tests", "Releases"]);
+  await expect(tabs.getByRole("link")).toHaveText(["Reviewer", "Stale PRs", "Tests", "Releases"]);
   await expect(tabs.getByRole("link", { name: "Tests" })).toHaveAttribute("aria-current", "page");
   // An item's page underneath shows no tabs.
   await page.goto(`/runs/detail${SAMPLE_QUERY["/runs/detail"]}`);

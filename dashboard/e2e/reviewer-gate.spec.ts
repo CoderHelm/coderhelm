@@ -112,6 +112,12 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
         message: "Auto-merge re-armed. Before merging it checks CoderHelm's approval of commit abcdef1, the required approvals and CI again.",
       });
     }
+    // Stale pull requests are off: the Reviewer page shows no stale line.
+    if (p === "/api/reviewer/stale/config") {
+      const off = { enabled: false, stale_days: 21, close_days: 7, label: "stale", warn_message: "", close_message: "", exempt_labels: [], exempt_drafts: true, exempt_authors: [], scope: "all", delete_branch: false, max_closes_per_run: 10, dry_run: true };
+      return json(route, { team: off, team_saved: false, repo: null, effective: off, defaults: off });
+    }
+    if (p === "/api/reviewer/stale") return json(route, { plan: null, plans: [], log: [], kept_open: [] });
     return json(route, { error: `Not mocked: ${req.method()} ${p}` }, 404);
   });
   return db;

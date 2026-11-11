@@ -37,6 +37,7 @@ export const ROUTES: Record<string, RouteInfo> = {
   "/reviewer/detail": { label: "Review", parent: "/reviewer", detail: true, description: "One review: its findings on the pull request, each with the code it points at." },
   "/reviewer/pr": { label: "Pull request", parent: "/reviewer", detail: true, description: "One pull request's reviews over time, and whether its merge check passes." },
   "/reviewer/session": { label: "Review session", parent: "/reviewer", detail: true, description: "One review session: what the reviewer read, what it found and the verdict it gave." },
+  "/reviewer/stale": { label: "Stale PRs", tab: "Stale pull requests", description: "Pull requests nobody has worked on for a while: which are marked stale and when each closes, what was closed, what is exempt, and the settings." },
   "/reviewer/config": { label: "Settings", parent: "/reviewer", tab: "Reviewer settings", description: "How the reviewer works: which pull requests it reviews, what it checks and when it blocks a merge." },
 
   "/tests": { label: "Tests", description: "The test suites Coderhelm runs against your apps, and how each one did on its last run." },

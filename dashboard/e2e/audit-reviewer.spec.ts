@@ -253,6 +253,12 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
       return s ? json(route, s) : json(route, { error: "not found" }, 404);
     }
     if (p === "/api/reviewer/re-review") return json(route, { status: "queued" });
+    // Stale pull requests: off, so the Reviewer page shows no stale line.
+    if (p === "/api/reviewer/stale/config") {
+      const off = { enabled: false, stale_days: 21, close_days: 7, label: "stale", warn_message: "", close_message: "", exempt_labels: [], exempt_drafts: true, exempt_authors: [], scope: "all", delete_branch: false, max_closes_per_run: 10, dry_run: true };
+      return json(route, { team: off, team_saved: false, repo: null, effective: off, defaults: off });
+    }
+    if (p === "/api/reviewer/stale") return json(route, { plan: null, plans: [], log: [], kept_open: [] });
     if (p === "/api/reviewer/org-config") {
       if (req.method() === "PUT") return route.fulfill({ status: 200, body: "" });
       if (db.failOrg) return json(route, { error: "boom" }, 500);
@@ -465,7 +471,7 @@ test("an empty reviewer list points to the settings", async ({ page }) => {
   await mockApi(page, { empty: true });
   await page.goto("/reviewer");
   await expect(page.getByText("No reviews yet")).toBeVisible();
-  await expect(page.getByRole("main").getByRole("link", { name: "Configure" }).last()).toHaveAttribute("href", /\/reviewer\/config/);
+  await expect(page.getByRole("main").getByRole("link", { name: "Settings", exact: true }).last()).toHaveAttribute("href", /\/reviewer\/config/);
   await shot(page, "audit-reviewer-empty");
   expect(errors).toEqual([]);
 });
@@ -765,9 +771,12 @@ test("reviewer settings load for a repo, with labelled fields and switches", asy
   expect(row, "the tab row scrolls at 1280px").toBeLessThanOrEqual(0);
   // Stop everything is the danger zone at the foot of Reviews.
   await expect(page.getByRole("heading", { name: "Stop everything" })).toBeVisible();
-  // The views shared by every repo open from the header, keeping the repo.
-  await expect(page.getByRole("link", { name: "Every repository" })).toHaveAttribute("href", /repo=your-team%2Fweb&section=standards/);
-  await expect(page.getByRole("link", { name: "Stale pull requests" })).toHaveAttribute("href", /section=stale/);
+  // One scope control, no header buttons: this repo, its settings set per repository.
+  await expect(page.getByTestId("settings-scope")).toHaveAttribute("data-scope", "repo");
+  await expect(page.getByTestId("scope-badge")).toHaveAttribute("data-state", "per-repo");
+  await expect(page.getByRole("link", { name: "Every repository" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Stale pull requests" })).toHaveCount(0);
+  await expect(page.getByTestId("standards-also-apply")).toContainText("The review standards for all repositories also apply here.");
   await expect(page.getByRole("switch", { name: /Auto-merge on approve/ })).toHaveCount(0);
   await nav.getByRole("link", { name: /^Auto-merge/ }).click();
   await expect(page).toHaveURL(/section=merge/);
@@ -778,10 +787,12 @@ test("reviewer settings load for a repo, with labelled fields and switches", asy
   await page.getByRole("switch", { name: /Auto-merge on approve/ }).click();
   await expect(page.getByRole("group", { name: "Merge method" })).toBeVisible();
   await page.getByRole("switch", { name: /Auto-merge on approve/ }).click();
-  // The shared standards are their own view.
-  await page.getByRole("link", { name: "Every repository" }).click();
-  await expect(page).toHaveURL(/section=standards/);
-  await expect(page.getByRole("link", { name: "Every repository" })).toHaveAttribute("aria-current", "page");
+  // The shared standards are "All repositories" in the same control.
+  await page.getByTestId("settings-scope-picker").click();
+  await page.getByRole("option", { name: /All repositories/ }).click();
+  await expect(page).toHaveURL(/scope=all/);
+  await expect(page.getByTestId("settings-scope")).toHaveAttribute("data-scope", "all");
+  await expect(page.getByRole("navigation", { name: "Settings sections" })).toHaveCount(0);
   await expect(page.getByRole("textbox", { name: "Review standards for every repo" })).toHaveValue("Never log secrets.");
   await shot(page, "audit-reviewer-config");
   expect(errors).toEqual([]);
@@ -806,11 +817,12 @@ test("an old ?section=stop link opens Reviews at Stop everything, and a phone ge
   expect(errors).toEqual([]);
 });
 
-test("reviewer settings with no repo picked explain what to do", async ({ page }) => {
+test("reviewer settings with no repo picked open on All repositories and say what is per repository", async ({ page }) => {
   const errors = watchConsole(page);
   await mockApi(page);
   await page.goto("/reviewer/config");
-  await expect(page.getByText(/Choose a repository to see what the reviewer does/)).toBeVisible();
+  await expect(page.getByTestId("settings-scope")).toHaveAttribute("data-scope", "all");
+  await expect(page.getByTestId("per-repo-note")).toContainText("set per repository");
   await shot(page, "audit-reviewer-config-empty");
   expect(errors).toEqual([]);
 });
@@ -832,7 +844,7 @@ test("a failed settings load hides the form so defaults cannot overwrite saved s
 test("a failed load of the shared review standards turns their save off", async ({ page }) => {
   const errors = watchConsole(page, true);
   const db = await mockApi(page, { failOrg: true });
-  await page.goto("/reviewer/config?section=standards");
+  await page.goto("/reviewer/config?scope=all");
   await expect(page.getByText("Could not load the review standards")).toBeVisible();
   await expect(page.getByRole("button", { name: "Save standards" })).toHaveCount(0);
   db.failOrg = false;
@@ -946,14 +958,14 @@ test("unsaved edits can be discarded, and switching repos with them asks first",
   await page.getByRole("switch", { name: /Stop everything/ }).click();
   await expect(page.getByTestId("reviewer-summary")).toContainText("Every reviewer action on this repo is stopped");
   await expect(nav.getByRole("link", { name: /^Reviews/ }).getByLabel("unsaved")).toBeVisible();
-  await page.getByRole("button", { name: /Repository: your-team\/web/ }).click();
+  await page.getByRole("button", { name: /Settings for: your-team\/web/ }).click();
   await page.getByRole("option", { name: "your-team/backend" }).first().click();
   await expect(page.getByText("Leave without saving?")).toBeVisible();
   await page.getByRole("button", { name: "Keep editing" }).click();
   await expect(page).toHaveURL(/repo=your-team%2Fweb/);
   await expect(page.getByRole("switch", { name: /Stop everything/ })).toHaveAttribute("aria-checked", "true");
 
-  await page.getByRole("button", { name: /Repository: your-team\/web/ }).click();
+  await page.getByRole("button", { name: /Settings for: your-team\/web/ }).click();
   await page.getByRole("option", { name: "your-team/backend" }).first().click();
   await page.getByRole("button", { name: "Drop changes" }).click();
   await expect(page).toHaveURL(/repo=your-team%2Fbackend/);

@@ -57,6 +57,7 @@ export const NAV_SECTIONS: NavSection[] = [
     icon: "reviews",
     pages: [
       { href: "/reviewer", label: "Reviewer", need: ANY_CHANGE },
+      { href: "/reviewer/stale", label: "Stale PRs", need: ANY_CHANGE },
       { href: "/tests", label: "Tests", need: ANY_CHANGE },
       { href: "/releases", label: "Releases", need: "reviews" },
     ],

@@ -9,12 +9,25 @@ It is off by default. It works on the repositories the [reviewer](/getting-start
 
 ## Turn it on
 
-1. Open **Reviewer**, then **Reviewer settings**.
-2. Press **Stale pull requests** at the top of the page.
-3. Switch on **Close stale pull requests** and press **Save settings**. **Dry run** stays on.
-4. Pick a repository and look at the list of what would be marked and closed. When it looks right, turn **Dry run** off.
+Stale pull requests have their own tab under **Code review**: **Reviewer**, **Stale PRs**, **Tests**, **Releases**. You can also search for "Stale pull requests" in the command palette.
 
-Admins can change these settings. Everyone else can see them.
+1. Open **Code review**, then **Stale PRs**. The top of the page says whether it is **Off**, a **Dry run** or **On**.
+2. Press **Turn on**. It starts as a dry run, so nothing changes on GitHub.
+3. Open **Would mark or close** and look at what it would do. When it looks right, open **Settings**, turn **Dry run** off and press **Save settings**.
+
+Admins can change these settings and keep pull requests open. Everyone else can see them. The **Reviewer** page shows a line such as "3 pull requests marked stale, 1 closing tomorrow" that links to this page.
+
+## The page
+
+| View | What it lists |
+| --- | --- |
+| **Marked stale** | Pull requests marked stale now, soonest to close first: the repository, the author, how many days it has been quiet and when it closes. **Keep open** keeps one open. |
+| **Would mark or close** (**Up next** once the dry run is off) | What the next check would mark or close. **Check now** works it out again. |
+| **Recently closed** | Pull requests closed as stale in the last 90 days, each with a **Reopen on GitHub** link. |
+| **Exempt** | Pull requests left alone because of a label, an author or a draft, and the ones kept open, with **Allow closing**. |
+| **Settings** | The settings below, for all repositories or one. |
+
+Filter every view by repository, or search by number, title or author.
 
 ## How it decides
 
@@ -59,15 +72,15 @@ On GitHub, any of these keeps a pull request open:
 
 `@coderhelm keep open` works for the pull request's author and anyone with write access to the repository. CoderHelm reacts with a thumbs up, and the pull request is never marked or closed as stale after that. Anyone else gets a reply that says only the author or someone with write access can keep it open, and nothing changes.
 
-In the dashboard, **Keep open** on a pull request in the list does the same. The **Kept open** list shows who kept each one and how, and **Allow closing** undoes it.
+In the dashboard, **Keep open** on a pull request in the list does the same. The **Exempt** view shows who kept each one open and how, and **Allow closing** undoes it.
 
 ## Dry run and the preview
 
 A new setup starts as a dry run. CoderHelm works out what it would do and changes nothing on GitHub: no labels, no comments, no closes.
 
-Pick a repository on the settings page to see its list. Each pull request shows what would happen (marked, closed on a date, or left alone), who opened it, its last activity and the reason. **Check now** works the list out again at any time; it reads GitHub and changes nothing. The list updates in a minute or two.
+**Would mark or close** on the **Stale PRs** page lists every pull request a check would mark or close, across your repositories, with who opened it, how long it has been quiet and its last activity. **Check now** works the list out again at any time, for the repository picked or all of them; it reads GitHub and changes nothing. The list updates in a minute or two.
 
-Turn **Dry run** off once the list looks right. The same list then shows what is marked and when each one closes.
+Turn **Dry run** off once the list looks right. **Marked stale** then shows what is marked and when each one closes.
 
 ## What the comments say
 
@@ -93,7 +106,7 @@ Reopen the pull request on GitHub. Reopening counts as activity, so the stale la
 
 ## Settings
 
-Set them once for **Every repository**, or choose a repository and switch on **Use its own settings**. A repository with its own settings uses only those; with it off, the repository follows the settings for every repository.
+Open **Settings** on the **Stale PRs** page. **Settings for** at the top picks what you change: **All repositories**, or one repository. A repository shows **Inherited from all repositories** until you press **Use different settings here**; then it shows **Overridden here** and uses only its own settings. **Reset to all repositories** drops them again. Press **Save settings** after either.
 
 | Setting | What it does | Default |
 | --- | --- | --- |

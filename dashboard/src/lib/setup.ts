@@ -465,7 +465,7 @@ export const FEATURE_HREF: Record<string, string> = {
   tags: "/reviewer/config?section=after-merge",
   release_notes: "/reviewer/config?section=release-notes",
   reminders: "/reviewer/config?section=reminders",
-  stale_prs: "/reviewer/config?section=stale",
+  stale_prs: "/reviewer/stale?view=settings",
   security: "/security/policy",
   instructions: "/settings/instructions",
   agent_file: "/settings/instructions",

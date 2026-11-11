@@ -131,6 +131,8 @@ function actionsFor(who: PaletteUser): (Entry & { need?: string })[] {
     { id: "act:skills-repo", group: "actions", label: "Connect a skills repository", sub: "Skills", href: "/skills", need: "data_sources", keywords: ["skill", "agent", "command"] },
     { id: "act:setup", group: "actions", label: "Set up repos", sub: "Setup: recommended settings for each repo", href: "/setup/run", need: "setup", keywords: ["setup", "onboard", "recommended", "configure", "wizard", "new repo"] },
     { id: "act:reviewer-config", group: "actions", label: "Configure the reviewer", sub: "Reviewer settings", href: "/reviewer/config", need: ANY_CHANGE, keywords: ["label", "auto-merge", "release notes"] },
+    { id: "act:stale-prs", group: "actions", label: "Stale pull requests", sub: "Code review: marked stale, closing soon, closed", href: "/reviewer/stale", need: ANY_CHANGE, keywords: ["stale", "old", "inactive", "quiet", "keep open", "cleanup", "pull request"] },
+    { id: "act:close-stale", group: "actions", label: "Close stale PRs", sub: "Stale pull request settings", href: "/reviewer/stale?view=settings", need: ANY_CHANGE, keywords: ["stale", "close", "cleanup", "dry run", "auto close", "inactive"] },
     // The href is filled in when the palette opens, with the page it opened on.
     { id: "act:get-help", group: "actions", label: "Get help…", sub: "Open a support ticket about this page", href: "/support?new=1", keywords: ["support", "ticket", "help", "contact", "broken", "bug"] },
     { id: "act:tickets", group: "actions", label: "Your support tickets", sub: "Support", href: "/support", keywords: ["support", "ticket", "help", "replies"] },
@@ -153,6 +155,7 @@ const SETTINGS: { label: string; href: string; need?: string; keywords: string[]
   { label: "Jira integration", href: "/settings/integrations/jira", need: "integrations", keywords: ["tickets", "atlassian"] },
   { label: "AWS accounts", href: "/settings/integrations/aws", need: "view_integrations", keywords: ["cloud", "role"] },
   { label: "Reviewer settings", href: "/reviewer/config", need: ANY_CHANGE, keywords: ["review label", "auto-merge", "release notes"] },
+  { label: "Stale pull request settings", href: "/reviewer/stale?view=settings", need: ANY_CHANGE, keywords: ["stale", "close", "inactive", "dry run", "exempt"] },
   { label: "Alert routes", href: "/settings/alerts", need: "view_alerts", keywords: ["alarm", "sns", "topic"] },
   { label: "Infrastructure vulnerabilities", href: "/security/infrastructure", keywords: ["aws", "ami", "kernel", "eks", "rds", "bulletin", "cve", "infrastructure"] },
   { label: "Security fixes policy", href: "/security/policy", keywords: ["cve", "advisory", "vulnerability", "dependabot", "deadline", "dependencies"] },
