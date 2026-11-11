@@ -38,6 +38,7 @@ import { buildRows, gateAction, gateHref, statusLook, summaryLine, type Group, t
 import { GATE_ACTION_LABEL, useGateControl } from "./gate-control";
 import { Disclosure } from "@/components/disclosure";
 import { Markdown } from "@/components/markdown";
+import { staleState, summaryLine as staleLine } from "@/lib/stale";
 
 export default function ReviewerPageGuarded() {
   return (
@@ -198,7 +199,7 @@ function ReviewerPage() {
               Review a PR…
             </button>
             <Link href="/reviewer/config" className={`shrink-0 ${secondaryButton}`}>
-              Configure
+              Settings
             </Link>
           </>
         }
@@ -212,13 +213,15 @@ function ReviewerPage() {
         live={live}
       />
 
+      <StaleSummary />
+
       <div className="mt-4 max-w-2xl">
         <Disclosure summary="Start a review from GitHub">
           <p>
             Add the review label (default <code className="text-zinc-200">ch-review</code>) to a PR, or reply{" "}
             <code className="text-zinc-200">@coderhelm re-review</code> on it. Labels and triggers are set in{" "}
             <Link href="/reviewer/config" className={linkButton}>
-              Configure
+              Settings
             </Link>
             .
           </p>
@@ -260,7 +263,7 @@ function ReviewerPage() {
       ) : rows.length === 0 ? (
         <ListEmpty title={repoFilter ? `No reviews for ${repoFilter} yet` : "No reviews yet"} onClear={repoFilter ? clear : undefined}>
           Turn the reviewer on for a repo in{" "}
-          <Link href="/reviewer/config" className={linkButton}>Configure</Link>, then use “Review a PR…” or add the review label
+          <Link href="/reviewer/config" className={linkButton}>Settings</Link>, then use “Review a PR…” or add the review label
           to a PR.
         </ListEmpty>
       ) : visible.length === 0 ? (
@@ -689,5 +692,27 @@ function PrItem({
       open={isExpanded}
       onOpenChange={onToggle}
     />
+  );
+}
+
+/** One line about stale pull requests ("3 pull requests marked stale, 1 closing tomorrow"), linking to Stale PRs. Nothing while it is off or quiet. */
+function StaleSummary() {
+  const [line, setLine] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    Promise.all([api.getStaleConfig(), api.getStaleActivity()])
+      .then(([c, a]) => live && setLine(staleLine(staleState(c.effective), a)))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+  if (!line) return null;
+  return (
+    <p className="mt-4 text-sm text-zinc-300" data-testid="stale-summary-line">
+      <Link href="/reviewer/stale" className={linkButton}>
+        {line}
+      </Link>
+    </p>
   );
 }

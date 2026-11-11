@@ -38,7 +38,7 @@ import {
 } from "@/components/settings";
 import { Page, PageHeader } from "@/components/page";
 import { MarkdownEditor } from "@/components/markdown-editor";
-import { StaleSection } from "./stale";
+import { SettingsScope, ScopeBadge } from "@/components/settings-scope";
 import { ReviewInSetup, useSetupMarks } from "@/components/setup-marks";
 
 /** Setup's registry id for each reviewer field that Setup recommends. */
@@ -136,10 +136,13 @@ const SECTIONS = [
   { id: "reminders", title: "Review reminders" },
 ] as const;
 type SectionId = (typeof SECTIONS)[number]["id"];
-/** What the page shows under the tabs: one repo section, the standards shared by every repo, or stale pull requests (every repo, or one). */
-type View = SectionId | "standards" | "stale";
-const VIEWS: View[] = [...SECTIONS.map((s) => s.id), "standards", "stale"];
+/** The repo section open under the tabs. "All repositories" (?scope=all) shows the review standards instead. */
+type View = SectionId;
+const VIEWS: View[] = SECTIONS.map((s) => s.id);
 const isView = (v: string | null): v is View => !!v && (VIEWS as string[]).includes(v);
+/** Older links: ?section=standards is now ?scope=all, ?section=stale the Stale PRs page's settings. */
+const OLD_STANDARDS = "standards";
+const OLD_STALE = "stale";
 /** Stop everything sits at the foot of Reviews as its danger zone; ?section=stop (older links) opens Reviews there. */
 const STOP_SECTION = "stop";
 
@@ -223,8 +226,8 @@ function summaryLines(cfg: ReviewerConfig): string[] {
 
 const shortInput = "sm:w-64";
 
-/** ?repo= in the address, so a refresh or a shared link opens the same repo (the tabs carry ?section=). */
-function writeParams(next: { repo?: string }) {
+/** ?repo= (or ?scope=all) in the address, so a refresh or a shared link opens the same settings (the tabs carry ?section=). */
+function writeParams(next: { repo?: string; scope?: string; section?: string }) {
   const url = new URL(window.location.href);
   for (const [k, v] of Object.entries(next)) {
     if (v) url.searchParams.set(k, v);
@@ -240,10 +243,11 @@ function ReviewerConfigPage() {
   const { confirm } = useConfirm();
   const [repos, setRepos] = useState<Repo[]>([]);
   const params = useSearchParams();
-  // ?repo=owner/name keeps a refresh or a shared link on the same repo. It is
-  // read on the first render, with ?section=, so the section that opens has
-  // its repo from the start (Stale pull requests picks its target on mount).
-  const [repo, setRepo] = useState(() => params.get("repo") ?? "");
+  // ?repo=owner/name keeps a refresh or a shared link on the same repo, read
+  // on the first render with ?section= so the section opens on its repo.
+  const [repo, setRepo] = useState(() => (params.get("section") === OLD_STANDARDS ? "" : params.get("repo") ?? ""));
+  // "Settings for": All repositories (?scope=all, or no repo picked yet) or one repo.
+  const [allScope, setAllScope] = useState(() => params.get("scope") === "all" || params.get("section") === OLD_STANDARDS || !params.get("repo"));
   const [loading, setLoading] = useState(false);
   // A failed load must not show the defaults as if they were saved: saving
   // them would overwrite the repo's real settings.
@@ -268,6 +272,19 @@ function ReviewerConfigPage() {
   const [savingOrg, setSavingOrg] = useState(false);
   const asked = params.get("section");
   const view: View = isView(asked) ? asked : "reviews";
+
+  // Older links keep working: the shared standards are "All repositories" now,
+  // and stale pull requests have their own page under Code review.
+  useEffect(() => {
+    if (asked === OLD_STALE) {
+      const r = params.get("repo");
+      window.location.replace(`/reviewer/stale?view=settings${r ? `&repo=${encodeURIComponent(r)}` : ""}`);
+    } else if (asked === OLD_STANDARDS) {
+      writeParams({ section: "", repo: "", scope: "all" });
+    }
+    // Only the address the page opened on.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     // Members can read these settings; only admins can save them.
@@ -358,7 +375,32 @@ function ReviewerConfigPage() {
       if (ok !== "primary") return;
     }
     setRepo(r);
-    writeParams({ repo: r });
+    setAllScope(false);
+    writeParams({ repo: r, scope: "" });
+  };
+
+  // The one scope control: "" is All repositories.
+  const pickScope = async (r: string) => {
+    if (r) {
+      if (r !== repo) return selectRepo(r);
+      setAllScope(false);
+      writeParams({ repo: r, scope: "" });
+      return;
+    }
+    if (allScope) return;
+    if (dirty) {
+      const ok = await confirm({
+        title: "Leave without saving?",
+        message: `Your changes to ${repo} are not saved yet. Switching to All repositories drops them.`,
+        confirmLabel: "Drop changes",
+        cancelLabel: "Keep editing",
+        destructive: true,
+      });
+      if (ok !== "primary") return;
+      form.discard();
+    }
+    setAllScope(true);
+    writeParams({ scope: "all", section: "" });
   };
 
   const save = async () => {
@@ -406,10 +448,10 @@ function ReviewerConfigPage() {
   const state = stateOf(cfg);
 
   const repoReady = !!repo && !loading && !loadFailed;
-  const viewTitle = view === "standards" ? "Every repository" : view === "stale" ? "Stale pull requests" : SECTIONS.find((s) => s.id === view)?.title ?? "";
+  const viewTitle = SECTIONS.find((s) => s.id === view)?.title ?? "";
   // The tabs keep the repo, so each one opens the same repo's section and can be shared.
   const tabHref = (id: View) => {
-    const q = new URLSearchParams({ ...(repo ? { repo } : {}), ...(id === "reviews" ? {} : { section: id }) }).toString();
+    const q = new URLSearchParams({ ...(repo && !allScope ? { repo } : {}), ...(id === "reviews" ? {} : { section: id }) }).toString();
     return q ? `/reviewer/config?${q}` : "/reviewer/config";
   };
   // A dot on a tab with unsaved edits, as the save bar counts them. The
@@ -435,27 +477,33 @@ function ReviewerConfigPage() {
     <Page>
       <PageHeader
         title="Reviewer settings"
-        lead="What the pull request reviewer does, set one repository at a time. A new repository starts with everything off."
-        actions={
-          // Not one repo's settings, so they open from the header, as Tests opens its setup and settings.
-          <>
-            <Link href={tabHref("standards")} aria-current={view === "standards" ? "page" : undefined} className={secondaryButton}>
-              Every repository
-              {orgDirty && <span aria-label="unsaved" className="ml-2 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />}
-            </Link>
-            <Link href={tabHref("stale")} aria-current={view === "stale" ? "page" : undefined} className={secondaryButton}>
-              Stale pull requests
-            </Link>
-          </>
-        }
+        lead="What the pull request reviewer does. The review standards apply to all repositories; everything else is set one repository at a time, and a new repository starts with everything off."
       />
 
-      <ReviewInSetup repo={repo} available={setupMarks.available && !!repo} />
+      <div className="mt-6">
+        <SettingsScope
+          repos={repos}
+          value={allScope ? "" : repo}
+          onChange={pickScope}
+          after={
+            allScope ? (
+              orgDirty ? <span aria-label="unsaved" className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" /> : null
+            ) : repoReady ? (
+              <>
+                <StatusText look={state} />
+                <ScopeBadge state="per-repo" />
+              </>
+            ) : null
+          }
+        />
+      </div>
 
-      <Tabs label="Settings sections" value={view} items={tabs} />
+      {!allScope && <ReviewInSetup repo={repo} available={setupMarks.available && !!repo} />}
+
+      {!allScope && <Tabs label="Settings sections" value={view} items={tabs} />}
 
       <div className="mt-6 min-w-0">
-        <div className="min-w-0" data-testid="reviewer-config-view" data-view={view}>
+        <div className="min-w-0" data-testid="reviewer-config-view" data-view={allScope ? "all" : view}>
           {readOnly && (
             <div className="mb-4">
               <Callout variant="neutral" title="You can view these settings">
@@ -463,7 +511,8 @@ function ReviewerConfigPage() {
               </Callout>
             </div>
           )}
-          {view === "standards" ? (
+          {allScope ? (
+            <>
             <StandardsSection
               state={orgState}
               value={orgInstructions}
@@ -475,36 +524,18 @@ function ReviewerConfigPage() {
               dirty={orgDirty}
               readOnly={readOnly}
             />
-          ) : view === "stale" ? (
-            <>
-              <div className="flex min-w-0 flex-col gap-2 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4 sm:flex-row sm:items-center sm:gap-4">
-                <span aria-hidden="true" className="shrink-0 text-sm font-medium text-zinc-300">Repository</span>
-                <div className="min-w-0 sm:w-96">
-                  <RepoCombobox id="rc-repo" repos={repos} selected={repo} onSelect={selectRepo} placeholder="Choose a repository" className="" />
-                </div>
-              </div>
-              <StaleSection repo={repo} readOnly={readOnly} />
+            <p className="mt-6 max-w-prose text-sm text-zinc-400" data-testid="per-repo-note">
+              Reviews, tests, CI labels, auto-merge, tags, release notes and reminders are set per repository: pick one under Settings for. Stale
+              pull requests have their own settings on the{" "}
+              <Link href="/reviewer/stale?view=settings" className={linkButton}>
+                Stale PRs
+              </Link>{" "}
+              tab.
+            </p>
             </>
           ) : (
             <>
-              {/* Repository switcher: the one choice a repo section depends on. */}
-              <div className="flex min-w-0 flex-col gap-2 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4 sm:flex-row sm:items-center sm:gap-4">
-                {/* The picker says "Repository: <name>" itself; this is the visible caption. */}
-                <span aria-hidden="true" className="shrink-0 text-sm font-medium text-zinc-300">Repository</span>
-                <div className="min-w-0 sm:w-96">
-                  <RepoCombobox id="rc-repo" repos={repos} selected={repo} onSelect={selectRepo} placeholder="Choose a repository" className="" />
-                </div>
-                {repoReady && <StatusText look={state} />}
-              </div>
-
-              {!repo ? (
-                <div className="mt-6">
-                  <EmptyState title="Choose a repository">
-                    Choose a repository to see what the reviewer does there and change it. The review standards under Every repository apply to all
-                    of them.
-                  </EmptyState>
-                </div>
-              ) : loading ? (
+              {!repo ? null : loading ? (
                 <div className="mt-6 space-y-4" aria-busy="true" aria-label="Loading settings">
                   <Skeleton className="h-28 w-full" />
                   <Skeleton className="h-40 w-full" />
@@ -530,6 +561,12 @@ function ReviewerConfigPage() {
                           </li>
                         ))}
                       </ul>
+                      <p className="mt-3 border-t border-zinc-800 pt-3 text-sm text-zinc-400" data-testid="standards-also-apply">
+                        The review standards for all repositories also apply here.{" "}
+                        <button type="button" onClick={() => pickScope("")} className={`${linkButton} !text-sm`}>
+                          Edit them
+                        </button>
+                      </p>
                     </section>
                   )}
 
@@ -1083,7 +1120,7 @@ function StandardsSection({
 }) {
   return (
     <section id="standards" aria-labelledby="standards-heading" className="min-w-0">
-      <h2 id="standards-heading" className="text-sm font-semibold text-zinc-100">Every repository</h2>
+      <h2 id="standards-heading" className="text-sm font-semibold text-zinc-100">All repositories</h2>
       <p className="mt-1 max-w-prose text-sm text-zinc-400">Shared by all of your repos and saved here, separately from each repo&apos;s own settings.</p>
       <div className="mt-3 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
         <div className="flex flex-wrap items-center gap-2">
@@ -1119,7 +1156,7 @@ function StandardsSection({
         <SaveBar
           persistent
           count={dirty ? 1 : 0}
-          context="every repository"
+          context="all repositories"
           onSave={onSave}
           onDiscard={onDiscard}
           saving={saving}

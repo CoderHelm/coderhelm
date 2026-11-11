@@ -292,6 +292,27 @@ function skillItem(path: string) {
   };
 }
 
+// ---- Stale pull requests --------------------------------------------------
+
+const STALE_CONFIG = {
+  enabled: true, stale_days: 21, close_days: 7, label: `stale-${TOKEN}`, warn_message: SENTENCE, close_message: SENTENCE,
+  exempt_labels: ["keep-open", TOKEN], exempt_drafts: true, exempt_authors: [`${TOKEN}[bot]`], scope: "all", delete_branch: false,
+  max_closes_per_run: 10, dry_run: true,
+};
+
+function stalePlan(repo: string, n: number) {
+  const now = Date.now();
+  const at = (days: number) => new Date(now + days * 86_400_000).toISOString();
+  return {
+    repo, computed_at: at(-0.1), dry_run: true, enabled: true, stopped: n ? "" : SENTENCE,
+    items: ["wait", "mark", "close", "exempt"].map((action, i) => ({
+      pr: 12345 + n * 10 + i, title: TITLE, author: `${TOKEN}-author`, url: `${PR_URL}${i}`, action, why: SENTENCE,
+      last_activity: at(-30 - i), last_what: `a comment by ${TOKEN}`, next_at: action === "exempt" ? "" : at(i + 1),
+      repo, days_quiet: 30 + i, closes_at: action === "exempt" ? null : at(i + 1),
+    })),
+  };
+}
+
 // ---- Handler ---------------------------------------------------------------
 
 export const reviewData: Handler = ({ method, path, url }) => {
@@ -322,6 +343,16 @@ export const reviewData: Handler = ({ method, path, url }) => {
         { at: iso(28), text: `${TITLE} ${TOKEN}`, detail: [FILE, FILE_2, LONG_URL, TOKEN].join("\n") },
         { at: iso(20), text: "Posted the review: 12 findings", detail: SENTENCE },
       ],
+    };
+  }
+  if (path === "/api/reviewer/stale/config") return { team: STALE_CONFIG, team_saved: true, repo: null, effective: STALE_CONFIG, defaults: STALE_CONFIG };
+  if (path === "/api/reviewer/stale") {
+    const plans = [stalePlan(REPO, 0), stalePlan(REPO_2, 1)];
+    return {
+      plan: url.searchParams.get("repo") ? plans[0] : null,
+      plans,
+      log: [0, 1, 2].map((i) => ({ at: iso(DAY * (i + 1)), repo: i % 2 ? REPO_2 : REPO, pr: 12300 + i, action: "closed", title: TITLE, url: `${PR_URL}${i}`, author: `${TOKEN}-author`, why: SENTENCE, by: "Coderhelm", run_id: i ? "" : "run-1" })),
+      kept_open: [{ repo: REPO, pr: 12399, title: TITLE, url: PR_URL, by: EMAIL, via: "comment", at: iso(DAY) }],
     };
   }
   if (path === "/api/reviewer/org-config") return { instructions: NOTES, web_domains: ["staging.web-platform-frontend-monorepo.example.com", LONG_URL] };

@@ -1,20 +1,20 @@
 "use client";
 
-// Stale pull requests: settings for every repository, a repository's own
-// settings, the plan (what Coderhelm marks or closes next) and what it did.
-// The rules live in coderhelm-platform's common::stale_prs.
+// Stale pull request settings, the Settings view of the Stale PRs page
+// (/reviewer/stale?view=settings): the settings for all repositories, or one
+// repository's, picked with the page's "Settings for" control. A repository
+// inherits the team's settings until it is given its own. The rules live in
+// coderhelm-platform's common::stale_prs.
 
-import { useCallback, useEffect, useState } from "react";
-import { api, type StaleActivity, type StaleConfig, type StaleConfigView, type StalePlanItem } from "@/lib/api";
+import { useEffect, useState } from "react";
+import { api, type StaleConfig, type StaleConfigView } from "@/lib/api";
 import { useToast } from "@/components/toast";
-import { Callout } from "@/components/callout";
 import { Skeleton } from "@/components/skeleton";
-import { Segmented } from "@/components/segmented";
 import { Problem } from "@/components/problem";
-import { EmptyState } from "@/components/empty-state";
-import { linkButton, monoInputClass, secondaryButton } from "@/components/ui";
-import { Code, Field, SaveBar, SettingsRow, SettingsSection, Switch, useDirtyForm } from "@/components/settings";
-import { ReviewInSetup, useSetupMarks } from "@/components/setup-marks";
+import { monoInputClass } from "@/components/ui";
+import { ScopeBadge } from "@/components/settings-scope";
+import { Field, SaveBar, SettingsRow, SettingsSection, Switch, useDirtyForm } from "@/components/settings";
+import { useSetupMarks } from "@/components/setup-marks";
 
 export const STALE_DEFAULTS: StaleConfig = {
   enabled: false,
@@ -43,28 +43,6 @@ const list = (s: string) =>
     .map((x) => x.trim())
     .filter(Boolean);
 
-const day = (iso?: string) => {
-  if (!iso) return "";
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-};
-
-const ACTION_WORD: Record<StalePlanItem["action"], string> = {
-  mark: "Marks stale",
-  close: "Closes",
-  unmark: "Un-stales",
-  wait: "Marked stale",
-  exempt: "Kept open",
-};
-
-const LOG_WORD: Record<string, string> = {
-  marked: "Marked stale",
-  closed: "Closed",
-  unstaled: "Un-staled",
-  kept_open: "Kept open",
-  allowed_to_close: "Allowed to close",
-};
-
 /** One sentence: what the cleanup does with these settings. */
 export function staleSummary(c: StaleConfig): string {
   if (!c.enabled) return "Off. Coderhelm never marks or closes pull requests here.";
@@ -73,21 +51,18 @@ export function staleSummary(c: StaleConfig): string {
   return c.dry_run ? `Dry run: shows what it would do and changes nothing. ${base}` : base;
 }
 
-export function StaleSection({ repo, readOnly }: { repo: string; readOnly: boolean }) {
+/** The settings for all repositories (no repo), or one repository's. `onSaved` runs after a save. */
+export function StaleSection({ repo, readOnly, onSaved }: { repo: string; readOnly: boolean; onSaved?: () => void }) {
   const { toast } = useToast();
   const [view, setView] = useState<StaleConfigView | null>(null);
   const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
-  const [target, setTarget] = useState<Target>(repo ? "repo" : "team");
+  const target: Target = repo ? "repo" : "team";
   const [saving, setSaving] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
   const form = useDirtyForm<Form>({ ...STALE_DEFAULTS, own: false }, { disabled: loadState !== "ready" });
   const setupMarks = useSetupMarks(repo || null);
   const { values: f, set, reset } = form;
-
-  useEffect(() => {
-    if (!repo) setTarget("team");
-  }, [repo]);
 
   useEffect(() => {
     let current = true;
@@ -114,6 +89,8 @@ export function StaleSection({ repo, readOnly }: { repo: string; readOnly: boole
   }, [view, target, reset]);
 
   const editing = target === "team" || f.own;
+  // A repository that inherits shows the team's values, read only.
+  const v: Form = editing || !view ? f : { ...view.team, own: false };
 
   const save = async () => {
     const { own, ...cfg } = f;
@@ -128,6 +105,7 @@ export function StaleSection({ repo, readOnly }: { repo: string; readOnly: boole
       else await api.saveStaleConfig(own ? cfg : null, repo);
       toast("Stale pull request settings saved");
       setReload((k) => k + 1);
+      onSaved?.();
     } catch (e) {
       const msg = e instanceof Error && /\b403\b/.test(e.message) ? "Only admins can change these settings." : "Could not save. Try again.";
       setProblem(msg);
@@ -146,7 +124,7 @@ export function StaleSection({ repo, readOnly }: { repo: string; readOnly: boole
       type="number"
       min={1}
       max={max}
-      value={f[key]}
+      value={v[key]}
       onChange={(e) => set(key, Math.max(1, Math.min(max, Number(e.target.value) || 1)))}
       controlClassName="sm:w-32"
       data-testid={`stale-${key}`}
@@ -154,23 +132,10 @@ export function StaleSection({ repo, readOnly }: { repo: string; readOnly: boole
   );
 
   return (
-    <section id="stale" aria-labelledby="stale-heading" className="mt-6 min-w-0" data-testid="stale-section">
-      <h2 id="stale-heading" className="text-sm font-semibold text-zinc-100">Stale pull requests</h2>
-      <p className="mt-1 max-w-prose text-sm text-zinc-400">
-        Coderhelm marks pull requests nobody has touched for a while, warns on them, and closes them after a grace period if nothing happens.
-        Coderhelm&apos;s own comments and other bots never count as activity. Nothing is lost: closing keeps the branch, and reopening picks it back up.
-      </p>
-
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        <Segmented<Target>
-          label="Settings for"
-          value={target}
-          onChange={setTarget}
-          options={[{ value: "team" as Target, label: "Every repository" }, ...(repo ? [{ value: "repo" as Target, label: `Only ${repo}` }] : [])]}
-        />
-        {!repo && <span className="text-sm text-zinc-400">Choose a repository above to give it its own settings or see its pull requests.</span>}
-      </div>
-
+    <section id="stale" aria-labelledby="stale-heading" className="min-w-0" data-testid="stale-section">
+      <h2 id="stale-heading" className="sr-only">
+        Stale pull request settings
+      </h2>
       {loadState === "loading" ? (
         <div className="mt-4 space-y-3" aria-busy="true" aria-label="Loading stale pull request settings">
           <Skeleton className="h-24 w-full" />
@@ -184,42 +149,40 @@ export function StaleSection({ repo, readOnly }: { repo: string; readOnly: boole
         </div>
       ) : (
         <>
+          {target === "repo" && (
+            <div className="mt-4">
+              <ScopeBadge
+                state={f.own ? "overridden" : "inherited"}
+                onOverride={() => set("own", true)}
+                onReset={() => set("own", false)}
+                disabled={readOnly}
+              />
+            </div>
+          )}
           <p className="mt-4 text-sm text-zinc-300" data-testid="stale-summary">
-            {target === "repo" && !f.own ? `${repo} follows the settings for every repository. ` : ""}
+            {target === "repo" && !f.own ? `${repo} uses the settings for all repositories. ` : ""}
             {staleSummary(effective)}
           </p>
-          <fieldset disabled={readOnly} className="mt-4 min-w-0">
+          <fieldset disabled={readOnly || !editing} className={`mt-4 min-w-0 ${editing ? "" : "opacity-60"}`} data-inherited={editing ? undefined : "true"}>
             <legend className="sr-only">Stale pull request settings</legend>
-            <SettingsSection id="stale-settings" title={target === "team" ? "Every repository" : repo}>
-              {target === "repo" && (
-                <SettingsRow
-                  label="Use its own settings"
-                  help="Off: this repository follows the settings for every repository."
-                  unsaved={form.isDirty("own")}
-                  layout="toggle"
-                  control={({ labelId, helpId, inputId }) => (
-                    <Switch id={inputId} checked={f.own} onChange={(v) => set("own", v)} labelledBy={labelId} describedBy={helpId} testId="stale-own" />
-                  )}
-                />
-              )}
-              {editing && (
-                <>
+            <SettingsSection id="stale-settings" title={target === "team" ? "All repositories" : repo}>
+              <>
                   <SettingsRow
                     label="Close stale pull requests"
                     help="Only on repositories the reviewer is on for. Off by default."
                     unsaved={form.isDirty("enabled")} setup={setupMarks.mark(["stale_prs.enabled"], form.values.enabled)}
                     layout="toggle"
                     control={({ labelId, helpId, inputId }) => (
-                      <Switch id={inputId} checked={f.enabled} onChange={(v) => set("enabled", v)} labelledBy={labelId} describedBy={helpId} testId="stale-enabled" />
+                      <Switch id={inputId} checked={v.enabled} onChange={(v) => set("enabled", v)} labelledBy={labelId} describedBy={helpId} testId="stale-enabled" />
                     )}
                   />
                   <SettingsRow
                     label="Dry run"
-                    help="Shows what would be marked and closed below, and changes nothing on GitHub. Turn it off once the list looks right."
+                    help="Lists what would be marked and closed under Would mark or close, and changes nothing on GitHub. Turn it off once the list looks right."
                     unsaved={form.isDirty("dry_run")} setup={setupMarks.mark(["stale_prs.dry_run"], form.values.dry_run)}
                     layout="toggle"
                     control={({ labelId, helpId, inputId }) => (
-                      <Switch id={inputId} checked={f.dry_run} onChange={(v) => set("dry_run", v)} labelledBy={labelId} describedBy={helpId} testId="stale-dry-run" />
+                      <Switch id={inputId} checked={v.dry_run} onChange={(v) => set("dry_run", v)} labelledBy={labelId} describedBy={helpId} testId="stale-dry-run" />
                     )}
                   />
                   <SettingsRow
@@ -243,7 +206,7 @@ export function StaleSection({ repo, readOnly }: { repo: string; readOnly: boole
                         as="select"
                         id={inputId}
                         label={<span className="sr-only">Which pull requests</span>}
-                        value={f.scope}
+                        value={v.scope}
                         onChange={(v) => set("scope", v as StaleConfig["scope"])}
                         options={[
                           { value: "all", label: "Every pull request" },
@@ -263,7 +226,7 @@ export function StaleSection({ repo, readOnly }: { repo: string; readOnly: boole
                           help="Comma separated."
                           mono
                           unsaved={form.isDirty("exempt_labels")}
-                          value={f.exempt_labels.join(", ")}
+                          value={v.exempt_labels.join(", ")}
                           onChange={(e) => set("exempt_labels", list(e.target.value))}
                           data-testid="stale-exempt-labels"
                         />
@@ -272,12 +235,12 @@ export function StaleSection({ repo, readOnly }: { repo: string; readOnly: boole
                           help="GitHub logins, comma separated. Bots too, like renovate[bot]."
                           mono
                           unsaved={form.isDirty("exempt_authors")}
-                          value={f.exempt_authors.join(", ")}
+                          value={v.exempt_authors.join(", ")}
                           onChange={(e) => set("exempt_authors", list(e.target.value))}
                           data-testid="stale-exempt-authors"
                         />
                         <label className="flex items-center gap-3 text-sm text-zinc-200">
-                          <Switch checked={f.exempt_drafts} onChange={(v) => set("exempt_drafts", v)} label="Never mark drafts" testId="stale-exempt-drafts" />
+                          <Switch checked={v.exempt_drafts} onChange={(v) => set("exempt_drafts", v)} label="Never mark drafts" testId="stale-exempt-drafts" />
                           Never mark drafts
                         </label>
                       </div>
@@ -293,7 +256,7 @@ export function StaleSection({ repo, readOnly }: { repo: string; readOnly: boole
                         id={inputId}
                         aria-describedby={helpId}
                         className={`${monoInputClass} w-full`}
-                        value={f.label}
+                        value={v.label}
                         maxLength={50}
                         onChange={(e) => set("label", e.target.value)}
                         data-testid="stale-label"
@@ -306,7 +269,7 @@ export function StaleSection({ repo, readOnly }: { repo: string; readOnly: boole
                     unsaved={form.isDirty("delete_branch")}
                     layout="toggle"
                     control={({ labelId, helpId, inputId }) => (
-                      <Switch id={inputId} checked={f.delete_branch} onChange={(v) => set("delete_branch", v)} labelledBy={labelId} describedBy={helpId} testId="stale-delete-branch" />
+                      <Switch id={inputId} checked={v.delete_branch} onChange={(v) => set("delete_branch", v)} labelledBy={labelId} describedBy={helpId} testId="stale-delete-branch" />
                     )}
                   />
                   <SettingsRow
@@ -320,7 +283,7 @@ export function StaleSection({ repo, readOnly }: { repo: string; readOnly: boole
                           label="Warning"
                           rows={3}
                           unsaved={form.isDirty("warn_message")}
-                          value={f.warn_message}
+                          value={v.warn_message}
                           onChange={(e) => set("warn_message", e.target.value)}
                           placeholder={view?.defaults.warn_message}
                           data-testid="stale-warn-message"
@@ -330,7 +293,7 @@ export function StaleSection({ repo, readOnly }: { repo: string; readOnly: boole
                           label="When closing"
                           rows={3}
                           unsaved={form.isDirty("close_message")}
-                          value={f.close_message}
+                          value={v.close_message}
                           onChange={(e) => set("close_message", e.target.value)}
                           placeholder={view?.defaults.close_message}
                           data-testid="stale-close-message"
@@ -338,15 +301,14 @@ export function StaleSection({ repo, readOnly }: { repo: string; readOnly: boole
                       </div>
                     )}
                   />
-                </>
-              )}
+              </>
             </SettingsSection>
           </fieldset>
           {!readOnly && (
             <SaveBar
               persistent
               count={form.count}
-              context={target === "team" ? "every repository" : repo}
+              context={target === "team" ? "all repositories" : repo}
               problem={problem}
               onSave={save}
               onDiscard={() => {
@@ -361,171 +323,6 @@ export function StaleSection({ repo, readOnly }: { repo: string; readOnly: boole
         </>
       )}
 
-      {repo && <StaleActivityPanel repo={repo} readOnly={readOnly} />}
     </section>
-  );
-}
-
-function StaleActivityPanel({ repo, readOnly }: { repo: string; readOnly: boolean }) {
-  const { toast } = useToast();
-  const [data, setData] = useState<StaleActivity | null>(null);
-  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
-  const [busy, setBusy] = useState<number | "preview" | null>(null);
-
-  const load = useCallback(() => {
-    setState("loading");
-    api
-      .getStaleActivity(repo)
-      .then((d) => {
-        setData(d);
-        setState("ready");
-      })
-      .catch(() => setState("error"));
-  }, [repo]);
-  useEffect(load, [load]);
-
-  const preview = async () => {
-    setBusy("preview");
-    try {
-      await api.previewStale(repo);
-      toast("Checking now. The list updates in a minute or two.");
-      window.setTimeout(load, 20_000);
-    } catch {
-      toast("Could not start the check. Try again.", "error");
-    }
-    setBusy(null);
-  };
-
-  const keep = async (pr: number, value: boolean, title: string, url: string) => {
-    setBusy(pr);
-    try {
-      await api.setStaleKeepOpen(repo, pr, value, title, url);
-      toast(value ? `#${pr} stays open` : `#${pr} can be closed again`);
-      load();
-    } catch {
-      toast("Could not change it. Try again.", "error");
-    }
-    setBusy(null);
-  };
-
-  const plan = data?.plan;
-  const kept = new Set((data?.kept_open ?? []).map((k) => k.pr));
-  const items = (plan?.items ?? []).filter((i) => i.action !== "exempt" || !kept.has(i.pr));
-
-  return (
-    <div className="mt-8 min-w-0 space-y-6" data-testid="stale-activity">
-      <div className="rounded-lg border border-zinc-800 bg-zinc-900/40">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800 px-4 py-3">
-          <div className="min-w-0">
-            <h3 className="text-sm font-semibold text-zinc-100">Pull requests on {repo}</h3>
-            <p className="mt-0.5 text-sm text-zinc-400">
-              {plan
-                ? `${plan.dry_run ? "Preview, nothing changed. " : ""}Checked ${day(plan.computed_at)}.${plan.stopped ? ` Stopped early: ${plan.stopped}.` : ""}`
-                : "Not checked yet. Checking reads GitHub and changes nothing."}
-            </p>
-          </div>
-          <button type="button" className={secondaryButton} onClick={preview} disabled={busy === "preview"} data-testid="stale-preview">
-            {busy === "preview" ? "Starting…" : "Check now"}
-          </button>
-        </div>
-        {state === "loading" ? (
-          <div className="p-4">
-            <Skeleton className="h-20 w-full" />
-          </div>
-        ) : state === "error" ? (
-          <div className="p-4">
-            <Problem title="Could not load the pull requests" onRetry={load}>
-              Try again.
-            </Problem>
-          </div>
-        ) : items.length === 0 ? (
-          <div className="p-4">
-            <EmptyState title="Nothing to mark or close">No open pull request has gone quiet long enough.</EmptyState>
-          </div>
-        ) : (
-          <ul className="divide-y divide-zinc-800" data-testid="stale-plan">
-            {items.map((i) => (
-              <li key={i.pr} className="flex min-w-0 flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between" data-testid={`stale-plan-${i.pr}`}>
-                <div className="min-w-0">
-                  <p className="min-w-0 text-sm text-zinc-100">
-                    <span className={`mr-2 text-xs font-medium ${i.action === "close" ? "text-red-300" : i.action === "mark" || i.action === "wait" ? "text-amber-300" : "text-zinc-400"}`}>
-                      {ACTION_WORD[i.action]}
-                      {i.action === "wait" && i.next_at ? `, closes ${day(i.next_at)}` : ""}
-                      {i.action === "mark" && i.next_at ? `, would close ${day(i.next_at)}` : ""}
-                    </span>
-                    <a href={i.url} target="_blank" rel="noreferrer" className={linkButton}>
-                      <span className="wrap-anywhere">#{i.pr} {i.title}</span>
-                    </a>
-                  </p>
-                  <p className="mt-0.5 text-xs text-zinc-400">
-                    {i.author ? `${i.author} · ` : ""}last activity {day(i.last_activity)} ({i.last_what}) · {i.why}
-                  </p>
-                </div>
-                {!readOnly && i.action !== "exempt" && i.action !== "unmark" && (
-                  <button type="button" className={`${secondaryButton} shrink-0`} disabled={busy === i.pr} onClick={() => keep(i.pr, true, i.title, i.url)}>
-                    Keep open
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      {!!data?.kept_open.length && (
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/40">
-          <h3 className="border-b border-zinc-800 px-4 py-3 text-sm font-semibold text-zinc-100">Kept open</h3>
-          <ul className="divide-y divide-zinc-800" data-testid="stale-kept">
-            {data.kept_open.map((k) => (
-              <li key={k.pr} className="flex min-w-0 flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                <p className="min-w-0 text-sm text-zinc-200">
-                  <a href={k.url} target="_blank" rel="noreferrer" className={linkButton}>
-                    <span className="wrap-anywhere">#{k.pr} {k.title}</span>
-                  </a>
-                  <span className="ml-2 text-xs text-zinc-400">
-                    by {k.by}
-                    {k.via === "comment" ? " (comment)" : ""} · {day(k.at)}
-                  </span>
-                </p>
-                {!readOnly && (
-                  <button type="button" className={`${secondaryButton} shrink-0`} disabled={busy === k.pr} onClick={() => keep(k.pr, false, k.title, k.url)}>
-                    Allow closing
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      <div className="rounded-lg border border-zinc-800 bg-zinc-900/40">
-        <h3 className="border-b border-zinc-800 px-4 py-3 text-sm font-semibold text-zinc-100">What Coderhelm did</h3>
-        {!data?.log.length ? (
-          <p className="px-4 py-3 text-sm text-zinc-400">Nothing yet. Every pull request marked, closed, un-staled or kept open shows here.</p>
-        ) : (
-          <ul className="divide-y divide-zinc-800" data-testid="stale-log">
-            {data.log.map((e) => (
-              <li key={`${e.at}-${e.pr}-${e.action}`} className="min-w-0 px-4 py-3 text-sm">
-                <p className="min-w-0 text-zinc-200">
-                  <span className="mr-2 text-xs font-medium text-zinc-400">{LOG_WORD[e.action] ?? e.action}</span>
-                  <a href={e.url} target="_blank" rel="noreferrer" className={linkButton}>
-                    <span className="wrap-anywhere">#{e.pr} {e.title}</span>
-                  </a>
-                </p>
-                <p className="mt-0.5 text-xs text-zinc-400">
-                  {day(e.at)} · {e.why}
-                  {e.run_id ? " · its run was closed" : ""}
-                </p>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-      <Callout variant="neutral" title="Keep one open from GitHub">
-        <p>
-          Comment <Code>@coderhelm keep open</Code> on the pull request, push a commit, or remove the stale label.
-        </p>
-      </Callout>
-    </div>
   );
 }
