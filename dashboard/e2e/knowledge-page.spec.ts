@@ -21,6 +21,7 @@ async function noSideways(page: Page) {
 
 async function shot(page: Page, name: string) {
   fs.mkdirSync(SHOTS, { recursive: true });
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.waitForTimeout(150);
   await page.screenshot({ path: path.join(SHOTS, `${name}.png`), fullPage: true });
 }
@@ -214,4 +215,69 @@ test.describe("knowledge base page", () => {
       await shot(page, `${state.replace("_", "-")}-400`);
     });
   }
+});
+
+test.describe("knowledge base page: sync history and reading pages again", () => {
+  test("each sync is a row; quiet ones fold; one with problems opens to each item and its fix", async ({ page }) => {
+    const db = newBackend("healthy");
+    await mockKnowledge(page, db);
+    await page.goto("/knowledge/base/?id=kb_dw");
+    const history = page.getByTestId("history");
+    await expect(history.getByTestId("history-row")).toHaveCount(3);
+    await expect(history.getByTestId("history-quiet")).toContainText("3 checks, nothing changed");
+    const first = history.getByTestId("history-row").first();
+    await expect(first).toContainText("Schedule");
+    await expect(first).toContainText("41 s");
+    await expect(first).toContainText("Done");
+    await expect(first).toContainText("3 updated");
+    const big = history.locator('[data-testid="history-row"][data-result="problems"]');
+    await expect(big).toContainText("Done with problems");
+    await expect(big).toContainText("410 added · 1 couldn't read · 1 skipped");
+    await big.getByTestId("history-open").click();
+    const problems = history.getByTestId("history-problem");
+    await expect(problems).toHaveCount(2);
+    await expect(problems.first()).toContainText("Upload a version with selectable text");
+    await expect(problems.first().getByRole("link")).toHaveAttribute("href", /atlassian/);
+    // One source at a time.
+    await history.getByRole("button", { name: "Engineering wiki" }).click();
+    await expect.poll(() => db.calls.some((c) => c.includes("/runs?source=src_notion"))).toBe(true);
+    await expect(history.getByTestId("history-row")).toHaveCount(1);
+    await expect(history.getByTestId("history-row")).toContainText("Change event");
+    await shot(page, "history-1280");
+  });
+
+  test("a stopped sync says why and what fixes it", async ({ page }) => {
+    const db = newBackend("error");
+    await mockKnowledge(page, db);
+    await page.goto("/knowledge/base/?id=kb_dw");
+    const stopped = page.locator('[data-testid="history-row"][data-result="stopped"]');
+    await expect(stopped).toContainText("Stopped");
+    await stopped.getByTestId("history-open").click();
+    await expect(page.getByTestId("history-detail")).toContainText("Reconnect Confluence to sign in again.");
+  });
+
+  test("pages that couldn't be read or were skipped can be read again", async ({ page }) => {
+    const db = newBackend("healthy");
+    await mockKnowledge(page, db);
+    await page.goto("/knowledge/base/?id=kb_dw");
+    await page.getByTestId("filter-skipped").click();
+    await expect(page.getByTestId("item-row")).toHaveCount(1);
+    await expect(page.getByTestId("item-row")).toContainText("It has no text to read");
+    await page.getByTestId("item-pick").check();
+    await page.getByTestId("retry-picked").click();
+    await expect.poll(() => db.calls.includes("POST /api/knowledge/kb_dw/sources/src_conf/retry")).toBe(true);
+    expect(db.bodies.some((b) => JSON.stringify(b.item_ids) === JSON.stringify(["i6"]))).toBe(true);
+    await expect(page.getByText("Reading 1 page again now.")).toBeVisible();
+  });
+
+  test("phone width: the history stacks and nothing scrolls sideways", async ({ page }) => {
+    await page.setViewportSize({ width: 400, height: 860 });
+    const db = newBackend("healthy");
+    await mockKnowledge(page, db);
+    await page.goto("/knowledge/base/?id=kb_dw");
+    await page.getByTestId("history-row").last().getByTestId("history-open").click();
+    await expect(page.getByTestId("history-problem")).toHaveCount(2);
+    await page.getByTestId("history").scrollIntoViewIfNeeded();
+    await noSideways(page);
+  });
 });

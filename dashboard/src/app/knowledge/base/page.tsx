@@ -15,8 +15,9 @@ import { SourceLogo } from "@/components/knowledge/logos";
 import { Picker } from "@/components/knowledge/picker";
 import { ConnectionRow, type ConnectionActions } from "@/components/knowledge/connections";
 import { Content } from "@/components/knowledge/content";
+import { History } from "@/components/knowledge/history";
 import { Access, PageNav, ProblemsBanner, StatusChip, Tiles, overallStatus } from "@/components/knowledge/base-parts";
-import { kbPage, missingRoute, type ItemState, type PageBase, type PageItem, type PageSource } from "@/lib/knowledge-page";
+import { kbHistory, kbPage, missingRoute, type ItemState, type PageBase, type PageItem, type PageSource } from "@/lib/knowledge-page";
 import { errorMessage } from "@/lib/data-sources";
 import {
   KIND_LABEL,
@@ -399,6 +400,7 @@ function BaseView() {
   const nav = [
     { id: "connections", label: "Connections" },
     { id: "content", label: "Content" },
+    { id: "history", label: "History" },
     { id: "access", label: "Access" },
   ];
   const showState = (st: ItemState | "") => {
@@ -631,9 +633,24 @@ function BaseView() {
                     replaceRef.current?.click();
                   }}
                   onDelete={removeFile}
+                  onRetry={async (sourceId, ids) => {
+                    try {
+                      const r = await kbHistory.retry(id, sourceId, ids);
+                      toast(`Reading ${r.queued} ${r.queued === 1 ? "page" : "pages"} again now.`);
+                      setSources((cur) => cur.map((x) => (x.id === sourceId ? { ...x, status: "syncing" } : x)));
+                    } catch (e) {
+                      toast(errorMessage(e, "Couldn't ask for them again."), "error");
+                    }
+                  }}
                 />
               )}
             </Section>
+
+            {sources.length > 0 && (
+              <Section title="Sync history" id="history" description="Every sync of each source: what started it, what it changed, and anything it couldn't read.">
+                <History kbId={id} sources={sources} version={version} />
+              </Section>
+            )}
           </>
         )}
 
