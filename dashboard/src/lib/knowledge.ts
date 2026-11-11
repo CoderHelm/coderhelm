@@ -4,6 +4,7 @@
 
 import { ApiError, request } from "./api";
 import type { BaseInput, KnowledgeFile, KnowledgeLimits, SignedUpload } from "./brain";
+import { suggestBaseName } from "./kb-name";
 
 export { fileSize, uploadProblem, uploadToSignedUrl } from "./brain";
 export type { BaseInput, KnowledgeLimits, SignedUpload } from "./brain";
@@ -541,15 +542,14 @@ export function fixLabel(s: Pick<Source, "error" | "kind">): string | null {
   }
 }
 
-/** A name for a knowledge base from what was picked. */
-export function suggestName(kind: AddKind, picked: { title: string }[], files: { name: string }[] = []): string {
-  if (kind === "upload") {
-    if (files.length === 1) return files[0].name.replace(/\.[^.]+$/, "");
-    return files.length ? "Team documents" : "Team documents";
-  }
-  if (picked.length === 1) return picked[0].title.slice(0, 80);
-  if (picked.length > 1) return `${picked[0].title.slice(0, 60)} and ${picked.length - 1} more`;
-  return KIND_LABEL[kind];
+/** A name for a knowledge base from what was picked (see lib/kb-name.ts for the alternatives). */
+export function suggestName(
+  kind: AddKind,
+  picked: { title: string; kind?: string; path?: string[] }[],
+  files: { name: string }[] = [],
+  taken: string[] = [],
+): string {
+  return suggestBaseName({ kind, label: KIND_LABEL[kind], picked, files, taken });
 }
 
 // ── Coming back from a sign-in ───────────────────────────────────────

@@ -7,6 +7,7 @@ import { Code } from "@/components/settings/code";
 import { Select } from "@/components/select";
 import { buttonClass, focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 import { errorMessage } from "@/lib/data-sources";
+import { distinctName, nameSuggestions } from "@/lib/kb-name";
 import {
   KB_ARN,
   KIND_LABEL,
@@ -18,7 +19,6 @@ import {
   rememberReturn,
   signInWindow,
   sourceHealth,
-  suggestName,
   uploadProblem,
   uploadToSignedUrl,
   type AddKind,
@@ -117,6 +117,7 @@ export function AddFlow({
   startWith,
   limits,
   onDone,
+  taken = [],
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -126,6 +127,8 @@ export function AddFlow({
   limits: KnowledgeLimits | null;
   /** The knowledge base that was made or added to. */
   onDone: (baseId: string) => void;
+  /** Names the team's knowledge bases already have: a suggested name differs from them. */
+  taken?: string[];
 }) {
   const [step, setStep] = useState<Step>("choose");
   const [kind, setKind] = useState<AddKind | null>(null);
@@ -313,16 +316,25 @@ export function AddFlow({
     setStep("name");
   };
 
-  /** What a new knowledge base is called until someone names it. */
-  const defaultName = (): string => {
-    if (!kind) return "";
-    if (kind === "bedrock_kb") return arnName || KIND_LABEL.bedrock_kb;
-    if (kind === "mcp") return mcp?.server.name ?? KIND_LABEL.mcp;
-    if (kind === "s3") return picked.length && picked[0].id !== WHOLE_BUCKET ? suggestName(kind, picked) : s3.bucket || KIND_LABEL.s3;
-    if (kind === "bedrock_import") return plan?.info.name ?? "Imported knowledge base";
-    if (kind === "archive") return archive ? archive.name.replace(/\.zip$/i, "") : KIND_LABEL.archive;
-    return suggestName(kind, picked, files.map((f) => f.file));
+  /** Names for a new knowledge base, best first: read from what was picked, never one the team already has. */
+  const suggestions = (): string[] => {
+    if (!kind) return [];
+    const one = (n: string) => [distinctName(n, taken, KIND_LABEL[kind])];
+    if (kind === "bedrock_kb") return one(arnName || KIND_LABEL.bedrock_kb);
+    if (kind === "mcp") return one(mcp?.server.name ?? KIND_LABEL.mcp);
+    if (kind === "s3" && (!picked.length || picked[0].id === WHOLE_BUCKET)) return one(s3.bucket || KIND_LABEL.s3);
+    if (kind === "bedrock_import") return one(plan?.info.name ?? "Imported knowledge base");
+    if (kind === "archive") return one(archive ? archive.name.replace(/\.zip$/i, "") : KIND_LABEL.archive);
+    return nameSuggestions({ kind, label: KIND_LABEL[kind], picked, files: files.map((f) => f.file), taken });
   };
+  /** What a new knowledge base is called until someone names it. */
+  const defaultName = (): string => suggestions()[0] ?? "";
+  const nameChips = step === "name" && creating ? suggestions() : [];
+  const nameInput = useRef<HTMLInputElement>(null);
+  // The suggested name arrives selected, so typing replaces it.
+  useEffect(() => {
+    if (step === "name") nameInput.current?.select();
+  }, [step]);
 
   /** The base's who-can-read settings, as the create call takes them. */
   const baseFields = (fallback: string) => ({
@@ -462,10 +474,18 @@ export function AddFlow({
     setBusy(true);
     setError(null);
     try {
-      const source = !isApp(kind) ? undefined : { kind, selection: picked, ...(via === "sign_in" ? { via: "sign_in" as const } : {}) };
+      const source = !isApp(kind)
+        ? undefined
+        : {
+            kind,
+            // The source is named like the base would be ("Data Engineering space"), not "first page and 6 more".
+            name: nameSuggestions({ kind, label: KIND_LABEL[kind], picked })[0],
+            selection: picked,
+            ...(via === "sign_in" ? { via: "sign_in" as const } : {}),
+          };
       if (mode.kind === "create") {
         const r = await knowledge.create({
-          ...baseFields(suggestName(kind, picked, files.map((f) => f.file))),
+          ...baseFields(defaultName()),
           source,
         });
         setMade({ baseId: r.base.id, sourceId: r.source?.id ?? null, setup: r.setup });
@@ -687,6 +707,7 @@ export function AddFlow({
               <label className="block">
                 <span className="mb-2 block text-sm font-medium text-zinc-300">Name</span>
                 <input
+                  ref={nameInput}
                   className={`${inputClass} !py-3 !text-lg font-semibold`}
                   value={name}
                   maxLength={80}
@@ -698,6 +719,32 @@ export function AddFlow({
                   autoFocus
                 />
               </label>
+            )}
+            {creating && nameChips.length > 1 && (
+              <div className="-mt-3 flex flex-wrap items-center gap-2" role="group" aria-label="Suggested names" data-testid="name-chips">
+                <span className="text-sm text-zinc-400">Suggestions:</span>
+                {nameChips.map((n) => {
+                  const on = name.trim() === n;
+                  return (
+                    <button
+                      key={n}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => {
+                        setName(n);
+                        setNamed(true);
+                        nameInput.current?.focus();
+                      }}
+                      className={`${focusRing} max-w-full truncate rounded-full border px-3 py-1 text-sm transition-colors ${
+                        on ? "border-sky-500/60 bg-sky-500/15 text-sky-100" : "border-zinc-700 bg-zinc-900 text-zinc-200 hover:border-zinc-500 hover:bg-zinc-800"
+                      }`}
+                      data-testid="name-chip"
+                    >
+                      {n}
+                    </button>
+                  );
+                })}
+              </div>
             )}
             {creating && (
               <div className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-4" data-testid="read-sentence">
