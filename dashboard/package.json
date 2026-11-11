@@ -19,7 +19,7 @@
     "@types/qrcode": "^1.5.6",
     "cmdk": "1.1.1",
     "mermaid": "^11.13.0",
-    "next": "^15.3.0",
+    "next": "^15.5.29",
     "qrcode": "^1.5.4",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
@@ -38,5 +38,13 @@
     "@types/react-dom": "^19.1.0",
     "tailwindcss": "^4.1.0",
     "typescript": "^5.8.0"
+  },
+  "overrides": {
+    "next": {
+      "postcss": "^8.5.32"
+    },
+    "mermaid": {
+      "katex": "^0.18.2"
+    }
   }
 }
