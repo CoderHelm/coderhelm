@@ -79,8 +79,8 @@ const DRAFT_HELD: RunLook = { label: "PR held", tone: "waiting", group: "waiting
 const DRAFT_NOT_MARKED: RunLook = { label: "PR held", tone: "attention", group: "waiting" };
 /** The pull request is held because its CI fails: named so, never "Done". */
 const CI_FAILING: RunLook = { label: "CI failing", tone: "attention", group: "waiting" };
-/** The run stopped before its planned work was done; its draft says what is left. */
-const STOPPED_UNFINISHED: RunLook = { label: "Stopped, not finished", tone: "attention", group: "waiting" };
+/** Planned work is left on the run's pull request; its draft names each item with why it was deferred. */
+const STOPPED_UNFINISHED: RunLook = { label: "Finished, work deferred", tone: "attention", group: "waiting" };
 /** Waiting on a person for something that isn't a question (`waiting_on`): reviewing the pull request, say. */
 const WAITING_ON_YOU: RunLook = { label: "Waiting on you", tone: "waiting", group: "waiting" };
 
