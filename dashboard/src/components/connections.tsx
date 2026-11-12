@@ -389,11 +389,15 @@ export function AwsAbilitiesPanel({
         )}
       </div>
       {a.install_account && (missing.length > 0 || a.permissions?.status === "update_needed") && (
-        <Callout variant="neutral" title="These read-only permissions come with the next version update" live={false}>
-          <p>Nothing is needed in AWS. Update Coderhelm and they are on the install&apos;s own role.</p>
+        <Callout
+          variant="neutral"
+          title={`${a.permissions?.missing_count || missing.length || 1} read-only permission${(a.permissions?.missing_count || missing.length || 1) === 1 ? " arrives" : "s arrive"} with the next update`}
+          live={false}
+        >
+          <p>Nothing is needed in AWS. The AWS page updates Coderhelm in one press, and the install&apos;s own role has them once it finishes.</p>
           <p className="mt-2">
-            <Link href="/settings/system#version" className={linkButton}>
-              Open Version and updates
+            <Link href={`/settings/integrations/aws#aws-account-${a.account}`} className={linkButton}>
+              Update from the AWS page
             </Link>
           </p>
         </Callout>

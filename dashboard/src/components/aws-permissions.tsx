@@ -1,13 +1,13 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type AwsConnection, type AwsPermissions } from "@/lib/api";
 import { timeAgo } from "@/lib/data-sources";
 import { Callout } from "./callout";
 import { CheckIcon, ExternalLinkIcon, WarningIcon, AlertCircleIcon } from "./icons";
-import { buttonClass, linkButton, primaryButton, secondaryButton } from "./ui";
+import { buttonClass, primaryButton, secondaryButton } from "./ui";
 import { Code } from "./settings/code";
+import { InstallNeededNow, OptionalReads, installHeader, useInstallStatus } from "./aws-install-options";
 
 // Whether each connected AWS account's read-only role has every permission
 // this release uses, checked live (IAM's policy simulator on the role, or one
@@ -115,6 +115,8 @@ export function stateLabel(s: AccountPermissions): string {
   if (!v) return s.checking ? "Checking permissions" : s.error ? "Couldn't check permissions" : "Not checked yet";
   if (v.status === "up_to_date") return "Permissions up to date";
   if (v.status === "error") return "Can't check: Coderhelm can't take on the role";
+  // The install's own account: nothing to do in AWS, its next update brings them.
+  if (v.install_account) return `${v.missing_count} permission${v.missing_count === 1 ? "" : "s"} ${v.missing_count === 1 ? "arrives" : "arrive"} with the next update`;
   return `Update needed: ${v.missing_count} new read-only permission${v.missing_count === 1 ? "" : "s"}`;
 }
 
@@ -195,6 +197,9 @@ export function PermissionsOverview({ connections, perms, canEdit }: { connectio
 export function PermissionsPanel({ account, perms, canEdit }: { account: string; perms: AwsPermissionsApi; canEdit: boolean }) {
   const s = perms.of(account);
   const v = s.view;
+  const install = !!v?.install_account;
+  // The install's own account: its version, the update in progress and its switches.
+  const status = useInstallStatus(install && canEdit);
   const checkAgain = (
     <button type="button" onClick={() => perms.check(account, !!s.pressedAt)} disabled={s.checking} className={secondaryButton}>
       {s.checking ? "Checking…" : "Check again"}
@@ -214,8 +219,23 @@ export function PermissionsPanel({ account, perms, canEdit }: { account: string;
     );
   }
 
+  // Optional reads that are off: never "needed", listed apart and collapsed.
+  // The install's own account lists every optional read with its switch (on ones too, to turn off).
+  const optionalShown = v.abilities.filter((a) => a.optional && (install || a.missing.length > 0));
+  const optional = (
+    <OptionalReads
+      groups={optionalShown}
+      account={account}
+      install={install}
+      s={install ? status : null}
+      canEdit={canEdit}
+      onPressedOutside={() => perms.pressed(account)}
+      onDone={() => perms.check(account, true)}
+    />
+  );
+
   if (v.status === "up_to_date") {
-    const total = v.abilities.reduce((n, a) => n + a.actions.length, 0);
+    const total = v.abilities.filter((a) => !a.optional).reduce((n, a) => n + a.actions.length, 0);
     return (
       <div className="flex flex-col gap-3" data-testid={`aws-perms-${account}`}>
         {s.updated && (
@@ -230,6 +250,7 @@ export function PermissionsPanel({ account, perms, canEdit }: { account: string;
             All {total} read-only permissions this release uses · checked {timeAgo(v.checked_at)}
           </p>
         </div>
+        {optional}
       </div>
     );
   }
@@ -245,102 +266,114 @@ export function PermissionsPanel({ account, perms, canEdit }: { account: string;
     );
   }
 
-  const missingGroups = v.abilities.filter((a) => a.missing.length > 0);
+  const neededGroups = v.abilities.filter((a) => !a.optional && a.missing.length > 0);
   const waiting = !!s.pressedAt && !v.problem;
+  const title = install ? installHeader(v.missing_count, status, v.problem?.code) : stateLabel(s);
   return (
-    <section
-      aria-labelledby={`aws-perms-title-${account}`}
-      className="overflow-hidden rounded-lg border border-amber-500/30 bg-amber-500/[0.04]"
-      data-testid={`aws-perms-${account}`}
-    >
-      <div className="flex flex-col gap-4 p-4 sm:p-5">
-        <div className="flex items-start gap-3">
-          <span className="mt-0.5">
-            <StateIcon s={s} />
-          </span>
-          <div className="min-w-0">
-            <h3 id={`aws-perms-title-${account}`} className="font-semibold text-zinc-100">
-              {stateLabel(s)}
-            </h3>
-            <p className="mt-1 text-sm text-zinc-300">
-              This release reads a little more from account {v.account}. Everything stays read-only: Coderhelm can list, describe and query, never change
-              anything. Until the role is updated, Coderhelm skips what needs these and keeps working with the rest.
-            </p>
-          </div>
-        </div>
-
-        {v.problem && (
-          <div className="sm:pl-8">
-            {/* The install's own account: its version update brings these, so nothing is wrong in AWS. */}
-            <Callout variant={v.install_account ? "neutral" : "error"} title={v.problem.message}>
-              <p>{v.problem.fix}</p>
-              {v.install_account && (
-                <p className="mt-2">
-                  <Link href="/settings/system#version" className={linkButton}>
-                    Open Version and updates
-                  </Link>
-                </p>
-              )}
-            </Callout>
-          </div>
-        )}
-
-        <ul className="flex flex-col gap-3 sm:pl-8">
-          {missingGroups.map((g) => (
-            <li key={g.key} className="min-w-0">
-              <p className="text-sm font-medium text-zinc-100">{g.name}</p>
-              <p className="mt-0.5 text-sm text-zinc-400">{g.why}</p>
-              <p className="mt-1.5 flex flex-wrap gap-1.5">
-                {g.missing.map((a) => (
-                  <Code key={a} className="!text-xs">
-                    {a}
-                  </Code>
-                ))}
+    <div className="flex flex-col gap-3" data-testid={`aws-perms-${account}`}>
+      <section
+        aria-labelledby={`aws-perms-title-${account}`}
+        className="overflow-hidden rounded-lg border border-amber-500/30 bg-amber-500/[0.04]"
+        data-case={install ? "install" : "account"}
+      >
+        <div className="flex flex-col gap-4 p-4 sm:p-5">
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5">
+              <StateIcon s={s} />
+            </span>
+            <div className="min-w-0">
+              <h3 id={`aws-perms-title-${account}`} className="font-semibold text-zinc-100">
+                {title}
+              </h3>
+              <p className="mt-1 text-sm text-zinc-300">
+                {install
+                  ? "This install's own account. This release reads a little more from it; everything stays read-only, and nothing is needed in AWS."
+                  : `This release reads a little more from account ${v.account}. Everything stays read-only: Coderhelm can list, describe and query, never change anything.`}{" "}
+                Until the role has it, Coderhelm skips what needs it and keeps working with the rest.
               </p>
-            </li>
-          ))}
-        </ul>
-
-        {canEdit && v.update && (
-          <div className="flex flex-col gap-3 sm:pl-8">
-            <ol className="flex list-decimal flex-col gap-1 pl-5 text-sm text-zinc-300">
-              <li>
-                Sign in to AWS account <span className="font-medium text-zinc-100">{v.update.sign_in_account}</span>, the role&apos;s account.
-              </li>
-              <li>
-                Press <span className="font-medium text-zinc-100">Update in AWS</span>, review the stack and press{" "}
-                <span className="font-medium text-zinc-100">Create stack</span>.
-              </li>
-              <li>Come back here. This page checks again by itself.</li>
-            </ol>
-            <div className="flex flex-wrap items-center gap-2">
-              <UpdateLink url={v.update.url} onPress={() => perms.pressed(account)} />
-              {checkAgain}
             </div>
-            {waiting && (
-              <p role="status" className="flex items-center gap-2 text-sm text-zinc-400">
-                <span aria-hidden="true" className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-zinc-700 border-t-zinc-300 motion-reduce:animate-none" />
-                Waiting for the update. Last checked {timeAgo(v.checked_at)}.
-              </p>
-            )}
-            <details className="text-sm text-zinc-400">
-              <summary className="cursor-pointer text-zinc-300 hover:text-zinc-100">Made the role by hand?</summary>
-              <p className="mt-2">
-                Add these actions to <Code>CoderhelmLogReader</Code>&apos;s policy instead, then press Check again. The stack is{" "}
-                <Code>{v.update.stack_name}</Code>, from <span className="[overflow-wrap:anywhere]">{v.update.template_url}</span>.
-              </p>
-              <p className="mt-2 flex flex-wrap gap-1.5">
-                {v.missing.map((m) => (
-                  <Code key={m.action} className="!text-xs">
-                    {m.action}
-                  </Code>
-                ))}
-              </p>
-            </details>
           </div>
-        )}
-        {!canEdit && <p className="text-sm text-zinc-400 sm:pl-8">An admin can update the role in one click from this page.</p>}
-      </div>
-    </section>
+
+          <div className="flex flex-col gap-3 sm:pl-8">
+            <p className="text-xs font-medium uppercase tracking-wide text-zinc-400">Needed now</p>
+            <ul className="flex flex-col gap-3" data-testid={`aws-needed-${account}`}>
+              {neededGroups.map((g) => (
+                <li key={g.key} className="min-w-0">
+                  <p className="text-sm font-medium text-zinc-100">{g.name}</p>
+                  <p className="mt-0.5 text-sm text-zinc-400">{g.why}</p>
+                  <p className="mt-1.5 flex flex-wrap gap-1.5">
+                    {g.missing.map((a) => (
+                      <Code key={a} className="!text-xs">
+                        {a}
+                      </Code>
+                    ))}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {install ? (
+            <div className="sm:pl-8">
+              {canEdit ? (
+                <InstallNeededNow s={status} problem={v.problem} onCheck={() => perms.check(account, true)} checking={s.checking} />
+              ) : (
+                <p className="text-sm text-zinc-400">An admin adds it from this card with the install&apos;s next version update.</p>
+              )}
+            </div>
+          ) : (
+            <>
+              {v.problem && (
+                <div className="sm:pl-8">
+                  <Callout variant="error" title={v.problem.message}>
+                    <p>{v.problem.fix}</p>
+                  </Callout>
+                </div>
+              )}
+              {canEdit && v.update && (
+                <div className="flex flex-col gap-3 sm:pl-8">
+                  <ol className="flex list-decimal flex-col gap-1 pl-5 text-sm text-zinc-300">
+                    <li>
+                      Sign in to AWS account <span className="font-medium text-zinc-100">{v.update.sign_in_account}</span>, the role&apos;s account.
+                    </li>
+                    <li>
+                      Press <span className="font-medium text-zinc-100">Update in AWS</span>, review the stack and press{" "}
+                      <span className="font-medium text-zinc-100">Create stack</span>.
+                    </li>
+                    <li>Come back here. This page checks again by itself.</li>
+                  </ol>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <UpdateLink url={v.update.url} onPress={() => perms.pressed(account)} />
+                    {checkAgain}
+                  </div>
+                  {waiting && (
+                    <p role="status" className="flex items-center gap-2 text-sm text-zinc-400">
+                      <span aria-hidden="true" className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-zinc-700 border-t-zinc-300 motion-reduce:animate-none" />
+                      Waiting for the update. Last checked {timeAgo(v.checked_at)}.
+                    </p>
+                  )}
+                  <details className="text-sm text-zinc-400">
+                    <summary className="cursor-pointer text-zinc-300 hover:text-zinc-100">Made the role by hand?</summary>
+                    <p className="mt-2">
+                      Add these actions to <Code>CoderhelmLogReader</Code>&apos;s policy instead, then press Check again. The stack is{" "}
+                      <Code>{v.update.stack_name}</Code>, from <span className="[overflow-wrap:anywhere]">{v.update.template_url}</span>.
+                    </p>
+                    <p className="mt-2 flex flex-wrap gap-1.5">
+                      {v.missing.map((m) => (
+                        <Code key={m.action} className="!text-xs">
+                          {m.action}
+                        </Code>
+                      ))}
+                    </p>
+                  </details>
+                </div>
+              )}
+              {!canEdit && <p className="text-sm text-zinc-400 sm:pl-8">An admin can update the role in one click from this page.</p>}
+            </>
+          )}
+        </div>
+      </section>
+      {optional}
+    </div>
   );
 }
