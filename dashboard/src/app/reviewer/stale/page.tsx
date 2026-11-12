@@ -282,7 +282,7 @@ function StalePage() {
       {configFailed && !config && (
         <div className="mt-4">
           <Problem title="Couldn't load the stale pull request settings" onRetry={reload} compact>
-            Whether cleanup is on isn't known until they load. The lists below are the last sweep of each repository.
+            {"Whether cleanup is on isn't known until they load. The lists below are the last sweep of each repository."}
           </Problem>
         </div>
       )}
