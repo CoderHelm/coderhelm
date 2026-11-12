@@ -48,8 +48,24 @@ export function isWarehouse(source: Pick<DataSource, "aws">): boolean {
 /** A REST API or OpenSearch cluster: one read with the key shows it works. */
 export const READER_CHECKS: CheckLabel[] = [{ id: "read", label: "Read with the key" }];
 
-export function checksFor(kind: DataSourceKind, warehouse = false): CheckLabel[] {
-  if (kind === "rest" || kind === "search") return READER_CHECKS;
+/** A search cluster: sign in, then read the indexes. */
+export const SEARCH_CHECKS: CheckLabel[] = [
+  { id: "sign_in", label: "Sign in to the cluster" },
+  { id: "read", label: "Read the indexes" },
+];
+
+/** A search cluster on a private network: each hop from inside the network first. */
+export const PRIVATE_NETWORK_CHECKS: CheckLabel[] = [
+  { id: "address", label: "An https address" },
+  { id: "dns", label: "Find the name inside the network" },
+  { id: "tcp", label: "Connect on the port (security groups)" },
+  { id: "tls", label: "Secure connection (TLS)" },
+  ...SEARCH_CHECKS,
+];
+
+export function checksFor(kind: DataSourceKind, warehouse = false, network = ""): CheckLabel[] {
+  if (kind === "search") return network ? PRIVATE_NETWORK_CHECKS : SEARCH_CHECKS;
+  if (kind === "rest") return READER_CHECKS;
   if (kind === "database") return warehouse ? WAREHOUSE_CHECKS : DATABASE_CHECKS;
   return kind === "logs" ? LOGS_CHECKS : CHECK_LABELS;
 }
@@ -80,8 +96,13 @@ const STEP_LABELS: Record<DataSourceKind, Record<string, string>> = {
   search: {
     reach: "Reach the cluster",
     sign_in: "Sign in to the cluster",
-    read: "Read with the key",
+    read: "Read the indexes",
     read_only: "Only reads are possible",
+    network: "Run the private network's function",
+    address: "An https address",
+    dns: "Find the name inside the network",
+    tcp: "Connect on the port (security groups)",
+    tls: "Secure connection (TLS)",
   },
 };
 

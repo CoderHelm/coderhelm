@@ -27,6 +27,7 @@ import {
 import { Page, PageHeader, Section } from "@/components/page";
 import { LogGroupPicker } from "@/components/log-group-picker";
 import { ActivityFeed } from "@/components/data-source-activity";
+import { PrivateNetworkPanel } from "@/components/private-network-panel";
 import { KindPicker } from "@/components/data-source-kinds";
 import { buttonClass, focusRing, inputClass, linkButton, monoInputClass, primaryButton, secondaryButton } from "@/components/ui";
 import { Problem, firstLine } from "@/components/problem";
@@ -422,7 +423,7 @@ function SourceFact({ label, children }: { label: string; children: ReactNode })
 
 // ── One connected source ──────────────────────────────────────────
 
-type Panel = "test" | "key" | "hidden" | "groups" | "settings" | "guide" | null;
+type Panel = "test" | "key" | "hidden" | "groups" | "settings" | "guide" | "network" | null;
 
 function SourceRow({
   source,
@@ -460,7 +461,7 @@ function SourceRow({
   const [groups, setGroups] = useState<string[]>(source.aws?.log_groups ?? []);
   const [available, setAvailable] = useState<AwsLogGroup[] | null>(null);
   const [groupsError, setGroupsError] = useState("");
-  const expected = checksFor(source.kind, isWarehouse(source));
+  const expected = checksFor(source.kind, isWarehouse(source), source.network ?? "");
   const noun = hiddenNoun(source.kind);
   const isApi = source.kind === "api";
   const isReader = source.kind === "rest" || source.kind === "search";
@@ -783,6 +784,9 @@ function SourceRow({
               {source.kind === "search" && (
                 <SourceFact label="Indexes">{source.indexes?.length ? source.indexes.join(", ") : "Every index the user sees"}</SourceFact>
               )}
+              {source.kind === "search" && (
+                <SourceFact label="Network">{source.network ? `Private network ${source.network}` : "The internet"}</SourceFact>
+              )}
               <SourceFact label="Failed or refused, last 7 days">
                 {stats === null ? (
                   "Unknown"
@@ -829,6 +833,11 @@ function SourceRow({
                   {source.kind === "rest" ? "Address and paths" : "Address and indexes"}
                 </button>
               )}
+              {source.kind === "search" && (
+                <button type="button" aria-expanded={panel === "network"} onClick={() => open("network")} className={secondaryButton}>
+                  Private network
+                </button>
+              )}
               <button
                 type="button"
                 aria-expanded={panel === "guide"}
@@ -871,6 +880,10 @@ function SourceRow({
                   </Callout>
                 )}
               </div>
+            )}
+
+            {panel === "network" && (
+              <PrivateNetworkPanel source={source} onChange={onChange} onClose={() => setPanel(null)} onTest={test} />
             )}
 
             {panel === "key" && (
