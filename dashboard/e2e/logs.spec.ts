@@ -74,12 +74,18 @@ interface Backend {
   connected: boolean;
   findings: Finding[];
   autofix: Record<string, unknown>;
+  /** Where fix PRs post (GET /api/log-findings/autofix's posts_to). */
+  postsTo: Record<string, unknown>;
+  runsToday: number;
   calls: Call[];
   /** AWS accounts whose log checks are failing (GET /api/log-findings). */
   analysis_failing?: unknown[];
 }
 
 const DEFAULT_AUTOFIX = { enabled: false, min_severity: "critical", daily_cap: 3, scope: "all", quiet_hours: null, overrides: [], enabled_at: "" };
+/** Never saved, so it follows the team's alerts channel. */
+const TEAM_CHANNEL = { mode: "team", saved: false, channels: ["Microsoft Teams", "Slack"], team_alerts: true };
+const NO_CHANNEL = { mode: "team", saved: false, channels: [], team_alerts: false };
 
 async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend> {
   const db: Backend = {
@@ -88,6 +94,8 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     connected: true,
     findings: [NEW, FIXING, SKIPPED, IGNORED].map((f) => ({ ...f })),
     autofix: { ...DEFAULT_AUTOFIX },
+    postsTo: TEAM_CHANNEL,
+    runsToday: 1,
     calls: [],
     ...init,
   };
@@ -109,7 +117,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     if (p === "/api/integrations") return json(route, { can_edit: false, items: [], migrated: 0 });
     if (p === "/api/teams") return json(route, { teams: [{ team_id: "t_1", org: "your-team", status: "active", current: true }] });
     if (p === "/api/repos") return json(route, { repos: [{ name: WEB, enabled: true, ticket_source: "github" }, { name: API, enabled: true, ticket_source: "github" }] });
-    if (p === "/api/recommendations/notify") return json(route, { notify_mode: "off", webhooks: { teams: { set: false, hint: "" }, slack: { set: false, hint: "" } } });
+    if (p === "/api/recommendations/notify") return json(route, { notify_mode: "team", saved: false, webhooks: { teams: { set: false, hint: "" }, slack: { set: false, hint: "" } } });
 
     if (p === "/api/log-findings") {
       const counts = { new: 0, acknowledged: 0, fixing: 0, fixed: 0, ignored: 0 } as Record<string, number>;
@@ -128,7 +136,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
         db.autofix = { ...sent, enabled_at: sent.enabled ? new Date().toISOString() : "" };
         return json(route, { ok: true, autofix: db.autofix });
       }
-      return json(route, { autofix: db.autofix, runs_today: 1 });
+      return json(route, { autofix: db.autofix, runs_today: db.runsToday, posts_to: db.postsTo });
     }
     const repoOf = p.match(/^\/api\/log-findings\/([^/]+)\/repo$/);
     if (repoOf) {
@@ -381,14 +389,17 @@ test("a member who isn't an admin can't remember a repo mapping", async ({ page 
 test("the automatic fix PR setting saves exactly what was chosen", async ({ page }) => {
   const db = await mockApi(page);
   await page.goto("/logs/");
-  await expect(page.getByTestId("autofix-toggle")).toContainText("Automatic fix PRs: Off");
-  await page.getByTestId("autofix-toggle").click();
+  await expect(page.getByTestId("autofix-card")).toHaveAttribute("data-state", "off");
+  await page.getByTestId("autofix-settings").click();
   const panel = page.getByTestId("autofix-panel");
   await expect(panel).toBeVisible();
 
   await panel.getByTestId("autofix-enabled").check();
-  await panel.getByRole("group", { name: "Minimum severity" }).getByRole("button", { name: "Warning and up" }).click();
-  await panel.getByLabel("Most automatic runs per day").fill("2");
+  await pickOption(panel.getByRole("combobox", { name: "Open fix PRs automatically for" }), "warning");
+  await panel.getByLabel("Most fix PRs a day").fill("2");
+  await expect(panel.getByTestId("autofix-state")).toContainText(
+    "On: warning and critical findings get a fix PR automatically, up to 2 a day, posted to Microsoft Teams and Slack. Not saved yet.",
+  );
   await panel.getByRole("checkbox", { name: "Quiet hours" }).check();
   await pickOption(panel.getByRole("combobox", { name: "Quiet hours start" }), "23");
   await pickOption(panel.getByRole("combobox", { name: "Quiet hours end" }), "7");
@@ -401,7 +412,8 @@ test("the automatic fix PR setting saves exactly what was chosen", async ({ page
   await shot(page, "logs-autofix-1280");
 
   await panel.getByTestId("autofix-save").click();
-  await expect(page.getByTestId("autofix-toggle")).toContainText("Automatic fix PRs: On");
+  await expect(page.getByTestId("autofix-card")).toHaveAttribute("data-state", "on");
+  await expect(page.getByTestId("autofix-card")).toContainText("On: warning and critical findings get a fix PR automatically");
   const put = db.calls.find((c) => c.method === "PUT" && c.path === "/api/log-findings/autofix");
   expect(put?.body).toEqual({
     enabled: true,
@@ -419,6 +431,9 @@ test("the automatic fix PR setting saves exactly what was chosen", async ({ page
 test("members see the setting but can't change it", async ({ page }) => {
   await mockApi(page, { role: "member" });
   await page.goto("/logs/?auto=1");
+  const card = page.getByTestId("autofix-card");
+  await expect(card).toContainText("Only an admin or the owner can turn them on.");
+  await expect(card.getByTestId("autofix-turn-on")).toHaveCount(0);
   const panel = page.getByTestId("autofix-panel");
   await expect(panel).toContainText("Only an admin or the owner can change these settings.");
   await expect(panel.getByTestId("autofix-enabled")).toBeDisabled();
@@ -458,12 +473,120 @@ test("phone width: no sideways scroll, actions reachable", async ({ page }) => {
   }
   expect(overflow).toBeLessThanOrEqual(0);
   await shot(page, "logs-390");
-  // On a phone the page's actions sit beside its title, in view.
-  await page.getByTestId("autofix-toggle").click();
+  // On a phone the automatic fix PR card is in view above the list.
+  await expect(page.getByTestId("autofix-card")).toBeInViewport();
+  await page.getByTestId("autofix-settings").click();
   await expect(page.getByTestId("autofix-panel")).toBeVisible();
   const overflow2 = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow2).toBeLessThanOrEqual(0);
   await shot(page, "logs-autofix-390");
+});
+
+// ── Automatic fix PRs: the card, the panel and the row hints ────────
+
+async function noSideways(page: Page) {
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+}
+
+for (const width of [1280, 390]) {
+  test.describe(`automatic fix PRs (${width})`, () => {
+    test.beforeEach(async ({ page }) => {
+      await page.setViewportSize({ width, height: width > 500 ? 900 : 844 });
+    });
+
+    test("off: the card says what turning it on does and where PRs post; Turn on saves only enabled", async ({ page }) => {
+      const db = await mockApi(page);
+      await page.goto("/logs/");
+      const card = page.getByTestId("autofix-card");
+      await expect(card).toHaveAttribute("data-state", "off");
+      await expect(card).toContainText("Automatic fix PRs are off.");
+      await expect(card).toContainText(
+        "Turn them on and Coderhelm opens a fix pull request for every critical finding, up to 3 a day, and posts it to Microsoft Teams and Slack, where production alerts post.",
+      );
+      await expect(card.getByRole("button", { name: "Turn on" })).toBeVisible();
+      await expect(card.getByRole("button", { name: "Change what counts" })).toBeVisible();
+      // The card sits above the list, under the header.
+      const cardBox = await card.boundingBox();
+      const listBox = await page.getByTestId("finding-rec_new").boundingBox();
+      expect(cardBox!.y).toBeLessThan(listBox!.y);
+      // No switch-looking button in the header any more.
+      await expect(page.getByTestId("autofix-toggle")).toHaveCount(0);
+      // A qualifying critical row says how to get one; a warning row doesn't.
+      await expect(page.getByTestId("finding-rec_new").getByTestId("autofix-hint")).toHaveText("Turn on automatic fixes");
+      await expect(page.getByTestId("finding-rec_fixing").getByTestId("autofix-hint")).toHaveCount(0);
+      await noSideways(page);
+      await shot(page, `logfix-off-${width}`);
+
+      await card.getByRole("button", { name: "Turn on" }).click();
+      await expect(card).toHaveAttribute("data-state", "on");
+      const put = db.calls.find((c) => c.method === "PUT" && c.path === "/api/log-findings/autofix");
+      expect(put?.body).toEqual({ ...DEFAULT_AUTOFIX, enabled: true, enabled_at: undefined });
+    });
+
+    test("on: one line with what qualifies, today's count, where it posts and Settings", async ({ page }) => {
+      await mockApi(page, { autofix: { ...DEFAULT_AUTOFIX, enabled: true, enabled_at: ago(40 * HOUR) }, runsToday: 1 });
+      await page.goto("/logs/");
+      const card = page.getByTestId("autofix-card");
+      await expect(card).toHaveAttribute("data-state", "on");
+      for (const part of ["On: critical findings get a fix PR automatically", "1 of 3 today", "posted to Microsoft Teams and Slack"]) {
+        await expect(card).toContainText(part);
+      }
+      await expect(card.getByRole("button", { name: "Settings" })).toBeVisible();
+      // The PR the sweep opened keeps Auto and its link; a new critical one would get one.
+      const fixing = page.getByTestId("finding-rec_fixing");
+      await expect(fixing).toContainText("Auto");
+      await expect(fixing.getByRole("link", { name: /PR #87/ })).toBeVisible();
+      await expect(page.getByTestId("finding-rec_new").getByTestId("autofix-hint")).toHaveText("Would get a fix PR automatically");
+      // The skipped one was decided: no promise.
+      await expect(page.getByTestId("finding-rec_skipped").getByTestId("autofix-hint")).toHaveCount(0);
+      await noSideways(page);
+      await shot(page, `logfix-on-${width}`);
+
+      await card.getByRole("button", { name: "Settings" }).click();
+      const panel = page.getByTestId("autofix-panel");
+      await expect(panel.getByTestId("autofix-state")).toHaveText(
+        "On: critical findings get a fix PR automatically, up to 3 a day, posted to Microsoft Teams and Slack.",
+      );
+      const posts = panel.getByTestId("autofix-posts-to");
+      await expect(posts).toHaveText("Posts to: Microsoft Teams and Slack (same as production alerts) Change");
+      await expect(posts.getByRole("link", { name: "Change where fix PRs post" })).toHaveAttribute("href", /\/settings\/alerts\/?#alert-settings/);
+      await expect(panel.getByRole("combobox", { name: "Open fix PRs automatically for" })).toContainText("Critical findings");
+      await expect(panel.getByLabel("Most fix PRs a day")).toHaveValue("3");
+      await noSideways(page);
+      await shot(page, `logfix-panel-${width}`);
+    });
+
+    test("no alerts channel: it says it isn't posting anywhere, with the link to set one up", async ({ page }) => {
+      await mockApi(page, { postsTo: NO_CHANNEL });
+      await page.goto("/logs/");
+      const card = page.getByTestId("autofix-card");
+      await expect(card).toContainText("up to 3 a day. Nothing merges");
+      const none = card.getByTestId("autofix-posts-to");
+      await expect(none).toHaveText("Not posting anywhere: set up an alerts channel");
+      await expect(none.getByRole("link", { name: "set up an alerts channel" })).toHaveAttribute("href", /\/settings\/alerts\/?#alert-settings/);
+      await noSideways(page);
+      await shot(page, `logfix-nochannel-${width}`);
+      await card.getByRole("button", { name: "Change what counts" }).click();
+      await expect(page.getByTestId("autofix-panel").getByTestId("autofix-state")).toHaveText(
+        "Off: no fix PRs open automatically. Fix PRs start only when someone presses Create fix PR.",
+      );
+    });
+  });
+}
+
+test("on with no channel: the line says not posted anywhere", async ({ page }) => {
+  await mockApi(page, { autofix: { ...DEFAULT_AUTOFIX, enabled: true }, postsTo: NO_CHANNEL, runsToday: 3 });
+  await page.goto("/logs/");
+  const card = page.getByTestId("autofix-card");
+  await expect(card).toContainText("3 of 3 today");
+  await expect(card).toContainText("not posted anywhere (set up an alerts channel)");
+});
+
+test("a saved own channel or off is what the panel shows", async ({ page }) => {
+  await mockApi(page, { postsTo: { mode: "custom", saved: true, channels: ["Slack"], team_alerts: true } });
+  await page.goto("/logs/?auto=1");
+  await expect(page.getByTestId("autofix-panel").getByTestId("autofix-posts-to")).toHaveText("Posts to: Slack (this page's own channel) Change");
 });
 
 // ── The repo, worked out ────────────────────────────────────────────

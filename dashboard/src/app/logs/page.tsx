@@ -6,9 +6,11 @@ import Link from "next/link";
 import {
   api,
   type LogAutofix,
+  type LogAutofixState,
   type LogFinding,
   type LogFindingStatus,
   type LogFindingsList,
+  type LogPostsTo,
   type LogSample,
   type LogSeverity,
   type Repo,
@@ -21,8 +23,17 @@ import { RepoCombobox } from "@/components/repo-combobox";
 import { ResolvedRepo, isSure } from "@/components/resolved-repo";
 import { Segmented } from "@/components/segmented";
 import { Callout } from "@/components/callout";
-import { ChevronRightIcon, ExternalLinkIcon } from "@/components/icons";
+import { ExternalLinkIcon } from "@/components/icons";
 import { FindingsNotify } from "@/components/findings-notify";
+import {
+  AUTOFIX_SEVERITY_OPTIONS,
+  autofixSentence,
+  channelNames,
+  everyFindingWord,
+  findingsWord,
+  meetsSeverity,
+  PostsTo,
+} from "@/components/autofix-words";
 import { CodeBlock } from "@/components/code-block";
 import { Code } from "@/components/settings/code";
 import { Page, PageHeader } from "@/components/page";
@@ -64,11 +75,6 @@ const SEVERITY_LOOK: Record<LogSeverity, { label: string; tone: Tone; rank: numb
   warning: { label: "Warning", tone: "waiting", rank: 1 },
   info: { label: "Info", tone: "neutral", rank: 0 },
 };
-const SEVERITY_OPTIONS: { value: LogSeverity; label: string }[] = [
-  { value: "critical", label: "Critical (high)" },
-  { value: "warning", label: "Warning and up" },
-  { value: "info", label: "Everything" },
-];
 
 const rowActionClass = `${buttonClass("secondary", "sm")} gap-1`;
 const HOUR_OPTIONS = Array.from({ length: 24 }, (_, h) => ({ value: String(h), label: hourLabel(h) }));
@@ -165,10 +171,10 @@ function LogsPage() {
   const [error, setError] = useState(false);
   const { can } = useCan();
   const [repos, setRepos] = useState<Repo[]>([]);
-  const [autofix, setAutofix] = useState<{ autofix: LogAutofix; runs_today: number } | null>(null);
+  const [autofix, setAutofix] = useState<LogAutofixState | null>(null);
   const [fixing, setFixing] = useState<LogFinding | null>(null);
   const [busy, setBusy] = useState("");
-  const autoButton = useRef<HTMLButtonElement>(null);
+  const settingsButton = useRef<HTMLButtonElement>(null);
 
   const load = useCallback(() => {
     api
@@ -244,7 +250,8 @@ function LogsPage() {
   };
 
   const groups = data?.log_groups ?? [];
-  const on = !!autofix?.autofix.enabled;
+  const openSettings = (v: boolean) => setParams({ auto: v ? "1" : "" }, { replace: true });
+  const showAutofix = !!autofix && !(data && !data.aws_connected);
 
   return (
     <Page testId="logs-page">
@@ -257,45 +264,35 @@ function LogsPage() {
           </>
         }
         actions={
-          <>
-            <button
-              ref={autoButton}
-              type="button"
-              onClick={() => setParams({ auto: params.auto ? "" : "1" }, { replace: true })}
-              aria-expanded={!!params.auto}
-              aria-controls="autofix-panel"
-              className={secondaryButton}
-              data-testid="autofix-toggle"
-            >
-              <span
-                aria-hidden="true"
-                className={`relative mr-2 inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors ${on ? "bg-emerald-600" : "bg-zinc-700"}`}
-              >
-                <span className={`absolute left-0.5 h-3 w-3 rounded-full bg-white transition-transform ${on ? "translate-x-3" : ""}`} />
-              </span>
-              Automatic fix PRs: {on ? "On" : "Off"}
-              <span aria-hidden="true" className={`ml-1.5 text-zinc-400 transition-transform ${params.auto ? "rotate-90" : ""}`}>
-                <ChevronRightIcon />
-              </span>
-            </button>
-            <Link href="/settings/integrations/aws" className={secondaryButton}>
-              AWS settings
-            </Link>
-          </>
+          <Link href="/settings/integrations/aws" className={secondaryButton}>
+            AWS settings
+          </Link>
         }
       />
 
+      {/* Automatic fix PRs: always in view, above the list. */}
+      {showAutofix && autofix && (
+        <AutofixCard
+          state={autofix}
+          canEdit={canEditAutofix}
+          settingsOpen={!!params.auto}
+          settingsButton={settingsButton}
+          onOpenSettings={() => openSettings(!params.auto)}
+          onSaved={(a) => setAutofix((prev) => (prev ? { ...prev, autofix: a } : prev))}
+        />
+      )}
       {params.auto && autofix && (
         <AutofixPanel
           initial={autofix.autofix}
           runsToday={autofix.runs_today}
+          postsTo={autofix.posts_to}
           groups={groups}
           repos={repos}
           canEdit={canEditAutofix}
-          onSaved={(a) => setAutofix((prev) => ({ runs_today: prev?.runs_today ?? 0, autofix: a }))}
+          onSaved={(a) => setAutofix((prev) => (prev ? { ...prev, autofix: a } : prev))}
           onClose={() => {
-            setParams({ auto: "" }, { replace: true });
-            autoButton.current?.focus();
+            openSettings(false);
+            settingsButton.current?.focus();
           }}
         />
       )}
@@ -398,6 +395,8 @@ function LogsPage() {
                 <FindingRow
                   key={f.rec_id}
                   f={f}
+                  autofix={autofix?.autofix ?? null}
+                  onAutofixSettings={() => openSettings(true)}
                   canAct={canAct}
                   busy={busy}
                   open={params.finding === f.rec_id}
@@ -484,8 +483,26 @@ function fixWords(f: LogFinding): string | null {
   }
 }
 
+/**
+ * Whether the automatic sweep would open a fix PR for this finding under the
+ * team's setting (its severity, the log group's own switch and severity, and
+ * only findings first seen after it was turned on). The server decides; this
+ * is the hint.
+ */
+function wouldAutofix(f: LogFinding, a: LogAutofix): boolean {
+  if (f.status !== "new" && f.status !== "acknowledged") return false;
+  if (f.fix || (f.auto && f.auto.status !== "waiting")) return false;
+  const own = a.overrides.find((o) => o.log_group === f.log_group);
+  if (own?.auto === false || (a.scope === "listed" && own?.auto !== true)) return false;
+  if (!meetsSeverity(f.severity, own?.min_severity ?? a.min_severity)) return false;
+  if (a.enabled && a.enabled_at && f.first_seen && f.first_seen < a.enabled_at) return false;
+  return true;
+}
+
 function FindingRow({
   f,
+  autofix,
+  onAutofixSettings,
   canAct,
   busy,
   open,
@@ -494,6 +511,8 @@ function FindingRow({
   onStatus,
 }: {
   f: LogFinding;
+  autofix: LogAutofix | null;
+  onAutofixSettings: () => void;
   canAct: boolean;
   busy: string;
   open: boolean;
@@ -535,6 +554,22 @@ function FindingRow({
           <StatusText look={look} />
           {f.fix?.auto && <Chip tone="info" title="Started automatically from this finding">Auto</Chip>}
           {link}
+          {autofix && wouldAutofix(f, autofix) &&
+            (autofix.enabled ? (
+              <span className="text-xs text-sky-300" data-testid="autofix-hint" data-state="on">
+                Would get a fix PR automatically
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={onAutofixSettings}
+                className={`rounded text-xs font-medium text-sky-300 underline underline-offset-2 hover:text-sky-200 ${focusRing}`}
+                data-testid="autofix-hint"
+                data-state="off"
+              >
+                Turn on automatic fixes
+              </button>
+            ))}
         </>
       }
       // One visible action; the rest in the row's menu.
@@ -815,6 +850,134 @@ function CreateFixForm({
 
 type Override = LogAutofix["overrides"][number];
 
+/**
+ * The card above the list. Off: what turning it on does, with Turn on (for
+ * admins) and Change what counts. On: one line with what qualifies, today's
+ * count of the daily limit, where PRs post and Settings.
+ */
+function AutofixCard({
+  state,
+  canEdit,
+  settingsOpen,
+  settingsButton,
+  onOpenSettings,
+  onSaved,
+}: {
+  state: LogAutofixState;
+  canEdit: boolean;
+  settingsOpen: boolean;
+  settingsButton: React.RefObject<HTMLButtonElement | null>;
+  onOpenSettings: () => void;
+  onSaved: (a: LogAutofix) => void;
+}) {
+  const { toast } = useToast();
+  const [saving, setSaving] = useState(false);
+  const a = state.autofix;
+  const p = state.posts_to;
+  const where = channelNames(p);
+
+  const turnOn = async () => {
+    setSaving(true);
+    try {
+      const r = await api.saveLogAutofix(autofixBody({ ...a, enabled: true }));
+      onSaved(r.autofix);
+      toast("Automatic fix PRs are on");
+    } catch (e) {
+      toast(errorText(e, "Could not turn on automatic fix PRs. Try again."), "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const settings = (label: string, className: string) => (
+    <button
+      ref={settingsButton}
+      type="button"
+      onClick={onOpenSettings}
+      aria-expanded={settingsOpen}
+      aria-controls="autofix-panel"
+      className={className}
+      data-testid="autofix-settings"
+    >
+      {label}
+    </button>
+  );
+
+  if (a.enabled) {
+    const dot = <span aria-hidden="true" className="hidden text-zinc-400 sm:inline">·</span>;
+    return (
+      <section
+        aria-label="Automatic fix PRs"
+        className="mt-6 flex min-w-0 flex-col items-start gap-x-2 gap-y-1 rounded-lg border border-emerald-900/70 sm:flex-row sm:flex-wrap sm:items-center bg-emerald-950/20 px-4 py-2.5 text-sm text-zinc-200"
+        data-testid="autofix-card"
+        data-state="on"
+      >
+        <span className="inline-flex min-w-0 items-center gap-2">
+          <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
+          <span>
+            <span className="font-medium text-emerald-200">On:</span> {findingsWord(a.min_severity)} get a fix PR automatically
+          </span>
+        </span>
+        {dot}
+        <span data-testid="autofix-today">
+          {Math.min(state.runs_today, a.daily_cap)} of {a.daily_cap} today
+        </span>
+        {dot}
+        {where ? (
+          <span className="min-w-0">posted to {where}</span>
+        ) : (
+          <span className="min-w-0 text-amber-200">
+            not posted anywhere (
+            <Link href="/settings/alerts/#alert-settings" className={`${linkButton} !text-sm`}>
+              set up an alerts channel
+            </Link>
+            )
+          </span>
+        )}
+        {dot}
+        {settings(settingsOpen ? "Hide settings" : "Settings", `${linkButton} !text-sm`)}
+      </section>
+    );
+  }
+
+  return (
+    <section
+      aria-labelledby="autofix-card-heading"
+      className="mt-6 min-w-0 rounded-lg border border-sky-900/70 bg-sky-950/20 p-4 sm:p-5"
+      data-testid="autofix-card"
+      data-state="off"
+    >
+      <h2 id="autofix-card-heading" className="text-base font-semibold text-zinc-100">
+        Automatic fix PRs are off.
+      </h2>
+      <p className="mt-1 max-w-prose text-sm text-zinc-300">
+        Turn them on and Coderhelm opens a fix pull request for {everyFindingWord(a.min_severity)}, up to {a.daily_cap} a day
+        {where ? `, and posts it to ${where}${p?.mode === "team" ? ", where production alerts post" : ""}` : ""}. Nothing merges without a person&apos;s approval.
+      </p>
+      {!where && (
+        <div className="mt-2">
+          <PostsTo p={p} />
+        </div>
+      )}
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        {canEdit ? (
+          <>
+            <button type="button" onClick={turnOn} disabled={saving} className={primaryButton} data-testid="autofix-turn-on">
+              {saving ? "Turning on…" : "Turn on"}
+            </button>
+            {settings("Change what counts", secondaryButton)}
+          </>
+        ) : (
+          <>
+            <p className="text-sm text-zinc-400">Only an admin or the owner can turn them on.</p>
+            {settings("See the settings", `${linkButton} !text-sm`)}
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
+
 /** The body sent on save: only groups with something of their own. */
 function autofixBody(a: LogAutofix): LogAutofix {
   return {
@@ -833,6 +996,7 @@ function autofixBody(a: LogAutofix): LogAutofix {
 function AutofixPanel({
   initial,
   runsToday,
+  postsTo,
   groups,
   repos,
   canEdit,
@@ -841,6 +1005,7 @@ function AutofixPanel({
 }: {
   initial: LogAutofix;
   runsToday: number;
+  postsTo: LogPostsTo | undefined;
   groups: string[];
   repos: Repo[];
   canEdit: boolean;
@@ -906,52 +1071,28 @@ function AutofixPanel({
         <p className="mt-3 text-sm text-zinc-500">Only an admin or the owner can change these settings.</p>
       )}
 
-      <div className="mt-4 grid min-w-0 gap-5 lg:grid-cols-2">
-        <div className="flex min-w-0 flex-col gap-4">
-          <label className="flex items-start gap-3 text-sm text-zinc-200">
+      {/* The main control, read as one sentence. */}
+      <div className="mt-4 min-w-0 rounded-lg border border-zinc-800 bg-zinc-950/60 p-4" data-testid="autofix-main">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 text-sm text-zinc-200">
+          <label className="flex items-center gap-2 font-medium">
             <input
               type="checkbox"
               checked={a.enabled}
               disabled={disabled}
               onChange={(e) => set({ enabled: e.target.checked })}
-              className="mt-1"
               data-testid="autofix-enabled"
             />
-            <span>
-              <span className="font-medium">Automatically create a fix PR for new findings</span>
-              <span className="block text-xs text-zinc-400">Only findings made after this is turned on. Off by default.</span>
-            </span>
+            Open fix PRs automatically for:
           </label>
-
-          <div className="min-w-0">
-            <p className="mb-1 text-sm font-medium text-zinc-300">Minimum severity</p>
-            <div className="max-w-full overflow-x-auto">
-              <Segmented label="Minimum severity" options={SEVERITY_OPTIONS} value={a.min_severity} onChange={(v) => set({ min_severity: v })} disabled={disabled} />
-            </div>
-          </div>
-
-          <div className="min-w-0">
-            <p className="mb-1 text-sm font-medium text-zinc-300">Which log groups</p>
-            <div className="max-w-full overflow-x-auto">
-              <Segmented
-                label="Which log groups"
-                options={[
-                  { value: "all", label: "Every group with a known repo" },
-                  { value: "listed", label: "Only groups turned on below" },
-                ]}
-                value={a.scope}
-                onChange={(v) => set({ scope: v })}
-                disabled={disabled}
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="flex min-w-0 flex-col gap-4">
-          <div>
-            <label htmlFor="autofix-cap" className="mb-1 block text-sm font-medium text-zinc-300">
-              Most automatic runs per day
-            </label>
+          <Select
+            aria-label="Open fix PRs automatically for"
+            value={a.min_severity}
+            disabled={disabled}
+            onChange={(v) => set({ min_severity: v as LogSeverity })}
+            options={AUTOFIX_SEVERITY_OPTIONS}
+          />
+          <span className="flex items-center gap-2">
+            <label htmlFor="autofix-cap">Up to</label>
             <input
               id="autofix-cap"
               type="number"
@@ -960,46 +1101,73 @@ function AutofixPanel({
               value={Number.isNaN(a.daily_cap) ? "" : a.daily_cap}
               disabled={disabled}
               onChange={(e) => set({ daily_cap: e.target.value === "" ? NaN : Number(e.target.value) })}
+              aria-label="Most fix PRs a day"
               aria-describedby="autofix-cap-help"
-              className={`${inputClass} !w-28`}
+              className={`${inputClass} !w-20`}
             />
-            <p id="autofix-cap-help" className="mt-1 text-xs text-zinc-400">
-              {runsToday > 0 ? `${plural(runsToday, "run")} started today (UTC). ` : ""}Never more than one open run or PR for the same error.
-              Runs count toward the team&apos;s token limit.
-            </p>
-          </div>
+            <span>a day</span>
+          </span>
+        </div>
+        <p className="mt-3 text-sm font-medium text-zinc-100" data-testid="autofix-state" aria-live="polite">
+          {autofixSentence({ ...a, daily_cap: capOk ? a.daily_cap : initial.daily_cap }, postsTo)}
+          {dirty && <span className="font-normal text-zinc-400"> Not saved yet.</span>}
+        </p>
+        <div className="mt-1">
+          <PostsTo p={postsTo} />
+        </div>
+        <p id="autofix-cap-help" className="mt-2 text-xs text-zinc-400">
+          Only findings first seen after it is turned on. {runsToday > 0 ? `${plural(runsToday, "fix PR run")} started today (UTC). ` : ""}
+          Never more than one open run or PR for the same error. Runs count toward the team&apos;s token limit.
+        </p>
+      </div>
 
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-zinc-300">
-              <input
-                type="checkbox"
-                checked={!!a.quiet_hours}
-                disabled={disabled}
-                onChange={(e) => set({ quiet_hours: e.target.checked ? { start_hour: 22, end_hour: 6 } : null })}
-              />
-              Quiet hours
-            </label>
-            {a.quiet_hours && (
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-zinc-400">
-                <Select
-                  aria-label="Quiet hours start"
-                  value={String(a.quiet_hours.start_hour)}
-                  disabled={disabled}
-                  onChange={(v) => set({ quiet_hours: { ...a.quiet_hours!, start_hour: Number(v) } })}
-                  options={HOUR_OPTIONS}
-                />
-                to
-                <Select
-                  aria-label="Quiet hours end"
-                  value={String(a.quiet_hours.end_hour)}
-                  disabled={disabled}
-                  onChange={(v) => set({ quiet_hours: { ...a.quiet_hours!, end_hour: Number(v) } })}
-                  options={HOUR_OPTIONS}
-                />
-                <p className="w-full text-xs text-zinc-400">Findings that arrive then start when the quiet hours end.</p>
-              </div>
-            )}
+      <div className="mt-5 grid min-w-0 gap-5 lg:grid-cols-2">
+        <div className="min-w-0">
+          <p className="mb-1 text-sm font-medium text-zinc-300">Which log groups</p>
+          <div className="max-w-full overflow-x-auto">
+            <Segmented
+              label="Which log groups"
+              options={[
+                { value: "all", label: "Every group with a known repo" },
+                { value: "listed", label: "Only groups turned on below" },
+              ]}
+              value={a.scope}
+              onChange={(v) => set({ scope: v })}
+              disabled={disabled}
+            />
           </div>
+        </div>
+
+        <div>
+          <label className="flex items-center gap-2 text-sm font-medium text-zinc-300">
+            <input
+              type="checkbox"
+              checked={!!a.quiet_hours}
+              disabled={disabled}
+              onChange={(e) => set({ quiet_hours: e.target.checked ? { start_hour: 22, end_hour: 6 } : null })}
+            />
+            Quiet hours
+          </label>
+          {a.quiet_hours && (
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-zinc-400">
+              <Select
+                aria-label="Quiet hours start"
+                value={String(a.quiet_hours.start_hour)}
+                disabled={disabled}
+                onChange={(v) => set({ quiet_hours: { ...a.quiet_hours!, start_hour: Number(v) } })}
+                options={HOUR_OPTIONS}
+              />
+              to
+              <Select
+                aria-label="Quiet hours end"
+                value={String(a.quiet_hours.end_hour)}
+                disabled={disabled}
+                onChange={(v) => set({ quiet_hours: { ...a.quiet_hours!, end_hour: Number(v) } })}
+                options={HOUR_OPTIONS}
+              />
+              <p className="w-full text-xs text-zinc-400">Findings that arrive then start when the quiet hours end.</p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1069,12 +1237,12 @@ function AutofixPanel({
           <button type="button" onClick={save} disabled={!dirty || !capOk || saving} className={primaryButton} data-testid="autofix-save">
             {saving ? "Saving…" : "Save"}
           </button>
-          {!capOk && <p className="text-xs text-red-300">Choose between 1 and 20 runs per day.</p>}
+          {!capOk && <p className="text-xs text-red-300">Choose between 1 and 20 fix PRs a day.</p>}
         </div>
       )}
 
       {canEdit && (
-        <div className="mt-6">
+        <div className="mt-6" id="findings-notify">
           <FindingsNotify />
         </div>
       )}

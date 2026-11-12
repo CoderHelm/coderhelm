@@ -53,6 +53,7 @@ import {
 } from "@/components/chat-channels";
 import { buttonClass, focusRing, inputClass, linkButton, monoInputClass, primaryButton, secondaryButton } from "@/components/ui";
 import { ReviewInSetup, useSetupMarks } from "@/components/setup-marks";
+import { autofixSentence } from "@/components/autofix-words";
 
 export default function AlertsPageGuarded() {
   return (
@@ -869,9 +870,44 @@ function AlertSettings() {
             </div>
           )}
         </SettingsRow>
+        <LogAutofixRow />
       </SettingsSection>
       <SaveBar count={count} onSave={save} onDiscard={discard} saving={saving} problem={problem} />
     </>
+  );
+}
+
+/**
+ * Automatic fix PRs for log findings live on the Logs page; this row says
+ * whether they are on and links there, since their PRs post to this channel.
+ */
+function LogAutofixRow() {
+  const [state, setState] = useState<Awaited<ReturnType<typeof api.getLogAutofix>> | null>(null);
+  useEffect(() => {
+    let live = true;
+    api
+      .getLogAutofix()
+      .then((s) => live && s?.autofix && setState(s))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+  return (
+    <SettingsRow
+      label="Automatic fix PRs for log findings"
+      testId="log-autofix-row"
+      help={
+        state
+          ? `${autofixSentence(state.autofix, state.posts_to)} Each fix PR posts to this team channel unless the Logs page has its own.`
+          : "Coderhelm can open a fix pull request for critical log findings and post it to this team channel."
+      }
+      control={() => (
+        <Link href="/logs/?auto=1" className={secondaryButton}>
+          {state?.autofix.enabled ? "Change on the Logs page" : "Set up on the Logs page"}
+        </Link>
+      )}
+    />
   );
 }
 

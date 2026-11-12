@@ -45,6 +45,24 @@ Copy **RoleArn** from the stack's **Outputs** tab, paste it with the region of y
 
 CoderHelm keeps only the findings and their error patterns, never raw log lines.
 
+## Log findings and automatic fix PRs
+
+Every finding shows on the **Logs** page with how often and when its error happened. Press **Create fix PR** on any finding to start a fix run, or let CoderHelm open them by itself.
+
+The card at the top of the Logs page says whether automatic fix PRs are on. While they are off, it says what turning them on does; **Turn on** switches them on for critical findings, up to 3 a day, and **Change what counts** opens the settings:
+
+- **Open fix PRs automatically for**: critical findings (the default), warning and critical findings, or every finding.
+- **Up to N a day**: the most fix runs started automatically in a day (UTC), from 1 to 20.
+- **Which log groups**, each log group's repo and its own switch and severity, and **quiet hours** when no automatic run starts.
+
+Once on, the card is one line, for example "On: critical findings get a fix PR automatically · 1 of 3 today · posted to Slack · Settings". Only findings first seen after it is turned on get one, there is never more than one open run or PR for the same error, and nothing merges without a person's approval. A finding that would get one says so in the list; one that got one shows **Auto** and its PR.
+
+### Where fix PRs are posted
+
+Fix PRs from findings, started automatically or by hand, post where new findings post. Until someone chooses otherwise, that is the team's alert channel, the same Teams or Slack channel production alerts post to (**Settings**, then **Alerts**, **Team channel and budget**). The automatic fix PR settings say where they post, or "Not posting anywhere" with a link to set up an alerts channel when none is set. Under **Post new findings to chat** you can instead pick channels of their own, or turn posting off; that choice stands.
+
+Each fix PR posts one card: the finding's title and severity, its log group, how many lines and when it was first and last seen, the PR and its repository, one line on what it changes, and links to the PR and the finding. A finding's card posts once, even when its run is retried. When the PR merges or is closed, one follow-up card posts in the same channel and names the card it follows; Teams and Slack webhooks can't reply in a thread or edit a posted card.
+
 ## Keeping permissions up to date
 
 When a CoderHelm release reads something new, the role needs the matching read-only permission. Each connected account shows its state:

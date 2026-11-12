@@ -123,6 +123,13 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     if (p === "/api/me") return json(r, { user_id: "u_1", team_id: "t_1", github_login: null, email: "person@example.com", avatar_url: "", role: db.role });
     if (p === "/api/usage") return json(r, { month: "2026-01", total_tokens: 0, tokens_in: 0, tokens_out: 0, total_runs: 0, max_tokens: 0 });
     if (p === "/api/banners") return json(r, { banners: [] });
+    if (p === "/api/log-findings/autofix") {
+      return json(r, {
+        autofix: { enabled: true, min_severity: "critical", daily_cap: 3, scope: "all", quiet_hours: null, overrides: [], enabled_at: "" },
+        runs_today: 0,
+        posts_to: { mode: "team", saved: false, channels: ["Slack"], team_alerts: true },
+      });
+    }
     if (p === "/api/integrations") return json(r, { can_edit: false, items: [], migrated: 0 });
     if (p === "/api/teams") return json(r, { teams: [{ team_id: "t_1", org: "your-team", status: "active", current: true }] });
     if (p === "/api/repos") return json(r, { repos: [
@@ -389,6 +396,15 @@ test.describe("AWS role access", () => {
 });
 
 test.describe("Alert routes", () => {
+  test("the team channel section says whether log fix PRs are on and links to them", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/settings/alerts");
+    const row = page.getByTestId("log-autofix-row");
+    await expect(row).toContainText("Automatic fix PRs for log findings");
+    await expect(row).toContainText("On: critical findings get a fix PR automatically, up to 3 a day, posted to Slack.");
+    await expect(row.getByRole("link", { name: "Change on the Logs page" })).toHaveAttribute("href", /\/logs\/?\?auto=1/);
+  });
+
   test("route cards, recent alerts with outcomes and recoveries paired to their alerts", async ({ page }) => {
     await mockApi(page);
     await page.goto("/settings/alerts");
