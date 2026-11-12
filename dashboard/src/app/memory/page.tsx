@@ -21,7 +21,7 @@ import { SettingsDisclosure } from "@/components/settings";
 import { Skeleton } from "@/components/skeleton";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
-import { ChatIcon, CodeIcon, MemoryIcon, PinIcon, PlannerIcon, ReviewerIcon } from "@/components/icons";
+import { ChatIcon, CodeIcon, MemoryIcon, PinIcon, PlannerIcon, ReviewerIcon, ShieldCheckIcon, WarningIcon } from "@/components/icons";
 import { Page, PageHeader, SectionHeading } from "@/components/page";
 import { focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 
@@ -42,7 +42,17 @@ const AGENT_ICON: Record<AgentProfile["id"], ReactNode> = {
   planner: <PlannerIcon />,
   coder: <CodeIcon />,
   feedback: <ChatIcon />,
+  stop_judge: <ShieldCheckIcon />,
 };
+
+/** "Uses this repo's memories" with how many it was handed lately. */
+function memoryUse(p: AgentProfile): string {
+  if (!p.uses_repo_memory) return "Doesn't use repo memories";
+  const n = p.memory_uses ?? 0;
+  return n === 0
+    ? "Uses this repo's memories · none needed in 30 days"
+    : `Uses this repo's memories · ${n} used in 30 days`;
+}
 
 type Show = "all" | "pinned" | "run" | "person";
 type Sort = "newest" | "most_used";
@@ -361,7 +371,7 @@ function MemoryPage() {
               <Skeleton className="h-24" />
             ) : (
               <>
-                <div className="grid grid-cols-1 gap-px overflow-hidden rounded-lg border border-zinc-800 bg-zinc-800 sm:grid-cols-2 lg:grid-cols-4" data-testid="memory-agents">
+                <div className="grid grid-cols-1 gap-px overflow-hidden rounded-lg border border-zinc-800 bg-zinc-800 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5" data-testid="memory-agents">
                   {profiles.map((p) => (
                     <button
                       key={p.id}
@@ -382,7 +392,7 @@ function MemoryPage() {
                         <span className="text-base font-semibold tabular-nums text-zinc-100">{p.activity_count}</span> {p.activity_label}
                       </span>
                       <span className={`mt-1 block text-xs ${p.uses_repo_memory ? "text-emerald-300/90" : "text-zinc-400"}`}>
-                        {p.uses_repo_memory ? "Uses this repo's memories" : "Doesn't use repo memories"}
+                        {memoryUse(p)}
                       </span>
                     </button>
                   ))}
@@ -413,6 +423,13 @@ function AgentDetail({ agent }: { agent: AgentProfile }) {
         <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-zinc-800 text-zinc-300" aria-hidden="true">{AGENT_ICON[agent.id]}</span>
         <h3 className="text-lg font-semibold">{agent.name}</h3>
       </div>
+      {agent.uses_repo_memory && (
+        <p className="mt-2 text-sm text-zinc-400" data-testid="agent-memory-use">
+          {(agent.memory_uses ?? 0) === 0
+            ? "Reads this repo's memories on each task. None were relevant enough to use in the last 30 days."
+            : `Used ${agent.memory_uses} of this repo's memories in the last 30 days, over ${agent.memory_reads ?? 0} task${(agent.memory_reads ?? 0) === 1 ? "" : "s"}.`}
+        </p>
+      )}
       <div className="mt-5 grid gap-6 md:grid-cols-2">
         <div className="min-w-0">
           <h4 className="text-sm font-semibold text-zinc-100">What it knows</h4>
@@ -430,8 +447,10 @@ function AgentDetail({ agent }: { agent: AgentProfile }) {
           {agent.learned.length === 0 ? (
             <p className="mt-2 text-sm text-zinc-400">
               {agent.id === "feedback"
-                ? "It works from each PR's conversation, so it keeps no memories of its own."
-                : agent.id === "reviewer"
+                ? "Nothing yet. When a person asks for a change it makes, the preference behind it is remembered here."
+                : agent.id === "stop_judge"
+                  ? "It learns from the decisions people overturn, not from memories of its own."
+                  : agent.id === "reviewer"
                   ? "No notes on its reviews yet. Rate a review with a note and it reads it before the next ones."
                   : "Nothing yet. It learns as it finishes tickets here."}
             </p>
@@ -519,13 +538,22 @@ function MemoryCard({
         m.origin?.edited_by ? `Edited by ${m.origin.edited_by}` : null,
         uses === 0
           ? "Not used yet"
-          : `Used on ${uses} ticket${uses === 1 ? "" : "s"}${m.last_used?.title ? `, last “${m.last_used.title}”` : ""}${day(m.last_used?.at) ? ` ${day(m.last_used?.at)}` : ""}`,
+          : `Used ${uses} time${uses === 1 ? "" : "s"}${m.last_used?.title ? `, last on “${m.last_used.title}”` : ""}${day(m.last_used?.at) ? ` ${day(m.last_used?.at)}` : ""}`,
       ]}
       chips={
-        m.pinned ? (
-          <Chip tone="waiting">
-            <PinIcon /> Pinned
-          </Chip>
+        m.pinned || m.flagged ? (
+          <>
+            {m.pinned && (
+              <Chip tone="waiting">
+                <PinIcon /> Pinned
+              </Chip>
+            )}
+            {m.flagged && (
+              <Chip tone="attention">
+                <WarningIcon /> May be out of date
+              </Chip>
+            )}
+          </>
         ) : undefined
       }
       actions={
@@ -545,6 +573,18 @@ function MemoryCard({
       details={long && !editing ? <Markdown>{m.content}</Markdown> : undefined}
       detailsLabel="Full text"
     >
+      {m.flagged && !editing && (
+        <p className="mt-2 text-sm text-amber-200/90" data-testid="memory-flagged">
+          A review found the code says otherwise: {m.flagged.note}
+          {m.flagged.link && (
+            <>
+              {" "}
+              <a href={m.flagged.link} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-amber-100">See the pull request</a>
+            </>
+          )}
+          . Edit it or forget it if it no longer holds.
+        </p>
+      )}
       {editing && (
         <div className="mt-3 flex flex-col gap-3">
           <label className="sr-only" htmlFor={`edit-${m.id}`}>Memory</label>

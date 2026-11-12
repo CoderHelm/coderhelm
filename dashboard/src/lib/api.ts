@@ -3387,7 +3387,9 @@ export interface MemoryItem {
   pinned?: boolean;
   origin?: MemoryOrigin;
   uses?: number;
-  last_used?: { at: string; run_id: string; title: string } | null;
+  last_used?: { at: string; run_id: string; title: string; agent?: string } | null;
+  /** A review found the code contradicts it: possibly out of date. */
+  flagged?: { at: string; note: string; link?: string } | null;
 }
 
 export interface MemoryFilters {
@@ -3403,10 +3405,13 @@ export interface MemoryPreview {
 }
 
 export interface AgentProfile {
-  id: "reviewer" | "planner" | "coder" | "feedback";
+  id: "reviewer" | "planner" | "coder" | "feedback" | "stop_judge";
   name: string;
   role: string;
   uses_repo_memory: boolean;
+  /** Memories it was handed in the last 30 days, and how often it read them. */
+  memory_uses?: number;
+  memory_reads?: number;
   knows: { label: string; detail: string }[];
   learned: { text: string; source: string; at: string; link?: string | null }[];
   activity_label: string;
