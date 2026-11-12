@@ -180,7 +180,8 @@ export function GroupsList({
       const t = e.target as HTMLElement | null;
       const typing =
         !!t && (t.isContentEditable || /^(TEXTAREA|SELECT)$/.test(t.tagName) || (t.tagName === "INPUT" && (t as HTMLInputElement).type !== "checkbox"));
-      if (typing) return;
+      // A key pressed in a side panel (the plan's, closing on Esc) is the panel's, never the list's.
+      if (typing || t?.closest("[data-drawer]")) return;
       if (e.key === "Escape" && count > 0) {
         clearAll();
         anchor.current = null;
@@ -199,10 +200,19 @@ export function GroupsList({
   const fixableRepos = [...new Set(fixable.map((g) => g.repo))];
   const urgent = fixable.filter((g) => g.tier === "P0" || g.tier === "P1");
   const bundle: Bundle = overview.bundle ?? "per_package";
+  // Cancelling keeps the selection, to change it and ask again; once the
+  // fixes start, the selection is done with and the list reads them.
+  const started = useRef(false);
   const closeAsk = () => {
     setAsk(null);
-    clearAll();
-    reload();
+    if (started.current) {
+      started.current = false;
+      clearAll();
+      reload();
+    }
+  };
+  const doneAsk = () => {
+    started.current = true;
   };
   const filters = { status, tier, repo, q };
   // What the request names: the picked findings while they fit in one list
@@ -242,6 +252,11 @@ export function GroupsList({
     const gone = items.filter((g) => g.finding_ids.every((id) => ids.includes(id))).map((g) => g.key);
     if (everything) setUnpicked((p) => ({ ...p, ...Object.fromEntries(gone.map((k) => [k, true])) }));
     else setPicked((p) => ({ ...p, ...Object.fromEntries(gone.map((k) => [k, false])) }));
+  };
+  const repickFindings = (ids: string[]) => {
+    const back = items.filter((g) => g.finding_ids.some((id) => ids.includes(id))).map((g) => g.key);
+    if (everything) setUnpicked((p) => ({ ...p, ...Object.fromEntries(back.map((k) => [k, false])) }));
+    else setPicked((p) => ({ ...p, ...Object.fromEntries(back.map((k) => [k, true])) }));
   };
   // Gmail's offer: the whole page is selected and more match.
   const pageAllOn = fixable.length > 0 && fixable.every(isOn);
@@ -372,7 +387,9 @@ export function GroupsList({
           onSelectEverything={selectEverything}
           onClear={clearAll}
           onClose={closeAsk}
+          onDone={doneAsk}
           onRemove={unpickFindings}
+          onRestore={repickFindings}
         />
       )}
       <div className="mt-4">
@@ -444,7 +461,9 @@ function BulkBar({
   onSelectEverything,
   onClear,
   onClose,
+  onDone,
   onRemove,
+  onRestore,
 }: {
   chosen: FindingGroup[];
   /** Fixes selected: the rows picked, or every fix that matches less the unticked ones. */
@@ -464,8 +483,12 @@ function BulkBar({
   onAsk: (c: Combine) => void;
   onSelectEverything: () => void;
   onClear: () => void;
+  /** The panel closed. */
   onClose: () => void;
+  /** The fixes started: the selection is done with. */
+  onDone: () => void;
   onRemove: (ids: string[]) => void;
+  onRestore: (ids: string[]) => void;
 }) {
   const bar = useRef<HTMLDivElement>(null);
   const [menu, setMenu] = useState(false);
@@ -483,11 +506,6 @@ function BulkBar({
       window.removeEventListener("mousedown", close);
     };
   }, [menu]);
-  // The review opens where the bar was: bring it into view.
-  const reviewing = ask !== null;
-  useEffect(() => {
-    if (reviewing) bar.current?.scrollIntoView({ block: "start", behavior: "auto" });
-  }, [reviewing]);
   const go = (c: Combine) => {
     setMenu(false);
     onAsk(c);
@@ -504,9 +522,19 @@ function BulkBar({
       className="mt-4 min-w-0 scroll-mt-16"
       data-testid="bulk-bar"
     >
-      {ask ? (
-        <FixRequest ids={ask.ids} select={ask.select} combine={ask.combine} names={names} onCancel={onClose} onRemove={onRemove} />
-      ) : (
+      {/* The review opens in the side panel; the bar and the list stay beside it. */}
+      {ask && (
+        <FixRequest
+          ids={ask.ids}
+          select={ask.select}
+          combine={ask.combine}
+          names={names}
+          onCancel={onClose}
+          onDone={onDone}
+          onRemove={onRemove}
+          onRestore={onRestore}
+        />
+      )}
         <div className="min-w-0 rounded-xl border border-zinc-700 bg-zinc-900 text-sm shadow-lg">
           <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
             <div className="min-w-0 flex-1 basis-64">
@@ -585,7 +613,6 @@ function BulkBar({
             </div>
           )}
         </div>
-      )}
     </div>
   );
 }

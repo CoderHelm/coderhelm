@@ -337,6 +337,8 @@ export interface PlanUnit {
   finding_ids: string[];
   advisories?: number;
   majors?: number;
+  /** The worst verdict of its bumps: what its reachability label says (older servers: absent). */
+  verdict?: Verdict;
   bumps?: PlanBump[];
   /** The open security PR these fixes are added to, instead of a new one. */
   joins?: { number: number; url: string } | null;

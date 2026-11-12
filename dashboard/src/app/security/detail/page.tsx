@@ -213,11 +213,7 @@ function FindingView({ f, timeline, admin, reload }: { f: Finding; timeline: Tim
         }
       />
 
-      {asking && (
-        <div className="mt-6">
-          <FixRequest ids={[f.id]} combine={asking} names={{ [f.id]: f.package }} onCancel={() => setAsking(null)} onDone={() => reload()} />
-        </div>
-      )}
+      {asking && <FixRequest ids={[f.id]} combine={asking} names={{ [f.id]: f.package }} onCancel={() => setAsking(null)} onDone={() => reload()} />}
 
       {dismissing && (
         <DismissForm

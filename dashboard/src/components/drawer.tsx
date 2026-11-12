@@ -45,6 +45,7 @@ export function Drawer({
         <Dialog.Overlay className="fixed inset-0 z-[60] bg-black/60" />
         <Dialog.Content
           data-testid={testId}
+          data-drawer=""
           onCloseAutoFocus={(e) => {
             const el = returnFocusTo?.current;
             if (el?.isConnected) {
