@@ -457,6 +457,51 @@ function planFor(joins: { number: number; url: string } | null = null) {
   };
 }
 
+// The side panel's plan: two repos, bumps in several tiers, an advisory the
+// server listed twice (older servers did, once per manifest), and majors.
+const DUP_GHSA = "GHSA-9q82-xgwf-vj6h";
+const DUP_CVE = "CVE-2026-104852";
+function panelPlan() {
+  const asked = ["tar_1", "tar_2", "tar_3", "sec_2"];
+  // A bump stays while one of its findings is asked for; the extra ones are always in.
+  const keep = (ids: string[]) => (b: ReturnType<typeof bump>) => b.finding_ids.some((id) => ids.includes(id)) || !b.finding_ids.some((id) => asked.includes(id));
+  return (ids: string[]) => {
+    const web = [
+      bump("tar", "6.2.1", "7.5.21", TAR.map((f) => f.id), {
+        tier: "P1",
+        verdict: "not_reachable",
+        advisories: [DUP_GHSA, DUP_GHSA, DUP_CVE, DUP_CVE, "GHSA-3xv7-q2mf-8r4c", "GHSA-h5wq-7c9p-jv2m"],
+      }),
+      bump("next", "14.1.0", "15.2.3", ["x_next"], { tier: "P0", verdict: "reachable" }),
+      bump("ws", "8.17.0", "8.17.1", ["x_ws"], { tier: "P1", verdict: "reachable" }),
+      bump("semver", "5.7.1", "7.5.2", ["x_semver"], { tier: "P2", verdict: "unknown" }),
+      bump("lodash", "4.17.20", "4.17.21", ["x_lodash"], { tier: "P2", verdict: "not_loaded" }),
+    ].filter(keep(ids));
+    const api = [
+      bump("python-multipart", "0.0.9", "0.0.18", ["sec_2"], { tier: "P1", verdict: "not_reachable" }),
+      bump("jinja2", "3.1.2", "3.1.6", ["x_jinja"], { tier: "P3", verdict: "not_reachable" }),
+    ].filter(keep(ids));
+    const count = (bs: ReturnType<typeof bump>[]) => new Set(bs.flatMap((b) => b.advisories)).size;
+    const units = [
+      unit("acme/web-app", `fix(deps): security updates for web-app (${web.length} packages, ${count(web)} advisories)`, web, {
+        advisories: count(web),
+        labels: ["security", "dependencies", "severity:critical", "reachable", "breaking", "javascript"],
+        verdict: "reachable",
+        starts_now: true,
+        waits: null,
+      }),
+      unit("acme/api", `fix(deps): security updates for api (${api.length} packages, ${count(api)} advisories)`, api, {
+        advisories: count(api),
+        labels: ["security", "dependencies", "severity:high", "not-reachable", "python"],
+        verdict: "not_reachable",
+        starts_now: false,
+        waits: "Waiting: today's 3 fix runs are used. Next starts tomorrow.",
+      }),
+    ];
+    return { units, skipped: [], runs_today: 2, runs_limit: 3, pr_count: 2, joins: 0, starting_now: 1, waiting: 1, tokens_today: 310_000, tokens_limit: 2_000_000, estimated_tokens: 420_000 };
+  };
+}
+
 const rowOf = (page: Page, pkg: string) => page.getByTestId("finding-row").filter({ has: page.getByRole("link", { name: new RegExp(`^${pkg} `) }) });
 
 test.describe("Security", () => {
@@ -655,7 +700,9 @@ test.describe("Security", () => {
     await bar.getByTestId("bulk-open").click();
     const req = page.getByTestId("fix-request");
     await expect(req.getByTestId("fix-unit")).toHaveCount(2);
-    await expect(req.getByTestId("fix-bump").first()).toContainText("tar 6.2.1 to 7.5.21major");
+    // Two pull requests start collapsed: open the first to see its bumps.
+    await req.getByTestId("fix-unit-toggle").first().click();
+    await expect(req.getByTestId("fix-bump").first()).toContainText("tar6.2.1 to 7.5.21Major");
     await expect(req.getByTestId("fix-budget")).toContainText("Uses 2 of today's 3 fix runs (1 used so far) · estimated 300k of 2M tokens (310k used today).");
     expect(call(db, "POST /api/security/fix/plan")[0].body).toEqual({ finding_ids: ["tar_1", "tar_2", "tar_3", "sec_2"], combine: "one_pr" });
     await req.getByTestId("fix-confirm").click();
@@ -1038,7 +1085,7 @@ test.describe("Security", () => {
     await expect(bar.getByTestId("bulk-open")).toHaveText("Fix in one PR");
     await bar.getByTestId("bulk-open").click();
     const req = page.getByTestId("fix-request");
-    await expect(req.getByTestId("fix-heading")).toHaveText("1 pull request");
+    await expect(req.getByTestId("fix-heading")).toHaveText("Open a fix pull request");
     await expect(req.getByTestId("fix-summary")).toHaveText("web-app · 4 advisories · 1 major upgrade");
     await expect(req.getByTestId("fix-title")).toHaveText("fix(deps): security updates for web-app (2 packages, 4 advisories)");
     await expect(req.getByTestId("fix-branch")).toHaveText("coderhelm/security-updates-2026-11-11-web-app");
@@ -1066,7 +1113,7 @@ test.describe("Security", () => {
     await page.getByRole("option", { name: "web-app (2)" }).click();
     await page.getByTestId("bulk-open").click();
     const req = page.getByTestId("fix-request");
-    await expect(req.getByTestId("fix-heading")).toHaveText("added to PR #812");
+    await expect(req.getByTestId("fix-heading")).toHaveText("Add to PR #812");
     await expect(req.getByTestId("fix-unit")).toContainText("Adds to PR #812");
     await expect(req.getByTestId("warn-join")).toContainText("Added to PR #812, the open security PR for web-app, instead of a second one.");
     await expect(req.getByTestId("fix-confirm")).toHaveText("Add to PR #812");
@@ -1080,7 +1127,7 @@ test.describe("Security", () => {
     await page.getByTestId("bulk-more").click();
     await expect(page.getByTestId("bulk-per-package")).toContainText("3 pull requests");
     await page.getByTestId("bulk-per-package").click();
-    await expect(page.getByTestId("fix-heading")).toHaveText("3 pull requests");
+    await expect(page.getByTestId("fix-heading")).toHaveText("Open 3 fix pull requests");
     expect(call(db, "POST /api/security/fix/plan").at(-1)?.body).toMatchObject({ combine: "per_package" });
     await page.getByRole("button", { name: "Cancel" }).click();
     await expect(page.getByTestId("fix-request")).toHaveCount(0);
@@ -1143,9 +1190,10 @@ test.describe("Security", () => {
       combine: "one_pr",
     });
     // One PR per repo; which start now and which wait for tomorrow, said plainly.
-    await expect(req.getByTestId("fix-heading")).toHaveText("3 pull requests");
+    await expect(req.getByTestId("fix-heading")).toHaveText("Open 3 fix pull requests");
     expect(await req.getByTestId("fix-unit").evaluateAll((els) => els.map((e) => e.getAttribute("data-repo")))).toEqual(["acme/web-app", "acme/api", "acme/docs"]);
     await expect(req.getByTestId("fix-when")).toHaveText(["Starts now", "Starts now", "Waits for tomorrow's limit"]);
+    await req.getByTestId("fix-unit-toggle").nth(2).click();
     await expect(req.getByTestId("fix-waits")).toHaveText("Waiting: today's 3 fix runs are used. Next starts tomorrow.");
     await expect(req.getByTestId("fix-budget")).toContainText("Uses 2 of today's 3 fix runs (1 used so far)");
     await expect(req.getByTestId("fix-budget")).toContainText("1 waits for tomorrow unless you raise today's limit.");
@@ -1188,7 +1236,7 @@ test.describe("Security", () => {
     expect(except.has("f1")).toBe(false);
   });
 
-  test("an error from the plan shows inside the bar, in the flow, never over a row; trying again works", async ({ page }) => {
+  test("an error from the plan shows in the side panel, in its flow; trying again works", async ({ page }) => {
     const all = manyGroups(350);
     const db = await mockApi(page, { groups: paged(all), planFor: repoPlan(350), planError: "finding_ids is at most 200 finding ids; to ask for more, send select with the list's filters" });
     await page.setViewportSize({ width: 1280, height: 800 });
@@ -1196,8 +1244,8 @@ test.describe("Security", () => {
     await page.getByTestId("pick-all").check();
     await page.getByTestId("select-all-matching-button").click();
     await page.getByTestId("bulk-open").click();
-    const bar = page.getByTestId("bulk-bar");
-    const err = bar.getByTestId("fix-error");
+    const req = page.getByTestId("fix-request");
+    const err = req.getByTestId("fix-error");
     await expect(err).toContainText("We couldn't work out the fix PRs");
     await expect(err).toContainText("finding_ids is at most 200 finding ids");
     await expect(err).toHaveAttribute("role", "alert");
@@ -1209,9 +1257,9 @@ test.describe("Security", () => {
     await expectClearOfRows(page);
     await shot(page, "390-error");
     db.planError = null;
-    await bar.getByRole("button", { name: "Try again" }).click();
-    await expect(bar.getByTestId("fix-unit")).toHaveCount(3);
-    await expect(bar.getByTestId("fix-error")).toHaveCount(0);
+    await req.getByRole("button", { name: "Try again" }).click();
+    await expect(req.getByTestId("fix-unit")).toHaveCount(3);
+    await expect(req.getByTestId("fix-error")).toHaveCount(0);
   });
 
   test("at 390 wide: select all on the page, every fix that matches, the plan; nothing covers a row or scrolls sideways", async ({ page }) => {
@@ -1237,10 +1285,128 @@ test.describe("Security", () => {
     await expectClearOfRows(page);
     await shot(page, "390-select-all-matching-bar");
     await bar.getByTestId("bulk-open").click();
-    await expect(bar.getByTestId("fix-unit")).toHaveCount(3);
-    await expect(bar.getByTestId("fix-selection-note")).toContainText("This request takes the first 1000 fixes");
+    const req = page.getByTestId("fix-request");
+    await expect(req.getByTestId("fix-unit")).toHaveCount(3);
+    await expect(req.getByTestId("fix-selection-note")).toContainText("This request takes the first 1000 fixes");
+    // On a phone the panel fills the screen, as the other side panels do.
+    expect(await req.boundingBox()).toEqual({ x: 0, y: 0, width: 390, height: 844 });
     await expectClearOfRows(page);
     await shot(page, "390-plan");
+  });
+
+  test("the plan opens in the side panel: repos collapse, bumps by tier with each advisory once, remove and undo, the footer stays, Esc closes", async ({ page }) => {
+    const db = await mockApi(page, { planFor: panelPlan() });
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto("/security");
+    await page.getByTestId("pick-all").check();
+    const bar = page.getByTestId("bulk-bar");
+    await bar.getByTestId("bulk-open").click();
+    const req = page.getByTestId("fix-request");
+    await expect(req).toHaveAttribute("role", "dialog");
+    // On the right, the width of the other side panels; the bar and the list stay on the left.
+    const panelWidth = await page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).fontSize) * 40);
+    expect(await req.boundingBox()).toEqual({ x: 1280 - panelWidth, y: 0, width: panelWidth, height: 800 });
+    const barBox = await bar.boundingBox();
+    expect(barBox!.x).toBeLessThan(1280 - panelWidth);
+    await expect(bar.getByTestId("bulk-summary")).toBeVisible();
+    await expect(req.getByTestId("fix-heading")).toHaveText("Open 2 fix pull requests");
+    await expect(req.getByTestId("fix-summary")).toHaveText("2 repos, one PR each · 10 advisories · 3 major upgrades");
+    // More than one PR: each starts collapsed, with what it holds and when it starts.
+    const units = req.getByTestId("fix-unit");
+    await expect(units).toHaveCount(2);
+    await expect(units.nth(0)).toHaveAttribute("data-open", "false");
+    await expect(units.nth(1)).toHaveAttribute("data-open", "false");
+    await expect(req.getByTestId("fix-bump")).toHaveCount(0);
+    await expect(req.getByTestId("fix-unit-facts")).toHaveText(["New pull request · 5 packages · 8 advisories · 3 major", "New pull request · 2 packages · 2 advisories"]);
+    await expect(req.getByTestId("fix-when")).toHaveText(["Starts now", "Waits for tomorrow's limit"]);
+    await expect(req.getByTestId("fix-limit-line")).toHaveText("Uses 1 of the 1 fix run left today · 1 waits for tomorrow");
+    await shot(page, "1280-plan-panel");
+
+    // Expanding a repo: its title in plain text, the branch, labels, the reachability sum, bumps by tier.
+    const web = units.nth(0);
+    await web.getByTestId("fix-unit-toggle").click();
+    await expect(web.getByTestId("fix-unit-toggle")).toHaveAttribute("aria-expanded", "true");
+    await expect(web.getByTestId("fix-title")).toHaveText("fix(deps): security updates for web-app (5 packages, 8 advisories)");
+    expect(await web.getByTestId("fix-title").evaluate((e) => getComputedStyle(e).fontFamily)).not.toMatch(/mono/i);
+    await expect(web.getByTestId("fix-branch")).toHaveText("coderhelm/security-updates-2026-11-11-web-app");
+    await expect(web.getByTestId("fix-label")).toHaveText(["security", "dependencies", "severity:critical", "reachable", "breaking", "javascript"]);
+    await expect(web.getByTestId("fix-reachability")).toHaveText("Reachability: 2 reachable, 1 unknown, 1 not reachable, 1 not loaded");
+    expect(await web.getByTestId("fix-tier").evaluateAll((els) => els.map((e) => e.getAttribute("data-tier")))).toEqual(["P0", "P1", "P2"]);
+    await expect(web.getByTestId("fix-tier-count")).toHaveText(["1 package", "2 packages", "2 packages"]);
+    // Most urgent first: by tier, then reachable before the rest.
+    expect(await web.getByTestId("fix-bump").evaluateAll((els) => els.map((e) => e.getAttribute("data-package")))).toEqual(["next", "ws", "tar", "semver", "lodash"]);
+    const tar = web.locator('[data-package="tar"]');
+    // Each advisory once, three shown, then how many more.
+    await expect(tar.getByTestId("fix-advisories")).toHaveText(`4 advisories: ${DUP_GHSA}, ${DUP_CVE}, GHSA-3xv7-q2mf-8r4c +1`);
+    await expect(tar.getByTestId("verdict-pill")).toHaveAttribute("data-verdict", "not_reachable");
+    await expect(tar.getByTestId("verdict-pill")).toHaveText("Present, not reachable");
+    await expect(tar.getByTestId("fix-major")).toHaveText("Major");
+    await expect(web.locator('[data-package="ws"]').getByTestId("fix-major")).toHaveCount(0);
+    await shot(page, "1280-plan-expanded");
+
+    // The footer stays in view however far the panel scrolls.
+    const footerInView = async () => {
+      const b = await req.getByTestId("fix-confirm").boundingBox();
+      const vh = page.viewportSize()!.height;
+      return !!b && b.y >= 0 && b.y + b.height <= vh;
+    };
+    await units.nth(1).getByTestId("fix-unit-toggle").click();
+    expect(await footerInView()).toBe(true);
+    await req.locator("[data-drawer-body]").evaluate((e) => e.scrollTo(0, e.scrollHeight));
+    expect(await footerInView()).toBe(true);
+    await expect(req.getByTestId("fix-confirm")).toHaveText("Open 2 fix PRs");
+    await expect(req.getByTestId("fix-cancel")).toBeVisible();
+
+    // Collapse and expand all.
+    await expect(req.getByTestId("fix-expand-all")).toHaveText("Collapse all");
+    await req.getByTestId("fix-expand-all").click();
+    await expect(req.getByTestId("fix-bump")).toHaveCount(0);
+    await req.getByTestId("fix-expand-all").click();
+    await expect(req.getByTestId("fix-bump")).toHaveCount(7);
+
+    // Remove a package: the plan is asked again without it, the row in the list unticks, and Undo puts it back.
+    await tar.getByRole("button", { name: "Remove tar from this request" }).click();
+    await expect(web.locator('[data-package="tar"]')).toHaveCount(0);
+    expect(call(db, "POST /api/security/fix/plan").at(-1)?.body).toEqual({ finding_ids: ["sec_2"], combine: "one_pr" });
+    const undo = req.getByTestId("fix-undo");
+    await expect(undo).toHaveText("Removed tar from the request.Undo");
+    await expect(req.getByTestId("fix-undo-button")).toBeFocused();
+    // The list behind the panel is hidden from the accessibility tree while it is open: find the row by its key.
+    const tarRow = page.locator('[data-testid="finding-row"][data-key*="|tar|"]').getByTestId("pick");
+    await expect(tarRow).not.toBeChecked();
+    await shot(page, "1280-plan-undo");
+    await req.getByTestId("fix-undo-button").click();
+    await expect(web.locator('[data-package="tar"]')).toHaveCount(1);
+    await expect(undo).toHaveCount(0);
+    expect(call(db, "POST /api/security/fix/plan").at(-1)?.body).toEqual({ finding_ids: ["tar_1", "tar_2", "tar_3", "sec_2"], combine: "one_pr" });
+    await expect(tarRow).toBeChecked();
+
+    // Esc closes the panel; the selection stays, to change and ask again.
+    await page.keyboard.press("Escape");
+    await expect(req).toHaveCount(0);
+    await expect(bar.getByTestId("bulk-summary")).toContainText("2 fixes selected");
+    await expect(bar.getByTestId("bulk-open")).toBeFocused();
+
+    // At 390 wide: full screen like the other panels, nothing sideways, the footer in view.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await bar.getByTestId("bulk-open").click();
+    await expect(req.getByTestId("fix-unit")).toHaveCount(2);
+    expect(await req.boundingBox()).toEqual({ x: 0, y: 0, width: 390, height: 844 });
+    await shot(page, "390-plan-panel");
+    await req.getByTestId("fix-unit-toggle").first().click();
+    await expect(req.getByTestId("fix-bump")).toHaveCount(5);
+    const sideways = await req.evaluate((e) => {
+      const body = e.querySelector<HTMLElement>("[data-drawer-body]")!;
+      const wide = [...e.querySelectorAll<HTMLElement>("*")].filter((x) => x.getBoundingClientRect().right > window.innerWidth + 0.5).length;
+      return { body: body.scrollWidth - body.clientWidth, wide, doc: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+    });
+    expect(sideways).toEqual({ body: 0, wide: 0, doc: 0 });
+    expect(await footerInView()).toBe(true);
+    await shot(page, "390-plan-expanded");
+    await req.locator("[data-drawer-body]").evaluate((e) => e.scrollTo(0, e.scrollHeight));
+    expect(await footerInView()).toBe(true);
+    await req.getByTestId("fix-cancel").click();
+    await expect(req).toHaveCount(0);
   });
 
   test("a tier still being checked is a muted pill with a clock, never a question mark, and sorts below settled rows", async ({ page }) => {
