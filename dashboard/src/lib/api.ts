@@ -5002,20 +5002,37 @@ export interface NativeUpdate {
 }
 
 /** The install's permissions against its release's access.json (lambda/updater, access_compute). */
+/** New permissions, grouped by what uses them (use: the AWS card's switch, null: always used). */
+export interface NativeAccessGroup {
+  use: string | null;
+  name: string | null;
+  services: string;
+  actions: string[];
+  line: string;
+}
+
 export interface NativeAccess {
-  /** pending | applied | none (a release before access.json) | unknown */
+  /** pending (needed for what the install uses) | optional (only for switches that are off) | applied | none (a release before access.json) | unknown */
   state: string;
   version?: string;
-  /** What it adds, in plain words. */
+  /** What it adds that matters, in plain words. */
   summary?: string[];
+  /** New permissions something the install uses needs, and those only switches that are off would. */
+  needed?: NativeAccessGroup[];
+  later?: NativeAccessGroup[];
+  /** Rules it adds or rewrites (always counted). */
+  rules?: string[];
+  /** What the install has now: the release whose access stack applied it (from "stack"), or when its limit was last written ("policy"). */
+  current?: { version?: string | null; at?: string | null; from?: "stack" | "policy" } | null;
+  /** update: the access stack exists (update it with template_url); create: one link; blocked: a stack of that name a release didn't make. */
+  apply?: "update" | "create" | "blocked" | null;
   resources?: string[];
-  /** The AWS console's quick-create link for the access stack. */
+  /** The AWS console's quick-create link for the access stack (only when there is none yet). */
   link?: string | null;
   template_url?: string;
   stack?: string;
-  /** The access stack exists from an earlier change (delete it first). */
-  /** A stack already named `stack`. kind "access": a release's access.json made it (deleting it changes nothing); "other": something else did, never to delete. */
-  existing?: { status?: string; link?: string; kind?: "access" | "other"; version?: string | null } | null;
+  /** A stack already named `stack`. kind "access": a release's access.json made it (update it); "other": something else did, never touched. version: its Version output. */
+  existing?: { status?: string; link?: string; kind?: "access" | "other"; version?: string | null; at?: string | null } | null;
   reason?: string;
   error?: string;
 }

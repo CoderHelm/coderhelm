@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
+import * as path from "node:path";
 import { pickOption, selectLabels } from "./select";
 
 // A self-hosted install: the dashboard reads where its API is from
@@ -610,88 +611,141 @@ test("System: a prepared update with nothing to confirm applies with one press",
 
 const ACCESS_LINK = "https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/quickcreate?stackName=coderhelm-prod-access&templateURL=https%3A%2F%2Fcoderhelm-public.s3.amazonaws.com%2Flaunch%2Fv2.0.0%2Faccess.json&param_Stage=prod";
 
-test("System: newer permissions are a separate, optional item with one link; the update applies without them", async ({ page }) => {
-  await setup(page, SELF, {
-    signedIn: true,
-    native: { stack: "coderhelm-prod", can_apply: true, auto_apply: true,
-      pending: { ...PREPARED, can_apply: true, confirm: "", hold: "", data_changes: [], permission_changes: [], admin_changes: [], held: ["Boundary", "DeployBoundary"] },
-      access: { state: "pending", version: "v2.0.0", summary: ["adds read access to Airflow, ECR and ECS (airflow:Get*, ecs:Describe*, ecr:List*)"],
-        resources: ["Boundary", "DeployBoundary"], link: ACCESS_LINK, stack: "coderhelm-prod-access", existing: null } },
-  });
+const TEMPLATE = "https://coderhelm-public.s3.amazonaws.com/launch/v2.0.0/access.json";
+const OLD_STACK = "https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?stackId=arn:aws:cloudformation:us-east-1:1:stack/coderhelm-prod-access/x";
+const INFRA = { use: "InfrastructureVulnerabilities", name: "infrastructure vulnerabilities", services: "Auto Scaling, EC2, ECR, EKS and RDS",
+  actions: ["autoscaling:Describe*", "ec2:DescribeI*", "ecr:Describe*", "eks:Describe*", "rds:Describe*"], line: "adds read access to Auto Scaling, EC2, ECR, EKS and RDS (...)" };
+const INSPECTOR = { use: "InspectorFindings", name: "Amazon Inspector findings", services: "Amazon Inspector",
+  actions: ["inspector2:List*", "inspector2:BatchGetA*"], line: "adds read access to Amazon Inspector (inspector2:List*, inspector2:BatchGetA*)" };
+const HEALTH = { use: "HealthEvents", name: "AWS Health events", services: "AWS Health", actions: ["health:Describe*"], line: "adds read access to AWS Health (health:Describe*)" };
+/** What the updater says when Inspector is switched on and the access stack v1.0.0 made on Nov 9 exists. */
+const needed = (over: Record<string, unknown> = {}) => ({
+  state: "pending", version: "v2.0.0", resources: ["Boundary", "DeployBoundary"], needed: [INSPECTOR], later: [INFRA, HEALTH], rules: [],
+  summary: [INSPECTOR.line], apply: "update", link: null, template_url: TEMPLATE, stack: "coderhelm-prod-access",
+  current: { version: "v1.0.0", at: "2026-11-09T18:45:35Z", from: "stack" },
+  existing: { status: "CREATE_COMPLETE", kind: "access", version: "v1.0.0", link: OLD_STACK, at: "2026-11-09T18:45:35Z" }, ...over });
+const nativeWith = (access: unknown) => ({ stack: "coderhelm-prod", can_apply: true, auto_apply: true, pending: null, access });
+
+async function accessShots(page: Page, name: string) {
+  for (const width of [1280, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.getByTestId("native-access").or(page.getByRole("heading", { name: "Version" })).first().scrollIntoViewIfNeeded();
+    await page.screenshot({ path: path.join(ACCESS_SHOTS, `${name}-${width}.png`), fullPage: true });
+  }
+  await page.setViewportSize({ width: 1280, height: 800 });
+}
+const ACCESS_SHOTS = process.env.E2E_SHOTS_DIR || path.join("test-results", "shots");
+
+test("System: newer permissions nothing the install uses needs show no card, only one quiet line", async ({ page }) => {
+  await setup(page, SELF, { signedIn: true, native: nativeWith({ ...needed(), state: "optional", needed: [], later: [INFRA, INSPECTOR, HEALTH], summary: [] }) });
   await page.goto("/settings/system/");
-  const card = page.getByTestId("native-update");
-  await expect(card).toContainText("v2.0.0 is ready to apply");
-  await expect(card).not.toContainText("needs an AWS admin");
-  await expect(page.getByTestId("native-update-held")).toContainText("stay as they are");
-  await expect(page.getByTestId("native-update-apply")).toBeVisible();
-  const access = page.getByTestId("native-access");
-  await expect(access).toContainText("Optional: allow more AWS access");
-  await expect(page.getByTestId("native-access-steps")).toContainText("Create stack");
-  await expect(page.getByTestId("native-access-summary")).toContainText("Adds read access to Airflow, ECR and ECS");
-  await expect(page.getByTestId("native-access-link")).toHaveAttribute("href", ACCESS_LINK);
-  // Nobody is sent to execute the update's change set in the console: it would run as the deploy role there too.
-  await expect(page.getByRole("link", { name: "Open it in the AWS console" })).toHaveCount(0);
+  const line = page.getByTestId("native-access");
+  await expect(line).toHaveAttribute("data-state", "optional");
+  await expect(line).toContainText("nothing needed for what you use");
+  await expect(page.getByText("More AWS access for what you use")).toHaveCount(0);
+  await expect(page.getByText("Optional: allow more AWS access")).toHaveCount(0);
+  await expect(page.getByTestId("native-access-steps")).toHaveCount(0);
+  // Collapsed: what the release would add for the switches that are off, only when asked.
+  await expect(line.getByText("Amazon Inspector findings", { exact: false })).toBeHidden();
+  await accessShots(page, "access-nothing-needed");
+  await line.locator("summary").click();
+  await expect(line).toContainText("Amazon Inspector findings");
 });
 
-test("System: a permissions link that isn't the access stack's quick-create from the release bucket is never rendered", async ({ page }) => {
+test("System: a switched-on read the limit doesn't allow yet: an update of the existing access stack, only the new permissions, never a delete", async ({ page }) => {
+  await setup(page, SELF, { signedIn: true, native: nativeWith(needed()) });
+  await page.goto("/settings/system/");
+  const card = page.getByTestId("native-access");
+  await expect(card).toHaveAttribute("data-state", "update");
+  await expect(card).toContainText("More AWS access for what you use");
+  await expect(page.getByTestId("native-access-current")).toContainText("You allowed access for v1.0.0 on Nov 9");
+  const list = page.getByTestId("native-access-summary");
+  await expect(list).toContainText("Amazon Inspector findings (switched on): read Amazon Inspector (inspector2:List*, inspector2:BatchGetA*)");
+  await expect(list).not.toContainText("EC2");
+  await expect(list).not.toContainText("AWS Health");
+  await expect(page.getByTestId("native-access-later")).toContainText("infrastructure vulnerabilities and AWS Health events, which are off here");
+  await expect(page.getByTestId("native-access-steps")).toContainText("Replace existing template");
+  await expect(page.getByTestId("native-access-steps")).toContainText("Keep every parameter as it is");
+  await expect(page.getByTestId("native-access-template")).toContainText(TEMPLATE);
+  await expect(page.getByTestId("native-access-existing-link")).toHaveAttribute("href", OLD_STACK);
+  await expect(card).not.toContainText(/First delete|then Delete/);
+  await expect(page.getByTestId("native-access-link")).toHaveCount(0);
+  await accessShots(page, "access-update-needed");
+});
+
+test("System: no access stack yet: one link creates it, with only the new permissions", async ({ page }) => {
+  await setup(page, SELF, { signedIn: true, native: nativeWith(needed({ apply: "create", existing: null, link: ACCESS_LINK,
+    current: { version: null, at: "2026-11-09T18:46:15Z", from: "policy" } })) });
+  await page.goto("/settings/system/");
+  const card = page.getByTestId("native-access");
+  await expect(card).toHaveAttribute("data-state", "create");
+  await expect(page.getByTestId("native-access-current")).toContainText("last widened on Nov 9");
+  await expect(page.getByTestId("native-access-steps")).toContainText("Create stack");
+  await expect(page.getByTestId("native-access-link")).toHaveAttribute("href", ACCESS_LINK);
+  await accessShots(page, "access-create-needed");
+});
+
+test("System: once the admin's update runs, the card says so, then clears when the stack's Version names the release", async ({ page }) => {
+  await setup(page, SELF, { signedIn: true, native: nativeWith(needed({ existing: { status: "UPDATE_IN_PROGRESS", kind: "access", version: "v1.0.0", link: OLD_STACK } })) });
+  await page.goto("/settings/system/");
+  await expect(page.getByTestId("native-access")).toHaveAttribute("data-state", "applying");
+  await expect(page.getByTestId("native-access")).toContainText("AWS is updating coderhelm-prod-access");
+  await accessShots(page, "access-updating");
+  // The Version output names this release already: never asks again while the next read settles.
+  await setup(page, SELF, { signedIn: true, native: nativeWith(needed({ existing: { status: "UPDATE_COMPLETE", kind: "access", version: "v2.0.0", link: OLD_STACK } })) });
+  await page.goto("/settings/system/");
+  await expect(page.getByTestId("native-access")).toHaveAttribute("data-state", "applying");
+  // The next read: applied, and nothing shows.
+  await setup(page, SELF, { signedIn: true, native: nativeWith({ state: "applied", version: "v2.0.0" }) });
+  await page.goto("/settings/system/");
+  await expect(page.getByTestId("native-update").or(page.getByRole("heading", { name: "Version" })).first()).toBeVisible();
+  await expect(page.getByTestId("native-access")).toHaveCount(0);
+  await accessShots(page, "access-cleared");
+});
+
+test("System: an update that rolled back says so and offers the same steps again", async ({ page }) => {
+  await setup(page, SELF, { signedIn: true, native: nativeWith(needed({ existing: { status: "UPDATE_ROLLBACK_COMPLETE", kind: "access", version: "v1.0.0", link: OLD_STACK } })) });
+  await page.goto("/settings/system/");
+  await expect(page.getByTestId("native-access")).toHaveAttribute("data-state", "update");
+  await expect(page.getByTestId("native-access-rolled-back")).toContainText("didn't finish (UPDATE_ROLLBACK_COMPLETE)");
+});
+
+test("System: a permissions link or template URL that isn't the updater's is never rendered", async ({ page }) => {
   for (const link of [
     "https://evil.example.com/#/stacks/quickcreate?stackName=coderhelm-prod-access&templateURL=https%3A%2F%2Fcoderhelm-public.s3.amazonaws.com%2Flaunch%2Fv2.0.0%2Faccess.json",
     "https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/quickcreate?stackName=coderhelm-prod-access&templateURL=https%3A%2F%2Fevil.s3.amazonaws.com%2Faccess.json",
     "https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/quickcreate?stackName=anything&templateURL=https%3A%2F%2Fcoderhelm-public.s3.amazonaws.com%2Flaunch%2Fv2.0.0%2Faccess.json",
     "javascript:alert(1)",
   ]) {
-    await setup(page, SELF, {
-      signedIn: true,
-      native: { stack: "coderhelm-prod", can_apply: true, auto_apply: true, pending: null,
-        access: { state: "pending", version: "v2.0.0", summary: ["adds read access to Airflow"], link, stack: "coderhelm-prod-access",
-          existing: { link: "https://evil.example.com/" } } },
-    });
+    await setup(page, SELF, { signedIn: true, native: nativeWith(needed({ apply: "create", existing: null, link })) });
     await page.goto("/settings/system/");
     await expect(page.getByTestId("native-access")).toBeVisible();
     await expect(page.getByTestId("native-access-link")).toHaveCount(0);
-    await expect(page.getByTestId("native-access-existing").locator("a")).toHaveCount(0);
   }
-});
-
-const OLD_STACK = "https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?stackId=arn:aws:cloudformation:us-east-1:1:stack/coderhelm-prod-access/x";
-const accessWith = (existing: Record<string, unknown>) => ({ state: "pending", version: "v2.0.0", summary: ["adds access to Bedrock (bedrock:Retrieve)"],
-  resources: ["Boundary"], link: ACCESS_LINK, stack: "coderhelm-prod-access", existing: { link: OLD_STACK, ...existing } });
-
-test("System: an older access stack is deleted first, and the create link shows only once it's gone", async ({ page }) => {
-  await setup(page, SELF, { signedIn: true, native: { stack: "coderhelm-prod", can_apply: true, auto_apply: true, pending: null,
-    access: accessWith({ status: "CREATE_COMPLETE", kind: "access", version: "v1.0.0" }) } });
+  await setup(page, SELF, { signedIn: true, native: nativeWith(needed({ template_url: "https://evil.s3.amazonaws.com/access.json",
+    existing: { status: "CREATE_COMPLETE", kind: "access", version: "v1.0.0", link: "https://evil.example.com/" } })) });
   await page.goto("/settings/system/");
-  await expect(page.getByTestId("native-access-existing")).toContainText("First delete the stack coderhelm-prod-access that v1.0.0 made");
-  await expect(page.getByTestId("native-access-steps")).toContainText("then Delete");
-  await expect(page.getByTestId("native-access-existing-link")).toHaveAttribute("href", OLD_STACK);
-  // The create link would fail with AlreadyExistsException while it exists.
-  await expect(page.getByTestId("native-access-link")).toHaveCount(0);
+  await expect(page.getByTestId("native-access")).toHaveAttribute("data-state", "update");
+  await expect(page.getByTestId("native-access-template")).toHaveCount(0);
+  await expect(page.getByTestId("native-access-existing-link")).toHaveCount(0);
 });
 
-test("System: while the old access stack is deleting, the card says so and still has no create link", async ({ page }) => {
-  await setup(page, SELF, { signedIn: true, native: { stack: "coderhelm-prod", can_apply: true, auto_apply: true, pending: null,
-    access: accessWith({ status: "DELETE_IN_PROGRESS", kind: "access", version: "v1.0.0" }) } });
+test("System: an older updater's view (summary only) still shows its lines", async ({ page }) => {
+  await setup(page, SELF, { signedIn: true, native: nativeWith({ state: "pending", version: "v2.0.0", summary: ["adds read access to Airflow, ECR and ECS (airflow:Get*, ecs:Describe*, ecr:List*)"],
+    resources: ["Boundary", "DeployBoundary"], link: ACCESS_LINK, stack: "coderhelm-prod-access", existing: null }) });
   await page.goto("/settings/system/");
-  await expect(page.getByTestId("native-access")).toHaveAttribute("data-state", "deleting");
-  await expect(page.getByTestId("native-access-link")).toHaveCount(0);
+  await expect(page.getByTestId("native-access-summary")).toContainText("Adds read access to Airflow, ECR and ECS");
+  await expect(page.getByTestId("native-access-link")).toHaveAttribute("href", ACCESS_LINK);
 });
 
-test("System: this release's access stack, just made, reads as being applied, never as one to delete", async ({ page }) => {
-  await setup(page, SELF, { signedIn: true, native: { stack: "coderhelm-prod", can_apply: true, auto_apply: true, pending: null,
-    access: accessWith({ status: "CREATE_COMPLETE", kind: "access", version: "v2.0.0" }) } });
-  await page.goto("/settings/system/");
-  await expect(page.getByTestId("native-access")).toHaveAttribute("data-state", "creating");
-  await expect(page.getByTestId("native-access-existing")).toHaveCount(0);
-});
-
-test("System: a stack of that name a release didn't make is never called safe to delete", async ({ page }) => {
-  await setup(page, SELF, { signedIn: true, native: { stack: "coderhelm-prod", can_apply: true, auto_apply: true, pending: null,
-    access: accessWith({ status: "UPDATE_COMPLETE", kind: "other", version: null }) } });
+test("System: a stack of that name a release didn't make is never updated or called safe to delete", async ({ page }) => {
+  await setup(page, SELF, { signedIn: true, native: nativeWith(needed({ apply: "blocked", existing: { status: "UPDATE_COMPLETE", kind: "other", version: null, link: OLD_STACK } })) });
   await page.goto("/settings/system/");
   const card = page.getByTestId("native-access");
   await expect(card).toHaveAttribute("data-state", "name-taken");
   await expect(card).toContainText("Don't delete it");
   await expect(card).not.toContainText("changes nothing");
+  await expect(page.getByTestId("native-access-steps")).toHaveCount(0);
   await expect(page.getByTestId("native-access-link")).toHaveCount(0);
 });
 
