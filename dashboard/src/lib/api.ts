@@ -4308,6 +4308,8 @@ export interface AwsPermissions {
   update: { url: string; stack_name: string; template_url: string; sign_in_account: string; stacks_url: string } | null;
   /** The self-hosted install's own account: its read-only permissions come with version updates, never from a stack in AWS. */
   install_account?: boolean;
+  /** The role checked (its name). */
+  role?: string;
   problem: { code: string; message: string; fix: string } | null;
 }
 

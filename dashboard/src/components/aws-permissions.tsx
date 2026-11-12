@@ -316,7 +316,14 @@ export function PermissionsPanel({ account, perms, canEdit }: { account: string;
           {install ? (
             <div className="sm:pl-8">
               {canEdit ? (
-                <InstallNeededNow s={status} problem={v.problem} onCheck={() => perms.check(account, true)} checking={s.checking} />
+                <InstallNeededNow
+                  s={status}
+                  problem={v.problem}
+                  onCheck={() => perms.check(account, true)}
+                  checking={s.checking}
+                  role={v.role}
+                  missing={v.missing.map((m) => m.action)}
+                />
               ) : (
                 <p className="text-sm text-zinc-400">An admin adds it from this card with the install&apos;s next version update.</p>
               )}

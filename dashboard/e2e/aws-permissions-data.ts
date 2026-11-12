@@ -73,6 +73,7 @@ export function permissionsView(
         : []),
     ],
     install_account: !!opts.install,
+    role: opts.install ? "coderhelm-prod-ServiceRole-0a1b2c3d" : "CoderHelmLogReader",
     update:
       status === "update_needed" && !opts.install
         ? {

@@ -217,13 +217,18 @@ test("this version already grants it: the card says exactly why and offers the f
   await shot(page, "aws-install-current-boundary");
 });
 
-test("this version already grants it and nothing blocks it: drift, said plainly", async ({ page }) => {
+test("no newer version and nothing blocks it: what IAM says is missing, on which role, never a claim about the stack", async ({ page }) => {
   await backend(page, { missing: ["logs:StopQuery"] });
   await page.goto("/settings/integrations/aws/");
   const panel = page.getByTestId(`aws-perms-${INSTALL}`);
   await expect(panel.getByRole("heading", { name: "1 permission missing from this install's read role" })).toBeVisible();
-  await expect(panel.getByTestId("install-needed-current")).toContainText("already runs v1.4.0, whose stack grants it");
-  await expect(panel.getByTestId("install-needed-current").getByRole("button", { name: "Check again" })).toBeVisible();
+  const why = panel.getByTestId("install-needed-current");
+  await expect(why).toContainText("IAM's policy simulator says coderhelm-prod-ServiceRole-0a1b2c3d isn't allowed logs:StopQuery");
+  await expect(why).toContainText("no newer version is out yet");
+  // Nothing it didn't read: no "your stack grants it", no drift.
+  await expect(why).not.toContainText(/grants it, yet|drift|changed in AWS/);
+  await expect(why.getByRole("button", { name: "Check again" })).toBeVisible();
+  await shot(page, "aws-install-missing-no-update");
 });
 
 test("an optional read switches on the install's own stack: review of exactly what it adds, confirm, progress, result", async ({ page }) => {

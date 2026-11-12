@@ -100,9 +100,14 @@ export function InstallNeededNow({
   problem,
   onCheck,
   checking,
+  role,
+  missing = [],
 }: {
   s: InstallStatus;
   problem: { code: string; message: string; fix: string } | null;
+  /** The role IAM checked, and the actions it lacks. */
+  role?: string;
+  missing?: string[];
   onCheck: () => void;
   checking: boolean;
 }) {
@@ -207,9 +212,15 @@ export function InstallNeededNow({
   return (
     <div className="flex flex-col gap-2" data-testid="install-needed-current">
       <p className="text-sm text-zinc-300">
-        This install already runs {data.current.version ?? "the newest release"}, whose stack grants it, yet the role doesn&apos;t have it. Either the stack&apos;s
-        last update didn&apos;t finish, or the role&apos;s policy was changed in AWS outside Coderhelm. The next version update puts the policy back; until then
-        an AWS admin can compare the stack <Code>{data.native?.stack ?? "coderhelm-<name>"}</Code> with its template (drift detection in the AWS console).
+        IAM&apos;s policy simulator says {role ? <Code>{role}</Code> : "this install's read role"} isn&apos;t allowed{" "}
+        {missing.map((a, i) => (
+          <span key={a}>
+            {i ? ", " : ""}
+            <Code>{a}</Code>
+          </span>
+        ))}
+        . This install runs {data.current.version ?? "the newest release"} and no newer version is out yet; the version update that grants it adds it to this role,
+        with nothing to do in AWS. Check again re-reads the role now.
       </p>
       <div className="flex flex-wrap items-center gap-2">{checkAgain}</div>
     </div>
