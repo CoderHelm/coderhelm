@@ -32,7 +32,9 @@ test.describe("knowledge base page", () => {
     await mockKnowledge(page, db);
     await page.goto("/knowledge/base/?id=kb_dw");
     await expect(page.getByRole("heading", { level: 1, name: "Data warehouse docs" })).toBeVisible();
-    await expect(page.getByTestId("base-status")).toHaveText("Up to date");
+    // One state with the Problems list below: a page that couldn't be read
+    // is never "Up to date" beside "1 problem".
+    await expect(page.getByTestId("base-status")).toHaveText("1 page couldn't be read");
     await expect(page.getByTestId("page-header").getByText("Source of truth", { exact: true })).toBeVisible();
     // The base is read without its items; the items come a page at a time.
     expect(db.calls).toContain("GET /api/knowledge/kb_dw?items=none");
