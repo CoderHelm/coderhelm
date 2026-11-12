@@ -188,8 +188,6 @@ function RunDetailInner() {
   const tracesLoaded = useRef(false);
   const [pipelineOpen, setPipelineOpen] = useState(false);
   const [agentLog, setAgentLog] = useState<AgentLog | null>(null);
-  // A link into the log (a step, a search, a filter) opens it.
-  const [agentLogOpen, setAgentLogOpen] = useState(() => ["step", "log_q", "log_filter", "log_file", "log_view", "log_time"].some((k) => searchParams.has(k)));
   const [agentLogFailed, setAgentLogFailed] = useState(false);
   const agentLogLoaded = useRef(false);
   const { toast } = useToast();
@@ -246,17 +244,28 @@ function RunDetailInner() {
     api.getAgentLog(runId).then(setAgentLog).catch(() => { agentLogLoaded.current = false; setAgentLogFailed(true); });
   }, [runId]);
 
-  // The log loads when the panel opens, and on the Overview for the build's digest.
+  // A link into the log from before it had its own tab (Details, or no tab,
+  // with a step, a search or a filter) lands on the Agent log tab.
   const tabParam = searchParams.get("tab");
-  const wantsLog = (agentLogOpen && tabParam === "details") || (!tabParam || tabParam === "overview");
-  const hasBuild = !!run?.pass_history?.some((h) => h.pass.startsWith("implement"));
+  const oldLogLink = (!tabParam || tabParam === "details") && LOG_PARAMS.some((k) => searchParams.has(k));
   useEffect(() => {
-    if (!run || agentLogLoaded.current) return;
-    if (!(agentLogOpen && tabParam === "details") && !hasBuild) return;
-    if (!wantsLog) return;
+    if (!oldLogLink) return;
+    const next = new URLSearchParams(searchParams.toString());
+    next.set("tab", "log");
+    router.replace(`/runs/detail?${next.toString()}`, { scroll: false });
+  }, [oldLogLink, searchParams, router]);
+
+  // The log loads the first time its tab opens, and on the Overview for the
+  // build's digest; the other tabs never fetch it.
+  const onLogTab = tabParam === "log" || oldLogLink;
+  const onOverview = !oldLogLink && (!tabParam || tabParam === "overview" || !(RUN_TABS as readonly string[]).includes(tabParam));
+  const hasBuild = !!run?.pass_history?.some((h) => h.pass.startsWith("implement"));
+  const wantsLog = onLogTab || (onOverview && hasBuild);
+  useEffect(() => {
+    if (!run || agentLogLoaded.current || !wantsLog) return;
     agentLogLoaded.current = true;
     loadAgentLog();
-  }, [run, wantsLog, hasBuild, agentLogOpen, tabParam, loadAgentLog]);
+  }, [run, wantsLog, loadAgentLog]);
 
   // Refresh the agent log every 10s while it is shown and the run is working.
   useEffect(() => {
@@ -555,7 +564,7 @@ function RunDetailInner() {
       </Link>
     </p>
   ) : null;
-  const tab: RunTab = (RUN_TABS as readonly string[]).includes(searchParams.get("tab") ?? "") ? (searchParams.get("tab") as RunTab) : "overview";
+  const tab: RunTab = onLogTab ? "log" : (RUN_TABS as readonly string[]).includes(tabParam ?? "") ? (tabParam as RunTab) : "overview";
   const tabHref = (t: RunTab) => `/runs/detail?id=${encodeURIComponent(runId)}${t === "overview" ? "" : `&tab=${t}`}`;
   const sourceWord = run.ticket_source === "jira" ? "Jira ticket" : run.ticket_source === "alert" ? "Alert" : "Issue";
   // "your-team/web#1234" in "your-team/web" says the repo twice: show "Issue #1234".
@@ -1104,7 +1113,8 @@ function RunDetailInner() {
         <div className="mt-6 space-y-6" data-testid="run-tab-overview">
           {/* What waits on a person comes first, before the steps and the numbers. */}
           <WaitingOnYou data={asks} live={asksAreCurrent} note={run.policy_note} prompts={run.sign_in_prompts} />
-          <div className={tasksCard ? "grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]" : ""}>
+          {/* One grid with or without the tasks card, so the cards and the row of numbers under them keep the page's gap-6. */}
+          <div className={`grid gap-6 ${tasksCard ? "lg:grid-cols-[minmax(0,1fr)_18rem]" : ""}`}>
             <div className="min-w-0 lg:col-start-1">
               <RunTimeline
                 steps={steps}
@@ -1127,7 +1137,7 @@ function RunDetailInner() {
                       log={agentLog}
                       traces={traces}
                       live={run.status === "running"}
-                      href={(step) => `/runs/detail?id=${encodeURIComponent(runId)}&tab=details${step ? `&step=${encodeURIComponent(step)}` : ""}`}
+                      href={(step) => `${tabHref("log")}${step ? `&step=${encodeURIComponent(step)}` : ""}`}
                     />
                   ) : undefined
                 }
@@ -1168,10 +1178,11 @@ function RunDetailInner() {
                 </Callout>
               )}
 
-              <dl className="flex flex-wrap gap-x-6 gap-y-2 text-sm" title={usageBreakdown(usageOf(run))} aria-label="About this run">
+              {/* Lined up with the text inside the cards above (their px-4). */}
+              <dl className="flex flex-wrap gap-x-6 gap-y-2 px-4 text-sm" title={usageBreakdown(usageOf(run))} aria-label="About this run" data-testid="run-stats">
                 <div className="flex items-baseline gap-2" data-testid="stat-time">
                   <dt className="text-zinc-400">Time</dt>
-                  <dd className="font-mono tabular-nums text-zinc-200">{runSecs ? sharedDuration(runSecs) : "—"}</dd>
+                  <dd className="tabular-nums text-zinc-200">{runSecs ? sharedDuration(runSecs) : "—"}</dd>
                 </div>
                 <div className="flex flex-wrap items-baseline gap-x-2" data-testid="stat-usage">
                   <dt className="text-zinc-400">AI usage</dt>
@@ -1296,6 +1307,25 @@ function RunDetailInner() {
         </div>
       )}
 
+      {tab === "log" && (
+        <section aria-labelledby="agent-log-heading" className="mt-6 min-w-0" data-testid="run-tab-log">
+          <h2 id="agent-log-heading" className="sr-only">Agent log</h2>
+          <div className="min-w-0 overflow-hidden rounded-lg border border-zinc-800">
+            {agentLogFailed && !agentLog ? (
+              <div className="p-4">
+                <Problem title="Couldn't load the agent log." compact onRetry={() => { agentLogLoaded.current = true; loadAgentLog(); }}>
+                  Check your connection and try again.
+                </Problem>
+              </div>
+            ) : !agentLog ? (
+              <div className="p-4 text-sm text-zinc-400" role="status">Loading the agent log…</div>
+            ) : (
+              <AgentLogPanel log={agentLog} traces={traces} runId={runId} live={isActive(run.status)} diffUrl={prLinks.length === 1 && run.pr_url ? `${run.pr_url.replace(/\/$/, "")}/files` : undefined} />
+            )}
+          </div>
+        </section>
+      )}
+
       {tab === "details" && (
         <div className="mt-6 space-y-8" data-testid="run-tab-details">
           <section aria-labelledby="tokens-heading" className="space-y-3">
@@ -1315,42 +1345,6 @@ function RunDetailInner() {
               <PassPipeline traces={traces} open={pipelineOpen} onToggle={() => setPipelineOpen((o) => !o)} />
             </section>
           )}
-
-          <section aria-labelledby="agent-log-heading" className="space-y-3">
-            <h2 id="agent-log-heading" className="sr-only">Agent log</h2>
-            <button
-              type="button"
-              aria-expanded={agentLogOpen}
-              onClick={() => {
-                setAgentLogOpen((o) => !o);
-                if (!agentLogLoaded.current) {
-                  agentLogLoaded.current = true;
-                  loadAgentLog();
-                }
-              }}
-              className={`flex items-center gap-1.5 rounded text-sm font-semibold text-zinc-100 hover:text-white ${focusRing}`}
-            >
-              <span aria-hidden="true" className={`inline-flex text-zinc-400 transition-transform motion-reduce:transition-none ${agentLogOpen ? "rotate-90" : ""}`}>
-                <ChevronRightIcon />
-              </span>
-              Agent log
-            </button>
-            {agentLogOpen && (
-              <div className="overflow-hidden rounded-lg border border-zinc-800">
-                {agentLogFailed && !agentLog ? (
-                  <div className="p-4">
-                    <Problem title="Couldn't load the agent log." compact onRetry={() => { agentLogLoaded.current = true; loadAgentLog(); }}>
-                      Check your connection and try again.
-                    </Problem>
-                  </div>
-                ) : !agentLog ? (
-                  <div className="p-4 text-sm text-zinc-400">Loading…</div>
-                ) : (
-                  <AgentLogPanel log={agentLog} traces={traces} runId={runId} live={isActive(run.status)} diffUrl={prLinks.length === 1 && run.pr_url ? `${run.pr_url.replace(/\/$/, "")}/files` : undefined} />
-                )}
-              </div>
-            )}
-          </section>
 
           <section aria-labelledby="meta-heading" className="space-y-3">
             <SectionHeading id="meta-heading">Run</SectionHeading>
@@ -1396,9 +1390,11 @@ function RunDetailInner() {
   );
 }
 
-const RUN_TABS = ["overview", "changes", "activity", "details"] as const;
+const RUN_TABS = ["overview", "changes", "activity", "log", "details"] as const;
 type RunTab = (typeof RUN_TABS)[number];
-const RUN_TAB_LABEL: Record<RunTab, string> = { overview: "Overview", changes: "Changes", activity: "Activity", details: "Details" };
+const RUN_TAB_LABEL: Record<RunTab, string> = { overview: "Overview", changes: "Changes", activity: "Activity", log: "Agent log", details: "Details" };
+/** The agent log's own URL state (agent-log.tsx): a link carrying any of these points into the log. */
+const LOG_PARAMS = ["step", "log_q", "log_filter", "log_file", "log_view", "log_time"];
 
 type OutcomeTone = "success" | "waiting" | "attention" | "live" | "neutral";
 

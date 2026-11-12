@@ -569,13 +569,10 @@ test("a run that doesn't exist says so, and a server error offers a retry", asyn
   await expect(page.getByRole("heading", { name: "Show the class schedule on the details page" })).toBeVisible();
 });
 
-test("the agent log opens with the keyboard state announced, and a failed load can be retried", async ({ page }) => {
+test("the agent log tab shows a failed load that can be retried", async ({ page }) => {
   const db = await mockApi(page, { agentLogFail: true });
-  await page.goto("/runs/detail/?id=01RUNDONE000000000000000A&tab=details");
-  const toggle = page.getByRole("button", { name: "Agent log" });
-  await expect(toggle).toHaveAttribute("aria-expanded", "false");
-  await toggle.click();
-  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await page.goto("/runs/detail/?id=01RUNDONE000000000000000A&tab=log");
+  await expect(page.getByRole("link", { name: "Agent log" })).toHaveAttribute("aria-current", "page");
   await expect(page.getByText("Couldn't load the agent log.")).toBeVisible();
   db.agentLogFail = false;
   await page.getByRole("button", { name: "Try again" }).click();
