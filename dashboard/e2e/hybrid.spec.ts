@@ -30,6 +30,10 @@ interface State {
   driveOffered?: boolean;
   /** A native install's uninstall choice (Settings, System, Uninstall); absent on an older release. */
   uninstall?: { delete_data: boolean; changed_by: string | null; changed_at: string | null };
+  /** The address's checks as the gateway sends them, in place of the default "Certificate for" line. */
+  nameChecks?: { id: string; status: string; code: string; title: string; fix: string | null }[];
+  /** Coderhelm's 15-minute check of the address (`name.check`). */
+  nameWatch?: Record<string, unknown> | null;
 }
 
 interface Call {
@@ -45,7 +49,7 @@ function status(s: State) {
     { id: "hybrid_registered", status: s.registered ? "pass" : "todo", code: s.registered ? "ok" : "not_registered", title: "Registered with Coderhelm", fix: s.registered ? null : "Press Register with Coderhelm." },
     ...(s.registered ? [{ id: "hybrid_relay", status: s.verified ? "pass" : "fail", code: s.verified ? "ok" : "signature_mismatch", title: "Events from Coderhelm are signed for this install", fix: s.verified ? null : "Register again so this install and Coderhelm share the same signing key." }] : []),
     ...(s.registered ? [{ id: "hybrid_github", status: s.links.length ? "pass" : "todo", code: s.links.length ? "ok" : "no_link", title: "Coderhelm's GitHub App is linked", fix: s.links.length ? null : "Press Install on GitHub, or use your own GitHub App." }] : []),
-    ...(s.name ? [{ id: "hybrid_name", status: "wait", code: "cert_pending", title: `Certificate for ${s.name.hostname}`, fix: "Coderhelm is issuing it. This takes a few minutes." }] : []),
+    ...(s.name ? s.nameChecks ?? [{ id: "hybrid_name", status: "wait", code: "cert_pending", title: `Certificate for ${s.name.hostname}`, fix: "Coderhelm is issuing it. This takes a few minutes." }] : []),
   ];
   return {
     available: true,
@@ -54,7 +58,7 @@ function status(s: State) {
     install_id: s.registered ? "ins_abcdefghijklmnopqrstuvwx" : null,
     cloudfront: "d111test.cloudfront.net",
     verified: s.verified,
-    name: s.name,
+    name: s.name ? { ...s.name, check: s.nameWatch ?? null } : null,
     github: { mode: s.mode, links: s.links, app_slug: "coderhelm" },
     integrations: [
       { id: "github", name: "GitHub", mode: "hosted", through_coderhelm: "Webhook events, on their way to this install.", stays_with_you: "Your code: the install reads it straight from GitHub.", uses_coderhelm: s.mode === "hosted" },
@@ -647,4 +651,96 @@ test("uninstall, hybrid: a plain warning that the forwarded GitHub installations
   await expect(page.getByTestId("uninstall-hybrid")).toContainText("back to Coderhelm hosted");
   await expect(page.getByTestId("uninstall-link")).toHaveAttribute("href", "https://docs.coderhelm.com/self-host/uninstall/?stage=acme&region=eu-west-1");
   if (process.env.E2E_SHOTS_DIR) await page.getByTestId("uninstall-section").screenshot({ path: path.join(SHOTS_DIR, "system-uninstall.png") });
+});
+
+// ── The Coderhelm address card: one state, from the latest check ─────────
+
+const ADDR = { name: "example-org", hostname: "example-org.coderhelm.com", code: "ok" };
+const LIVE = { id: "hybrid_name", status: "pass", code: "ok", title: "example-org.coderhelm.com is live", fix: null };
+const PARKED_NOTE = {
+  id: "hybrid_name_parked",
+  status: "fail",
+  code: "origin_gone",
+  title: "The CloudFront address this name pointed at stopped answering as this install, so CoderHelm put the address back on its holding page. Settings, System, Domain sets it up again.",
+  fix: "Open Settings, System, Domain and press Try again. If the install moved to a new CloudFront address, set the name up again there.",
+};
+const CARD_SHOTS = process.env.E2E_SHOTS_DIR || path.join("test-results", "shots", "domain-card");
+
+async function cardShot(page: Page, name: string) {
+  fs.mkdirSync(CARD_SHOTS, { recursive: true });
+  for (const [w, h] of [[1280, 900], [390, 844]] as const) {
+    await page.setViewportSize({ width: w, height: h });
+    const row = page.getByTestId("hybrid-name");
+    await row.scrollIntoViewIfNeeded();
+    // No sideways scroll at phone width.
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+    await row.screenshot({ path: path.join(CARD_SHOTS, `${name}-${w}.png`) });
+  }
+}
+
+async function oneState(page: Page) {
+  const row = page.getByTestId("hybrid-name");
+  const lines = row.getByTestId("hybrid-name-checks").getByTestId("hybrid-check");
+  await expect(lines).toHaveCount(1);
+  // Never live and needing a fix at once, in the card or in the checks below it.
+  for (const where of [row, page.getByTestId("hybrid-checks")]) {
+    const text = (await where.innerText()).toLowerCase();
+    expect(text.includes("passed") && text.includes("needs a fix") && text.includes("coderhelm.com is live") && text.includes("holding page")).toBe(false);
+  }
+  return lines.first();
+}
+
+test("address card: a live address with a stale parked note from an older gateway shows only that it is live", async ({ page }) => {
+  await setup(page, SELF, {
+    registered: true, verified: true, name: ADDR,
+    nameChecks: [LIVE, PARKED_NOTE],
+    nameWatch: { state: "parked", checked_at: "2026-11-11T15:45:00Z", parked: true, parked_code: "origin_gone", parked_reason: PARKED_NOTE.title, parked_at: "2026-11-11T15:45:00Z" },
+  });
+  await page.goto("/settings/system/");
+  const line = await oneState(page);
+  await expect(line).toHaveAttribute("data-status", "pass");
+  await expect(line).toContainText("example-org.coderhelm.com is live");
+  await expect(page.getByTestId("hybrid-name")).not.toContainText("holding page");
+  await expect(page.getByTestId("hybrid-checks")).not.toContainText("holding page");
+  await expect(page.getByTestId("hybrid-checks").locator('[data-status="fail"]')).toHaveCount(0);
+  await cardShot(page, "live-stale-note-hidden");
+});
+
+test("address card: recovered shows live, with when it recovered as a quiet history line", async ({ page }) => {
+  const recovered = new Date(Date.now() - 3 * 3600_000).toISOString();
+  await setup(page, SELF, {
+    registered: true, verified: true, name: ADDR,
+    nameChecks: [LIVE],
+    nameWatch: { state: "ok", checked_at: new Date().toISOString(), parked: false, parked_code: null, parked_reason: null, parked_at: null, recovered_at: recovered, recovered_code: "origin_gone", last_parked_at: recovered },
+  });
+  await page.goto("/settings/system/");
+  const line = await oneState(page);
+  await expect(line).toHaveAttribute("data-status", "pass");
+  await expect(page.getByTestId("hybrid-name-history")).toContainText("Recovered at");
+  await expect(page.getByTestId("hybrid-name-history")).toContainText("moved it back by itself");
+  await cardShot(page, "recovered-history");
+});
+
+test("address card: a parked address that doesn't answer shows one line that needs a fix", async ({ page }) => {
+  await setup(page, SELF, {
+    registered: true, verified: true, name: ADDR,
+    nameChecks: [{ ...PARKED_NOTE, id: "hybrid_name" }],
+    nameWatch: { state: "parked", checked_at: "2026-11-11T15:45:00Z", parked: true, parked_code: "origin_gone", parked_reason: PARKED_NOTE.title, parked_at: "2026-11-11T15:45:00Z" },
+  });
+  await page.goto("/settings/system/");
+  const line = await oneState(page);
+  await expect(line).toHaveAttribute("data-status", "fail");
+  await expect(line).toContainText("holding page");
+  await expect(line).toContainText("How to fix");
+  await expect(page.getByTestId("hybrid-name-history")).toHaveCount(0);
+  await cardShot(page, "parked-one-line");
+});
+
+test("address card: offers your own domain plainly, with its docs", async ({ page }) => {
+  await setup(page, SELF, { registered: true, verified: true, name: ADDR, nameChecks: [LIVE] });
+  await page.goto("/settings/system/");
+  const own = page.getByTestId("hybrid-own-domain");
+  await expect(own.getByTestId("hybrid-own-domain-link")).toHaveText("Use your own domain");
+  await expect(own.getByTestId("hybrid-own-domain-link")).toHaveAttribute("href", /\/settings\/system\/?#domain$/);
+  await expect(own.getByRole("link", { name: /How it works/ })).toHaveAttribute("href", "https://docs.coderhelm.com/self-host/domains/");
 });

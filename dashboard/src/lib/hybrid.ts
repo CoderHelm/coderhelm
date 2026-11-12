@@ -4,11 +4,45 @@
 // the System page, the integration pages and the tests agree.
 
 import { useCallback, useEffect, useState } from "react";
-import { api, errorStatus, type HybridAppsMode, type HybridIntegration, type HybridStatus, type HybridSettingsPatch } from "./api";
+import { api, errorStatus, type HybridAppsMode, type HybridCheck, type HybridIntegration, type HybridNameWatch, type HybridStatus, type HybridSettingsPatch } from "./api";
 import { apiBase, isSelfHosted } from "./runtime-config";
 
 /** Where the trust model is written down. */
 export const TRUST_MODEL_URL = "https://docs.coderhelm.com/self-host/hybrid/#trust-model";
+
+/** Where using your own domain is written down, and where it is set up. */
+export const OWN_DOMAIN_DOCS_URL = "https://docs.coderhelm.com/self-host/domains/";
+export const OWN_DOMAIN_HREF = "/settings/system#domain";
+
+const isNameCheck = (c: HybridCheck) => c.id === "hybrid_name" || c.id.startsWith("hybrid_name_");
+
+/**
+ * The address's one line, from the latest checks. A passing check of the
+ * address wins: an older install also sends Coderhelm's parked note as a
+ * second line, and once the address answers as this install that note is out
+ * of date. Otherwise the first line that needs a fix, then the first waiting.
+ */
+export function addressLine(checks: HybridCheck[]): HybridCheck | null {
+  const name = checks.filter(isNameCheck);
+  const rank = (c: HybridCheck) => (c.status === "pass" ? 0 : c.status === "fail" ? 1 : c.status === "wait" ? 2 : 3);
+  return name.length ? [...name].sort((a, b) => rank(a) - rank(b))[0] : null;
+}
+
+/** Every check, with the address as its one current line. */
+export function currentChecks(checks: HybridCheck[]): HybridCheck[] {
+  const line = addressLine(checks);
+  return checks.filter((c) => !isNameCheck(c) || c === line);
+}
+
+/** "Recovered 15:52, Nov 11", from Coderhelm's check, when the address came back within the last week and works now. */
+export function recoveredNote(watch: HybridNameWatch | null | undefined, line: HybridCheck | null, now = Date.now()): string | null {
+  const at = watch?.recovered_at ? Date.parse(watch.recovered_at) : NaN;
+  if (!line || line.status !== "pass" || Number.isNaN(at) || now - at > 7 * 86_400_000) return null;
+  const d = new Date(at);
+  const time = d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  const day = d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return `Recovered at ${time}, ${day}. Coderhelm had moved the address to its holding page while this install wasn't answering, and moved it back by itself.`;
+}
 
 /** The Hybrid section on Settings, then System. */
 export const HYBRID_HREF = "/settings/system/#hybrid";

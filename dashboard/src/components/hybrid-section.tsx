@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { api, type HybridAppsMode, type HybridCheck, type HybridGithubLink, type HybridNameCheck, type HybridStatus } from "@/lib/api";
-import { APPS_MODES, GITHUB_OUTCOMES, NAME_CODES, TRUST_MODEL_URL, appTools, appsModeOf, appsModePatch, cleanName, useHybrid, type HybridState } from "@/lib/hybrid";
+import { APPS_MODES, GITHUB_OUTCOMES, NAME_CODES, OWN_DOMAIN_DOCS_URL, OWN_DOMAIN_HREF, TRUST_MODEL_URL, addressLine, appTools, appsModeOf, appsModePatch, cleanName, currentChecks, recoveredNote, useHybrid, type HybridState } from "@/lib/hybrid";
 import { Callout } from "./callout";
 import { CopyButton } from "./copy-button";
 import { useConfirm } from "./confirm-dialog";
@@ -124,7 +124,7 @@ export function HybridSection() {
         </>
       )}
 
-      <ChecksRow hybrid={hybrid} checks={s.checks ?? []} />
+      <ChecksRow hybrid={hybrid} checks={currentChecks(s.checks ?? [])} />
 
       <div className={`${row} flex flex-wrap gap-x-6 gap-y-2`}>
         <a href={TRUST_MODEL_URL} target="_blank" rel="noopener noreferrer" className={`${linkButton} gap-1.5`}>
@@ -325,7 +325,7 @@ function NameRow({ hybrid, s }: RowProps) {
     };
   }, [name]);
 
-  const nameChecks = (s.checks ?? []).filter((c) => c.id === "hybrid_name" || c.id.startsWith("hybrid_name"));
+  const line = addressLine(s.checks ?? []);
 
   if (s.name) {
     const url = `https://${s.name.hostname}`;
@@ -357,11 +357,22 @@ function NameRow({ hybrid, s }: RowProps) {
           </a>
           <CopyButton text={url} variant="link" className="shrink-0" />
         </div>
-        {nameChecks.length > 0 && (
-          <ul className="mt-3 divide-y divide-zinc-800 overflow-hidden rounded-lg border border-zinc-800" aria-label="Address checks" data-testid="hybrid-name-checks">
-            {nameChecks.map((c) => <HybridCheckRow key={`${c.id}-${c.code}`} check={c} />)}
+        {line && (
+          <ul className="mt-3 overflow-hidden rounded-lg border border-zinc-800" aria-label="Address check" data-testid="hybrid-name-checks">
+            <HybridCheckRow check={line} />
           </ul>
         )}
+        {(() => {
+          const note = recoveredNote(s.name.check, line);
+          return note ? <p className="mt-2 text-xs text-zinc-400" data-testid="hybrid-name-history">{note}</p> : null;
+        })()}
+        <p className="mt-3 text-sm text-zinc-400" data-testid="hybrid-own-domain">
+          Prefer an address on your company&apos;s domain?{" "}
+          <Link href={OWN_DOMAIN_HREF} className={linkButton} data-testid="hybrid-own-domain-link">Use your own domain</Link>.{" "}
+          <a href={OWN_DOMAIN_DOCS_URL} target="_blank" rel="noopener noreferrer" className={`${linkButton} gap-1`}>
+            How it works <ExternalLinkIcon />
+          </a>
+        </p>
       </div>
     );
   }
