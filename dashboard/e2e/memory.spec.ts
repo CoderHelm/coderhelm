@@ -14,12 +14,14 @@ const iso = (daysAgo: number) => new Date(now - daysAgo * 86_400_000).toISOStrin
 interface Mem {
   id: string; content: string; topic: string; pinned: boolean; source: "run" | "person";
   title?: string; added_by?: string; edited_by?: string; uses: number; created: number;
+  flagged?: { at: string; note: string; link?: string };
 }
 
 function seed(): Mem[] {
   return [
     { id: "m1", content: "Run unit tests with pnpm test:unit; the e2e suite needs staging.", topic: "procedure", pinned: true, source: "person", added_by: "admin@example.com", uses: 7, created: 20 },
-    { id: "m2", content: "Prices come from the pricing service; never hardcode amounts in copy.", topic: "anti-pattern", pinned: false, source: "run", title: "Fix the checkout total after a coupon", uses: 3, created: 5 },
+    { id: "m2", content: "Prices come from the pricing service; never hardcode amounts in copy.", topic: "anti-pattern", pinned: false, source: "run", title: "Fix the checkout total after a coupon", uses: 3, created: 5,
+      flagged: { at: iso(1), note: "`src/pricing/client.ts:14`: the pricing service was replaced by the prices table", link: "https://github.com/your-team/web/pull/33" } },
     { id: "m3", content: "Components live in src/components and use the shared Button.", topic: "code-style", pinned: false, source: "run", title: "Add the class filter chips", uses: 0, created: 2 },
   ];
 }
@@ -32,15 +34,18 @@ function toItem(m: Mem) {
     origin: { source: m.source, title: m.title, added_by: m.added_by, edited_by: m.edited_by, run_id: m.source === "run" ? "01RUN" : undefined },
     uses: m.uses,
     last_used: m.uses ? { at: iso(1), run_id: "01RUNLAST", title: "Show the schedule on the class page" } : null,
+    flagged: m.flagged ?? null,
   };
 }
 
 const PROFILES = [
   {
     id: "reviewer", name: "Reviewer", role: "Reviews pull requests, comments on the exact lines, and approves when nothing is left to change.",
-    uses_repo_memory: false,
+    uses_repo_memory: true, memory_uses: 23, memory_reads: 11,
     knows: [
       { label: "Review rules for this repo", detail: "Prefer small PRs. Flag missing migrations." },
+      { label: "Memories about this repo", detail: "3 in all: 1 pinned (always used), 1 added by people. The pinned ones and the most relevant come along on each review." },
+      { label: "How it treats a memory", detail: "It uses them to choose where to look and to leave settled points alone. A memory never blocks a pull request on its own: a blocking comment points at the code. A memory the code contradicts is flagged here instead of followed." },
       { label: "Lessons from ratings", detail: "1 note people left on its reviews; it reads them before every review." },
     ],
     learned: [{ text: "Ask for a flow test, not one test per function.", source: "A rating on PR #12", at: iso(3), link: "https://github.com/your-team/web/pull/12" }],
@@ -49,7 +54,7 @@ const PROFILES = [
   },
   {
     id: "planner", name: "Planner", role: "Reads a ticket, works out the root cause and writes the plan the coding agent follows.",
-    uses_repo_memory: true,
+    uses_repo_memory: true, memory_uses: 31, memory_reads: 9,
     knows: [{ label: "Memories about this repo", detail: "3 in all: 1 pinned (always used), 1 added by people." }, { label: "Systems it can look things up in", detail: "Production database" }],
     learned: [{ text: "Run unit tests with pnpm test:unit; the e2e suite needs staging.", source: "Added by admin@example.com · used on 7 tickets", at: iso(20) }],
     activity_label: "tickets planned in the last 30 days", activity_count: 9,
@@ -57,13 +62,21 @@ const PROFILES = [
   },
   {
     id: "coder", name: "Coding agent", role: "Writes the change, runs the checks and opens the pull request. After each ticket it saves what it learned.",
-    uses_repo_memory: true, knows: [{ label: "Memories about this repo", detail: "3 in all" }], learned: [],
+    uses_repo_memory: true, memory_uses: 18, memory_reads: 9, knows: [{ label: "Memories about this repo", detail: "3 in all" }], learned: [],
     activity_label: "pull requests merged in the last 30 days", activity_count: 6, recent: [],
   },
   {
     id: "feedback", name: "Feedback agent", role: "Answers review comments on Coderhelm's pull requests and fixes the CI it broke.",
-    uses_repo_memory: false, knows: [{ label: "The pull request's conversation", detail: "Every comment and review thread on the PR, and the CI results." }], learned: [],
+    uses_repo_memory: true, memory_uses: 4, memory_reads: 2,
+    knows: [{ label: "The pull request's conversation", detail: "Every comment and review thread on the PR, and the CI results." }, { label: "Memories about this repo", detail: "3 in all" }],
+    learned: [{ text: "Use the shared retry helper for calls to the pricing service; never a hand-written loop.", source: "Learned from a change asked for on “Fix the checkout total after a coupon”", at: iso(2) }],
     activity_label: "pull requests it pushed fixes to in the last 30 days", activity_count: 2, recent: [],
+  },
+  {
+    id: "stop_judge", name: "Stop judge", role: "Decides whether a run goes on, asks a person, or stops, before anything costly happens.",
+    uses_repo_memory: true, memory_uses: 0, memory_reads: 0,
+    knows: [{ label: "Memories about this repo", detail: "3 in all" }], learned: [],
+    activity_label: "decisions that read this repo's memories in the last 30 days", activity_count: 0, recent: [],
   },
 ];
 
@@ -153,18 +166,31 @@ test("agent profiles say what each agent knows, learned and did", async ({ page 
   await expect(page.getByRole("heading", { name: "Memory", exact: true })).toBeVisible();
   const reviewer = page.getByRole("button", { name: /Reviewer/ });
   await expect(reviewer).toContainText("18 reviews in the last 30 days");
-  await expect(reviewer).toContainText("Doesn't use repo memories");
-  await expect(page.getByRole("button", { name: /Planner/ })).toContainText("Uses this repo's memories");
+  // Every agent that works on the repo is listed, and each says how many
+  // memories it used.
+  const cards = page.getByTestId("memory-agents").getByRole("button");
+  await expect(cards).toHaveText([/Reviewer/, /Planner/, /Coding agent/, /Feedback agent/, /Stop judge/]);
+  await expect(page.getByTestId("memory-agents")).not.toContainText("Doesn't use repo memories");
+  await expect(reviewer).toContainText("Uses this repo's memories · 23 used in 30 days");
+  await expect(page.getByRole("button", { name: /Planner/ })).toContainText("Uses this repo's memories · 31 used in 30 days");
+  await expect(page.getByRole("button", { name: /Feedback agent/ })).toContainText("Uses this repo's memories · 4 used in 30 days");
+  await expect(page.getByRole("button", { name: /Stop judge/ })).toContainText("Uses this repo's memories · none needed in 30 days");
   await reviewer.click();
   await expect(reviewer).toHaveAttribute("aria-expanded", "true");
   const profile = page.getByRole("region", { name: "Reviewer profile" });
   await expect(profile).toContainText("Review rules for this repo");
   await expect(profile).toContainText("Prefer small PRs. Flag missing migrations.");
+  await expect(profile.getByTestId("agent-memory-use")).toHaveText("Used 23 of this repo's memories in the last 30 days, over 11 tasks.");
+  await expect(profile).toContainText("A memory never blocks a pull request on its own");
   await expect(profile.getByRole("link", { name: "A rating on PR #12" })).toHaveAttribute("href", "https://github.com/your-team/web/pull/12");
   await expect(profile.getByRole("link", { name: "PR #31" })).toBeVisible();
-  // The feedback agent keeps no memories, and says so.
+  // The feedback agent learns from what people asked for.
   await page.getByRole("button", { name: /Feedback agent/ }).click();
-  await expect(page.getByRole("region", { name: "Feedback agent profile" })).toContainText("keeps no memories of its own");
+  const feedback = page.getByRole("region", { name: "Feedback agent profile" });
+  await expect(feedback).toContainText("Use the shared retry helper");
+  await expect(feedback).toContainText("Learned from a change asked for on");
+  await page.getByRole("button", { name: /Stop judge/ }).click();
+  await expect(page.getByRole("region", { name: "Stop judge profile" }).getByTestId("agent-memory-use")).toContainText("None were relevant enough");
   expect(db.calls).toContain(`GET /api/memories/agents?repo=${encodeURIComponent(REPO)}`);
   await page.getByRole("button", { name: /Reviewer/ }).click();
   await shot(page, "memory-profiles");
@@ -180,9 +206,14 @@ test("memories are grouped by topic with where they came from and how often they
   const pinned = list.filter({ hasText: "pnpm test:unit" });
   await expect(pinned).toContainText("Pinned");
   await expect(pinned).toContainText("Added by admin@example.com");
-  await expect(pinned).toContainText("Used on 7 tickets, last “Show the schedule on the class page”");
+  await expect(pinned).toContainText("Used 7 times, last on “Show the schedule on the class page”");
+  await expect(pinned).not.toContainText("May be out of date");
   const learned = list.filter({ hasText: "pricing service" });
   await expect(learned).toContainText("Learned on “Fix the checkout total after a coupon”");
+  // A memory a review found the code contradicts says so, with the PR.
+  await expect(learned).toContainText("May be out of date");
+  await expect(learned.getByTestId("memory-flagged")).toContainText("the pricing service was replaced by the prices table");
+  await expect(learned.getByRole("link", { name: "See the pull request" })).toHaveAttribute("href", "https://github.com/your-team/web/pull/33");
   await expect(list.filter({ hasText: "shared Button" })).toContainText("Not used yet");
   // Memories come first; who uses them is one strip under the list.
   const listTop = (await page.getByRole("heading", { name: /^Memories/ }).boundingBox())!.y;

@@ -3,7 +3,7 @@ title: Memories
 description: What CoderHelm knows about each repository, where it learned it, and how to teach or correct it.
 ---
 
-CoderHelm keeps **memories** for each repository: short facts it has learned, such as "API handlers return errors as `{ error: string }`" or "never edit the generated client in `src/gen`". The planner and the coder read them on every ticket.
+CoderHelm keeps **memories** for each repository: short facts it has learned, such as "API handlers return errors as `{ error: string }`" or "never edit the generated client in `src/gen`". Every agent that works on the repository reads them: the reviewer, the planner, the coding agent, the feedback agent and the stop judge.
 
 Open **Memory** (under Insights) to see them.
 
@@ -20,12 +20,32 @@ Open **Memory** (under Insights) to see them.
 
 ## Where memories come from
 
-- **From tickets**: when a pull request is closed without merging, or someone says the fix belonged somewhere else, CoderHelm writes down what it got wrong.
+- **From tickets**: when a pull request is closed without merging, or someone says the fix belonged somewhere else, CoderHelm writes down what it got wrong. After a ticket it also keeps up to five specific things it learned about the repository.
+- **From pull request feedback**: when a person asks for a change on CoderHelm's pull request and the feedback agent pushes it, the preference behind the request is kept (for example "use the shared retry helper, never a hand-written loop"). A request that only fixes that one change teaches nothing and isn't kept.
 - **From people**: an admin clicks **Teach it something** and writes one.
+
+A memory that repeats one already kept, word for word, isn't stored again.
+
+The reviewer's own lessons (when someone shows a review comment was wrong, so it isn't raised again) are kept with the reviewer's settings, not here.
 
 ## What agents get
 
-On each ticket, the planner and the coder get every **pinned** memory, plus the five most relevant others. Pin a memory when every change should know it.
+Each agent gets every **pinned** memory, the team's lessons on where similar fixes belonged, and the most relevant others for what it is doing, within a size limit for its prompt. Relevance is judged against its own work: the ticket for the planner and the coding agent, the pull request's title, description and changed files for the reviewer, the comments and failing checks for the feedback agent, and the decision at hand for the stop judge. Pin a memory when every change should know it.
+
+| Agent | What memories are for |
+| --- | --- |
+| Planner | Where the fix belongs, how the code is built, what went wrong before. |
+| Coding agent | How to build and test, conventions, past fixes and what to avoid. |
+| Reviewer | Conventions, accepted patterns, known false alarms and earlier answers, so it follows the team's rules and leaves settled points alone. |
+| Feedback agent | How to build and test, past fixes and the team's preferences, for review comments and failing checks on CoderHelm's pull requests. |
+| Stop judge | Context for whether a run goes on, asks a person or stops. A memory never makes a stop needed on its own. |
+
+The reviewer treats memories with care, because a memory can go out of date:
+
+- **A memory never blocks a pull request on its own.** A blocking comment that rests on one must point at the code it is about in the pull request. Without that it is posted as a note.
+- **A memory the code contradicts is flagged, not followed.** The review lists it under "Memories that look out of date", and the memory shows **May be out of date** on the Memory page with a link to the pull request. Edit it or forget it if it no longer holds.
+
+**Who uses memory**, at the bottom of the Memory page, lists each agent with how many memories it used in the last 30 days.
 
 ## Change or remove
 
