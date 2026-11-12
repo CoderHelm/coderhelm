@@ -5321,6 +5321,19 @@ export interface HybridCheck {
   fix: string | null;
 }
 
+/** Coderhelm's 15-minute check of a name.coderhelm.com address: the latest state, and when it last recovered (history, apart from the state). Absent on an older install. */
+export interface HybridNameWatch {
+  state: string;
+  checked_at: string;
+  parked: boolean;
+  parked_code: string | null;
+  parked_reason: string | null;
+  parked_at: string | null;
+  recovered_at?: string | null;
+  recovered_code?: string | null;
+  last_parked_at?: string | null;
+}
+
 export interface HybridStatus {
   available: boolean;
   hosted_url: string;
@@ -5328,7 +5341,7 @@ export interface HybridStatus {
   install_id: string | null;
   cloudfront: string;
   verified: boolean;
-  name: { name: string; hostname: string; code: string } | null;
+  name: { name: string; hostname: string; code: string; check?: HybridNameWatch | null } | null;
   github: { mode: "own" | "hosted"; links: HybridGithubLink[]; app_slug: string | null };
   integrations: HybridIntegration[];
   /** Other apps, for the whole install. Missing from older gateways (then read from `integrations`). */
