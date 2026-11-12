@@ -1,9 +1,9 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
-import { api } from "@/lib/api";
-import { READER_CHECKS, errorMessage, runningChecks, toCheckItems } from "@/lib/data-sources";
+import { Suspense, useEffect, useState } from "react";
+import { api, type PrivateNetworkPlacement } from "@/lib/api";
+import { PRIVATE_NETWORK_CHECKS, READER_CHECKS, SEARCH_CHECKS, errorMessage, runningChecks, toCheckItems } from "@/lib/data-sources";
 import { RoleGuard } from "@/components/role-guard";
 import { useToast } from "@/components/toast";
 import { Callout } from "@/components/callout";
@@ -11,6 +11,7 @@ import { CheckList, type CheckItem } from "@/components/check-list";
 import { Field, SecretInput } from "@/components/field";
 import { MarkdownEditor } from "@/components/markdown-editor";
 import { FlowShell } from "@/components/data-source-flow-shell";
+import { Select } from "@/components/select";
 import { inputClass, primaryButton } from "@/components/ui";
 
 export default function ConnectReaderPageGuarded() {
@@ -56,20 +57,28 @@ function ConnectReaderPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [checks, setChecks] = useState<CheckItem[] | null>(null);
+  // A self-hosted install's private networks: a cluster inside a VPC is read through one.
+  const [networks, setNetworks] = useState<PrivateNetworkPlacement[]>([]);
+  const [network, setNetwork] = useState("");
+  useEffect(() => {
+    if (rest) return;
+    api.getPrivateNetworks().then((r) => setNetworks(r.available ? r.networks : [])).catch(() => setNetworks([]));
+  }, [rest]);
+  const expectedChecks = rest ? READER_CHECKS : network ? PRIVATE_NETWORK_CHECKS : SEARCH_CHECKS;
 
   const missing = !name.trim() || !url.trim() || !key.trim() || (rest ? entries(paths).length === 0 : !user.trim());
 
   const connect = async () => {
     setSaving(true);
     setError("");
-    setChecks(runningChecks(READER_CHECKS));
+    setChecks(runningChecks(expectedChecks));
     try {
       const res = await api.createDataSourceReader(kind, {
         name: name.trim(),
         url: url.trim(),
         key: key.trim(),
         instructions: guide,
-        ...(rest ? { header_name: headerName.trim(), paths: entries(paths) } : { user: user.trim(), indexes: entries(indexes) }),
+        ...(rest ? { header_name: headerName.trim(), paths: entries(paths) } : { user: user.trim(), indexes: entries(indexes), ...(network ? { network } : {}) }),
         ...(useNow ? { enabled: true } : {}),
       } as Parameters<typeof api.createDataSourceReader>[1]);
       if (res.ok) {
@@ -78,7 +87,7 @@ function ConnectReaderPage() {
         router.push(HUB);
         return;
       }
-      setChecks(res.checks ? toCheckItems(res.checks, READER_CHECKS) : null);
+      setChecks(res.checks ? toCheckItems(res.checks, expectedChecks) : null);
       setError(`${res.error} Nothing was saved.`);
     } catch (e) {
       setChecks(null);
@@ -133,6 +142,19 @@ function ConnectReaderPage() {
           <>
             {text("reader-user", "User", user, setUser, "A user with read-only access. Coderhelm sees what it can see.")}
             {text("reader-indexes", "Indexes", indexes, setIndexes, "Index names or patterns agents may read, like orders or logs-*. Leave empty for every index the user sees.", "orders, logs-*", true)}
+            {networks.length > 0 && (
+              <Field id="reader-network" label="Reach it through" helper="A cluster that is reachable only inside a VPC (a vpc-… endpoint) is read through the install's private network in that VPC.">
+                {(p) => (
+                  <Select
+                    {...p}
+                    className="w-full"
+                    value={network}
+                    onChange={setNetwork}
+                    options={[{ value: "", label: "The internet" }, ...networks.map((n) => ({ value: n.network, label: `Private network ${n.network} (${n.vpc_id})` }))]}
+                  />
+                )}
+              </Field>
+            )}
           </>
         )}
         <Field id="reader-key" label={rest ? "API key" : "Password"} helper="Encrypted for your team. It can be replaced but never shown.">

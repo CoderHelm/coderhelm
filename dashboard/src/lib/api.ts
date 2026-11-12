@@ -1296,6 +1296,8 @@ export const api = {
       name?: string;
       log_groups?: string[];
       instructions?: string;
+      /** Search: "" for the internet, or a private network ("1" to "3"). */
+      network?: string;
     },
   ) =>
     request<{ source: DataSource }>(`/api/data-sources/${encodeURIComponent(id)}`, {
@@ -1308,6 +1310,12 @@ export const api = {
       `/api/data-sources/${encodeURIComponent(id)}/key`,
       { method: "POST", body: JSON.stringify({ key }) },
     ),
+  /** The install's private networks (self-hosted only: available is false elsewhere). */
+  getPrivateNetworks: () =>
+    request<{ available: boolean; networks: PrivateNetworkPlacement[] }>("/api/data-sources/private-networks"),
+  /** Search sources: the domain's VPC, which private network reads it, and the rule its security group needs. */
+  getPrivateNetworkPlan: (id: string) =>
+    request<PrivateNetworkPlan>(`/api/data-sources/${encodeURIComponent(id)}/private-network`),
   testDataSource: (id: string) =>
     request<DataSourceCheckResult & { source: DataSource }>(
       `/api/data-sources/${encodeURIComponent(id)}/test`,
@@ -1369,7 +1377,7 @@ export const api = {
    * running release, which waits for the admin to confirm its permission
    * changes (applyUpdate with the pending switch's id and confirm token).
    */
-  setInstallOptions: (options: Partial<Record<InstallOption, "on" | "off">>) =>
+  setInstallOptions: (options: Partial<Record<InstallOption, "on" | "off">> | Partial<Record<PrivateNetworkParam, string>>) =>
     request<UpdateEntry>("/api/system/options", { method: "POST", body: JSON.stringify({ options }) }),
   applyUpdate: (id: string, confirm = "") =>
     request<UpdateEntry>("/api/system/update/apply", { method: "POST", body: JSON.stringify({ id, ...(confirm ? { confirm } : {}) }) }),
@@ -3484,6 +3492,51 @@ export interface DataSource {
   indexes?: string[];
   /** What agents should know when using it. */
   instructions?: string;
+  /** Search: "" over the internet, or the private network ("1" to "3") it is read through. */
+  network?: string;
+}
+
+/** One of the install's private networks, as Lambda has its function. */
+export interface PrivateNetworkPlacement {
+  network: string;
+  vpc_id: string;
+  subnet_ids: string[];
+  security_group_ids: string[];
+  /** Lambda's state: Active, Pending, Failed. */
+  state: string;
+}
+
+/** The inbound rule a cluster's security group needs for a network. */
+export interface PrivateNetworkRule {
+  target_group: string;
+  source_group: string;
+  console_url: string;
+  command: string;
+}
+
+/** Where a search source's AWS domain lives, and how to read it from inside its VPC. */
+export interface PrivateNetworkPlan {
+  /** False on Coderhelm's hosted service: it runs outside your AWS account. */
+  available: boolean;
+  why?: string;
+  network?: string;
+  networks?: PrivateNetworkPlacement[];
+  domain?: {
+    domain: string;
+    region: string;
+    endpoint: string;
+    vpc_only: boolean;
+    vpc_id: string;
+    subnet_ids: string[];
+    security_group_ids: string[];
+  } | null;
+  domain_error?: string | null;
+  /** A network already in the domain's VPC (exists), or the free one to add with this stack value. */
+  suggestion?: { network: string | null; exists: boolean; option_value: string; parameter: string } | null;
+  /** True when the address's own domain is gone and `domain` has a similar name: its likely replacement. */
+  replaced?: boolean;
+  /** Whether the domain's security groups let the network in on 443 (null: couldn't read them). */
+  access?: { network: string; allowed: boolean | null; rules: PrivateNetworkRule[] } | null;
 }
 
 /** What a REST API or OpenSearch cluster is set up with. */
@@ -3493,9 +3546,14 @@ export interface DataSourceReaderSettings {
   paths?: string[];
   user?: string;
   indexes?: string[];
+  /** Search: "" for the internet, or a private network ("1" to "3"). */
+  network?: string;
 }
 
-export type DataSourceStepId = "reach" | "sign_in" | "read" | "read_only" | "role" | "logs";
+export type DataSourceStepId =
+  | "reach" | "sign_in" | "read" | "read_only" | "role" | "logs"
+  // A search source on a private network, hop by hop from inside it.
+  | "network" | "address" | "dns" | "tcp" | "tls";
 
 export interface DataSourceCheck {
   id: DataSourceStepId;
@@ -4294,6 +4352,8 @@ export interface AwsPermissionGroup {
 
 /** The install's switches for what it reads in its own account (lambda/updater, OPTION_PARAMS). */
 export type InstallOption = "InfrastructureVulnerabilities" | "InspectorFindings" | "HealthEvents";
+/** A private network's install stack parameter: "" or vpc-<id>:subnet-<id>[,subnet-<id>...]. */
+export type PrivateNetworkParam = "PrivateNetwork1" | "PrivateNetwork2" | "PrivateNetwork3";
 
 /** A live check of a connected account's role against this release's permissions. */
 export interface AwsPermissions {

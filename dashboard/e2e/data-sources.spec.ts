@@ -20,7 +20,7 @@ interface Source {
   enabled: boolean; setup_complete: boolean; key_hint: string; has_mutations: boolean; kinds: number | null;
   schema_available: boolean; hidden_fields: string[]; repos: string[]; last_checked_at: string;
   created_at: string; created_by: string;
-  header_name?: string; paths?: string[]; user?: string; indexes?: string[]; instructions?: string;
+  header_name?: string; paths?: string[]; user?: string; indexes?: string[]; instructions?: string; network?: string;
 }
 interface Call { method: string; path: string; body: Record<string, unknown> | null }
 interface Backend {
@@ -37,6 +37,10 @@ interface Backend {
   awsAccounts: { account: string; region: string; role: string }[];
   /** Suggested hidden columns, by source id. */
   suggestions: Record<string, { entry: string; reason: string }[]>;
+  /** A search source's private network plan, by source id. */
+  plans: Record<string, Record<string, unknown>>;
+  /** What Test answers, by source id (else every check passes). */
+  testChecks: Record<string, Record<string, unknown>[]>;
 }
 
 const NO_CONNECTORS = [
@@ -138,7 +142,7 @@ function makeSource(over: Partial<Source> = {}): Source {
 
 async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend> {
   const db: Backend = {
-    sources: [], events: [], calls: [], rejectKey: false, existing: [], dbWritable: false,
+    sources: [], events: [], calls: [], rejectKey: false, existing: [], dbWritable: false, plans: {}, testChecks: {},
     connectors: NO_CONNECTORS.map((c) => ({ ...c })), awsAccounts: [], suggestions: {}, ...init,
   };
   const json = (route: Route, body: unknown, status = 200) =>
@@ -252,7 +256,10 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
       db.suggestions[hs[1]] = list.filter((x) => !accept.includes(x.entry) && !dismiss.includes(x.entry));
       return json(route, { source: src, suggestions: db.suggestions[hs[1]], dismissed: dismiss });
     }
-    const m = p.match(/^\/api\/data-sources\/([^/]+)(?:\/(key|test|samples|try))?$/);
+    if (p === "/api/system/options" && method === "POST") {
+      return json(route, { id: "upd_1", status: "preparing", mode: "options", version: "v1.0.0", options: body?.options });
+    }
+    const m = p.match(/^\/api\/data-sources\/([^/]+)(?:\/(key|test|samples|try|private-network))?$/);
     const source = m && db.sources.find((s) => s.id === m[1]);
     if (m && !source) return json(route, { error: "Data source not found" }, 404);
     if (m && source) {
@@ -265,6 +272,13 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
       if (!sub && method === "DELETE") {
         db.sources = db.sources.filter((s) => s.id !== source.id);
         return json(route, { ok: true });
+      }
+      if (sub === "private-network") return json(route, db.plans[source.id] ?? { available: false, why: "Not self-hosted." });
+      if (sub === "test" && db.testChecks[source.id]) {
+        const checks = db.testChecks[source.id];
+        const ok = checks.every((c) => c.ok);
+        source.status = ok ? "ready" : "error";
+        return json(route, { ok, checks, source });
       }
       if (sub === "test") {
         source.status = "ready";
@@ -1407,4 +1421,96 @@ test("a broken source offers Test again right on its closed row", async ({ page 
   await card.getByRole("button", { name: "Test api.yourcompany.com again" }).click();
   await expect(card.getByText("Ready", { exact: true })).toBeVisible();
   await expect(card.getByText("Coderhelm is not using this source until the problem is fixed.")).toHaveCount(0);
+});
+
+// ── Private networks ───────────────────────────────────────────────
+
+const OLD_HOST = "search-orders-os2-abcdefghijklmnopqrstuvwxyz.us-east-1.es.amazonaws.com";
+const VPC_ENDPOINT = "https://vpc-orders-os-0123456789abcdefghijklmnop.us-east-1.es.amazonaws.com";
+const DOMAIN = {
+  domain: "orders-os", region: "us-east-1", endpoint: VPC_ENDPOINT, vpc_only: true, vpc_id: "vpc-0a1b2c3d4e5f60710",
+  subnet_ids: ["subnet-0a1b2c3d4e5f60711", "subnet-0a1b2c3d4e5f60712"], security_group_ids: ["sg-0a1b2c3d4e5f60713"],
+};
+const NETWORK_1 = { network: "1", vpc_id: DOMAIN.vpc_id, subnet_ids: DOMAIN.subnet_ids, security_group_ids: ["sg-0a1b2c3d4e5f60799"], state: "Active" };
+const RULE = {
+  target_group: "sg-0a1b2c3d4e5f60713", source_group: "sg-0a1b2c3d4e5f60799",
+  console_url: "https://us-east-1.console.aws.amazon.com/ec2/home?region=us-east-1#ModifyInboundSecurityGroupRules:securityGroupId=sg-0a1b2c3d4e5f60713",
+  command: "aws ec2 authorize-security-group-ingress --region us-east-1 --group-id sg-0a1b2c3d4e5f60713 --ip-permissions 'IpProtocol=tcp,FromPort=443,ToPort=443,UserIdGroupPairs=[{GroupId=sg-0a1b2c3d4e5f60799,Description=CoderHelm private network read-only lookups}]'",
+};
+
+function searchSource(over: Partial<Source> = {}): Source {
+  return makeSource({
+    id: "ds_os", kind: "search", name: "Orders search", url: `https://${OLD_HOST}`, has_mutations: false, kinds: null,
+    user: "reader", indexes: ["orders-*"], enabled: true, setup_complete: true, status: "error",
+    status_message: `${OLD_HOST} no longer exists. AWS removes a domain's address when the domain is deleted or replaced, for example when it is moved into a VPC (it then gets a new vpc-orders-os2-… address). Find the domain's current endpoint (OpenSearch Service console in us-east-1, the domain, Endpoint) and put it in this source's address.`,
+    ...over,
+  });
+}
+
+test("private network: a VPC-only domain gets a network through the reviewed update, then reads through it hop by hop", async ({ page }) => {
+  const db = await mockApi(page, { sources: [searchSource()] });
+  db.plans.ds_os = {
+    available: true, network: "", networks: [], domain: DOMAIN, domain_error: null,
+    suggestion: { network: "1", exists: false, option_value: `${DOMAIN.vpc_id}:${DOMAIN.subnet_ids.join(",")}`, parameter: "PrivateNetwork1" },
+    access: null,
+  };
+  await page.goto("/data-sources");
+  const row = await openSource(page, "Orders search");
+  // The error names an OpenSearch address and what happened, never a GraphQL example.
+  await expect(row.getByText(/no longer exists/).first()).toBeVisible();
+  await expect(row.getByText(/graphql/i)).toHaveCount(0);
+  await expect(row.getByText("The internet", { exact: true })).toBeVisible();
+
+  await row.getByRole("button", { name: "Private network" }).click();
+  const panel = row.getByTestId("private-network-panel");
+  await expect(panel.getByText(DOMAIN.vpc_id)).toBeVisible();
+  await expect(panel.getByText(VPC_ENDPOINT)).toBeVisible();
+  await expect(panel.getByText(/No private network runs in this VPC yet/)).toBeVisible();
+  await shot(page, "private-network-add");
+  await panel.getByRole("button", { name: "Add private network 1" }).click();
+  await expect(panel.getByText("Private network 1 is prepared")).toBeVisible();
+  await expect(panel.getByRole("link", { name: "Settings, System" })).toHaveAttribute("href", /^\/settings\/system\/?$/);
+  const proposed = db.calls.find((c) => c.path === "/api/system/options");
+  expect(proposed?.body).toEqual({ options: { PrivateNetwork1: `${DOMAIN.vpc_id}:${DOMAIN.subnet_ids.join(",")}` } });
+
+  // Once applied: the network is there, the domain doesn't let it in yet; the card shows the one rule.
+  db.plans.ds_os = {
+    available: true, network: "", networks: [NETWORK_1], domain: DOMAIN, domain_error: null,
+    suggestion: { network: "1", exists: true, option_value: "", parameter: "PrivateNetwork1" },
+    access: { network: "1", allowed: false, rules: [RULE] },
+  };
+  await row.getByRole("button", { name: "Private network" }).click();
+  await row.getByRole("button", { name: "Private network" }).click();
+  await expect(panel.getByRole("button", { name: "Read through private network 1" })).toBeVisible();
+  await expect(panel.getByText(/doesn't let private network 1 in yet/)).toBeVisible();
+  await expect(panel.getByRole("link", { name: "Open sg-0a1b2c3d4e5f60713 in the AWS console" })).toHaveAttribute("href", RULE.console_url);
+  await expect(panel.getByText(/authorize-security-group-ingress/)).toBeVisible();
+  await panel.getByRole("button", { name: "Read through private network 1" }).click();
+  await expect.poll(() => db.calls.find((c) => c.method === "PUT" && c.path === "/api/data-sources/ds_os")?.body).toEqual({ network: "1", url: VPC_ENDPOINT });
+  await expect(row.getByText("Private network 1", { exact: true })).toBeVisible();
+  await shot(page, "private-network-rule");
+
+  // Test names each hop and stops at the one that fails.
+  db.testChecks.ds_os = [
+    { id: "address", label: "An https address", ok: true, detail: "an https address" },
+    { id: "dns", label: "Find the name inside the network", ok: true, detail: "vpc-orders-os-0123456789abcdefghijklmnop.us-east-1.es.amazonaws.com is 10.2.101.7" },
+    { id: "tcp", label: "Connect on the port (security groups)", ok: false, detail: "no answer on 10.2.101.7:443 within 25 seconds: a security group or network ACL drops it", fix: "The service's security group must allow tcp 443 (or 9200) from the private network's security group: the source's card shows the rule. Also check the subnets' network ACLs." },
+  ];
+  await row.getByRole("button", { name: "Test again" }).last().click();
+  const checks = row.getByRole("list", { name: "Checks for Orders search" });
+  await expect(checks.getByText("Find the name inside the network")).toBeVisible();
+  await expect(row.getByText("Connect on the port (security groups) failed")).toBeVisible();
+  await expect(checks.getByText("Sign in to the cluster")).toBeVisible();
+  await expect(checks.getByText("Not run, because an earlier check failed.").first()).toBeVisible();
+  await shot(page, "private-network-test");
+});
+
+test("private network: hosted teams are told plainly it needs a self-hosted install", async ({ page }) => {
+  const db = await mockApi(page, { sources: [searchSource({ status: "ready", status_message: "" })] });
+  db.plans.ds_os = { available: false, why: "This Coderhelm runs outside your AWS account, so it can't reach inside your VPC. Give the cluster a read-only https address on the internet, or run Coderhelm self-hosted in the cluster's AWS account and add a private network there." };
+  await page.goto("/data-sources");
+  const row = await openSource(page, "Orders search");
+  await row.getByRole("button", { name: "Private network" }).click();
+  await expect(row.getByText("Private networks need a self-hosted install")).toBeVisible();
+  await expect(row.getByRole("button", { name: /Add private network/ })).toHaveCount(0);
 });
