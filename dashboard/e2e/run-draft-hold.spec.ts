@@ -173,7 +173,7 @@ test("a run whose pull request's CI fails reads CI failing, with the check and t
   await shot(page, "run-ci-failing");
 });
 
-test("a run stopped with planned work left reads Stopped, not finished", async ({ page }) => {
+test("a run with planned work left reads Finished, work deferred", async ({ page }) => {
   await mockApi(page, run({
     waiting_on: {
       action: "Review pull request #318",
@@ -184,7 +184,7 @@ test("a run stopped with planned work left reads Stopped, not finished", async (
     draft_hold: null,
   }));
   await page.goto("/runs/detail?id=01RUNHOLD");
-  await expect(page.getByTestId("page-header").getByText("Stopped, not finished", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("page-header").getByText("Finished, work deferred", { exact: true })).toBeVisible();
 });
 
 test("a run with no hold still reads as before", async ({ page }) => {

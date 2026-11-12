@@ -235,7 +235,7 @@ test("a finished run shows its pull request, steps, documents and tasks without 
   const outcome = page.getByTestId("run-outcome");
   await expect(outcome).toContainText("Pull request #101 is ready for review");
   await expect(page.getByTestId("run-who")).toHaveText("Needs a person");
-  await expect(page.getByTestId("run-next")).toContainText("Someone on your team reviews and merges it.");
+  await expect(page.getByTestId("run-next")).toContainText("Merging it is your team's call: review it and merge.");
   await expect(outcome.getByRole("link", { name: /Open pull request #101/ })).toHaveAttribute("href", "https://github.com/your-team/web/pull/101");
   // The steps read as what Coderhelm did, in words, not the worker's ids, ending on where the run is.
   const steps = page.getByRole("list", { name: "Steps" });
@@ -521,7 +521,7 @@ test("a failed run shows what went wrong with one retry, and a refused retry say
   await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
   // A plain headline and the next step; the raw error waits behind Technical details.
   const outcome = page.getByTestId("run-outcome");
-  await expect(outcome).toContainText("Coderhelm stopped before it finished");
+  await expect(outcome).toContainText("Coderhelm couldn't ship this run");
   await expect(outcome).toContainText("test step");
   await expect(outcome.getByText(/ci\.example\.com/)).toBeHidden();
   await outcome.getByText("Technical details").click();
@@ -660,7 +660,7 @@ test("a finished run with an old error says it's done; the old error waits in Ac
   await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
   await expect(page.getByTestId("run-outcome")).toContainText("Pull request #101 is ready for review");
   await expect(page.getByText(/TypeError/)).toHaveCount(0);
-  await expect(page.getByText("Coderhelm stopped before it finished")).toHaveCount(0);
+  await expect(page.getByText("Coderhelm couldn't ship this run")).toHaveCount(0);
   await openTab(page, "Activity");
   await expect(page.getByText("A problem earlier in this run")).toBeVisible();
 });

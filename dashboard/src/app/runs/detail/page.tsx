@@ -801,7 +801,7 @@ function RunDetailInner() {
     outcome = (
       <Problem
         testId="run-outcome"
-        title="Coderhelm stopped before it finished"
+        title="Coderhelm couldn't ship this run"
         details={run.error ? sanitizeError(run.error) : undefined}
         action={
           <>
@@ -812,7 +812,7 @@ function RunDetailInner() {
         }
       >
         {currentStep ? `It hit a problem during the ${currentStep.toLowerCase()} step. ` : ""}
-        {canAct && canRetry ? "Retry to run it again, or get help if it keeps happening." : "Ask someone with member access to retry it, or get help."}
+        {canAct && canRetry ? "The reason above says what stopped it. Retry to run it again, or get help if it keeps happening." : "Ask someone with member access to retry it, or get help."}
       </Problem>
     );
   } else if (run.status === "closed") {
@@ -917,9 +917,9 @@ function RunDetailInner() {
           ? {
               tone: "success",
               title: prLinks.length ? `${prWords} is ready for review` : "Done.",
-              body: prLinks.length ? "Coderhelm finished its work on it and handed it over." : "Coderhelm finished this work.",
+              body: prLinks.length ? "Coderhelm finished the work on it, checked it, and named anything it deferred and why." : "Coderhelm finished this work.",
               who: prLinks.length ? "you" : "none",
-              next: prLinks.length ? "Someone on your team reviews and merges it." : undefined,
+              next: prLinks.length ? "Merging it is your team's call: review it and merge." : undefined,
               actions: (
                 <>
                   {openPrButtons("primary")}
