@@ -633,6 +633,10 @@ export function baseHealth(b: Pick<Base, "sources" | "processing" | "failed">, n
   if (broken) return { tone: "attention", words: `${KIND_LABEL[broken.kind]} needs attention` };
   if (srcs.some((s) => s.status === "syncing" || s.status === "queued") || b.processing > 0) return { tone: "live", words: "Bringing in new pages" };
   if (!srcs.length) return null;
+  // One state with the Problems list: pages that couldn't be read are a
+  // problem there, so never "Up to date" here.
+  if (b.failed > 0) return { tone: "attention", words: `${b.failed.toLocaleString()} page${b.failed === 1 ? "" : "s"} couldn't be read` };
+  if (srcs.every((s) => s.paused)) return { tone: "muted", words: "Paused" };
   const last = srcs
     .map((s) => s.last_success_at)
     .filter(Boolean)

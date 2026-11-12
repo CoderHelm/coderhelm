@@ -263,6 +263,9 @@ test("the repo filter and search narrow every list, and clear", async ({ page })
   await page.getByRole("searchbox", { name: "Search stale pull requests" }).fill("cache");
   await expect(rows).toHaveCount(1);
   await expect(rows.first()).toContainText("#31 Try the new cache");
+  // Each tab's count is the list it shows: the search narrows both.
+  await expect(views(page).getByRole("link", { name: /^Marked stale/ })).toContainText("1");
+  await expect(views(page).getByRole("link", { name: /^Up next/ })).not.toContainText(/\d/);
   await page.getByRole("searchbox", { name: "Search stale pull requests" }).fill("nothing like this");
   await expect(page.getByTestId("list-empty")).toContainText("No marked pull requests match");
   await page.getByRole("button", { name: "Clear filters" }).first().click();
@@ -329,7 +332,7 @@ test("off: a banner above the tabs, and every tab still lists what its count say
   await expect(rows.first()).toContainText("#41 Label marked by hand");
   await expect(rows.first()).toContainText("quiet 30 days");
   await expect(rows.first()).toContainText("Last activity: a review");
-  await expect(rows.first()).toContainText("Cleanup is off, so nothing closes it.");
+  await expect(rows.first()).toContainText("Cleanup is off for this repository, so nothing closes it.");
   await expect(rows.first()).toContainText("Nothing closes it");
   await expect(rows.nth(1)).toContainText("#51 Marked before it was turned off");
   for (const w of [1280, 390]) {
@@ -463,7 +466,22 @@ test("settings: one mode, Off, Preview only or On, each with a plain line; saved
 test("off for all repositories, but repositories with their own settings say so on the page and in settings", async ({ page }) => {
   await mockApi(page, { team: null, plans: offPlans(), repos: { "acme/web": { enabled: true, dry_run: true } } });
   await page.goto("/reviewer/stale");
-  await expect(page.getByTestId("stale-off-others")).toContainText("Preview only on web, which has its own settings.");
+  // One current state: a repository previews, so the page never heads with
+  // "cleanup is off" over lists that act; it says which and the rest.
+  await expect(page.getByTestId("stale-state")).toHaveAttribute("data-state", "dry_run");
+  await expect(page.getByTestId("stale-off")).toHaveCount(0);
+  await expect(page.getByTestId("stale-mixed")).toContainText("Preview only on web; off for the other repositories.");
+  await expect(page.getByTestId("stale-applies")).toHaveCount(0);
+  await expect(page.getByText("Off: nothing happens")).toHaveCount(0);
+  for (const w of [1280, 390]) {
+    await page.setViewportSize({ width: w, height: 900 });
+    await noSidewaysScroll(page);
+    await shot(page, `mixed-${w}`);
+  }
+  await page.setViewportSize({ width: 1280, height: 800 });
+  // Picking a repository that is off: its own state, with the way to turn it on.
+  await page.goto("/reviewer/stale?repo=acme%2Fapi");
+  await expect(page.getByTestId("stale-state")).toHaveAttribute("data-state", "off");
   await page.goto("/reviewer/stale?view=settings");
   await expect(page.getByTestId("stale-repo-modes")).toContainText("Preview only on acme/web, which has its own settings.");
 });
@@ -547,4 +565,19 @@ test("the Reviewer page says how many are marked and when they close, and links 
   await expect(line).toContainText("3 pull requests marked stale, 2 closing today or tomorrow");
   await expect(line.getByRole("link")).toHaveAttribute("href", /^\/reviewer\/stale\/?$/);
   await expect(page.getByRole("main").getByRole("link", { name: "Settings", exact: true }).first()).toHaveAttribute("href", /^\/reviewer\/config\/?$/);
+});
+
+test("settings that didn't load are unknown, never off", async ({ page }) => {
+  await mockApi(page, { team: { enabled: true, dry_run: false } });
+  await page.route("**/api/reviewer/stale/config*", (route) => route.fulfill({ status: 500, contentType: "application/json", body: '{"error":"boom"}' }));
+  await page.goto("/reviewer/stale");
+  await expect(page.getByTestId("stale-row").first()).toBeVisible();
+  await expect(page.getByText("Couldn't load the stale pull request settings")).toBeVisible();
+  await expect(page.getByTestId("stale-off")).toHaveCount(0);
+  await expect(page.getByTestId("stale-state")).toHaveCount(0);
+  for (const w of [1280, 390]) {
+    await page.setViewportSize({ width: w, height: 900 });
+    await noSidewaysScroll(page);
+    await shot(page, `settings-failed-${w}`);
+  }
 });

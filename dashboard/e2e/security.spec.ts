@@ -682,6 +682,23 @@ test.describe("Security", () => {
     await expect(page.getByTestId("permission-banner")).toContainText("hasn't accepted it yet");
   });
 
+  test("a source whose problem cleared shows one state: on, and when it fixed itself", async ({ page }) => {
+    const o = overview();
+    (o.source_rows as Record<string, unknown>[])[0] = { id: "dependabot", name: "Dependabot alerts", gives: "GitHub's own alerts.", state: "ok", reason: "", synced_at: iso(-0.2), recovered_at: iso(-1), count: 3 };
+    await mockApi(page, { overview: o });
+    await page.goto("/security");
+    const row = page.getByTestId("sources").locator('[data-source="dependabot"]');
+    await expect(row).toContainText("On");
+    await expect(row.getByTestId("recovered")).toContainText("Fixed itself at");
+    await expect(row.getByTestId("source-reason")).toHaveCount(0);
+    await expect(row.locator(".text-red-300")).toHaveCount(0);
+    for (const w of [1280, 390]) {
+      await page.setViewportSize({ width: w, height: 900 });
+      await row.evaluate((e) => e.scrollIntoView({ block: "center" }));
+      if (SHOTS) await page.screenshot({ path: `${SHOTS}/source-recovered-${w}.png` });
+    }
+  });
+
   test("selecting rows shows the PRs they become, the runs they use, and what started", async ({ page }) => {
     const db = await mockApi(page);
     await page.goto("/security");

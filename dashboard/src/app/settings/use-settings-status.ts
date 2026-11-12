@@ -7,6 +7,7 @@ import { can } from "@/lib/capabilities";
 import { SETTINGS_ITEMS, offered, type SettingsStatusKey } from "@/components/settings-items";
 import { isSelfHosted } from "@/lib/runtime-config";
 import { systemChecks } from "@/lib/install";
+import { deriveUpdateState, updateStatusLine } from "@/lib/update-state";
 
 export type StatusTone = "neutral" | "success" | "warning" | "error";
 
@@ -93,8 +94,7 @@ const LOADERS: Record<SettingsStatusKey, (me: Me) => Promise<ItemStatus | null>>
   },
   system: async () => {
     const v = await api.getSystemVersion();
-    if (v.update_available && v.latest) return { text: `Update to ${v.latest.version} waiting`, tone: "warning" };
-    return v.current.version ? { text: `Up to date · ${v.current.version}`, tone: "success" } : null;
+    return updateStatusLine(deriveUpdateState(v, null), v.current.version ?? null);
   },
   security: async (me) => {
     if (me.auth_provider && me.auth_provider !== "email") {

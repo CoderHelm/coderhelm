@@ -719,9 +719,9 @@ export function badgeText(n: number): string {
   return n > 9 ? "9+" : String(n);
 }
 
-/** The Setup menu item's count: new recommendations plus repos not set up yet. */
+/** The Setup menu item's count: new recommendations plus repos not set up yet or whose last setup failed (Setup lists those first). */
 export function badgeCount(home: Pick<SetupHome, "repos" | "new_recommendations">): number {
-  return home.new_recommendations.length + home.repos.filter((r) => r.state === "not_set_up").length;
+  return home.new_recommendations.length + home.repos.filter((r) => r.state === "not_set_up" || r.state === "failed").length;
 }
 
 /** One recommendation of one release, as a list key. */

@@ -135,30 +135,25 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   const [banners, setBanners] = useState<Banner[]>([]);
   const [teams, setTeams] = useState<TeamInfo[]>([]);
   const [dismissedBanners, setDismissedBanners] = useState<Set<string>>(new Set());
-  // Load persisted dismissals once usage data is available (keyed to usage month)
-  const usageMonth = usage?.month;
   // The app has started: the inline loading screen (lib/boot-recovery.ts)
   // stops offering Reload, however long sign-in takes.
   useEffect(() => {
     document.documentElement.setAttribute("data-ch-mounted", "");
   }, []);
+  // A dismissed banner stays dismissed: by its id, never reset by the month
+  // (a banner that matters again is posted with a new id).
   useEffect(() => {
-    if (!usageMonth) return;
     try {
       const stored = JSON.parse(localStorage.getItem("dismissedBanners") || "{}");
-      if (stored.period === usageMonth && Array.isArray(stored.ids)) {
-        setDismissedBanners(new Set<string>(stored.ids));
-      }
+      if (Array.isArray(stored.ids)) setDismissedBanners(new Set<string>(stored.ids));
     } catch { /* ignore */ }
-  }, [usageMonth]);
+  }, []);
   const dismissBanner = (id: string) => {
     setDismissedBanners((prev) => {
       const next = new Set(prev).add(id);
-      if (usage) {
-        try {
-          localStorage.setItem("dismissedBanners", JSON.stringify({ period: usage.month, ids: [...next] }));
-        } catch { /* ignore */ }
-      }
+      try {
+        localStorage.setItem("dismissedBanners", JSON.stringify({ ids: [...next].slice(-200) }));
+      } catch { /* ignore */ }
       return next;
     });
   };

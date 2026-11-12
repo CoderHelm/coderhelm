@@ -866,6 +866,7 @@ function HybridCheckRow({ check }: { check: HybridCheck }) {
 function ChecksRow({ hybrid, checks }: { hybrid: HybridState; checks: HybridCheck[] }) {
   if (checks.length === 0) return null;
   const failing = checks.filter((c) => c.status === "fail").length;
+  const waiting = checks.filter((c) => c.status === "wait" || c.status === "todo").length;
   return (
     <div className={row} id="hybrid-checks" data-testid="hybrid-checks">
       <RowHeading
@@ -876,7 +877,13 @@ function ChecksRow({ hybrid, checks }: { hybrid: HybridState; checks: HybridChec
           </button>
         }
       >
-        <p>{failing ? `${failing} need${failing === 1 ? "s" : ""} a fix.` : "Checked live from this install."}</p>
+        <p>
+          {failing
+            ? `${failing} need${failing === 1 ? "s" : ""} a fix.`
+            : waiting
+              ? `${waiting} still ${waiting === 1 ? "waits" : "wait"}; the rest passed. Checked live from this install.`
+              : "All passed. Checked live from this install."}
+        </p>
       </RowHeading>
       <ul className="mt-3 divide-y divide-zinc-800 overflow-hidden rounded-lg border border-zinc-800" aria-label="Hybrid checks">
         {checks.map((c) => <HybridCheckRow key={`${c.id}-${c.code}`} check={c} />)}

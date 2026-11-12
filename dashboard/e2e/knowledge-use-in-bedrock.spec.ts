@@ -689,13 +689,17 @@ test("self-hosted: one button opens the stack and the page follows it to the fir
     acknowledged: true,
     create_knowledge_base: true,
   });
-  expect(
-    await page.evaluate(() =>
-      (window as unknown as { __opened: { href: string }[] }).__opened.map(
-        (o) => o.href,
+  // The tab opens on the press and gets its address when the setup call
+  // answers: wait for it rather than read it at once.
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        (window as unknown as { __opened: { href: string }[] }).__opened.map(
+          (o) => o.href,
+        ),
       ),
-    ),
-  ).toEqual([LAUNCH]);
+    )
+    .toEqual([LAUNCH]);
   const progress = page.getByTestId("setup-progress");
   await expect(progress).toContainText("Waiting for the stack");
   await expect(page.getByTestId("setup-open")).toHaveAttribute("href", LAUNCH);

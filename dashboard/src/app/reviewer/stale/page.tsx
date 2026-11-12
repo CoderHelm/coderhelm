@@ -24,10 +24,12 @@ import {
   plural,
   rowsOf,
   staleState,
+  pageState,
   type StaleRow,
   type StaleState,
 } from "@/lib/stale";
 import { RoleGuard } from "@/components/role-guard";
+import { Problem } from "@/components/problem";
 import { Page, PageHeader } from "@/components/page";
 import { Tabs } from "@/components/tabs";
 import { useToast } from "@/components/toast";
@@ -136,7 +138,9 @@ function StalePage() {
     };
   }, [attempt]);
 
-  const state: StaleState | null = config ? staleState(config.effective) : configFailed ? "off" : null;
+  // Settings that didn't load are unknown, never "off".
+  const state: StaleState | null = config ? pageState(config.effective, config.repo_configs, !!repo) : null;
+  const teamState: StaleState | null = config ? staleState(config.effective) : null;
   const applies = config?.effective;
 
   const allRows = useMemo(() => rowsOf(activity, repo), [activity, repo]);
@@ -173,10 +177,11 @@ function StalePage() {
   const count = (n: number | null) => (n === null || n === 0 ? undefined : <span className="tabular-nums text-xs text-zinc-400">{n}</span>);
   const loaded = !!activity;
   const tabs = [
-    { value: "stale", label: "Marked stale", href: tabHref("stale"), count: count(loaded ? marked.length : null), countText: loaded ? String(marked.length) : undefined },
-    { value: "next", label: nextLabel, href: tabHref("next"), count: count(loaded ? upNext.length : null), countText: loaded ? String(upNext.length) : undefined },
-    { value: "closed", label: "Recently closed", href: tabHref("closed"), count: count(loaded ? closed.length : null), countText: loaded ? String(closed.length) : undefined },
-    { value: "exempt", label: "Exempt", href: tabHref("exempt"), count: count(loaded ? exempt.length + kept.length : null), countText: loaded ? String(exempt.length + kept.length) : undefined },
+    // Each count is the list its tab shows: the search narrows both.
+    { value: "stale", label: "Marked stale", href: tabHref("stale"), count: count(loaded ? shownMarked.length : null), countText: loaded ? String(shownMarked.length) : undefined },
+    { value: "next", label: nextLabel, href: tabHref("next"), count: count(loaded ? shownNext.length : null), countText: loaded ? String(shownNext.length) : undefined },
+    { value: "closed", label: "Recently closed", href: tabHref("closed"), count: count(loaded ? shownClosed.length : null), countText: loaded ? String(shownClosed.length) : undefined },
+    { value: "exempt", label: "Exempt", href: tabHref("exempt"), count: count(loaded ? shownExempt.length + shownKept.length : null), countText: loaded ? String(shownExempt.length + shownKept.length) : undefined },
     { value: "settings", label: "Settings", href: tabHref("settings") },
   ];
 
@@ -262,7 +267,8 @@ function StalePage() {
         lead={
           <>
             <p>{LEAD}</p>
-            {applies && state !== "off" && (
+            {/* The settings' own line only when they are the page's state (one state, never "Off" under a Preview only header). */}
+            {applies && state !== "off" && state === staleState(applies) && (
               <p className="mt-1 text-zinc-500" data-testid="stale-applies">
                 {staleSummary(applies)}
                 {repo && config?.repo ? ` ${shortRepo(repo)} has its own settings.` : ""}
@@ -273,6 +279,14 @@ function StalePage() {
         actions={primary}
       />
 
+      {configFailed && !config && (
+        <div className="mt-4">
+          <Problem title="Couldn't load the stale pull request settings" onRetry={reload} compact>
+            {"Whether cleanup is on isn't known until they load. The lists below are the last sweep of each repository."}
+          </Problem>
+        </div>
+      )}
+
       {state === "off" && view !== "settings" && (
         <OffBanner
           admin={admin}
@@ -281,6 +295,14 @@ function StalePage() {
           settingsHref={tabHref("settings")}
           others={otherRepoModes(config?.repo_configs, "off").filter((g) => !repo)}
         />
+      )}
+      {!repo && state !== null && teamState === "off" && state !== "off" && view !== "settings" && (
+        <p className="mt-4 text-sm text-zinc-400" data-testid="stale-mixed">
+          {otherRepoModes(config?.repo_configs, "off")
+            .map((g) => `${STATE_WORD[g.state]} on ${g.repos.length > 3 ? plural(g.repos.length, "repository", "repositories") : g.repos.map(shortRepo).join(", ")}`)
+            .join("; ")}
+          ; off for the other repositories.
+        </p>
       )}
 
       <Tabs label="Stale pull request views" value={view} items={tabs} />
@@ -436,9 +458,11 @@ function PlanRow({ r, state, admin, busy, onKeep }: { r: StaleRow; state: StaleS
   const days = daysUntil(closesAt(r));
   const would = r.dry_run;
   // A marked one while nothing acts: it carries the label, and nothing closes it.
-  const idle = isMarked(r) && (state === "off" || state === "dry_run");
+  // Its own repository's mode decides, never the page's.
+  const mode = r.mode ?? state;
+  const idle = isMarked(r) && (mode === "off" || mode === "dry_run");
   const chip = idle ? (
-    <Chip tone="muted">{state === "off" ? "Nothing closes it" : "Preview: not closed"}</Chip>
+    <Chip tone="muted">{mode === "off" ? "Nothing closes it" : "Preview: not closed"}</Chip>
   ) : r.action === "mark" ? (
       <Chip tone="waiting">{would ? "Would mark" : "Marks next"}</Chip>
     ) : r.action === "close" ? (
@@ -463,7 +487,7 @@ function PlanRow({ r, state, admin, busy, onKeep }: { r: StaleRow; state: StaleS
       summary={
         [
           r.last_what ? `Last activity: ${r.last_what}, ${formatDate(r.last_activity)}.` : "",
-          idle ? (state === "off" ? "Cleanup is off, so nothing closes it." : "Preview only, so nothing closes it.") : "",
+          idle ? (mode === "off" ? "Cleanup is off for this repository, so nothing closes it." : "Preview only, so nothing closes it.") : "",
         ]
           .filter(Boolean)
           .join(" ") || undefined

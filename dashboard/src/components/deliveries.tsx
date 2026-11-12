@@ -23,6 +23,7 @@ import { AtlassianIcon, BellIcon, ChatIcon, CloudIcon, GitHubIcon, MailIcon, Plu
 import { Chip, ListEmpty, ListError, ListSkeleton, ListToolbar, StatusDot, TONES, formatDate, formatMs, statusWords, timeAgo, type Tone } from "./list";
 import { SectionHeading } from "./page";
 import { Code } from "./settings/code";
+import { TechnicalDetails } from "./problem";
 import { Skeleton } from "./skeleton";
 import { StatGrid, StatTile } from "./stat-tile";
 import { useConfirm } from "./confirm-dialog";
@@ -725,10 +726,12 @@ function DeliveryDetail({ detail, refusal }: { detail: DeliveryDetailReply; refu
     d.status === "pending"
       ? `Not through yet${d.next_retry_at ? `: Coderhelm tries again at ${clock(d.next_retry_at)}` : ""}.`
       : d.status === "failed"
-        ? "Failed for good."
+        ? "Failed, and Coderhelm stopped retrying it."
         : d.status === "ignored"
           ? "Received, and not an event Coderhelm acts on."
-          : "Went through.";
+          : d.status === "received"
+            ? "Received; Coderhelm is handling it."
+            : "Went through.";
 
   const facts: [string, ReactNode][] = [
     [
@@ -792,7 +795,7 @@ function DeliveryDetail({ detail, refusal }: { detail: DeliveryDetailReply; refu
                 {reason.fix}
               </p>
             )}
-            <p className="text-xs text-zinc-400">Reason code <Code>{reason.code}</Code></p>
+            <TechnicalDetails text={`Reason code: ${reason.code}`} summary="Technical details" />
           </Callout>
         </div>
       )}

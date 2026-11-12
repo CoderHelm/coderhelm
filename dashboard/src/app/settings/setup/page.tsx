@@ -175,12 +175,14 @@ function Setup() {
 /** The server-side checks, grouped, failing first within the summary. */
 function InstallChecks({ data, state, onRecheck }: { data: SystemChecks | null; state: "loading" | "ready" | "failed"; onRecheck: () => void }) {
   const groups: [string, SystemChecks["checks"]][] = [];
-  for (const c of healthChecks(data?.checks ?? [])) {
+  const shown = healthChecks(data?.checks ?? []);
+  for (const c of shown) {
     const g = groups.find(([name]) => name === c.group);
     if (g) g[1].push(c);
     else groups.push([c.group, [c]]);
   }
-  const s = data?.summary;
+  // Counted from the rows listed here, so the line and the list agree.
+  const s = data ? { ...data.summary, pass: shown.filter((c) => c.status === "pass").length, warn: shown.filter((c) => c.status === "warn").length, fail: shown.filter((c) => c.status === "fail").length } : null;
   return (
     <section aria-labelledby="install-checks-heading" data-testid="install-checks" className="min-w-0">
       <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">

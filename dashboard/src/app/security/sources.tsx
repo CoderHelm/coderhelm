@@ -7,6 +7,8 @@
 
 import { Chip, Time, type Tone } from "@/components/list";
 import { Section } from "@/components/page";
+import { Recovered } from "@/components/recovered";
+import { currentMessage } from "@/lib/current-state";
 import { repoName, type AdvisoryPoll, type RepoInventory, type SecurityOverview, type SourceRow } from "@/lib/security";
 
 const STATE_LOOK: Record<SourceRow["state"], { tone: Tone; label: string }> = {
@@ -97,7 +99,7 @@ export function SourcesPanel({ o }: { o: SecurityOverview }) {
                 {poll && <PollStatus poll={poll} />}
                 {s.reason && !poll && (
                   <p className={`mt-1 ${s.state === "error" ? "text-red-300" : s.state === "needs_permission" ? "text-amber-300" : "text-zinc-400"}`} data-testid="source-reason">
-                    {s.reason}
+                    {s.state === "ok" ? s.reason : currentMessage(false, s.reason)}
                   </p>
                 )}
               </div>
@@ -106,6 +108,11 @@ export function SourcesPanel({ o }: { o: SecurityOverview }) {
                 <p>
                   Last read <When at={s.synced_at} />
                 </p>
+                {s.state === "ok" && s.recovered_at && (
+                  <p>
+                    <Recovered at={s.recovered_at} />
+                  </p>
+                )}
               </div>
             </li>
           );
