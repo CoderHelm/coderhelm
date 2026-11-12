@@ -10,6 +10,8 @@ import {
   type LogFinding,
   type LogFindingStatus,
   type LogFindingsList,
+  type LogIncident,
+  type LogPlace,
   type LogPostsTo,
   type LogSample,
   type LogSeverity,
@@ -160,8 +162,9 @@ export default function LogsGuarded() {
 
 function LogsPage() {
   // ?q= search, ?status= one status, ?severity=, ?group= one log group,
-  // ?finding= the open row, ?auto=1 the automatic fix PR settings.
-  const [params, setParams] = useListParams({ q: "", status: "all", severity: "", group: "", finding: "", auto: "" });
+  // ?finding= the open row, ?auto=1 the automatic fix PR settings,
+  // ?incident= one incident and its findings (where a card links).
+  const [params, setParams] = useListParams({ q: "", status: "all", severity: "", group: "", finding: "", auto: "", incident: "" });
   const q = params.q.trim();
   const status = (STATUS_ORDER as string[]).includes(params.status) ? (params.status as LogFindingStatus) : "all";
   const severity = params.severity in SEVERITY_LOOK ? (params.severity as LogSeverity) : "";
@@ -210,13 +213,17 @@ function LogsPage() {
   const canRemember = can("memory");
 
   const findings = useMemo(() => data?.findings ?? [], [data]);
+  // Findings with one cause are one incident: one row, one card, one fix.
+  const incidents = useMemo(() => incidentsOf(findings), [findings]);
+  const incident = params.incident ? incidents.get(params.incident) ?? null : null;
   const searched = useMemo(
     () =>
       findings
         .filter((f) => matches(f, q))
         .filter((f) => !severity || f.severity === severity)
-        .filter((f) => !params.group || f.log_group === params.group),
-    [findings, q, severity, params.group],
+        .filter((f) => !params.group || f.log_group === params.group)
+        .filter((f) => !params.incident || f.incident_id === params.incident),
+    [findings, q, severity, params.group, params.incident],
   );
   const counts = useMemo(() => {
     const c: Record<LogFindingStatus, number> = { new: 0, acknowledged: 0, fixing: 0, fixed: 0, ignored: 0 };
@@ -233,8 +240,25 @@ function LogsPage() {
       ),
     [searched, status],
   );
-  const filtered = !!(q || status !== "all" || severity || params.group);
-  const clear = () => setParams({ q: "", status: "all", severity: "", group: "" });
+  // Outside one incident's view, an incident's findings fold into its row,
+  // placed where its first finding would be.
+  const rows = useMemo(() => {
+    const out: ({ kind: "finding"; f: LogFinding } | { kind: "incident"; inc: LogIncident; members: LogFinding[] })[] = [];
+    const placed = new Set<string>();
+    for (const f of shown) {
+      const inc = !params.incident && f.incident_id ? incidents.get(f.incident_id) : undefined;
+      if (!inc) {
+        out.push({ kind: "finding", f });
+        continue;
+      }
+      if (placed.has(inc.id)) continue;
+      placed.add(inc.id);
+      out.push({ kind: "incident", inc, members: shown.filter((m) => m.incident_id === inc.id) });
+    }
+    return out;
+  }, [shown, incidents, params.incident]);
+  const filtered = !!(q || status !== "all" || severity || params.group || params.incident);
+  const clear = () => setParams({ q: "", status: "all", severity: "", group: "", incident: "" });
 
   const setStatus = async (f: LogFinding, action: "ignore" | "acknowledge" | "reopen") => {
     setBusy(`${action}:${f.rec_id}`);
@@ -259,8 +283,9 @@ function LogsPage() {
         title="Logs"
         lead={
           <>
-            Errors Coderhelm found in your AWS logs. It looks every 6 hours. Create a fix PR from any
-            finding, or let Coderhelm open one for new findings.
+            Errors Coderhelm found in your AWS logs. It watches for new errors every few minutes and works out the cause:
+            findings with one cause are one incident. Create a fix PR from any finding, or let Coderhelm open one for
+            new findings.
           </>
         }
         actions={
@@ -375,6 +400,7 @@ function LogsPage() {
             </div>
           </div>
 
+          {incident && <IncidentPanel inc={incident} onClose={() => setParams({ incident: "", finding: "" })} />}
           {!data && !error ? (
             <ListSkeleton rows={4} label="Loading findings" />
           ) : error && !data ? (
@@ -391,20 +417,32 @@ function LogsPage() {
             <ListEmpty title={q ? `No findings match “${q}”` : "No findings here"} onClear={clear} />
           ) : (
             <List label="Log findings">
-              {shown.map((f) => (
+              {rows.map((r) =>
+                r.kind === "incident" ? (
+                  <IncidentRow
+                    key={`inc-${r.inc.id}`}
+                    inc={r.inc}
+                    members={r.members}
+                    open={params.finding === `incident:${r.inc.id}`}
+                    onOpenChange={(v) => setParams({ finding: v ? `incident:${r.inc.id}` : "" }, { replace: true })}
+                    onShow={() => setParams({ incident: r.inc.id, finding: r.inc.lead })}
+                  />
+                ) : (
                 <FindingRow
-                  key={f.rec_id}
-                  f={f}
+                  key={r.f.rec_id}
+                  f={r.f}
                   autofix={autofix?.autofix ?? null}
                   onAutofixSettings={() => openSettings(true)}
                   canAct={canAct}
                   busy={busy}
-                  open={params.finding === f.rec_id}
-                  onOpenChange={(v) => setParams({ finding: v ? f.rec_id : "" }, { replace: true })}
-                  onFix={() => setFixing(f)}
-                  onStatus={(a) => setStatus(f, a)}
+                  open={params.finding === r.f.rec_id}
+                  onOpenChange={(v) => setParams({ finding: v ? r.f.rec_id : "" }, { replace: true })}
+                  onFix={() => setFixing(r.f)}
+                  onStatus={(a) => setStatus(r.f, a)}
+                  onRepoSettings={() => openSettings(true)}
                 />
-              ))}
+                ),
+              )}
             </List>
           )}
         </>
@@ -430,6 +468,187 @@ function LogsPage() {
         )}
       </Modal>
     </Page>
+  );
+}
+
+// ── Incidents ───────────────────────────────────────────────────────
+
+const PLACE_WORDS: Record<LogPlace, string> = {
+  code: "The application code",
+  aws: "AWS (a managed service or a passing blip)",
+  data: "Data (an index rebuild or a pipeline rerun)",
+  infra: "Infrastructure as code",
+  config: "A setting (config, secret or environment)",
+};
+
+/** Incidents shown as one row: more than one finding, or a cause outside the code. */
+function incidentsOf(findings: LogFinding[]): Map<string, LogIncident> {
+  const out = new Map<string, LogIncident>();
+  for (const f of findings) {
+    const inc = f.incident;
+    if (!f.incident_id || !inc || out.has(f.incident_id)) continue;
+    const present = findings.filter((m) => m.incident_id === f.incident_id).length;
+    if (present > 1 || inc.diagnosis.place !== "code") out.set(f.incident_id, inc);
+  }
+  return out;
+}
+
+function IncidentRow({
+  inc,
+  members,
+  open,
+  onOpenChange,
+  onShow,
+}: {
+  inc: LogIncident;
+  members: LogFinding[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onShow: () => void;
+}) {
+  const d = inc.diagnosis;
+  const worst = members.reduce((w, f) => (SEVERITY_LOOK[f.severity].rank > SEVERITY_LOOK[w].rank ? f.severity : w), "info" as LogSeverity);
+  const sev = SEVERITY_LOOK[worst];
+  const recovered = !!d.recovered_at;
+  const fixing = members.some((f) => f.status === "fixing");
+  const look: StatusLook = recovered
+    ? { label: "Recovered", tone: "success" }
+    : fixing
+      ? STATUS_LOOK.fixing
+      : { label: "Incident", tone: "attention" };
+  return (
+    <ListRow
+      testId={`incident-${inc.id}`}
+      data={{ place: d.place }}
+      status={look}
+      title={d.headline || members[0]?.title || "Incident"}
+      titleText={d.headline}
+      meta={[
+        <span key="g" className="font-medium text-zinc-300">
+          {inc.log_groups.map(serviceName).join(", ")}
+        </span>,
+        `${plural(inc.members.length, "finding")}, one cause`,
+        inc.first_seen ? `began ${timeAgo(inc.first_seen)}` : null,
+        recovered ? `stopped ${timeAgo(d.recovered_at)}` : null,
+      ]}
+      summary={inc.action || d.summary}
+      summaryTone={recovered ? "success" : fixing ? "live" : "attention"}
+      chips={
+        <>
+          <Chip tone={recovered ? "neutral" : sev.tone}>{sev.label}</Chip>
+          <Chip tone="info" title="Where the fix belongs">
+            {PLACE_WORDS[d.place]}
+          </Chip>
+        </>
+      }
+      actions={
+        <button type="button" onClick={onShow} className={rowActionClass} aria-label={`Show the findings of ${d.headline}`}>
+          Show findings
+        </button>
+      }
+      details={<IncidentDetail inc={inc} />}
+      detailsFor={`details of ${d.headline}`}
+      open={open}
+      onOpenChange={onOpenChange}
+    />
+  );
+}
+
+function IncidentDetail({ inc }: { inc: LogIncident }) {
+  const d = inc.diagnosis;
+  return (
+    <div data-testid="incident-detail">
+      <DetailBlock title="What happened">
+        <p className="text-zinc-300">{d.summary}</p>
+      </DetailBlock>
+      {inc.action && (
+        <DetailBlock title="What Coderhelm did">
+          <p className="text-zinc-300" data-testid="incident-action">{inc.action}</p>
+        </DetailBlock>
+      )}
+      <DetailBlock title="Fix belongs in">
+        <p className="text-zinc-300">{PLACE_WORDS[d.place]}</p>
+        {d.fix && (
+          <p className="mt-1 text-zinc-400">
+            {d.fix.change} <Code>{d.fix.path}</Code> in {d.fix.repo}
+          </p>
+        )}
+      </DetailBlock>
+      {!!d.steps.length && (
+        <DetailBlock title="Also needed">
+          <ul className="list-disc space-y-0.5 pl-5 text-zinc-300">
+            {d.steps.map((s) => (
+              <li key={s} className="break-words">{s}</li>
+            ))}
+          </ul>
+        </DetailBlock>
+      )}
+      {!!d.facts.length && (
+        <DetailBlock title="What Coderhelm checked">
+          <ul className="list-disc space-y-0.5 pl-5 text-zinc-400">
+            {d.facts.map((s) => (
+              <li key={s} className="break-words">{s}</li>
+            ))}
+          </ul>
+        </DetailBlock>
+      )}
+      {!!d.permissions.length && (
+        <DetailBlock title="Would check more with">
+          <p className="text-zinc-400">
+            {d.permissions.map((p, i) => (
+              <span key={p}>
+                {i > 0 && ", "}
+                <Code>{p}</Code>
+              </span>
+            ))}{" "}
+            on the read-only role (
+            <Link href="/settings/integrations/aws" className={`${linkButton} !text-xs`}>
+              update it in AWS settings
+            </Link>
+            ).
+          </p>
+        </DetailBlock>
+      )}
+      <DetailBlock title="Findings">
+        <ul className="space-y-0.5 text-zinc-300">
+          {inc.members.map((m) => (
+            <li key={m.rec_id} className="break-words">
+              {m.title}
+              {m.rec_id === inc.lead ? <span className="text-zinc-400"> (the fix starts here)</span> : null}
+            </li>
+          ))}
+        </ul>
+      </DetailBlock>
+    </div>
+  );
+}
+
+/** One incident above its findings (where a chat card links). */
+function IncidentPanel({ inc, onClose }: { inc: LogIncident; onClose: () => void }) {
+  const d = inc.diagnosis;
+  return (
+    <section
+      aria-labelledby="incident-heading"
+      className="mb-4 min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 sm:p-5"
+      data-testid="incident-panel"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-medium uppercase tracking-wide text-zinc-400">
+            Incident · {plural(inc.members.length, "finding")}, one cause
+          </p>
+          <h2 id="incident-heading" className="mt-1 break-words text-base font-semibold text-zinc-100">
+            {d.headline}
+          </h2>
+        </div>
+        <button type="button" onClick={onClose} className={`${linkButton} !text-xs`}>
+          All findings
+        </button>
+      </div>
+      <div className="mt-3">
+        <IncidentDetail inc={inc} />
+      </div>
+    </section>
   );
 }
 
@@ -509,6 +728,7 @@ function FindingRow({
   onOpenChange,
   onFix,
   onStatus,
+  onRepoSettings,
 }: {
   f: LogFinding;
   autofix: LogAutofix | null;
@@ -519,6 +739,7 @@ function FindingRow({
   onOpenChange: (open: boolean) => void;
   onFix: () => void;
   onStatus: (action: "ignore" | "acknowledge" | "reopen") => void;
+  onRepoSettings: () => void;
 }) {
   const look = STATUS_LOOK[f.status];
   const sev = SEVERITY_LOOK[f.severity] ?? SEVERITY_LOOK.info;
@@ -543,7 +764,12 @@ function FindingRow({
         f.first_seen ? `first seen ${timeAgo(f.first_seen)}` : null,
         f.last_seen ? `last seen ${timeAgo(f.last_seen)}` : null,
         f.reopened_at ? `seen again ${timeAgo(f.reopened_at)} after it was resolved` : null,
-        f.repo ? <span key="r">{f.repo}</span> : null,
+        f.repo ? (
+          <span key="r">
+            {f.repo}
+            {f.repo_learned && !f.fix ? " (learned)" : ""}
+          </span>
+        ) : null,
       ]}
       summary={fixWords(f) ?? autoNote ?? quietWords(f) ?? undefined}
       summaryTone={f.fix ? (f.fix.state === "merged" ? "success" : f.fix.state === "failed" || f.fix.state === "pr_closed" ? "attention" : "live") : "muted"}
@@ -594,7 +820,7 @@ function FindingRow({
           : []),
       ]}
       menuLabel={`More actions for ${f.title}`}
-      details={<FindingDetail f={f} canAct={canAct} onStatus={onStatus} busy={busy} />}
+      details={<FindingDetail f={f} canAct={canAct} onStatus={onStatus} busy={busy} onRepoSettings={onRepoSettings} />}
       detailsFor={`details of ${f.title}`}
       open={open}
       onOpenChange={onOpenChange}
@@ -607,17 +833,40 @@ function FindingDetail({
   canAct,
   busy,
   onStatus,
+  onRepoSettings,
 }: {
   f: LogFinding;
   canAct: boolean;
   busy: string;
   onStatus: (action: "ignore" | "acknowledge" | "reopen") => void;
+  onRepoSettings: () => void;
 }) {
+  const inc = f.incident;
   return (
     <>
       <DetailBlock title="What's wrong">
         <p className="text-zinc-300">{f.summary}</p>
       </DetailBlock>
+      {inc && (inc.members.length > 1 || inc.diagnosis.place !== "code") && (
+        <DetailBlock title="Cause">
+          <p className="text-zinc-300" data-testid="finding-cause">{inc.diagnosis.summary}</p>
+          {inc.action && <p className="mt-1 text-zinc-400">{inc.action}</p>}
+        </DetailBlock>
+      )}
+      {f.repo_learned && f.repo && (
+        <DetailBlock title="Repo">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1" data-testid="finding-learned">
+            <Chip tone="info" title={f.repo_learned.reason}>Learned</Chip>
+            <span className="text-zinc-300">{f.repo}</span>
+            <button type="button" onClick={onRepoSettings} className={`${linkButton} !text-xs`}>
+              Change
+            </button>
+          </div>
+          <p className="mt-1 text-xs text-zinc-400">
+            Coderhelm saved this repo for {f.log_group} on {formatDate(f.repo_learned.at)}: {f.repo_learned.reason}
+          </p>
+        </DetailBlock>
+      )}
       <DetailBlock title="Log group">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <Code>{f.log_group}</Code>
@@ -1175,7 +1424,8 @@ function AutofixPanel({
         <h3 className="text-sm font-medium text-zinc-300">Log groups</h3>
         <p className="mt-0.5 text-xs text-zinc-400">
           The repo each log group&apos;s code lives in ({mapped} of {rows.length} saved). For a group without one, Coderhelm works the
-          repo out from AWS and your code: it fixes there when it&apos;s sure and asks you when it isn&apos;t.
+          repo out from AWS and your code. When the evidence is clear it fixes there and saves the repo here as learned, so it
+          never asks again; it asks you once only when the evidence is split.
         </p>
         {rows.length === 0 ? (
           <p className="mt-2 text-sm text-zinc-500">Log groups appear here once the analyzer finds something in them.</p>
@@ -1191,11 +1441,17 @@ function AutofixPanel({
                     <RepoCombobox
                       repos={repos}
                       selected={r.repo}
-                      onSelect={(name) => setRow(r.log_group, { repo: name })}
+                      onSelect={(name) => setRow(r.log_group, { repo: name, learned: name === r.repo ? r.learned : null })}
                       label={`Repo for ${r.log_group}`}
                       placeholder="Choose a repo"
                       className=""
                     />
+                  )}
+                  {r.learned && r.repo && (
+                    <p className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-400" data-testid={`learned-${r.log_group}`}>
+                      <Chip tone="info">Learned</Chip>
+                      <span className="min-w-0 break-words">{r.learned.reason} Choose another repo to change it.</span>
+                    </p>
                   )}
                 </div>
                 <Select

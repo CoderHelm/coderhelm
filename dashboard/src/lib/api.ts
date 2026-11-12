@@ -3228,6 +3228,52 @@ export interface LogFinding {
   /** When the analyzer resolved it, and why. */
   resolved_at?: string | null;
   resolved_reason?: string | null;
+  /** The incident it is part of: findings with one cause share one id,
+   *  one card and one fix. Older servers leave these out. */
+  incident_id?: string | null;
+  incident?: LogIncident | null;
+  /** A repo Coderhelm saved for its log group itself, and why. */
+  repo_learned?: LogLearned | null;
+}
+
+/** Where an incident's fix belongs. */
+export type LogPlace = "code" | "aws" | "data" | "infra" | "config";
+
+/** Findings with one cause, what Coderhelm found and what it did. */
+export interface LogIncident {
+  id: string;
+  /** The finding its fix starts from. */
+  lead: string;
+  members: { rec_id: string; title: string }[];
+  log_groups: string[];
+  first_seen: string;
+  last_seen: string;
+  /** What Coderhelm did about it, in a sentence. */
+  action: string;
+  diagnosis: {
+    place: LogPlace;
+    service: string;
+    resource: string;
+    headline: string;
+    summary: string;
+    /** What Coderhelm checked and found, one sentence each. */
+    facts: string[];
+    /** The change to make, when it is in a repo. */
+    fix: { repo: string; path: string; change: string } | null;
+    /** Steps that aren't a code change. */
+    steps: string[];
+    /** When the errors stopped, when they did. */
+    recovered_at: string;
+    changed_at: string;
+    /** Read-only permissions that would let Coderhelm check more. */
+    permissions: string[];
+  };
+}
+
+/** Why and when Coderhelm saved a log group's repo itself. */
+export interface LogLearned {
+  reason: string;
+  at: string;
 }
 
 /** Which repo a log group's (or alarm's) code lives in, how sure, and why. */
@@ -3272,7 +3318,9 @@ export interface LogAutofix {
   scope: "all" | "listed";
   /** UTC hours. */
   quiet_hours: { start_hour: number; end_hour: number } | null;
-  overrides: { log_group: string; repo: string; auto: boolean | null; min_severity: LogSeverity | null }[];
+  /** `learned`: Coderhelm saved the repo itself from decisive evidence; a
+   *  person choosing another repo clears it. */
+  overrides: { log_group: string; repo: string; auto: boolean | null; min_severity: LogSeverity | null; learned?: LogLearned | null }[];
   /** Set by the server when it is turned on. */
   enabled_at?: string;
 }
