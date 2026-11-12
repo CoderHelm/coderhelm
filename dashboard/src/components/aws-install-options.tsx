@@ -196,6 +196,8 @@ export function InstallNeededNow({
               <span aria-hidden="true" className="scale-90"><ExternalLinkIcon /></span>
               <span className="sr-only">(opens the AWS console in a new tab)</span>
             </a>
+          ) : access?.apply === "update" ? (
+            <a href="/settings/system/#version" className={primaryButton}>Update the access stack (Settings, System)</a>
           ) : null}
           {checkAgain}
         </div>
