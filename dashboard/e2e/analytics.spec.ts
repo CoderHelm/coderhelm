@@ -149,7 +149,7 @@ function analytics(period: string, repo: string | null, deployState: DeployState
   };
 }
 
-interface Backend { calls: string[]; fail: boolean; empty: boolean; oldServer: boolean; estimated: number; recovered: number; deliveries?: "ok" | "refused"; deployState?: DeployState; noAccess?: string[]; sourceNote?: string | null; notRead?: { repo: string; reason: string }[]; progress?: { read: number; total: number; resumes_at?: string | null } | null }
+interface Backend { endedWrong?: boolean; calls: string[]; fail: boolean; empty: boolean; oldServer: boolean; estimated: number; recovered: number; deliveries?: "ok" | "refused"; deployState?: DeployState; noAccess?: string[]; sourceNote?: string | null; notRead?: { repo: string; reason: string }[]; progress?: { read: number; total: number; resumes_at?: string | null } | null }
 
 async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend> {
   const db: Backend = { calls: [], fail: false, empty: false, oldServer: false, estimated: 0, recovered: 0, ...init };
@@ -174,7 +174,10 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
       const period = url.searchParams.get("period") === "mtd" ? "mtd" : url.searchParams.get("days") || "30";
       const { comparison: base, ...older } = analytics(period, url.searchParams.get("repo"), db.deployState, db.noAccess, db.sourceNote ?? null);
       const comparison = { ...base, deploys_not_read: db.notRead ?? [], deploys_backfill_progress: db.progress ?? null };
-      const body = db.oldServer ? older : { ...older, comparison };
+      const shown = db.endedWrong
+        ? { ...older, ci: { ...older.ci, ended_wrong: { completed_with_red_ci: 1, completed_red_runs: ["01RUNREDDONE0000000000000A"], completed_after_stop: 2, completed_after_stop_runs: ["01RUNSTOPPED000000000000A"] } } }
+        : older;
+      const body = db.oldServer ? shown : { ...shown, comparison };
       if (db.empty) {
         const zero = Object.fromEntries(Object.keys(SUMMARY).map((k) => [k, typeof (SUMMARY as Record<string, unknown>)[k] === "number" ? 0 : null]));
         return json(route, { ...body, summary: zero, previous: zero, reviews: { ...body.reviews, posted: 0 }, lookups: { ...body.lookups, total: 0 } });
@@ -315,6 +318,20 @@ test("where it struggles places every red CI run in one outcome, base-branch fai
   await expect(outcomes.locator("tbody tr td:nth-child(2)")).toHaveText(["6", "0", "1", "1", "1", "0"]);
   await page.getByRole("table", { name: "CI outcomes" }).scrollIntoViewIfNeeded();
   await shot(page, "analytics-ci-outcomes");
+});
+
+test("runs that ended done with red CI or after a stop are counted, so a regression shows", async ({ page }) => {
+  await mockApi(page);
+  await page.goto("/analytics?tab=reliability");
+  await expect(page.getByTestId("ci-line")).toBeVisible();
+  await expect(page.getByTestId("ended-wrong")).toHaveCount(0);
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+  await mockApi(page, { endedWrong: true });
+  await page.goto("/analytics?tab=reliability");
+  const line = page.getByTestId("ended-wrong");
+  await expect(line).toContainText("1 run ended done with its CI still red");
+  await expect(line).toContainText("2 runs ended done after stopping with work left");
+  await expect(line.getByRole("link", { name: "newest" }).first()).toHaveAttribute("href", /\/runs\/detail\/?\?id=01RUNREDDONE0000000000000A$/);
 });
 
 test("period and repository filters reload, and a chart can be read as a table", async ({ page }) => {

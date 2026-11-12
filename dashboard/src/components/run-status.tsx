@@ -77,14 +77,27 @@ const UNFINISHED_ROUND: RunLook = { label: "PR open, fix unfinished", tone: "att
 const DRAFT_HELD: RunLook = { label: "PR held", tone: "waiting", group: "waiting" };
 /** The same, when GitHub refused every try to mark it ready. */
 const DRAFT_NOT_MARKED: RunLook = { label: "PR held", tone: "attention", group: "waiting" };
+/** The pull request is held because its CI fails: named so, never "Done". */
+const CI_FAILING: RunLook = { label: "CI failing", tone: "attention", group: "waiting" };
+/** The run stopped before its planned work was done; its draft says what is left. */
+const STOPPED_UNFINISHED: RunLook = { label: "Stopped, not finished", tone: "attention", group: "waiting" };
 /** Waiting on a person for something that isn't a question (`waiting_on`): reviewing the pull request, say. */
 const WAITING_ON_YOU: RunLook = { label: "Waiting on you", tone: "waiting", group: "waiting" };
+
+/** What a run that needs a person is held on, from its hold reasons and its wait: CI failing, or work left unfinished. */
+export function runHeldOn(whats: (string | null | undefined)[]): "ci_failing" | "unfinished" | null {
+  const w = whats.map((s) => (s ?? "").trim());
+  if (w.some((s) => s.startsWith("CI is failing"))) return "ci_failing";
+  if (w.some((s) => s.startsWith("Planned work is not done") || s.startsWith("Stopped:"))) return "unfinished";
+  return null;
+}
 
 export function RunStatusBadge({
   status,
   unfinishedRound,
   draftHold,
   waitingOn,
+  heldOn,
 }: {
   status: string | null | undefined;
   unfinishedRound?: boolean;
@@ -92,8 +105,14 @@ export function RunStatusBadge({
   draftHold?: string | null;
   /** A `needs_input` run waits for a named action, not an answer. */
   waitingOn?: boolean;
+  /** What holds it, when that is CI failing or unfinished work (`runHeldOn`). */
+  heldOn?: "ci_failing" | "unfinished" | null;
 }) {
-  const look = draftHold
+  const look = heldOn === "ci_failing"
+    ? CI_FAILING
+    : heldOn === "unfinished"
+      ? STOPPED_UNFINISHED
+      : draftHold
     ? draftHold === "failed"
       ? DRAFT_NOT_MARKED
       : DRAFT_HELD

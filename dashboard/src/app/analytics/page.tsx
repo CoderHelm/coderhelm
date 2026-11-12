@@ -330,6 +330,29 @@ function Body({ data, loading, stats, tab }: { data: Analytics; loading: boolean
           </p>
         )}
         {data.ci.outcomes && <CiOutcomes ci={data.ci} outcomes={data.ci.outcomes} />}
+        {!!((data.ci.ended_wrong?.completed_with_red_ci ?? 0) + (data.ci.ended_wrong?.completed_after_stop ?? 0)) && (
+          <p className="mt-3 text-sm text-red-300" data-testid="ended-wrong" role="status">
+            {(data.ci.ended_wrong?.completed_with_red_ci ?? 0) > 0 && (
+              <>
+                {plural(data.ci.ended_wrong?.completed_with_red_ci ?? 0, "run")} ended done with its CI still red
+                {data.ci.ended_wrong?.completed_red_runs?.[0] && (
+                  <> (<Link href={`/runs/detail?id=${data.ci.ended_wrong.completed_red_runs[0]}`} className="underline-offset-2 hover:underline">newest</Link>)</>
+                )}
+                .{" "}
+              </>
+            )}
+            {(data.ci.ended_wrong?.completed_after_stop ?? 0) > 0 && (
+              <>
+                {plural(data.ci.ended_wrong?.completed_after_stop ?? 0, "run")} ended done after stopping with work left
+                {data.ci.ended_wrong?.completed_after_stop_runs?.[0] && (
+                  <> (<Link href={`/runs/detail?id=${data.ci.ended_wrong.completed_after_stop_runs[0]}`} className="underline-offset-2 hover:underline">newest</Link>)</>
+                )}
+                .{" "}
+              </>
+            )}
+            Neither should happen: tell Coderhelm support.
+          </p>
+        )}
         {!!data.loops_stopped?.total && <LoopsStopped stopped={data.loops_stopped} />}
         {!!data.waiting?.total && <Waiting waiting={data.waiting} />}
       </Section>

@@ -3801,6 +3801,13 @@ export interface Analytics {
     outcomes?: AnalyticsCiOutcomes;
     /** Why Coderhelm left a red PR to a person, most common first. */
     gave_up_reasons?: { reason: string; count: number }[];
+    /** Runs that ended in a state Coderhelm must never leave (both should be zero). Missing from older backends. */
+    ended_wrong?: {
+      completed_with_red_ci: number;
+      completed_red_runs: string[];
+      completed_after_stop: number;
+      completed_after_stop_runs: string[];
+    };
   };
   /** Runs the run guard ended for making no progress. Missing from older backends. */
   loops_stopped?: { total: number; reasons: { reason: string; count: number }[] };
