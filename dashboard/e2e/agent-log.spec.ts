@@ -183,9 +183,7 @@ async function shot(page: Page, name: string, widths = [1280, 390]) {
 }
 
 const openLog = async (page: Page, query = "") => {
-  await page.goto(`/runs/detail/?id=${RUN_ID}&tab=details${query}`);
-  const toggle = page.getByRole("button", { name: "Agent log", exact: true });
-  if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
+  await page.goto(`/runs/detail/?id=${RUN_ID}&tab=log${query}`);
   await expect(page.getByTestId("agent-log-panel")).toBeVisible();
 };
 
@@ -246,7 +244,7 @@ test("filters, search and the view are kept in the URL; a step link opens that s
   await expect(page.getByTestId("agent-log-panel")).toBeVisible();
   await expect(page.getByRole("button", { name: "Structured" })).toHaveAttribute("aria-pressed", "true");
   // A link to one step opens its part, its group and the step, and scrolls to it.
-  await page.goto(`/runs/detail/?id=${RUN_ID}&tab=details&log_view=structured&step=toolu_build_003`);
+  await page.goto(`/runs/detail/?id=${RUN_ID}&tab=log&log_view=structured&step=toolu_build_003`);
   const linked = page.locator("#step-toolu_build_003");
   await expect(linked).toBeVisible();
   await expect(linked.getByTestId("log-step-detail")).toBeVisible();
@@ -299,10 +297,7 @@ test("on a phone a step opens in a sheet, and the page never scrolls sideways", 
 
 test("a failed load can be retried", async ({ page }) => {
   const db = await mockRunApi(page, { log: formatTwoLog(), logFail: true });
-  await page.goto(`/runs/detail/?id=${RUN_ID}&tab=details`);
-  const toggle = page.getByRole("button", { name: "Agent log", exact: true });
-  await toggle.click();
-  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await page.goto(`/runs/detail/?id=${RUN_ID}&tab=log`);
   await expect(page.getByText("Couldn't load the agent log.")).toBeVisible();
   db.logFail = false;
   await page.getByRole("button", { name: "Try again" }).click();
@@ -321,7 +316,7 @@ test("the Overview shows the build in three lines instead of a note per tool", a
   await expect(page.getByTestId("run-step").filter({ hasText: "Built the change" })).toContainText("1 note");
   await shot(page, "agent-log-overview");
   await digest.getByRole("link", { name: "Open the agent log" }).click();
-  await expect(page).toHaveURL(/tab=details.*step=toolu_build_/);
+  await expect(page).toHaveURL(/tab=log.*step=toolu_build_/);
   await expect(page.getByTestId("agent-log-panel")).toBeVisible();
   expect(errors).toEqual([]);
 });
