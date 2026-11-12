@@ -489,7 +489,11 @@ test("on the AWS page members see Integrations lit, and no AWS item", async ({ p
   await mockApi(page, { role: "member" });
   await page.goto("/settings/integrations/aws");
   const nav = page.getByRole("navigation", { name: "Settings" });
-  await expect(nav.getByRole("link", { name: "Integrations", exact: true })).toHaveAttribute("aria-current", "page");
+  // The link's name gains "Needs attention: ..." once the integrations' status
+  // arrives, so it is matched by its start and its address, never the exact name.
+  const integrations = nav.getByRole("link", { name: /^Integrations/ });
+  await expect(integrations).toHaveAttribute("href", /\/settings\/integrations\/?$/);
+  await expect(integrations).toHaveAttribute("aria-current", "page");
   await expect(nav.getByRole("link", { name: "AWS" })).toHaveCount(0);
   await expect(nav.getByRole("link", { name: "Data sources" })).toHaveCount(0);
 });
