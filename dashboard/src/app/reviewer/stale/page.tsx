@@ -184,7 +184,7 @@ function StalePage() {
     if (!config) return;
     setBusy("turn-on");
     try {
-      // On as a dry run: nothing changes on GitHub until someone turns the dry run off.
+      // Preview only (enabled with dry_run): nothing changes on GitHub until someone picks On.
       await api.saveStaleConfig({ ...config.team, enabled: true, dry_run: true });
       toast("Turned on as Preview only. Nothing changes on GitHub until you pick On.");
       setParams({ view: "next" });
