@@ -1290,7 +1290,9 @@ function RunDetailInner() {
 
       {tab === "activity" && (
         <div className="mt-6 space-y-8" data-testid="run-tab-activity">
-          {done && run.error && (
+          {/* Only a run that really finished got past it: a run whose last
+              round didn't finish, or whose PR is held, says so above. */}
+          {done && run.error && !run.round_incomplete && !hold && (
             <Callout variant="neutral" title="A problem earlier in this run" live={false}>
               <p>Coderhelm got past it and finished. The details are kept here for reference.</p>
               <TechnicalDetails text={sanitizeError(run.error)} />

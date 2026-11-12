@@ -82,6 +82,8 @@ export interface SourceRow {
   listed?: number;
   /** The GitHub advisory feed: the hourly poll of GitHub's advisory database. */
   poll?: AdvisoryPoll;
+  /** When its last problem cleared (the check passed again), while nothing is wrong now. */
+  recovered_at?: string | null;
 }
 
 /** The advisory poll's last run, and where it has read to while behind. */

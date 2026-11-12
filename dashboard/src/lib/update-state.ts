@@ -314,3 +314,41 @@ export function isStateAnswer(status: number | undefined): boolean {
 export function healthChecks<T extends { key: string; status: string }>(checks: T[]): T[] {
   return checks.filter((c) => c.key !== "update_models" || c.status === "fail");
 }
+
+/**
+ * The System line in Settings and its menu dot, from the same state the
+ * Version card shows, so the two never disagree. Only a state that needs
+ * someone is a warning or an error; an ordinary release waiting is not.
+ */
+export function updateStatusLine(s: UpdateState, current: string | null): { text: string; tone: "neutral" | "success" | "warning" | "error" } | null {
+  switch (s.kind) {
+    case "development":
+      return null;
+    case "applying":
+    case "preparing":
+    case "starting":
+      return { text: `Updating to ${s.version}`, tone: "neutral" };
+    case "checking":
+      return { text: `Checking ${s.version}`, tone: "neutral" };
+    case "review":
+      return { text: `Update to ${s.version} needs your OK`, tone: "warning" };
+    case "check-stalled":
+    case "needs-action":
+      return { text: `Update to ${s.version} needs your action`, tone: "warning" };
+    case "failed":
+      return { text: "The last update didn't finish", tone: "error" };
+    case "updater-down":
+    case "blocked":
+      return { text: `Update to ${s.version} can't start yet`, tone: "warning" };
+    case "available":
+    case "behind":
+      return { text: `${s.version} is available`, tone: "neutral" };
+    case "unreachable":
+      return { text: "Couldn't check for updates", tone: "neutral" };
+    case "stale":
+    case "not-checked":
+      return { text: current ? `Running ${current} · not checked lately` : "Not checked lately", tone: "neutral" };
+    case "current":
+      return current ? { text: `Up to date · ${current}`, tone: "success" } : null;
+  }
+}

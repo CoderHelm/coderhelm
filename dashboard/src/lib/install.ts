@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, type SystemChecks, type SystemVersion } from "@/lib/api";
+import { api, type SystemChecks, type SystemEmails, type SystemVersion } from "@/lib/api";
 import { isSelfHosted } from "@/lib/runtime-config";
 
 /**
@@ -44,6 +44,13 @@ function emailOk(): boolean {
   } catch {
     return false;
   }
+}
+
+/** Email through Coderhelm's mail service that is registered, answering and not paused. */
+function relayWorks(e: SystemEmails | null | undefined): boolean {
+  if (!e || e.transport !== "coderhelm" || !e.relay?.registered || e.relay.turned_off) return false;
+  const st = e.relay.status;
+  return !!st && !("error" in st) && !st.paused;
 }
 
 /** Every setup item, each from its own live call; one failing leaves its item unknown. */
@@ -93,8 +100,14 @@ export async function loadSetupChecks(): Promise<SetupCheck[]> {
     {
       key: "email",
       label: "Email working",
-      done: emailOk(),
-      detail: emailOk() ? "A test email went out." : "Send yourself a test email (new AWS accounts start in the SES sandbox).",
+      // The install's own state first (any admin, any browser): mail through
+      // Coderhelm's mail service that is registered and not paused works.
+      done: relayWorks(emails) || emailOk(),
+      detail: relayWorks(emails)
+        ? "Email goes out through Coderhelm's mail service."
+        : emailOk()
+          ? "A test email went out."
+          : "Send yourself a test email. A new AWS account can only send to addresses it has confirmed until AWS lifts that limit.",
       href: "/settings/setup#email",
       action: "Send a test email",
     },

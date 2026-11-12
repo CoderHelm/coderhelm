@@ -13,12 +13,13 @@ const lastDecisions = (db: SetupDb) => calls(db, "PUT /api/setup/runs/run_03/dec
 const decisionOf = (d: Decisions, repo: string, id: string) => d.items.find((i) => i.repo === repo && i.setting_id === id)?.decision;
 
 test.describe("Setup", () => {
-  test("the menu puts Setup first with a count of new recommendations plus repos not set up", async ({ page }) => {
+  test("the menu puts Setup first with a count of new recommendations plus repos not set up or failed", async ({ page }) => {
     const db = await mockSetup(page);
     await page.goto("/setup");
     const link = page.getByTestId("main-nav").getByRole("link").first();
-    // 3 new recommendations + 2 repos not set up.
-    await expect(link).toHaveText(/^Setup5 things to set up$/);
+    // 3 new recommendations + 2 repos not set up + 1 whose setup failed
+    // (listed first on the page, so the badge counts it too).
+    await expect(link).toHaveText(/^Setup6 things to set up$/);
     await expect(link).toHaveAttribute("aria-current", "page");
 
     // Dismissing one recommendation tells the server, for the whole team, and takes one off the count.
@@ -28,7 +29,7 @@ test.describe("Setup", () => {
     await expect(recs).toHaveCount(2);
     await expect.poll(() => calls(db, "POST /api/setup/seen").length).toBe(1);
     expect(calls(db, "POST /api/setup/seen")[0].body).toEqual({ setting_ids: ["security.enabled"] });
-    await expect(link.getByTestId("count-badge")).toHaveText(/^4/);
+    await expect(link.getByTestId("count-badge")).toHaveText(/^5/);
     // Anyone loading the page sees it gone.
     await page.reload();
     await expect(page.getByTestId("new-rec")).toHaveCount(2);

@@ -47,10 +47,32 @@ export function otherRepoModes(
   return (["on", "dry_run", "off"] as StaleState[]).filter((st) => by.has(st)).map((state) => ({ state, repos: by.get(state)! }));
 }
 
+/**
+ * The one mode the page heads with. Picking a repository: its own. All
+ * repositories: the team's, unless the team is off while repositories with
+ * their own settings are on or previewing (Setup saves settings per
+ * repository): then the most active of those, so the headline never says
+ * "off" over lists that act.
+ */
+export function pageState(
+  effective: Pick<StaleConfig, "enabled" | "dry_run"> | null | undefined,
+  configs: { repo: string; config: Pick<StaleConfig, "enabled" | "dry_run"> }[] | undefined,
+  repoPicked: boolean,
+): StaleState {
+  const base = staleState(effective);
+  if (repoPicked || base !== "off") return base;
+  const modes = (configs ?? []).map((c) => staleState(c.config));
+  if (modes.includes("on")) return "on";
+  if (modes.includes("dry_run")) return "dry_run";
+  return "off";
+}
+
 /** One plan item with the repository and whether its plan was a dry run. */
 export interface StaleRow extends StalePlanItem {
   repo: string;
   dry_run: boolean;
+  /** The repository's mode now (its settings, not the plan's sweep). */
+  mode: StaleState;
 }
 
 /** Every repository's plan, from a new or an older backend (one `plan`). */
@@ -62,7 +84,12 @@ export function plansOf(a: StaleActivity | null | undefined): StalePlan[] {
 
 export function rowsOf(a: StaleActivity | null | undefined, fallbackRepo = ""): StaleRow[] {
   return plansOf(a).flatMap((p) =>
-    p.items.map((i) => ({ ...i, repo: i.repo || p.repo || fallbackRepo, dry_run: p.dry_run })),
+    p.items.map((i) => ({
+      ...i,
+      repo: i.repo || p.repo || fallbackRepo,
+      dry_run: p.dry_run,
+      mode: staleState({ enabled: p.enabled ?? true, dry_run: p.dry_run }),
+    })),
   );
 }
 

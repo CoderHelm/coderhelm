@@ -158,7 +158,8 @@ function UpdateLink({ url, onPress, size = "md" }: { url: string; onPress: () =>
 /** Every account's permission state in one list, with an update link for each (two or more accounts). */
 export function PermissionsOverview({ connections, perms, canEdit }: { connections: AwsConnection[]; perms: AwsPermissionsApi; canEdit: boolean }) {
   const rows = connections.map((c) => ({ account: accountOf(c), region: c.region, s: perms.of(accountOf(c)) }));
-  const needing = rows.filter((r) => r.s.view?.status === "update_needed").length;
+  // The install's own account gets its permissions with the next Coderhelm update: never "needs an update".
+  const needing = rows.filter((r) => r.s.view?.status === "update_needed" && !r.s.view?.install_account).length;
   return (
     <section aria-labelledby="aws-perms-heading" className="rounded-lg border border-zinc-800 bg-zinc-900/40" data-testid="aws-permissions-overview">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-zinc-800 px-4 py-3">

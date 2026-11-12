@@ -328,7 +328,8 @@ export function AwsAbilitiesPanel({
   };
   const check = () => run(() => api.checkAwsAbilities(a.account), "Checked what the role can do");
   const set = (body: Parameters<typeof api.setAwsAbilities>[1]) => run(() => api.setAwsAbilities(a.account, body), "Saved");
-  const missing = (a.missing ?? []).map((m) => (m === "metrics" ? "CloudWatch metrics" : "Airflow"));
+  const ABILITY: Record<string, string> = { metrics: "CloudWatch metrics", airflow: "Airflow", infra: "the Infrastructure vulnerabilities reads" };
+  const missing = (a.missing ?? []).map((m) => ABILITY[m] ?? m);
 
   return (
     <div className="mt-4 flex flex-col gap-4 border-t border-zinc-800 pt-4" data-testid={`aws-panel-${a.account}`}>
