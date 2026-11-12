@@ -613,7 +613,7 @@ export function repoView(repo: string, switchedOn: string[] = []): Record<string
             mark: "preview",
             short: "preview waiting",
             value_text: "Stale after 7 days, closed 7 days later, preview only",
-            why: "Preview: stale cleanup starts as a dry run. Over the last 14 days this would have marked 3 and closed 2 of the 9 open pull requests (7 days with no activity, then closed 7 days later).",
+            why: "Preview: stale cleanup starts in Preview only. Over the last 14 days this would have marked 3 and closed 2 of the 9 open pull requests (7 days with no activity, then closed 7 days later).",
             settings_href: "/reviewer/stale?view=settings",
             switch_on: { run_id: "run_02", setting_id: "stale_prs.enabled" },
           },

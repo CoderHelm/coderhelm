@@ -125,7 +125,7 @@ export function plural(n: number, one: string, many = `${one}s`): string {
 
 /**
  * The one line on the Reviewer page: "3 pull requests marked stale, 1 closing
- * tomorrow", or for a dry run "Dry run: would mark 4 and close 1". Null when
+ * tomorrow", or in Preview only "Stale pull requests, preview only: would mark 4 and close 1 pull requests". Null when
  * there is nothing to say.
  */
 export function summaryLine(state: StaleState, a: StaleActivity | null | undefined, now = Date.now()): string | null {

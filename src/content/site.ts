@@ -39,7 +39,7 @@ export const SITE = {
     "Reviews any pull request that gets the review label (`ch-review` by default) once a repository turns the reviewer on.",
     "Setup: the first item in the dashboard's left menu. Do it for me reads each repository and turns on a recommended value for every setting, labelled detected, inferred or default with its evidence. It keeps settings someone already chose, starts anything that closes or merges as a preview, and any change or a whole run can be undone. New recommendations from a release never turn themselves on.",
     "Infrastructure vulnerabilities: off until an admin switches it on for a connected AWS account. Once a day it reads, read only, the AMIs, kernels, EKS node groups, databases, caches and OpenSearch domains running there, and matches them by version against AWS's security bulletins and the Amazon Linux and Bottlerocket advisories, with no model. Each fix is a pull request in the code that defines the resource, a runbook step in AWS that CoderHelm never runs, or AWS-managed and never counted as open.",
-    "Stale pull requests: off by default. Once a team turns it on, CoderHelm marks a pull request stale after 7 days with no activity from a person and closes it 7 days later if nothing happened, with a comment that says how to reopen. Its own comments and other bots never count as activity; exempt labels, drafts, chosen authors and pull requests CoderHelm is working on are never touched; it starts as a dry run and keeps the branch.",
+    "Stale pull requests: off by default. Once a team turns it on, CoderHelm marks a pull request stale after 7 days with no activity from a person and closes it 7 days later if nothing happened, with a comment that says how to reopen. Its own comments and other bots never count as activity; exempt labels, drafts, chosen authors and pull requests CoderHelm is working on are never touched; it starts in Preview only and keeps the branch.",
     "Learning: it scores its own work from what happens next (a pull request merged as written or edited, closed or reverted; CI passing on the first try or needing fixes; review comments acted on or dismissed; thumbs up or down), reads the best and worst past examples from the repository before a change or a review, and turns justified pushback on a review into a lesson. Lessons, memories, examples and behavior changes are listed with their evidence, and admins can delete or turn off any of them.",
     "Not: a code editor or IDE plugin. It works through issues, tickets and pull requests.",
   ],
@@ -176,7 +176,7 @@ const home: Page = {
                   id: "stale",
                   title: "Close stale pull requests",
                   heading: "Quiet pull requests get a warning first, then a clean close.",
-                  text: "Turned on, it marks a pull request stale after 7 days with no activity from a person and warns on it. If nothing happens in the next 7 days, it closes it with a comment that says how to reopen. Bot comments never count as activity, it starts as a dry run, and the branch is kept.",
+                  text: "Turned on, it marks a pull request stale after 7 days with no activity from a person and warns on it. If nothing happens in the next 7 days, it closes it with a comment that says how to reopen. Bot comments never count as activity, it starts in Preview only, and the branch is kept.",
                   frame: "stale",
                   caption: "A quiet pull request on GitHub: the stale label and the warning, a bot comment that does not count as activity, and the close a week later with the branch kept.",
                   href: "/stale-pull-requests/",
@@ -458,7 +458,7 @@ const setup: Page = {
           type: "cards",
           items: [
             { title: "Keeps your settings", text: "Keep my settings is on by default: a setting someone already chose stays as it is. Switching it off reads Replace mine with recommended, and the page warns you before you start." },
-            { title: "Previews for anything that closes or merges", text: "Closing stale pull requests starts as a dry run, and auto merge stays off until you pick it yourself. Each shows what it would have done over the last 14 days. Switch on makes it real in one click." },
+            { title: "Previews for anything that closes or merges", text: "Closing stale pull requests starts in Preview only, and auto merge stays off until you pick it yourself. Each shows what it would have done over the last 14 days. Switch on makes it real in one click." },
             { title: "Undo one setting or a whole run", text: "On the results, Undo next to a change puts that one setting back, and Undo this run puts back everything the run changed. A setting someone changed again since is left as it is and listed." },
             { title: "Custom stays custom", text: "A setting changed by hand after Setup applied it is marked Custom, and later runs leave it alone unless you choose to replace it." },
             { title: "Retry what failed", text: "A repository that fails shows its reason on its row, and one button runs again for the failed repositories only." },
@@ -626,7 +626,7 @@ const reviewer: Page = {
             { title: "Release tags", text: "Tags a release after merges, grouping merges that land close together (within 15 minutes by default)." },
             { title: "Deploy check", text: "With auto merge on, it waits for the deploy checks after the merge and reports only failures that are new. It never rolls back a shared branch." },
             { title: "Learns from your team", text: "Rate a review and add a note. Later reviews on that repository follow the feedback, on top of AGENTS.md and your review instructions." },
-            { title: "Closes stale pull requests", text: "Off by default. After 7 days with no activity from a person it adds a stale label and warns; 7 days later, if nothing happened, it closes the pull request and says how to reopen. Its own comments and bots never count, and it starts as a dry run that lists what it would close.", href: "/stale-pull-requests/" },
+            { title: "Closes stale pull requests", text: "Off by default. After 7 days with no activity from a person it adds a stale label and warns; 7 days later, if nothing happened, it closes the pull request and says how to reopen. Its own comments and bots never count, and it starts in Preview only, which lists what it would mark and close.", href: "/stale-pull-requests/" },
           ],
         },
       ],
@@ -656,7 +656,7 @@ const stalePrs: Page = {
   navLabel: "Stale pull requests",
   title: "Close stale pull requests without losing work",
   description:
-    "CoderHelm marks a pull request stale after 7 days with no activity from a person, warns on it, and closes it 7 days later if nothing happened. Bot comments never count, it starts as a dry run and the branch is kept.",
+    "CoderHelm marks a pull request stale after 7 days with no activity from a person, warns on it, and closes it 7 days later if nothing happened. Bot comments never count, it starts in Preview only and the branch is kept.",
   eyebrow: "Stale pull requests",
   h1: "Close the pull requests nobody is working on. Warn first.",
   lede:
@@ -723,7 +723,7 @@ const stalePrs: Page = {
           type: "cards",
           items: [
             { title: "Off by default", text: "Nothing happens until an admin turns it on." },
-            { title: "Starts as a dry run", text: "The dashboard lists what would be marked and closed, and when, and nothing changes on GitHub until you turn the dry run off. Check now works the list out again at any time." },
+            { title: "Starts in Preview only", text: "The mode is Off, Preview only or On. In Preview only the dashboard lists what would be marked and closed, and when, under Would mark or close, and nothing changes on GitHub until you pick On. Check now works the list out again at any time." },
             { title: "Keep open, anywhere", text: "Comment `@coderhelm keep open`, push a commit, comment or remove the label. The author or anyone with write access can keep a pull request open." },
             { title: "The branch is kept", text: "Closing keeps the branch unless you choose to delete it, and even then never a fork's branch, the default branch or a branch another pull request is based on." },
             { title: "Closes are capped", text: "At most 10 closes per repository each hour by default, writes one at a time, and it waits out GitHub's rate limit." },
