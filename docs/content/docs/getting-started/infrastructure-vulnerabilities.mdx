@@ -95,7 +95,11 @@ Each row says how the code was found and how sure CoderHelm is: **Sure**, **Like
 
 ### What a pull request may never do
 
-Before anything else happens to a pull request for an infrastructure fix, CoderHelm reads the change. If it would replace or destroy a resource that holds data (a changed identifier, a removed or renamed resource, a lowered version, an OpenSearch version change without the version upgrade policy, a safeguard taken away), CoderHelm closes its own pull request and the row says why.
+Before anything else happens to a pull request for an infrastructure fix, CoderHelm reads the change. If it would replace or destroy a resource that holds data (a changed identifier, a removed or renamed resource, a lowered version, an OpenSearch version change without the version upgrade policy, a safeguard taken away), CoderHelm does this, in order:
+
+1. One fix round on the same branch. It is told each line that would replace, remove or downgrade the resource, and makes the in-place change instead. The change is read again.
+2. If the change still would, the pull request becomes a draft. It is never closed and its branch is kept. The reason and the lines are at the top of its description, it is never marked ready or merged as it is, and the row becomes a runbook, so there is still a correct way to apply the update.
+3. CoderHelm makes no further attempt for that row until the code that defines the resource or the update's target changes.
 
 ### Order
 

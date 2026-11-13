@@ -410,9 +410,19 @@ export function FindingDetails({ f }: { f: InfraFinding }) {
         </DetailBlock>
       )}
       {(f.refused?.length ?? 0) > 0 && (
-        <DetailBlock title="Coderhelm refused its own change">
+        <DetailBlock title={f.drafted ? "Coderhelm made its pull request a draft" : "Coderhelm is correcting its own change"}>
           <Lines items={f.refused!} testid="fix-refused" />
-          <p className="mt-1 text-xs text-zinc-400">It would have replaced or destroyed a resource that holds data. The pull request was closed and nothing was applied.</p>
+          <p className="mt-1 max-w-prose text-xs leading-relaxed text-zinc-400" data-testid="fix-refused-note">
+            {f.note ||
+              (f.drafted
+                ? "The change would have replaced or destroyed a resource that holds data. The pull request is kept as a draft and nothing was applied."
+                : "The change would have replaced or destroyed a resource that holds data. One fix round is correcting these lines.")}
+          </p>
+          {f.drafted && f.pr?.url && (
+            <p className="mt-1 text-xs">
+              <OutLink href={f.pr.url}>The draft pull request #{f.pr.number}</OutLink>
+            </p>
+          )}
         </DetailBlock>
       )}
       {order.length > 0 && (

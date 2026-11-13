@@ -162,14 +162,18 @@ export interface InfraFinding {
   tier: Tier | null;
   fix: InfraFix;
   status: InfraStatus;
-  pr: { number: number; url: string; state: "open" | "merged" | "closed" } | null;
+  pr: { number: number; url: string; state: "open" | "merged" | "closed" | "draft" } | null;
   inspector?: { exploit_available: boolean; reachable: boolean | null; findings?: number } | null;
   first_seen_at: string;
   updated_at: string;
   fixed_at?: string | null;
   environment?: string;
-  /** Why the replacement guard refused the change a fix run made. */
+  /** The lines of a fix run's change that would have replaced or destroyed a data resource. */
   refused?: string[];
+  /** The change was refused twice: the pull request is a draft and the row is a runbook. */
+  drafted?: boolean;
+  /** What is happening with the row, in the server's words. */
+  note?: string;
 }
 
 export interface InfraReadError {

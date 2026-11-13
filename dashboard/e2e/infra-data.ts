@@ -488,13 +488,41 @@ export const DB_UNSURE = dbFinding({
   },
 });
 
+// The guard tripped twice: the pull request is a draft and the row fell back
+// to its runbook.
 export const DB_REFUSED = dbFinding({
   ...DB_UPGRADE,
   id: "f_db_refused",
   name: "audit-prod-aurora",
   title: "Aurora cluster audit-prod-aurora: engine version upgrade to 16.6 pending",
-  pr: { number: 418, url: "https://github.com/acme/infra/pull/418", state: "closed" },
-  refused: ["modules/aurora/main.tf: `aws_rds_cluster.this` changes `cluster_identifier`, which replaces the resource (a new one is created and this one is destroyed)."],
+  pr: { number: 418, url: "https://github.com/acme/infra/pull/418", state: "draft" },
+  refused: ["modules/aurora/main.tf, line 5: `aws_rds_cluster.this` changes `cluster_identifier`, which replaces the resource (a new one is created and this one is destroyed)."],
+  drafted: true,
+  note: "The pull request is kept as a draft with the reason at the top of its description, and is never merged as it is. Nothing was applied.",
+  fix: {
+    ...(DB_UPGRADE.fix as Record<string, unknown>),
+    kind: "runbook",
+    decision:
+      "A runbook: CoderHelm's own code change for this update would have replaced or destroyed a resource that holds data, twice, so its pull request is a draft and the update is applied in AWS. CoderHelm makes no further attempt until the code that defines the resource or the update's target changes.",
+    notes: null,
+    runbook: {
+      ...((DB_PATCH.fix as unknown as { runbook: Record<string, unknown> }).runbook),
+      steps: [{ text: "Upgrade the cluster in its next maintenance window.", cli: "aws rds modify-db-cluster --db-cluster-identifier audit-prod-aurora --engine-version 16.6 --no-apply-immediately --region us-east-1" }],
+    },
+  },
 });
 
-export const INFRA_DATABASES = [DB_UPGRADE, DB_PATCH, DB_UNSURE, DB_REFUSED];
+// The guard tripped once: one fix round is correcting the change.
+export const DB_FIXING = dbFinding({
+  ...DB_UPGRADE,
+  id: "f_db_fixing",
+  name: "billing-prod-aurora",
+  title: "Aurora cluster billing-prod-aurora: engine version upgrade to 16.6 pending",
+  status: "fixing",
+  pr: { number: 419, url: "https://github.com/acme/infra/pull/419", state: "open" },
+  refused: ["modules/aurora/main.tf, line 5: `aws_rds_cluster.this` changes `cluster_identifier`, which replaces the resource (a new one is created and this one is destroyed)."],
+  drafted: false,
+  note: "CoderHelm read its own change and it would have replaced or destroyed a resource that holds data. One fix round is correcting the lines below; the change is read again when it ends.",
+});
+
+export const INFRA_DATABASES = [DB_UPGRADE, DB_PATCH, DB_UNSURE, DB_REFUSED, DB_FIXING];

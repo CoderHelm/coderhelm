@@ -40,7 +40,7 @@ async function mockApi(page: Page, overview: unknown) {
 const overview = () =>
   infraOverview({
     findings: INFRA_DATABASES,
-    counts: { open: 4, p0: 0, p1: 0, p2: 0, p3: 4, prs: 2, runbooks: 2, aws_managed: 0, fixed_30d: 0 },
+    counts: { open: 5, p0: 0, p1: 0, p2: 0, p3: 5, prs: 2, runbooks: 3, aws_managed: 0, fixed_30d: 0 },
   });
 
 const rows = (page: Page) => page.getByRole("list", { name: "Infrastructure findings" }).getByTestId("infra-row");
@@ -49,7 +49,7 @@ test.describe("Infrastructure: database updates", () => {
   test("a pull request says why, where the code is and how sure, and what happens when it is applied", async ({ page }) => {
     await mockApi(page, overview());
     await page.goto("/security/infrastructure");
-    await expect(rows(page)).toHaveCount(4);
+    await expect(rows(page)).toHaveCount(5);
     const up = rows(page).filter({ hasText: "ledger-prod-aurora: engine version upgrade" });
     await expect(up.getByTestId("fix-chip")).toHaveText("Fix PR");
     await up.getByRole("button", { name: /details of ledger-prod-aurora/ }).click();
@@ -116,11 +116,26 @@ test.describe("Infrastructure: database updates", () => {
     // Without a full runbook the card still gives the command.
     await expect(unsure.getByTestId("runbook-cli")).toContainText("aws rds modify-db-instance");
 
+    // Refused twice: the pull request is a draft (never closed), the row is a
+    // runbook with the reason, the offending line and a way to apply the update.
     const refused = rows(page).filter({ hasText: "audit-prod-aurora" });
+    await expect(refused.getByTestId("fix-chip")).toHaveText("Runbook");
     await refused.getByRole("button", { name: /details of audit-prod-aurora/ }).click();
-    await expect(refused.getByText("Coderhelm refused its own change")).toBeVisible();
-    await expect(refused.getByTestId("fix-refused")).toContainText("changes cluster_identifier, which replaces the resource");
-    await expect(refused).toContainText("The pull request was closed and nothing was applied.");
+    await expect(refused.getByText("Coderhelm made its pull request a draft")).toBeVisible();
+    await expect(refused.getByTestId("fix-refused")).toContainText("modules/aurora/main.tf, line 5");
+    await expect(refused.getByTestId("fix-refused")).toContainText("which replaces the resource");
+    await expect(refused.getByTestId("fix-refused-note")).toContainText("kept as a draft");
+    await expect(refused.getByTestId("fix-refused-note")).not.toContainText("closed");
+    await expect(refused.getByRole("link", { name: "The draft pull request #418" })).toHaveAttribute("href", "https://github.com/acme/infra/pull/418");
+    await expect(refused.getByTestId("fix-decision")).toContainText("makes no further attempt until the code");
+    await expect(refused.getByTestId("runbook-cli")).toContainText("aws rds modify-db-cluster --db-cluster-identifier audit-prod-aurora");
+
+    // Refused once: still a pull request, with the fix round under way.
+    const fixing = rows(page).filter({ hasText: "billing-prod-aurora" });
+    await expect(fixing.getByTestId("fix-chip")).toHaveText("Fix PR");
+    await fixing.getByRole("button", { name: /details of billing-prod-aurora/ }).click();
+    await expect(fixing.getByText("Coderhelm is correcting its own change")).toBeVisible();
+    await expect(fixing.getByTestId("fix-refused-note")).toContainText("One fix round is correcting the lines below");
   });
 
   test("the details fit a narrow screen", async ({ page }) => {
