@@ -18,6 +18,7 @@ import { ChartCard, ChartTip, SERIES, Table, axis, delta, shortDay } from "@/com
 import { DecisionsSection } from "./decisions";
 import { SecuritySection } from "./security";
 import { InfraSecuritySection } from "./infra-security";
+import { TokenTiles, TokenUseSection } from "./token-use";
 
 const PERIODS: { value: `${AnalyticsPeriod}`; label: string }[] = [
   { value: "7", label: "7 days" },
@@ -133,6 +134,7 @@ function UsageNote({ stats }: { stats: Stats | null }) {
 const TABS = [
   { value: "overview", label: "Overview" },
   { value: "trends", label: "Compared" },
+  { value: "tokens", label: "Token use" },
   { value: "reliability", label: "Reliability" },
   { value: "teams", label: "Teams and repos" },
   { value: "security", label: "Security" },
@@ -257,7 +259,12 @@ function Body({ data, loading, stats, tab }: { data: Analytics; loading: boolean
           <Tile testId="tile-merged" label="PRs merged" value={count(s.prs_merged)} change={delta(s.prs_merged, p.prs_merged, "count", vs)} basis={`${plural(s.prs_opened, "PR")} opened, ${count(s.prs_open)} still open`} />
           <Tile testId="tile-merge-rate" label="Merge rate" value={pct(s.merge_rate)} change={delta(s.merge_rate, p.merge_rate, "rate", vs)} basis="Merged out of opened" />
           <Tile testId="tile-time-to-merge" label="Median time to merge" value={hours(s.median_hours_to_merge)} change={delta(s.median_hours_to_merge, p.median_hours_to_merge, "hours", vs)} basis={s.time_to_merge_known ? `From ${plural(s.time_to_merge_known, "merged PR")}` : "Recorded for PRs merged from now on"} />
-          <Tile testId="tile-tokens-per-pr" label="Tokens per merged PR" value={perPr(s) == null ? "—" : tokens(perPr(s)!)} change={delta(perPr(s), perPr(p), "count", vs)} basis={`${tokens(totalTokens(s))} tokens across ${plural(s.runs, "run")}`} />
+          {data.token_use ? (
+            <TokenTiles tu={data.token_use} span={span} vs={vs} />
+          ) : (
+            // An older server: every run's tokens over the merged PRs, the only figure it has.
+            <Tile testId="tile-tokens-per-pr" label="Tokens per merged PR" value={perPr(s) == null ? "—" : tokens(perPr(s)!)} change={delta(perPr(s), perPr(p), "count", vs)} basis={`${tokens(totalTokens(s))} tokens across ${plural(s.runs, "run")}, failed and unmerged ones included`} />
+          )}
           <Tile testId="tile-untouched" label="Merged as written" value={s.edits_known ? pct(s.merged_untouched / s.edits_known) : "—"} basis={s.edits_known ? `${count(s.merged_untouched)} of ${plural(s.edits_known, "merged PR")} had no commits from people` : "Recorded for PRs merged from now on"} />
           <Tile testId="tile-ci" label="Red CI fixed by Coderhelm" value={pct(data.ci.fix_rate)} basis={data.ci.runs_with_red_ci ? `${count(data.ci.fixed_by_coderhelm)} of ${plural(data.ci.runs_with_red_ci, "run")} went green after its fixes` : "No red CI on Coderhelm's PRs"} />
           <Tile testId="tile-findings" label="Review findings acted on" value={pct(data.reviews.acted_on_rate)} basis={data.reviews.outcomes_known_reviews ? `${count(data.reviews.findings_fixed)} fixed in code, ${count(data.reviews.findings_settled_by_person)} settled by a person` : "Counted from re-reviews from now on"} />
@@ -317,6 +324,8 @@ function Body({ data, loading, stats, tab }: { data: Analytics; loading: boolean
         ) : (
           <p className="mt-10 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 text-sm text-zinc-400">No comparison for this period yet.</p>
         ))}
+
+      {tab === "tokens" && <TokenUseSection tu={data.token_use} span={span} vs={vs} />}
 
       {tab === "reliability" && (
         <>
