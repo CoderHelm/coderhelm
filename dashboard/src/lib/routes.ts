@@ -63,7 +63,7 @@ export const ROUTES: Record<string, RouteInfo> = {
   "/data-sources/tools/tool": { label: "Tool", parent: "/data-sources/tools", detail: true, description: "One team tool: what it does, its settings and its recent calls." },
 
   "/analytics": { label: "Analytics", description: "How Coderhelm is doing for your team: runs, merged pull requests, time saved and token use." },
-  "/learning": { label: "Learning", description: "How people answered the reviewer's comments, and the changes in its behavior that came from those answers." },
+  "/learning": { label: "Learning", description: "What became of Coderhelm's pull requests, how people answered the reviewer's comments, and the lessons and changes in behavior that came from both." },
   "/infrastructure": { label: "Infrastructure", description: "The cloud resources Coderhelm can see, and what changed in them." },
   "/alerts": { label: "Alerts", description: "Alerts Coderhelm picked up from your monitoring, and what it did about each one." },
   "/alerts/detail": { label: "Alert", parent: "/alerts", detail: true, description: "One alert: when it fired, what Coderhelm found and the fix it proposed." },
