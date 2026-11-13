@@ -21,13 +21,6 @@ const count = (v: number) => v.toLocaleString();
 const plural = (n: number, one: string, many = `${one}s`) => `${count(n)} ${n === 1 ? one : many}`;
 const share = (part: number, whole: number) => (whole > 0 ? `${Math.round((part / whole) * 100)}%` : "—");
 const pct = (v: number | null | undefined) => (v == null ? "—" : `${Math.round(v * 100)}%`);
-/** An estimate in dollars: cents under $100, whole dollars above. */
-function usd(v: number | null | undefined) {
-  if (v == null) return "—";
-  if (v > 0 && v < 0.01) return "under $0.01";
-  return v >= 100 ? `$${Math.round(v).toLocaleString()}` : `$${v.toFixed(2)}`;
-}
-
 const KIND: Record<TokenWorkKind, string> = {
   ticket_runs: "Ticket runs",
   security: "Security fixes",
@@ -91,7 +84,7 @@ function whyNotCompared(why: TokenNotComparable, tu: AnalyticsTokenUse) {
 }
 
 /** The tokens that are not cache reads: new input, cache writes and output. */
-const fullPrice = (p: TokenParts) => p.tokens_in + p.cache_write_tokens + p.tokens_out;
+const restOf = (p: TokenParts) => p.tokens_in + p.cache_write_tokens + p.tokens_out;
 
 const partCells = (p: TokenParts) => [tokens(p.tokens_in), tokens(p.tokens_out), tokens(p.cache_read_tokens), tokens(p.cache_write_tokens), tokens(p.tokens)];
 const PART_HEAD = ["New input", "Output", "Cache read", "Cache write", "All tokens"];
@@ -133,7 +126,7 @@ export function TokenTiles({ tu, span, vs }: { tu: AnalyticsTokenUse; span: stri
 
 // ── The view ───────────────────────────────────────────────────────────────
 
-type Row = { label: string; cache_read: number; full_price: number };
+type Row = { label: string; cache_read: number; rest: number };
 
 function SplitBars({ rows, label }: { rows: Row[]; label: string }) {
   return (
@@ -145,7 +138,7 @@ function SplitBars({ rows, label }: { rows: Row[]; label: string }) {
           <YAxis type="category" dataKey="label" width={150} {...axis} tick={{ fill: "#a1a1aa", fontSize: 11 }} />
           <Tooltip cursor={{ fill: "#27272a66" }} content={<ChartTip format={(v) => `${tokens(v)} tokens`} labelFormat={(l) => l} />} />
           <Legend wrapperStyle={{ fontSize: 12, color: "#a1a1aa" }} iconType="circle" iconSize={8} />
-          <Bar dataKey="full_price" stackId="t" name="New input, cache writes and output" fill={SERIES.second} stroke="#18181b" strokeWidth={1} maxBarSize={16} />
+          <Bar dataKey="rest" stackId="t" name="New input, cache writes and output" fill={SERIES.second} stroke="#18181b" strokeWidth={1} maxBarSize={16} />
           <Bar dataKey="cache_read" stackId="t" name="Cache reads" fill={SERIES.first} stroke="#18181b" strokeWidth={1} radius={[0, 4, 4, 0]} maxBarSize={16} />
         </BarChart>
       </ResponsiveContainer>
@@ -187,11 +180,10 @@ export function TokenUseSection({ tu, span, vs }: { tu: AnalyticsTokenUse | unde
   const per = tu.per_merged_pr;
   const reasons = [...new Set([tu.not_comparable, per.not_comparable].filter((x): x is TokenNotComparable => !!x))];
   const noUse = total.tokens === 0 && tu.runs.tokens === 0;
-  const kindRows: Row[] = tu.by_kind.map((k) => ({ label: kindLabel(k.kind), cache_read: k.cache_read_tokens, full_price: fullPrice(k) }));
-  const modelRows: Row[] = tu.by_model.map((m) => ({ label: m.model, cache_read: m.cache_read_tokens, full_price: fullPrice(m) }));
-  const daily = tu.daily.map((d) => ({ day: d.day, cache_read: d.cache_read_tokens, full_price: fullPrice(d) }));
+  const kindRows: Row[] = tu.by_kind.map((k) => ({ label: kindLabel(k.kind), cache_read: k.cache_read_tokens, rest: restOf(k) }));
+  const modelRows: Row[] = tu.by_model.map((m) => ({ label: m.model, cache_read: m.cache_read_tokens, rest: restOf(m) }));
+  const daily = tu.daily.map((d) => ({ day: d.day, cache_read: d.cache_read_tokens, rest: restOf(d) }));
   const lumped = tu.by_kind.filter((k) => k.features.length > 1 || (k.features.length === 1 && k.kind === "other"));
-  const unpriced = tu.by_model.filter((m) => !m.price_known);
 
   return (
     <div data-testid="token-use">
@@ -222,13 +214,6 @@ export function TokenUseSection({ tu, span, vs }: { tu: AnalyticsTokenUse | unde
             value={share(total.cache_read_tokens, total.tokens)}
             note={`${tokens(total.cache_read_tokens)} of ${tokens(total.tokens)} tokens were text the model had already read. A cache read is billed at a small fraction of new input.`}
           />
-          <StatTile
-            testId="tile-token-cost"
-            label="Estimated cost"
-            value={usd(total.cost_usd)}
-            delta={tu.comparable && tu.previous ? { text: delta(total.cost_usd, tu.previous.cost_usd, "count", vs), tone: "flat" } : undefined}
-            note="Each call at its model's list price. Your provider's bill is the real figure."
-          />
         </StatGrid>
       </Section>
 
@@ -239,7 +224,7 @@ export function TokenUseSection({ tu, span, vs }: { tu: AnalyticsTokenUse | unde
           <div className="mt-6 space-y-4">
             <ChartCard
               title={metered ? "Tokens per day, by part" : "Tokens per day, by part (runs, on the day each started)"}
-              table={<Table label="Tokens per day by part" head={["Day", ...PART_HEAD, "Est. cost"]} rows={tu.daily.map((d) => [shortDay(d.day), ...partCells(d), usd(d.cost_usd)])} empty="No days." />}
+              table={<Table label="Tokens per day by part" head={["Day", ...PART_HEAD]} rows={tu.daily.map((d) => [shortDay(d.day), ...partCells(d)])} empty="No days." />}
             >
               <div className="h-56" role="img" aria-label="Stacked bar chart of tokens per day: cache reads, and new input, cache writes and output">
                 <ResponsiveContainer width="100%" height="100%">
@@ -249,7 +234,7 @@ export function TokenUseSection({ tu, span, vs }: { tu: AnalyticsTokenUse | unde
                     <YAxis width={44} tickFormatter={(v: number) => tokens(v)} {...axis} />
                     <Tooltip cursor={{ fill: "#27272a66" }} content={<ChartTip format={(v) => `${tokens(v)} tokens`} />} />
                     <Legend wrapperStyle={{ fontSize: 12, color: "#a1a1aa" }} iconType="circle" iconSize={8} />
-                    <Bar dataKey="full_price" stackId="t" name="New input, cache writes and output" fill={SERIES.second} stroke="#18181b" strokeWidth={1} maxBarSize={18} />
+                    <Bar dataKey="rest" stackId="t" name="New input, cache writes and output" fill={SERIES.second} stroke="#18181b" strokeWidth={1} maxBarSize={18} />
                     <Bar dataKey="cache_read" stackId="t" name="Cache reads" fill={SERIES.first} stroke="#18181b" strokeWidth={1} radius={[4, 4, 0, 0]} maxBarSize={18} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -261,8 +246,8 @@ export function TokenUseSection({ tu, span, vs }: { tu: AnalyticsTokenUse | unde
               table={
                 <Table
                   label="Tokens by kind of work"
-                  head={["Kind of work", ...PART_HEAD, "Share", "Est. cost", "Change"]}
-                  rows={tu.by_kind.map((k) => [kindLabel(k.kind), ...partCells(k), share(k.tokens, total.tokens), usd(k.cost_usd), changeCell(k.tokens, k.previous_tokens)])}
+                  head={["Kind of work", ...PART_HEAD, "Share", "Change"]}
+                  rows={tu.by_kind.map((k) => [kindLabel(k.kind), ...partCells(k), share(k.tokens, total.tokens), changeCell(k.tokens, k.previous_tokens)])}
                   empty="No model calls in this period."
                 />
               }
@@ -272,6 +257,7 @@ export function TokenUseSection({ tu, span, vs }: { tu: AnalyticsTokenUse | unde
           </div>
 
           <div className="mt-3 space-y-1 text-xs text-zinc-400" data-testid="token-use-lumped">
+            <p data-testid="token-use-parts-note">Cache read tokens are billed at a fraction of new input tokens, so a count that is mostly cache reads weighs far less than the same count of new input.</p>
             {metered ? (
               <>
                 <p>Fixes after review comments, CI fixes and merge conflicts on an open pull request are counted together: the meter does not tell them apart. A CI fix made while a run is still going counts under that run.</p>
@@ -293,8 +279,8 @@ export function TokenUseSection({ tu, span, vs }: { tu: AnalyticsTokenUse | unde
                 table={
                   <Table
                     label="Tokens by model"
-                    head={["Model", ...PART_HEAD, "Cache hit share", "Calls", "Est. cost", "Change"]}
-                    rows={tu.by_model.map((m) => [m.model, ...partCells(m), pct(m.cache_hit_share), count(m.calls), m.price_known ? usd(m.cost_usd) : `${usd(m.cost_usd)} at most`, changeCell(m.tokens, m.previous_tokens)])}
+                    head={["Model", ...PART_HEAD, "Cache hit share", "Calls", "Change"]}
+                    rows={tu.by_model.map((m) => [m.model, ...partCells(m), pct(m.cache_hit_share), count(m.calls), changeCell(m.tokens, m.previous_tokens)])}
                     empty="No model calls in this period."
                   />
                 }
@@ -302,8 +288,7 @@ export function TokenUseSection({ tu, span, vs }: { tu: AnalyticsTokenUse | unde
                 {modelRows.length ? <SplitBars rows={modelRows} label="Bar chart of tokens by model, cache reads apart from the rest" /> : <p className="flex h-40 items-center justify-center text-sm text-zinc-400">No model calls in this period.</p>}
               </ChartCard>
               <p className="mt-3 text-xs text-zinc-400">
-                Cache hit share is cache reads out of all input (cache reads, cache writes and new input): the higher it is, the less each call costs.
-                {unpriced.length > 0 && ` No list price is known for ${unpriced.map((m) => m.model).join(", ")}: its cost is shown at the highest known price, so it is an upper bound.`}
+                Cache hit share is cache reads out of all input (cache reads, cache writes and new input): the higher it is, the more of each call is billed at the lower cache read rate.
               </p>
             </div>
           )}
@@ -315,15 +300,15 @@ export function TokenUseSection({ tu, span, vs }: { tu: AnalyticsTokenUse | unde
           >
             <Table
               label="Tokens per merged PR by kind of run"
-              head={["Kind of run", "Merged PRs", "Runs", "Tokens per PR", "Est. cost per PR", "All tokens", "Cache read"]}
-              rows={per.by_kind.map((k) => [kindLabel(k.kind), count(k.prs), count(k.runs), k.tokens_per_pr == null ? "—" : tokens(k.tokens_per_pr), usd(k.cost_per_pr), tokens(k.tokens), tokens(k.cache_read_tokens)])}
+              head={["Kind of run", "Merged PRs", "Runs", "Tokens per PR", "All tokens", "Cache read"]}
+              rows={per.by_kind.map((k) => [kindLabel(k.kind), count(k.prs), count(k.runs), k.tokens_per_pr == null ? "—" : tokens(k.tokens_per_pr), tokens(k.tokens), tokens(k.cache_read_tokens)])}
               empty={`No run started in ${span} has a merged pull request yet.`}
             />
             <div className="mt-6">
               <Table
                 label="Run tokens by how the work ended"
-                head={["How the work ended", "Runs", "All tokens", "Share of run tokens", "Est. cost"]}
-                rows={tu.runs.by_outcome.map((o) => [outcomeLabel(o.outcome), count(o.runs), tokens(o.tokens), share(o.tokens, tu.runs.tokens), usd(o.cost_usd)])}
+                head={["How the work ended", "Runs", "All tokens", "Share of run tokens"]}
+                rows={tu.runs.by_outcome.map((o) => [outcomeLabel(o.outcome), count(o.runs), tokens(o.tokens), share(o.tokens, tu.runs.tokens)])}
                 empty="No runs in this period."
               />
               <p className="mt-3 text-xs text-zinc-400">Every run started in {span} is in exactly one row, by where its pull request stands now.</p>
@@ -333,12 +318,11 @@ export function TokenUseSection({ tu, span, vs }: { tu: AnalyticsTokenUse | unde
           <Section title="Heaviest pull requests" id="heaviest-prs" description="All the runs on one pull request, added up. Open one to see what it did.">
             <Table
               label="Heaviest pull requests"
-              head={["Pull request", "Runs", ...PART_HEAD, "Est. cost"]}
+              head={["Pull request", "Runs", ...PART_HEAD]}
               rows={tu.heaviest_prs.map((r) => [
                 <RunLink key={`${r.repo}#${r.pr_number}`} id={r.run_id} title={r.title} sub={<>{r.repo}<PrLink url={r.pr_url} number={r.pr_number} />{" · "}{kindLabel(r.kind)}{" · "}{outcomeLabel(r.outcome)}</>} />,
                 count(r.runs),
                 ...partCells(r),
-                usd(r.cost_usd),
               ])}
               empty="No pull requests from runs in this period."
             />
@@ -347,11 +331,10 @@ export function TokenUseSection({ tu, span, vs }: { tu: AnalyticsTokenUse | unde
           <Section title="Heaviest runs" id="heaviest-runs">
             <Table
               label="Heaviest runs"
-              head={["Run", ...PART_HEAD, "Est. cost"]}
+              head={["Run", ...PART_HEAD]}
               rows={tu.heaviest_runs.map((r) => [
                 <RunLink key={r.run_id} id={r.run_id} title={r.title} sub={<>{r.repo}<PrLink url={r.pr_url} number={r.pr_number} />{" · "}{kindLabel(r.kind)}{" · "}{outcomeLabel(r.outcome)}</>} />,
                 ...partCells(r),
-                usd(r.cost_usd),
               ])}
               empty="No runs used tokens in this period."
             />

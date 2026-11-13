@@ -7,9 +7,9 @@ import path from "node:path";
 
 const SHOTS_DIR = process.env.E2E_SHOTS_DIR || path.join("test-results", "shots");
 
-const parts = (tokens_in: number, tokens_out: number, cache_read_tokens: number, cache_write_tokens: number, cost_usd: number) => ({
+const parts = (tokens_in: number, tokens_out: number, cache_read_tokens: number, cache_write_tokens: number) => ({
   tokens: tokens_in + tokens_out + cache_read_tokens + cache_write_tokens,
-  tokens_in, tokens_out, cache_read_tokens, cache_write_tokens, cost_usd,
+  tokens_in, tokens_out, cache_read_tokens, cache_write_tokens,
 });
 
 function lastDays(n: number) {
@@ -25,55 +25,55 @@ const SUMMARY = {
 };
 
 function tokenUse(days: number) {
-  const total = parts(2_000_000, 1_500_000, 60_000_000, 6_500_000, 84.5);
+  const total = parts(2_000_000, 1_500_000, 60_000_000, 6_500_000);
   return {
     basis: "metered",
     counted_since: "2026-01-04",
     metered_from: "2026-01-05",
     run_records_from: "2026-01-12",
     total: { ...total, calls: 5200, cache_hit_share: 0.876 },
-    previous: parts(1_800_000, 1_200_000, 50_000_000, 3_000_000, 70),
+    previous: parts(1_800_000, 1_200_000, 50_000_000, 3_000_000),
     comparable: true,
     not_comparable: null,
-    daily: lastDays(days).map((day, i) => ({ day, ...parts(10_000 * (i % 4), 8_000 * (i % 3), 400_000 * (i % 5), 30_000 * (i % 2), 0.4 * (i % 5)) })),
+    daily: lastDays(days).map((day, i) => ({ day, ...parts(10_000 * (i % 4), 8_000 * (i % 3), 400_000 * (i % 5), 30_000 * (i % 2)) })),
     by_kind: [
-      { kind: "ticket_runs", calls: 2000, previous_tokens: 30_000_000, previous_cost_usd: 30, ...parts(900_000, 800_000, 25_000_000, 3_300_000, 38), features: [{ feature: "run", calls: 1900, ...parts(850_000, 780_000, 24_000_000, 3_200_000, 36) }, { feature: "plan", calls: 100, ...parts(50_000, 20_000, 1_000_000, 100_000, 2) }] },
-      { kind: "security", calls: 600, previous_tokens: 1_000_000, previous_cost_usd: 1, ...parts(300_000, 200_000, 12_000_000, 1_500_000, 14), features: [{ feature: "security_fix", calls: 500, ...parts(280_000, 190_000, 11_500_000, 1_450_000, 13.5) }, { feature: "security", calls: 100, ...parts(20_000, 10_000, 500_000, 50_000, 0.5) }] },
-      { kind: "follow_ups", calls: 700, previous_tokens: 7_000_000, previous_cost_usd: 9, ...parts(250_000, 150_000, 8_000_000, 600_000, 10), features: [{ feature: "feedback", calls: 700, ...parts(250_000, 150_000, 8_000_000, 600_000, 10) }] },
-      { kind: "reviews", calls: 1500, previous_tokens: 16_000_000, previous_cost_usd: 25, ...parts(450_000, 300_000, 14_000_000, 1_000_000, 20), features: [{ feature: "review", calls: 1500, ...parts(450_000, 300_000, 14_000_000, 1_000_000, 20) }] },
-      { kind: "chat", calls: 150, previous_tokens: 900_000, previous_cost_usd: 2, ...parts(50_000, 30_000, 700_000, 60_000, 1.5), features: [{ feature: "chat", calls: 150, ...parts(50_000, 30_000, 700_000, 60_000, 1.5) }] },
-      { kind: "logs", calls: 200, previous_tokens: 800_000, previous_cost_usd: 2, ...parts(40_000, 15_000, 250_000, 30_000, 0.8), features: [{ feature: "log_analysis", calls: 200, ...parts(40_000, 15_000, 250_000, 30_000, 0.8) }] },
-      { kind: "other", calls: 50, previous_tokens: 300_000, previous_cost_usd: 1, ...parts(10_000, 5_000, 50_000, 10_000, 0.2), features: [{ feature: "memory", calls: 50, ...parts(10_000, 5_000, 50_000, 10_000, 0.2) }] },
+      { kind: "ticket_runs", calls: 2000, previous_tokens: 30_000_000, ...parts(900_000, 800_000, 25_000_000, 3_300_000), features: [{ feature: "run", calls: 1900, ...parts(850_000, 780_000, 24_000_000, 3_200_000) }, { feature: "plan", calls: 100, ...parts(50_000, 20_000, 1_000_000, 100_000) }] },
+      { kind: "security", calls: 600, previous_tokens: 1_000_000, ...parts(300_000, 200_000, 12_000_000, 1_500_000), features: [{ feature: "security_fix", calls: 500, ...parts(280_000, 190_000, 11_500_000, 1_450_000) }, { feature: "security", calls: 100, ...parts(20_000, 10_000, 500_000, 50_000) }] },
+      { kind: "follow_ups", calls: 700, previous_tokens: 7_000_000, ...parts(250_000, 150_000, 8_000_000, 600_000), features: [{ feature: "feedback", calls: 700, ...parts(250_000, 150_000, 8_000_000, 600_000) }] },
+      { kind: "reviews", calls: 1500, previous_tokens: 16_000_000, ...parts(450_000, 300_000, 14_000_000, 1_000_000), features: [{ feature: "review", calls: 1500, ...parts(450_000, 300_000, 14_000_000, 1_000_000) }] },
+      { kind: "chat", calls: 150, previous_tokens: 900_000, ...parts(50_000, 30_000, 700_000, 60_000), features: [{ feature: "chat", calls: 150, ...parts(50_000, 30_000, 700_000, 60_000) }] },
+      { kind: "logs", calls: 200, previous_tokens: 800_000, ...parts(40_000, 15_000, 250_000, 30_000), features: [{ feature: "log_analysis", calls: 200, ...parts(40_000, 15_000, 250_000, 30_000) }] },
+      { kind: "other", calls: 50, previous_tokens: 300_000, ...parts(10_000, 5_000, 50_000, 10_000), features: [{ feature: "memory", calls: 50, ...parts(10_000, 5_000, 50_000, 10_000) }] },
     ],
     by_model: [
-      { model: "model-large", calls: 3000, previous_tokens: 40_000_000, previous_cost_usd: 60, cache_hit_share: 0.9, price_known: true, ...parts(1_200_000, 1_000_000, 45_000_000, 3_800_000, 70) },
-      { model: "model-small", calls: 2200, previous_tokens: 16_000_000, previous_cost_usd: 10, cache_hit_share: 0.82, price_known: true, ...parts(800_000, 500_000, 15_000_000, 2_700_000, 14.5) },
+      { model: "model-large", calls: 3000, previous_tokens: 40_000_000, cache_hit_share: 0.9, ...parts(1_200_000, 1_000_000, 45_000_000, 3_800_000) },
+      { model: "model-small", calls: 2200, previous_tokens: 16_000_000, cache_hit_share: 0.82, ...parts(800_000, 500_000, 15_000_000, 2_700_000) },
     ],
     per_merged_pr: {
-      ...parts(300_000, 250_000, 6_000_000, 450_000, 9.2), prs: 4, runs: 5, tokens_per_pr: 1_750_000, cost_per_pr: 2.3,
+      ...parts(300_000, 250_000, 6_000_000, 450_000), prs: 4, runs: 5, tokens_per_pr: 1_750_000,
       comparable: true, not_comparable: null,
-      previous: { ...parts(250_000, 200_000, 5_000_000, 550_000, 8), prs: 4, runs: 4, tokens_per_pr: 1_500_000, cost_per_pr: 2 },
+      previous: { ...parts(250_000, 200_000, 5_000_000, 550_000), prs: 4, runs: 4, tokens_per_pr: 1_500_000 },
       by_kind: [
-        { kind: "ticket_runs", prs: 3, runs: 4, tokens_per_pr: 2_000_000, cost_per_pr: 2.8, ...parts(260_000, 220_000, 5_100_000, 420_000, 8.4) },
-        { kind: "security", prs: 1, runs: 1, tokens_per_pr: 1_000_000, cost_per_pr: 0.8, ...parts(40_000, 30_000, 900_000, 30_000, 0.8) },
+        { kind: "ticket_runs", prs: 3, runs: 4, tokens_per_pr: 2_000_000, ...parts(260_000, 220_000, 5_100_000, 420_000) },
+        { kind: "security", prs: 1, runs: 1, tokens_per_pr: 1_000_000, ...parts(40_000, 30_000, 900_000, 30_000) },
       ],
     },
     runs: {
-      ...parts(1_500_000, 1_100_000, 40_000_000, 4_200_000, 52), runs: 20,
+      ...parts(1_500_000, 1_100_000, 40_000_000, 4_200_000), runs: 20,
       by_outcome: [
-        { outcome: "merged", runs: 5, ...parts(300_000, 250_000, 6_000_000, 450_000, 9.2) },
-        { outcome: "open", runs: 8, ...parts(700_000, 500_000, 20_000_000, 2_300_000, 25) },
-        { outcome: "closed", runs: 1, ...parts(50_000, 50_000, 1_800_000, 100_000, 2.3) },
-        { outcome: "failed", runs: 3, ...parts(300_000, 200_000, 9_000_000, 1_000_000, 11.5) },
-        { outcome: "no_pr", runs: 3, ...parts(150_000, 100_000, 3_200_000, 350_000, 4) },
+        { outcome: "merged", runs: 5, ...parts(300_000, 250_000, 6_000_000, 450_000) },
+        { outcome: "open", runs: 8, ...parts(700_000, 500_000, 20_000_000, 2_300_000) },
+        { outcome: "closed", runs: 1, ...parts(50_000, 50_000, 1_800_000, 100_000) },
+        { outcome: "failed", runs: 3, ...parts(300_000, 200_000, 9_000_000, 1_000_000) },
+        { outcome: "no_pr", runs: 3, ...parts(150_000, 100_000, 3_200_000, 350_000) },
       ],
     },
     heaviest_runs: [
-      { run_id: "01RUNHEAVY000000000000000A", title: "Move the checkout form to the new layout", repo: "your-team/web", pr_number: 140, pr_url: "https://github.com/your-team/web/pull/140", kind: "ticket_runs", outcome: "open", ...parts(200_000, 150_000, 9_000_000, 900_000, 9.9) },
-      { run_id: "01RUNHEAVY000000000000000B", title: "Update the image library", repo: "your-team/backend", pr_number: 0, pr_url: "", kind: "security", outcome: "failed", ...parts(100_000, 80_000, 5_000_000, 500_000, 5.5) },
+      { run_id: "01RUNHEAVY000000000000000A", title: "Move the checkout form to the new layout", repo: "your-team/web", pr_number: 140, pr_url: "https://github.com/your-team/web/pull/140", kind: "ticket_runs", outcome: "open", ...parts(200_000, 150_000, 9_000_000, 900_000) },
+      { run_id: "01RUNHEAVY000000000000000B", title: "Update the image library", repo: "your-team/backend", pr_number: 0, pr_url: "", kind: "security", outcome: "failed", ...parts(100_000, 80_000, 5_000_000, 500_000) },
     ],
     heaviest_prs: [
-      { repo: "your-team/web", pr_number: 140, pr_url: "https://github.com/your-team/web/pull/140", title: "Move the checkout form to the new layout", run_id: "01RUNHEAVY000000000000000C", runs: 3, kind: "ticket_runs", outcome: "open", ...parts(400_000, 300_000, 15_000_000, 1_500_000, 17) },
+      { repo: "your-team/web", pr_number: 140, pr_url: "https://github.com/your-team/web/pull/140", title: "Move the checkout form to the new layout", run_id: "01RUNHEAVY000000000000000C", runs: 3, kind: "ticket_runs", outcome: "open", ...parts(400_000, 300_000, 15_000_000, 1_500_000) },
     ],
   };
 }
@@ -159,24 +159,24 @@ test("tokens per merged PR counts only the runs behind merged PRs, and says so",
   await expect(page.getByText("$")).toHaveCount(0);
 });
 
-test("the Token use view splits tokens by part, kind of work and model, with cost", async ({ page }) => {
+test("the Token use view splits tokens by part, kind of work and model, in tokens only", async ({ page }) => {
   await mockApi(page);
   await page.goto("/analytics?tab=tokens");
   const view = page.getByTestId("token-use");
   await expect(view.getByTestId("tile-cache-share")).toContainText("86%");
   await expect(view.getByTestId("tile-cache-share")).toContainText("60.0M of 70.0M tokens");
-  await expect(view.getByTestId("tile-token-cost")).toContainText("$84.50");
-  await expect(view.getByTestId("tile-token-cost")).toContainText("Each call at its model's list price");
+  // Tokens only, as everywhere on Analytics: no money on this view.
+  await expect(view.getByTestId("tile-token-cost")).toHaveCount(0);
+  await expect(view.getByTestId("token-use-parts-note")).toHaveText("Cache read tokens are billed at a fraction of new input tokens, so a count that is mostly cache reads weighs far less than the same count of new input.");
   await expect(view.getByTestId("token-use-not-compared")).toHaveCount(0);
 
   // Each chart reads as a table with all four parts.
   await page.getByRole("button", { name: "Show table: Tokens by kind of work" }).click();
   const kinds = page.getByRole("table", { name: "Tokens by kind of work" });
-  await expect(kinds.locator("thead th")).toHaveText(["Kind of work", "New input", "Output", "Cache read", "Cache write", "All tokens", "Share", "Est. cost", "Change"]);
+  await expect(kinds.locator("thead th")).toHaveText(["Kind of work", "New input", "Output", "Cache read", "Cache write", "All tokens", "Share", "Change"]);
   await expect(kinds.locator("tbody tr td:first-child")).toHaveText(["Ticket runs", "Security fixes", "Review and CI fixes on open PRs", "PR reviews", "Chat and questions", "Logs and alerts", "Other"]);
   await expect(kinds.locator("tbody tr").nth(1)).toContainText("12.0M");
   await expect(kinds.locator("tbody tr").nth(1)).toContainText("20%");
-  await expect(kinds.locator("tbody tr").nth(1)).toContainText("$14.00");
   await expect(kinds.locator("tbody tr").nth(1)).toContainText("▲ 1300%");
   // What is lumped together is said.
   const lumped = page.getByTestId("token-use-lumped");
@@ -188,7 +188,7 @@ test("the Token use view splits tokens by part, kind of work and model, with cos
   const models = page.getByRole("table", { name: "Tokens by model" });
   await expect(models.locator("tbody tr").first()).toContainText("model-large");
   await expect(models.locator("tbody tr").first()).toContainText("90%");
-  await expect(models.locator("tbody tr").first()).toContainText("$70.00");
+  await expect(models.locator("thead th")).toHaveText(["Model", "New input", "Output", "Cache read", "Cache write", "All tokens", "Cache hit share", "Calls", "Change"]);
 
   await page.getByRole("button", { name: "Show table: Tokens per day, by part" }).click();
   await expect(page.getByRole("table", { name: "Tokens per day by part" }).locator("tbody tr")).toHaveCount(30);
@@ -209,6 +209,7 @@ test("the Token use view splits tokens by part, kind of work and model, with cos
   const runs = page.getByRole("table", { name: "Heaviest runs" });
   await expect(runs.getByRole("link", { name: "Update the image library" })).toHaveAttribute("href", /id=01RUNHEAVY000000000000000B$/);
   await expect(runs).toContainText("Security fixes · Run failed");
+  await expect(page.getByText("$")).toHaveCount(0);
   await shot(page, "analytics-token-use");
 });
 
@@ -217,8 +218,8 @@ test("periods counted differently are not compared, and the page says why", asyn
     change: (tu) => ({
       ...tu,
       comparable: false, not_comparable: "counting_started_later", previous: null,
-      by_kind: tu.by_kind.map((k) => ({ ...k, previous_tokens: null, previous_cost_usd: null })),
-      by_model: tu.by_model.map((m) => ({ ...m, previous_tokens: null, previous_cost_usd: null })),
+      by_kind: tu.by_kind.map((k) => ({ ...k, previous_tokens: null })),
+      by_model: tu.by_model.map((m) => ({ ...m, previous_tokens: null })),
       per_merged_pr: { ...tu.per_merged_pr, comparable: false, not_comparable: "run_records_were_partial", previous: null },
     }),
   });
@@ -235,7 +236,6 @@ test("periods counted differently are not compared, and the page says why", asyn
   const why = page.getByTestId("token-use-not-compared");
   await expect(why).toContainText("Coderhelm has counted every model call one by one since Jan 5.");
   await expect(why).toContainText("Until Jan 12 a run that continued later (a CI fix, a resume) kept only its last step's tokens");
-  await expect(page.getByTestId("tile-token-cost")).not.toContainText("vs previous");
   await page.getByRole("button", { name: "Show table: Tokens by kind of work" }).click();
   await expect(page.getByRole("table", { name: "Tokens by kind of work" }).locator("tbody tr").first().locator("td").last()).toHaveText("—");
 });
@@ -256,20 +256,12 @@ test("one repository reads the run records: no models, and it says what is left 
   await expect(page.getByRole("button", { name: "Show table: Tokens per day, by part (runs, on the day each started)" })).toBeVisible();
 });
 
-test("a model with no list price shows its cost as an upper bound", async ({ page }) => {
-  await mockApi(page, { change: (tu) => ({ ...tu, by_model: [{ ...tu.by_model[0], model: "model-new", price_known: false }] }) });
-  await page.goto("/analytics?tab=tokens");
-  await expect(page.getByText("No list price is known for model-new: its cost is shown at the highest known price, so it is an upper bound.")).toBeVisible();
-  await page.getByRole("button", { name: "Show table: Tokens by model" }).click();
-  await expect(page.getByRole("table", { name: "Tokens by model" })).toContainText("$70.00 at most");
-});
-
 test("no model calls and no merged PRs read as that, not as zeros to compare", async ({ page }) => {
-  const zero = parts(0, 0, 0, 0, 0);
+  const zero = parts(0, 0, 0, 0);
   await mockApi(page, {
     change: (tu) => ({
       ...tu, total: { ...zero, calls: 0, cache_hit_share: null }, previous: zero, by_kind: [], by_model: [], daily: tu.daily.map((d) => ({ day: d.day, ...zero })),
-      per_merged_pr: { ...zero, prs: 0, runs: 0, tokens_per_pr: null, cost_per_pr: null, comparable: true, not_comparable: null, previous: { ...zero, prs: 0, runs: 0, tokens_per_pr: null, cost_per_pr: null }, by_kind: [] },
+      per_merged_pr: { ...zero, prs: 0, runs: 0, tokens_per_pr: null, comparable: true, not_comparable: null, previous: { ...zero, prs: 0, runs: 0, tokens_per_pr: null }, by_kind: [] },
       runs: { ...zero, runs: 0, by_outcome: [] }, heaviest_runs: [], heaviest_prs: [],
     }),
   });

@@ -4009,7 +4009,7 @@ export interface Analytics {
   token_use?: AnalyticsTokenUse;
 }
 
-/** The four token parts, their sum, and the cost at each model's list price. */
+/** The four token parts and their sum. */
 export interface TokenParts {
   /** All four parts. */
   tokens: number;
@@ -4018,7 +4018,6 @@ export interface TokenParts {
   tokens_out: number;
   cache_read_tokens: number;
   cache_write_tokens: number;
-  cost_usd: number;
 }
 
 export type TokenWorkKind = "ticket_runs" | "security" | "follow_ups" | "reviews" | "chat" | "logs" | "other";
@@ -4045,7 +4044,6 @@ export interface AnalyticsTokenUse {
     kind: TokenWorkKind;
     calls: number;
     previous_tokens: number | null;
-    previous_cost_usd: number | null;
     /** What is lumped into this kind, heaviest first (empty when read from run records). */
     features: (TokenParts & { feature: string; calls: number })[];
   })[];
@@ -4053,22 +4051,18 @@ export interface AnalyticsTokenUse {
     model: string;
     calls: number;
     previous_tokens: number | null;
-    previous_cost_usd: number | null;
     /** Cache reads out of all input, 0-1. */
     cache_hit_share: number | null;
-    /** False when the price list has no price for the model: its cost is an upper bound. */
-    price_known: boolean;
   })[];
   /** Runs started in the period whose pull request merged, and only those. */
   per_merged_pr: TokenParts & {
     prs: number;
     runs: number;
     tokens_per_pr: number | null;
-    cost_per_pr: number | null;
     comparable: boolean;
     not_comparable: TokenNotComparable | null;
-    previous: (TokenParts & { prs: number; runs: number; tokens_per_pr: number | null; cost_per_pr: number | null }) | null;
-    by_kind: (TokenParts & { kind: TokenWorkKind; prs: number; runs: number; tokens_per_pr: number | null; cost_per_pr: number | null })[];
+    previous: (TokenParts & { prs: number; runs: number; tokens_per_pr: number | null }) | null;
+    by_kind: (TokenParts & { kind: TokenWorkKind; prs: number; runs: number; tokens_per_pr: number | null })[];
   };
   /** Every run started in the period, by how its work ended. */
   runs: TokenParts & { runs: number; by_outcome: (TokenParts & { outcome: TokenRunOutcome; runs: number })[] };
