@@ -4005,6 +4005,69 @@ export interface Analytics {
   repo_names: string[];
   /** Absent from servers older than the comparison. */
   comparison?: AnalyticsComparison;
+  /** Token use by part, kind of work and model. Absent from older servers. */
+  token_use?: AnalyticsTokenUse;
+}
+
+/** The four token parts and their sum. */
+export interface TokenParts {
+  /** All four parts. */
+  tokens: number;
+  /** New input: not read from or written to the cache. */
+  tokens_in: number;
+  tokens_out: number;
+  cache_read_tokens: number;
+  cache_write_tokens: number;
+}
+
+export type TokenWorkKind = "ticket_runs" | "security" | "follow_ups" | "reviews" | "chat" | "logs" | "other";
+export type TokenRunOutcome = "merged" | "open" | "closed" | "failed" | "no_pr";
+/** Why a number is not compared with the period before: the two were recorded differently. */
+export type TokenNotComparable = "counting_started_later" | "run_records_were_partial";
+
+export interface AnalyticsTokenUse {
+  /** `metered`: every model call, on the day it was made. `runs`: the records of runs started in the period (one repository picked, or nothing metered). */
+  basis: "metered" | "runs";
+  /** The first day (UTC) any model call was counted one by one. */
+  counted_since: string | null;
+  /** The first whole day of that counting. */
+  metered_from: string | null;
+  /** The first whole day run records hold everything a run used. */
+  run_records_from: string;
+  total: TokenParts & { calls: number; cache_hit_share: number | null };
+  /** Null when the period before was recorded differently. */
+  previous: TokenParts | null;
+  comparable: boolean;
+  not_comparable: TokenNotComparable | null;
+  daily: (TokenParts & { day: string })[];
+  by_kind: (TokenParts & {
+    kind: TokenWorkKind;
+    calls: number;
+    previous_tokens: number | null;
+    /** What is lumped into this kind, heaviest first (empty when read from run records). */
+    features: (TokenParts & { feature: string; calls: number })[];
+  })[];
+  by_model: (TokenParts & {
+    model: string;
+    calls: number;
+    previous_tokens: number | null;
+    /** Cache reads out of all input, 0-1. */
+    cache_hit_share: number | null;
+  })[];
+  /** Runs started in the period whose pull request merged, and only those. */
+  per_merged_pr: TokenParts & {
+    prs: number;
+    runs: number;
+    tokens_per_pr: number | null;
+    comparable: boolean;
+    not_comparable: TokenNotComparable | null;
+    previous: (TokenParts & { prs: number; runs: number; tokens_per_pr: number | null }) | null;
+    by_kind: (TokenParts & { kind: TokenWorkKind; prs: number; runs: number; tokens_per_pr: number | null })[];
+  };
+  /** Every run started in the period, by how its work ended. */
+  runs: TokenParts & { runs: number; by_outcome: (TokenParts & { outcome: TokenRunOutcome; runs: number })[] };
+  heaviest_runs: (TokenParts & { run_id: string; title: string; repo: string; pr_number: number; pr_url: string; kind: TokenWorkKind; outcome: TokenRunOutcome })[];
+  heaviest_prs: (TokenParts & { repo: string; pr_number: number; pr_url: string; title: string; run_id: string; runs: number; kind: TokenWorkKind; outcome: TokenRunOutcome })[];
 }
 
 // ── E2E test intelligence ─────────────────────────────────────────
