@@ -149,8 +149,22 @@ function InfrastructureFindings() {
           </div>
           {data.dry_run && (
             <div className="mt-4">
-              <Callout variant="info" title="Preview: no pull requests are opened" testId="infra-dry-run">
-                <p>Findings and runbook steps show here, but fix pull requests open only when dry run is off in the policy, or when an admin asks for one.</p>
+              <Callout
+                variant="info"
+                title="Preview first is on: no pull requests are opened"
+                testId="infra-dry-run"
+                actions={
+                  admin ? (
+                    <Link href="/security/policy#mode" className={linkButton} data-testid="infra-dry-run-turn-on">
+                      Open fix PRs (recommended)
+                    </Link>
+                  ) : undefined
+                }
+              >
+                <p>
+                  Findings and runbook steps show here. Fix pull requests open by themselves once the policy is set to Open fix PRs
+                  {admin ? ", or when you ask for one on a finding." : "; ask an admin to change it."}
+                </p>
               </Callout>
             </div>
           )}
