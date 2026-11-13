@@ -6,7 +6,7 @@
 // Nothing here runs; it is checked by the compiler only.
 
 import type { OpenApiFields } from "./openapi-fields";
-import type { ActivityGroup, ActivityItem, AnswerRunResult, OverviewFile, Plan, Review, ReviewOverview, ReviewSession, Run, RunAnswer, RunCheck, RunChecks, RunPrReview, RunDetail, RunDraftHold, RunDraftHoldReason, RunQuestion, RunTrigger, SessionStep, Task, api } from "./api";
+import type { ActivityGroup, ActivityItem, AnswerRunResult, OverviewFile, Plan, Review, ReviewOverview, ReviewSession, Run, RunAnswer, RunCheck, RunChecks, RunPrReview, RunDetail, RunDraftHold, RunDraftHoldReason, RunMergeStanding, RunQuestion, RunTrigger, SessionStep, Task, api } from "./api";
 
 type Answer<K extends keyof typeof api> = Awaited<ReturnType<(typeof api)[K]>>;
 
@@ -34,6 +34,8 @@ export type AnswerRunContract = None<Undocumented<AnswerRunResult, "AnswerRunRes
 // Why a finished run's pull request is still a draft, and what to do about each reason.
 export type RunDraftHoldContract = None<Undocumented<RunDraftHold, "RunDraftHold">>;
 export type RunDraftHoldReasonContract = None<Undocumented<RunDraftHoldReason, "RunDraftHoldReason">>;
+// Where a finished run's pull request stands on its way to merge, and whether a person has to act.
+export type RunMergeStandingContract = None<Undocumented<RunMergeStanding, "RunMergeStanding">>;
 
 // Plans and their tasks (the plan pages and the runs they start).
 export type PlansPageContract = None<Undocumented<Answer<"listPlans">, "PlansPage">>;
