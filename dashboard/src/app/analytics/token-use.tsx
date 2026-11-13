@@ -282,7 +282,7 @@ export function TokenUseSection({ tu, span, vs }: { tu: AnalyticsTokenUse | unde
                 ))}
               </>
             ) : (
-              <p>Each run's tokens include the fixes made on its pull request afterwards. The split by model needs every repository: pick All repositories to see it.</p>
+              <p>Each run&apos;s tokens include the fixes made on its pull request afterwards. The split by model needs every repository: pick All repositories to see it.</p>
             )}
           </div>
 
