@@ -1,7 +1,7 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
-import { learningFixture, learningHealthFixture } from "./wide-data/learning";
+import { learningFixture, learningHealthFixture, outcomeLessonsFixture, reviewerAsksFixture, scorecardFixture } from "./wide-data/learning";
 import { pickOption } from "./select";
 
 // The Learning page: what Coderhelm learned from outcomes, the behavior it
@@ -24,10 +24,14 @@ interface Backend {
   calls: { method: string; path: string; body: unknown }[];
   /** The health check's answer, or its error status; left out, a gateway without it (404). */
   health?: unknown;
+  /** The scorecard, lessons and reviewer asks: "full", "empty", an error status, or left out for a gateway without them (404). */
+  outcomes?: "full" | "empty" | number;
+  /** Reviewers and asks forgotten so far. */
+  forgotten: Set<string>;
 }
 
 async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend> {
-  const db: Backend = { role: "admin", canManage: true, empty: false, writeStatus: 200, reverted: new Set(), pinned: "", weights: {}, calls: [], ...init };
+  const db: Backend = { role: "admin", canManage: true, empty: false, writeStatus: 200, reverted: new Set(), pinned: "", weights: {}, calls: [], forgotten: new Set(), ...init };
   const json = (route: Route, body: unknown, status = 200) =>
     route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
   await page.route((url) => url.hostname !== "localhost", (route) => route.abort());
@@ -52,9 +56,23 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
       if (typeof db.health === "number") return json(route, { error: "Internal error" }, db.health);
       return json(route, db.health);
     }
+    if (["/api/learning/scorecard", "/api/learning/lessons", "/api/learning/reviewers"].includes(p) && method === "GET") {
+      db.calls.push({ method, path: `${p}${url.search}`, body });
+      if (db.outcomes === undefined) return json(route, { error: "Not found" }, 404);
+      if (typeof db.outcomes === "number") return json(route, { error: "Internal error" }, db.outcomes);
+      const empty = db.outcomes === "empty";
+      const only = url.searchParams.get("repo") || undefined;
+      if (p === "/api/learning/scorecard") return json(route, scorecardFixture({ repo: REPO, repo2: REPO_2, months: Number(url.searchParams.get("months") ?? 3), only, empty }));
+      if (p === "/api/learning/lessons") return json(route, outcomeLessonsFixture({ repo: only ?? REPO, text: "", file: "apps/web/src", empty }));
+      return json(route, reviewerAsksFixture({ repo: REPO, text: "", canManage: db.canManage, forgotten: db.forgotten, empty }));
+    }
     if (p.startsWith("/api/learning/")) {
       db.calls.push({ method, path: p, body });
       if (db.writeStatus !== 200) return json(route, {}, db.writeStatus);
+      if (p === "/api/learning/reviewers/forget") {
+        db.forgotten.add(body.id ?? body.login);
+        return json(route, { forgotten: 1 });
+      }
       if (p === "/api/learning/pin") {
         db.pinned = body.arm ?? "";
         return json(route, { ok: true });
@@ -540,4 +558,144 @@ test("a loop this dashboard has no title for reads as its id in words", async ({
   await expect(extra.getByRole("heading")).toHaveText("Planner lessons");
   await expect(page.getByText("Planner lessons (API name)")).toHaveCount(0);
   await expect(extra).toContainText("1 of 2 this week");
+});
+
+// ── The scorecard, lessons from pull requests, and what reviewers ask for ──
+
+test("the scorecard says what became of Coderhelm's pull requests, for the team and each repository", async ({ page }) => {
+  const db = await mockApi(page, { outcomes: "full" });
+  await page.goto("/learning");
+  const card = page.getByTestId("scorecard");
+  await expect(card).toBeVisible();
+  await expect(page.getByTestId("score-opened")).toContainText("24");
+  await expect(page.getByTestId("score-opened")).toContainText("4 still open");
+  await expect(page.getByTestId("score-merged")).toContainText("16");
+  await expect(page.getByTestId("score-merged")).toContainText("80% of the 20 that finished");
+  await expect(page.getByTestId("score-closed")).toContainText("4");
+  await expect(page.getByTestId("score-reverted")).toContainText("2");
+  await expect(page.getByTestId("score-edited")).toContainText("25% of merged; 12 merged as written");
+  await expect(page.getByTestId("score-open-items")).toContainText("3");
+  await expect(page.getByTestId("score-rounds")).toContainText("0.6");
+  await expect(page.getByTestId("score-rounds")).toContainText("11 of 16 passed with no changes asked");
+  await expect(page.getByTestId("score-time")).toContainText("9.5 h");
+  await expect(page.getByTestId("score-time")).toContainText("Half merged within 8 h");
+  await expect(page.locator("#scorecard")).toContainText("Counting began in January 2026");
+  // Each repository, and a rate with nothing behind it is said so, never a zero.
+  const repos = page.getByRole("table", { name: "Scorecard by repository" });
+  await expect(repos.getByRole("row").filter({ hasText: REPO })).toContainText("12 (80%)");
+  await expect(repos.getByRole("row").filter({ hasText: REPO_2 })).toContainText("No data yet");
+  // Another period asks the gateway again.
+  await page.getByRole("group", { name: "Scorecard period" }).getByRole("button", { name: "All time" }).click();
+  await expect.poll(() => db.calls.some((c) => c.path === "/api/learning/scorecard?months=0")).toBe(true);
+  // The page's repository filter narrows it, and the per-repository table goes.
+  await page.getByTestId("repo-filter").click();
+  await page.getByTestId("combo-popover").getByRole("option", { name: REPO, exact: true }).first().click();
+  await expect.poll(() => db.calls.some((c) => c.path.startsWith("/api/learning/scorecard") && c.path.includes(`repo=${encodeURIComponent(REPO)}`))).toBe(true);
+  await expect(page.getByTestId("score-opened")).toContainText("18");
+  await expect(page.getByRole("table", { name: "Scorecard by repository" })).toHaveCount(0);
+});
+
+test("lessons say how they are checked, show their evidence, and name the guide pull request", async ({ page }) => {
+  await mockApi(page, { outcomes: "full" });
+  await page.goto("/learning");
+  const ready = page.getByTestId("lesson-les_ready");
+  await expect(ready).toContainText("Build image addresses with the shared `imageUrl` helper");
+  await expect(ready).toContainText("How it is checked: Search the diff under apps/web/src");
+  await expect(ready).toContainText("seen on 2 pull requests (#12345, #12399)");
+  await expect(ready).toContainText("In use");
+  await expect(ready).toContainText("Seen often enough to be proposed for the guide file.");
+  await ready.getByText("Evidence (3 lines): people edited the pull request before merging").click();
+  await expect(ready).toContainText('PR #12345 in people\'s words: "Use the shared image builder"');
+  await expect(ready).toContainText("+  const src = imageUrl(p.image)");
+  await expect(page.getByTestId("lesson-les_guide")).toContainText("In the guide file");
+  const against = page.getByTestId("lesson-les_against");
+  await expect(against).toContainText("Contradicted");
+  await expect(against).toContainText("contradicted 2 times");
+  await expect(against).toContainText("The team declined it for the guide file.");
+  // A lesson that only records what happened has no check and no evidence list.
+  await expect(page.getByTestId("lesson-les_area")).not.toContainText("How it is checked");
+  const guide = page.getByTestId("guide-prs");
+  await expect(guide).toContainText("proposes 1 lesson for AGENTS.md");
+  await expect(guide).toContainText("Waiting for review");
+  await expect(guide.getByRole("link", { name: `${REPO} #12400` })).toHaveAttribute("href", `https://github.com/${REPO}/pull/12400`);
+});
+
+test("an admin forgets one ask, then everything kept about a reviewer", async ({ page }) => {
+  const db = await mockApi(page, { outcomes: "full" });
+  await page.goto("/learning");
+  const reviewer = page.getByTestId("reviewer-a-reviewer");
+  await expect(reviewer.getByTestId("ask-ask_tests")).toContainText("Add a test for the empty state of every new block.");
+  await expect(reviewer.getByTestId("ask-ask_tests")).toContainText("Tests · on 3 pull requests");
+  await expect(reviewer.getByTestId("ask-ask_tests")).toContainText("In use");
+  await expect(reviewer.getByTestId("ask-ask_errors")).toContainText("Error handling · on 1 pull request");
+  await expect(reviewer.getByTestId("ask-ask_errors")).toContainText("Seen once");
+  await expect(page.locator("#reviewers")).toContainText("nothing about the person");
+
+  await reviewer.getByRole("button", { name: /Forget this ask of a-reviewer: Return typed errors/ }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Forget" }).click();
+  await expect(page.getByTestId("ask-ask_errors")).toHaveCount(0);
+  expect(db.calls.find((c) => c.path === "/api/learning/reviewers/forget")?.body).toEqual({ login: "a-reviewer", id: "ask_errors" });
+
+  await reviewer.getByRole("button", { name: "Forget a-reviewer" }).click();
+  await expect(page.getByRole("alertdialog")).toContainText("Every ask kept for a-reviewer is removed");
+  await page.getByRole("alertdialog").getByRole("button", { name: "Forget" }).click();
+  await expect(page.getByTestId("reviewer-a-reviewer")).toHaveCount(0);
+  await expect(page.getByTestId("reviewer-another-reviewer")).toBeVisible();
+  expect(db.calls.filter((c) => c.path === "/api/learning/reviewers/forget").at(-1)?.body).toEqual({ login: "a-reviewer" });
+});
+
+test("a member sees what reviewers ask for and cannot forget it", async ({ page }) => {
+  const db = await mockApi(page, { role: "member", canManage: false, outcomes: "full" });
+  await page.goto("/learning");
+  await expect(page.getByTestId("reviewer-a-reviewer")).toContainText("Add a test for the empty state");
+  await expect(page.locator("#reviewers").getByRole("button", { name: /Forget/ })).toHaveCount(0);
+  expect(db.calls.filter((c) => c.method !== "GET")).toHaveLength(0);
+});
+
+test("a refused forget is said in words and nothing goes", async ({ page }) => {
+  await mockApi(page, { outcomes: "full", writeStatus: 403 });
+  await page.goto("/learning");
+  await page.getByTestId("reviewer-a-reviewer").getByRole("button", { name: "Forget a-reviewer" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Forget" }).click();
+  await expect(page.locator("#reviewers").getByRole("alert")).toContainText("Only an admin or the owner can forget what was learned (error 403)");
+  await expect(page.getByTestId("reviewer-a-reviewer")).toBeVisible();
+});
+
+test("before anything is counted or learned, each section says what fills it", async ({ page }) => {
+  await mockApi(page, { outcomes: "empty" });
+  await page.goto("/learning");
+  await expect(page.getByTestId("scorecard-empty")).toContainText("The scorecard fills in as pull requests open, merge and close from now on.");
+  await expect(page.getByTestId("lessons-empty")).toContainText("No lessons yet");
+  await expect(page.getByTestId("reviewers-empty")).toContainText("Nothing kept yet");
+  await expect(page.getByTestId("guide-prs")).toHaveCount(0);
+});
+
+test("a gateway without the scorecard shows none of the three sections, and one that fails says so", async ({ page }) => {
+  await mockApi(page);
+  await page.goto("/learning");
+  await expect(page.getByTestId("tile-events")).toBeVisible();
+  for (const name of ["Pull request scorecard", "Lessons from pull requests", "What reviewers ask for"]) {
+    await expect(page.getByRole("heading", { name })).toHaveCount(0);
+  }
+  await mockApi(page, { outcomes: 500 });
+  await page.goto("/learning");
+  await expect(page.getByText("Couldn't load the scorecard")).toBeVisible();
+  await expect(page.getByText("Couldn't load the lessons")).toBeVisible();
+  await expect(page.getByText("Couldn't load what reviewers ask for")).toBeVisible();
+  // The rest of the page still loads.
+  await expect(page.getByTestId("tile-events")).toBeVisible();
+});
+
+test("the scorecard, lessons and reviewer asks fit a phone at 375 wide", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 844 });
+  await mockApi(page, { outcomes: "full" });
+  await page.goto("/learning");
+  await expect(page.getByTestId("scorecard")).toBeVisible();
+  await page.getByTestId("lesson-les_ready").getByText(/Evidence \(3 lines\)/).click();
+  await expect(page.getByTestId("reviewer-a-reviewer")).toBeVisible();
+  await noSideways(page);
+  fs.mkdirSync(SHOTS_DIR, { recursive: true });
+  for (const id of ["scorecard", "lessons", "reviewers"]) {
+    await page.locator(`#${id}`).screenshot({ path: path.join(SHOTS_DIR, `learning-${id}-phone.png`) });
+  }
 });
