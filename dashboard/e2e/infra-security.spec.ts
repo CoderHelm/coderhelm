@@ -103,7 +103,11 @@ test.describe("Infrastructure vulnerabilities", () => {
     await expect(db1.getByTestId("fix-chip")).toHaveText("Runbook");
     await db1.getByRole("button", { name: /details of orders/ }).click();
     await expect(db1.getByTestId("runbook-cli")).toContainText("aws rds apply-pending-maintenance-action");
-    await expect(db1).toContainText("RDS > Databases > orders > Maintenance & backups > Pending maintenance > Apply");
+    await expect(db1).toContainText("Databases > select orders-1 > Actions > Patch at next window");
+    // An operating system update carries no CVE: the bulletin is related, and the card says so.
+    await expect(db1.getByTestId("finding-cves")).toHaveCount(0);
+    await expect(db1.getByTestId("advisory-note")).toContainText("AWS publishes no CVE list for this action");
+    await expect(db1.getByTestId("fix-decision")).toContainText("This cannot be expressed in code.");
     await expect(db1.getByTestId("apply-by")).toContainText("Apply by");
     await expect(db1).toContainText("Coderhelm never runs this.");
     // A runbook's target is an action, not a version: no "from to" line.

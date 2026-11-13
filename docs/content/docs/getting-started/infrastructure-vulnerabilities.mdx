@@ -35,10 +35,11 @@ With the option on, CoderHelm reads each account once a day through the same rea
 | `autoscaling:DescribeAutoScalingGroups` | Which instances one fix changes together, and their launch template. |
 | `elasticloadbalancing:DescribeTargetGroups`, `elasticloadbalancing:DescribeLoadBalancers` | Whether an Auto Scaling group or a service sits behind an internet-facing load balancer. |
 | `eks:ListClusters`, `eks:DescribeCluster`, `eks:ListNodegroups`, `eks:DescribeNodegroup` | Each node group's release version and AMI type, and whether the cluster uses Auto Mode. |
-| `rds:DescribeDBClusters`, `rds:DescribeDBInstances`, `rds:DescribePendingMaintenanceActions` | Engine versions, whether a database is publicly accessible, and the OS updates AWS has waiting for it. |
+| `rds:DescribeDBClusters`, `rds:DescribeDBInstances`, `rds:DescribePendingMaintenanceActions` | Engine versions, whether a database is publicly accessible, the settings that tell one database from another in your code (subnet group, parameter group, instance class), and what AWS has pending for it: operating system updates, engine patches and engine upgrades. |
 | `elasticache:DescribeServiceUpdates`, `elasticache:DescribeUpdateActions` | The self-service updates waiting for each cache, and AWS's apply-by date. |
 | `es:ListDomainNames`, `es:DescribeDomains` | OpenSearch service software updates. |
 | `ecr:DescribeImageScanFindings` | ECR's own scan results for the images your services run. |
+| `cloudformation:DescribeStackResources` | Which stack made a resource, and the resource's logical id in it, where CloudFormation does not tag the resource. It returns names only: never a template, parameters or outputs. A role without it still works: resources are placed by their tags and by your code alone, and the page names the permission. |
 | `ssm:ListInventoryEntries` | The installed kernel, for instances managed by Systems Manager. |
 | `ssm:GetParameters`, on `arn:aws:ssm:*::parameter/aws/service/*` only | AWS's public latest AMI in your region. |
 
@@ -78,11 +79,31 @@ Matching is by version, with no model, so it costs no tokens. One row is one fix
 
 | Fix | When | What you get |
 | --- | --- | --- |
-| **Fix PR** | The change is in the code that defines the resource. | A pull request that points the AMI at AWS's latest parameter, sets a node group's `release_version`, changes a Lambda `runtime` or bumps a Dockerfile `FROM`. It goes through the same daily run and token limits as dependency fixes. When rolling the change out needs a step, such as an instance refresh, the exact command is shown with it. |
-| **Runbook** | The change happens in AWS, not in code. | A card with the exact AWS CLI command, the path in the AWS console, and AWS's apply-by date: apply an RDS OS update, an ElastiCache service update or an OpenSearch software update. CoderHelm never runs it. |
+| **Fix PR** | The update has a code equivalent, and CoderHelm found the code that defines the resource and is sure of it. | A pull request that points the AMI at AWS's latest parameter, sets a node group's `release_version`, changes a Lambda `runtime`, raises a database's engine version or bumps a Dockerfile `FROM`. Its description says when the change takes effect, the expected interruption, what must not change, the checks to run first, what the plan must show and what the real rollback is. It goes through the same daily run and token limits as dependency fixes. |
+| **Runbook** | The update can't be expressed in code (an operating system update, an Aurora PostgreSQL patch, an ElastiCache service update, OpenSearch service software), or CoderHelm didn't find the code, or isn't sure of it. | A card that says why it is a runbook, then the whole runbook: scope and exact identifiers, what it is, the expected interruption, what you need, checks to run first, the backup, the console path, the exact AWS CLI commands with your identifiers and region, how to check it worked, the rollback, and AWS's date. Each fact names the AWS or tool page it came from and the day it was last read. CoderHelm never runs it. |
 | **AWS-managed** | AWS patches it itself. | A row with the bulletin's reason, collapsed at the bottom. It is never counted as open and has no tier. |
 
-Where the code is comes from the resource's tags (a `Repo` tag, its CloudFormation stack), or from a search of your connected repositories for its AMI, group or name. For Terraform that is the file and the resource address, such as `aws_launch_template.web`.
+### Where the code is
+
+CoderHelm looks in every connected repository, whatever the layout: a dedicated infrastructure repository, Terraform inside an application repository, CDK next to the application code, CloudFormation or SAM templates, a `serverless.yml`. A file counts as infrastructure code by what is in it, not by its name.
+
+- **CloudFormation, CDK, SAM and Serverless Framework.** A resource a stack made carries the stack's name and its logical id, in its tags or in CloudFormation's own answer. CoderHelm finds the template that defines that logical id, or the CDK construct the id was built from.
+- **Terraform and OpenTofu.** CoderHelm matches by resource type and settings, not by the name alone: the identifier (written out, or built from variables and an environment's variable file), a name prefix with the suffix Terraform generates, the engine, the tags, the subnet group. It follows module calls, so the line it edits may be the caller's input or a line of a `.tfvars` file. It does not read Terraform state.
+- **A name written in a file** is the last resort, and is trusted least.
+
+Each row says how the code was found and how sure CoderHelm is: **Sure**, **Likely** or **Not sure**. A match it is not sure of never becomes a pull request: the row says what was found, what else it could be, and stays a runbook.
+
+### What a pull request may never do
+
+Before anything else happens to a pull request for an infrastructure fix, CoderHelm reads the change. If it would replace or destroy a resource that holds data (a changed identifier, a removed or renamed resource, a lowered version, an OpenSearch version change without the version upgrade policy, a safeguard taken away), CoderHelm does this, in order:
+
+1. One fix round on the same branch. It is told each line that would replace, remove or downgrade the resource, and makes the in-place change instead. The change is read again.
+2. If the change still would, the pull request becomes a draft. It is never closed and its branch is kept. The reason and the lines are at the top of its description, it is never marked ready or merged as it is, and the row becomes a runbook, so there is still a correct way to apply the update.
+3. CoderHelm makes no further attempt for that row until the code that defines the resource or the update's target changes.
+
+### Order
+
+Several updates pending on one database are separate rows, numbered in the order to do them. When the same resource exists in more than one environment, the non-production one goes first: the production pull request waits until the other is done, unless AWS's own date is within a week.
 
 Urgency uses the same tiers as dependency fixes. Whether the internet can reach the resource takes the place of whether your code reaches the vulnerable part: a public IP address, an internet-facing load balancer or a publicly accessible database.
 
@@ -104,7 +125,7 @@ CVE-2026-98432 is a use-after-free in the Linux kernel's IPv4 TCP code, rated Im
 | --- | --- | --- |
 | Auto Scaling group `web-asg` | Fix PR, P1 | Amazon Linux 2023 is fixed in release `2023.12.20261102`. The pull request changes `aws_launch_template.web`, then an instance refresh rolls it out. Internet-facing, so P1. |
 | EKS node group `prod-ng` | Fix PR, P2 | EKS optimized AMIs are fixed in `v20261031`. The pull request sets the node group's `release_version`. |
-| Aurora cluster `orders` | Runbook | The bulletin says to apply the database OS update, and RDS lists it as pending with a date. The card shows `aws rds apply-pending-maintenance-action` with the cluster's ARN. |
+| Aurora cluster `orders` | Runbook | RDS lists an operating system update as pending on one of the cluster's instances, with a date. An operating system update can't be expressed in code, so it is a runbook even though the cluster is in the team's Terraform. The card shows `aws rds apply-pending-maintenance-action` with that instance's ARN. AWS publishes no CVE list for the update, so the card names none: the bulletin, which tells RDS customers to patch the database OS, is shown as related. |
 | ECS service `api` on Fargate | AWS-managed | Tasks started after the fix run patched, and AWS retires older ones. Forcing a new deployment replaces them sooner. |
 | Lambda `thumbs` | AWS-managed | The bulletin says Lambda is not affected. |
 

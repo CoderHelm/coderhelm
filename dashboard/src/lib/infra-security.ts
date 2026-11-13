@@ -25,12 +25,35 @@ export type InfraKind =
 export type FixKind = "pr" | "runbook" | "aws";
 export type InfraStatus = "open" | "fixing" | "pr_open" | "fixed" | "aws_managed" | "dismissed";
 
+export type InfraConfidence = "high" | "medium" | "low";
+
+/** The line a version change edits, and where its value lives. */
+export interface InfraEdit {
+  file: string;
+  line?: number;
+  attribute: string;
+  value?: string;
+  /** resource, module_input, tfvars, variable_default, local, template, parameter, construct, add */
+  via: string;
+  shared?: string;
+}
+
 export interface InfraLocation {
   repo: string;
   file: string;
   address: string;
   line: number;
-  how: "tag" | "search" | "cloudformation" | string;
+  /** How it was found: cloudformation_tag, cloudformation_lookup, cdk_logical_id, terraform_name, ... */
+  how: string;
+  tool?: string;
+  confidence?: InfraConfidence;
+  /** What matched, and what makes it unsure. */
+  evidence?: string[];
+  edit?: InfraEdit | null;
+  environment?: string;
+  stack?: string;
+  /** The other places that could define it, when unsure. */
+  candidates?: string[];
 }
 
 export interface InfraExposure {
@@ -45,6 +68,57 @@ export interface InfraSource {
   severity: string;
 }
 
+/** One thing to do or check in a runbook, with its command when there is one. */
+export interface InfraStep {
+  text: string;
+  cli?: string;
+}
+
+/** A page a fact came from, and the day the server last read it. */
+export interface InfraCited {
+  url: string;
+  reviewed_on: string;
+  stale?: boolean;
+}
+
+/** The whole runbook for an update a person applies in AWS. */
+export interface InfraRunbook {
+  scope: string[];
+  what: string[];
+  interruption: string[];
+  prerequisites: string[];
+  prechecks: InfraStep[];
+  backup: InfraStep[];
+  console: string[];
+  steps: InfraStep[];
+  validation: InfraStep[];
+  rollback: InfraStep[];
+  apply_by: string;
+  if_nothing: string[];
+  notes: string[];
+  sources: InfraCited[];
+  stale: boolean;
+}
+
+/** What a pull request for a code change says and checks. */
+export interface InfraPrNotes {
+  attribute: string[];
+  takes_effect: string[];
+  interruption: string[];
+  replacement: string[];
+  never_change: string[];
+  prechecks: InfraStep[];
+  backup: InfraStep[];
+  rollback: string[];
+  traps: string[];
+  plan: string[];
+  pipeline: string[];
+  order: string[];
+  validation: InfraStep[];
+  sources: InfraCited[];
+  stale: boolean;
+}
+
 export interface InfraFix {
   kind: FixKind;
   summary: string;
@@ -55,6 +129,19 @@ export interface InfraFix {
   console: string;
   apply_by: string;
   reason: string;
+  /** Why this is a pull request, or why it is a runbook. */
+  decision?: string;
+  /** What a pending action means: os_update, engine_patch, engine_upgrade, ... */
+  meaning?: string | null;
+  runbook?: InfraRunbook | null;
+  notes?: InfraPrNotes | null;
+  /** What to do in the code once it is applied in AWS. */
+  code_note?: string;
+  /** Its place among related work, and non-production first. */
+  order?: string[];
+  after?: string[];
+  /** Why no CVE is named, or that an advisory is only related. */
+  advisory_note?: string;
 }
 
 export interface InfraFinding {
@@ -75,11 +162,18 @@ export interface InfraFinding {
   tier: Tier | null;
   fix: InfraFix;
   status: InfraStatus;
-  pr: { number: number; url: string; state: "open" | "merged" | "closed" } | null;
+  pr: { number: number; url: string; state: "open" | "merged" | "closed" | "draft" } | null;
   inspector?: { exploit_available: boolean; reachable: boolean | null; findings?: number } | null;
   first_seen_at: string;
   updated_at: string;
   fixed_at?: string | null;
+  environment?: string;
+  /** The lines of a fix run's change that would have replaced or destroyed a data resource. */
+  refused?: string[];
+  /** The change was refused twice: the pull request is a draft and the row is a runbook. */
+  drafted?: boolean;
+  /** What is happening with the row, in the server's words. */
+  note?: string;
 }
 
 export interface InfraReadError {
@@ -313,6 +407,63 @@ export function locationWords(l: InfraLocation | null | undefined): string | nul
   if (!l) return null;
   if (!l.repo && !l.file) return l.address || null;
   return [l.repo, l.file ? `${l.file}${l.line ? `:${l.line}` : ""}` : "", l.address].filter(Boolean).join(" · ");
+}
+
+/** How a location was found, in words. */
+export function howWords(how: string): string {
+  switch (how) {
+    case "cloudformation_tag":
+      return "its CloudFormation stack tags";
+    case "cloudformation_lookup":
+      return "CloudFormation's record of the stack that owns it";
+    case "cdk_logical_id":
+      return "its CloudFormation logical id, matched to a CDK construct";
+    case "terraform_name":
+      return "its identifier in Terraform";
+    case "terraform_generated_name":
+      return "its Terraform-generated name's prefix and its settings";
+    case "terraform_attributes":
+      return "its type and settings in Terraform";
+    case "terraform_module":
+      return "a Terraform module call and its inputs";
+    case "repo_tag":
+    case "tag":
+      return "its repository tag";
+    case "cloudformation":
+      return "its CloudFormation stack";
+    default:
+      return "its name in the code";
+  }
+}
+
+export const CONFIDENCE_LOOK: Record<InfraConfidence, { label: string; tone: Tone; hover: string }> = {
+  high: { label: "Sure", tone: "success", hover: "AWS's own stack records name it, or the code writes its identifier." },
+  medium: { label: "Likely", tone: "info", hover: "One place fits, without the identifier itself being written there." },
+  low: { label: "Not sure", tone: "attention", hover: "More than one place could define it, or only weak signs point here. Coderhelm opens no pull request on a guess." },
+};
+
+/** Where the edit's value lives, in words: "a module call's input". */
+export function viaWords(via: string): string {
+  switch (via) {
+    case "module_input":
+      return "a module call's input";
+    case "tfvars":
+      return "a variable file";
+    case "variable_default":
+      return "a variable's default";
+    case "local":
+      return "a local value";
+    case "parameter":
+      return "a template parameter's default";
+    case "template":
+      return "the template";
+    case "construct":
+      return "the construct's props";
+    case "add":
+      return "nothing sets it yet";
+    default:
+      return "the resource block";
+  }
 }
 
 /** The resource's main version in one phrase: "AMI 2023.12.20261020", "aurora-postgresql 16.4". */
