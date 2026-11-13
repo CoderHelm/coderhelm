@@ -27,13 +27,16 @@ import {
   MAX_PICKED_IDS,
   TIERS,
   cannotFix,
+  closedWords,
   epssText,
   fixWords,
   isActive,
   isMajor,
   prCount,
   repoName,
+  runsHref,
   securityApi,
+  whyNoneSelectable,
   type FindingGroup,
   type GroupFilter,
   type Bundle,
@@ -656,7 +659,7 @@ function FixCell({ g }: { g: FindingGroup }) {
       g.pr.state === "merged"
         ? "merged"
         : g.pr.state === "closed"
-          ? "closed"
+          ? closedWords(g.pr)
           : g.pr.ci === "passing"
             ? "CI passing"
             : g.pr.ci === "failing"
@@ -685,9 +688,57 @@ function FixCell({ g }: { g: FindingGroup }) {
     g.manifests.every((m) => /(^|\/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|poetry\.lock|Cargo\.lock|go\.sum|Gemfile\.lock|composer\.lock)$/.test(m));
   const words = g.status === "fixing" ? "Working on the fix" : !g.fixed_version ? "No fix yet" : lockOnly ? "Lockfile update" : `Upgrade to ${g.fixed_version}`;
   return (
-    <span className="text-xs text-zinc-400" data-testid="fix-state">
+    <span className="inline-flex flex-wrap items-center gap-x-1.5 text-xs text-zinc-400" data-testid="fix-state">
       {words}
+      {g.status === "fixing" && g.ticket && (
+        <Link href={runsHref(g.ticket)} className={`${linkButton} !text-xs`} data-testid="fix-run">
+          See the run
+        </Link>
+      )}
     </span>
+  );
+}
+
+/**
+ * Why an open row has no checkbox to tick, in the row itself (the
+ * checkbox's tooltip says the same, for a pointer). Rows already fixed or
+ * dismissed say so by where they are listed.
+ */
+function PickWhy({ g }: { g: FindingGroup }) {
+  const why = isActive(g) ? cannotFix(g) : null;
+  if (!why) return null;
+  const words = why.startsWith("PR ") ? why : why.charAt(0).toLowerCase() + why.slice(1);
+  return (
+    <p className="mt-1 text-xs text-zinc-400" data-testid="pick-why">
+      Can&apos;t be selected: {words}.
+    </p>
+  );
+}
+
+/** The strip above the rows when none of them can be selected: why, and the next step. */
+function NoneSelectable({ rows }: { rows: FindingGroup[] }) {
+  const none = whyNoneSelectable(rows);
+  if (!none) return null;
+  return (
+    <div
+      id="pick-none"
+      role="status"
+      className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-zinc-800 bg-zinc-800/40 px-4 py-2.5 text-sm"
+      data-testid="pick-none"
+    >
+      <span className="font-medium text-zinc-100">{none.words}.</span>
+      <span className="text-zinc-300">{none.next}</span>
+      {none.link &&
+        (none.link.external ? (
+          <a href={none.link.href} target="_blank" rel="noreferrer" className={`${linkButton} !text-sm`} data-testid="pick-none-link">
+            {none.link.label}
+          </a>
+        ) : (
+          <Link href={none.link.href} className={`${linkButton} !text-sm`} data-testid="pick-none-link">
+            {none.link.label}
+          </Link>
+        ))}
+    </div>
   );
 }
 
@@ -762,7 +813,24 @@ function PickBox({ g, pick }: { g: FindingGroup; pick: Pick }) {
 }
 
 /** The header checkbox: on, off, or partly on when some rows are picked. */
-function AllBox({ all, some, disabled, onChange, label, testId }: { all: boolean; some: boolean; disabled: boolean; onChange: () => void; label?: string; testId: string }) {
+function AllBox({
+  all,
+  some,
+  disabled,
+  onChange,
+  label,
+  testId,
+  why,
+}: {
+  all: boolean;
+  some: boolean;
+  disabled: boolean;
+  onChange: () => void;
+  label?: string;
+  testId: string;
+  /** Off because no row can be selected: the reason, also in the strip above the rows. */
+  why?: string;
+}) {
   const ref = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (ref.current) ref.current.indeterminate = some;
@@ -776,6 +844,8 @@ function AllBox({ all, some, disabled, onChange, label, testId }: { all: boolean
       disabled={disabled}
       onChange={onChange}
       aria-label={label}
+      aria-describedby={why ? "pick-none" : undefined}
+      title={why}
       data-testid={testId}
     />
   );
@@ -790,8 +860,11 @@ function GroupsTable({ rows, showRepo, pick }: { rows: FindingGroup[]; showRepo:
   const on = pick ? selectable.filter((g) => pick.isOn(g)).length : 0;
   const allOn = selectable.length > 0 && on === selectable.length;
   const someOn = on > 0 && !allOn;
+  // No row to select: the header says why and what to do, instead of a dead checkbox.
+  const none = pick ? whyNoneSelectable(rows) : null;
   return (
     <div className="min-w-0 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/30" data-testid="findings">
+      {none && <NoneSelectable rows={rows} />}
       <div className="hidden lg:block">
         <table aria-label="Findings" className="w-full table-fixed text-sm">
           <colgroup>
@@ -800,14 +873,22 @@ function GroupsTable({ rows, showRepo, pick }: { rows: FindingGroup[]; showRepo:
             <col />
             {showRepo && <col className="w-28" />}
             <col className="w-40" />
-            <col className="w-36" />
+            <col className="w-44" />
             <col className="w-24" />
           </colgroup>
           <thead>
             <tr className="border-b border-zinc-800 text-left text-xs text-zinc-400">
               {pick && (
                 <th scope="col" className="py-2.5 pl-4">
-                  <AllBox all={allOn} some={someOn} disabled={selectable.length === 0} onChange={() => pick.all(!allOn)} label="Select every fix on this page" testId="pick-all" />
+                  <AllBox
+                    all={allOn}
+                    some={someOn}
+                    disabled={selectable.length === 0}
+                    onChange={() => pick.all(!allOn)}
+                    label={none ? `No fix on this page can be selected: ${none.words}` : "Select every fix on this page"}
+                    testId="pick-all"
+                    why={none?.words}
+                  />
                 </th>
               )}
               {head.map((h) => (
@@ -853,6 +934,7 @@ function GroupsTable({ rows, showRepo, pick }: { rows: FindingGroup[]; showRepo:
                   </td>
                   <td className="px-3 py-3">
                     <FixCell g={g} />
+                    {pick && <PickWhy g={g} />}
                   </td>
                   <td className="px-3 py-3 text-right">
                     <DueDate due={g.due_at} active={isActive(g)} now={now} />
@@ -873,7 +955,7 @@ function GroupsTable({ rows, showRepo, pick }: { rows: FindingGroup[]; showRepo:
         </table>
       </div>
       {/* Below `lg:` one card per fix, so nothing hides off the right edge; the header checkbox is a row of its own. */}
-      {pick && (
+      {pick && !none && (
         <label className="flex min-h-11 cursor-pointer items-center gap-2.5 border-b border-zinc-800 px-4 py-2 text-sm text-zinc-300 lg:hidden">
           <AllBox all={allOn} some={someOn} disabled={selectable.length === 0} onChange={() => pick.all(!allOn)} testId="pick-all-cards" />
           Select all {selectable.length} on this page
@@ -909,6 +991,7 @@ function GroupsTable({ rows, showRepo, pick }: { rows: FindingGroup[]; showRepo:
             </div>
             <div>
               <FixCell g={g} />
+              {pick && <PickWhy g={g} />}
             </div>
             <div>
               <Expander g={g} open={!!open[g.key]} onToggle={() => toggle(g.key)} />
