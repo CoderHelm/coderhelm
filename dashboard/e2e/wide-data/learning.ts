@@ -198,8 +198,101 @@ export function learningHealthFixture(o: { repo: string; text: string; quiet?: s
   return { window_days: 7, generated_at: iso(0), state: q.length ? "red" : "ok", quiet: q, loops };
 }
 
+/** One scope's numbers on GET /api/learning/scorecard (common::scorecard::row). */
+function scoreRow(opened: number, merged: number, closed: number, extra: Record<string, number | null> = {}) {
+  const finished = merged + closed;
+  return {
+    opened,
+    merged,
+    closed_unmerged: closed,
+    open: opened - finished,
+    reverted: 1,
+    merge_rate: finished ? Math.round((merged / finished) * 1000) / 1000 : null,
+    revert_rate: merged ? Math.round((1 / merged) * 1000) / 1000 : null,
+    human_edited: 4,
+    human_edited_rate: merged ? Math.round((4 / merged) * 1000) / 1000 : null,
+    merged_as_written: Math.max(0, merged - 4),
+    open_items: 3,
+    open_items_rate: finished ? Math.round((3 / finished) * 1000) / 1000 : null,
+    reviewed: merged,
+    first_pass: Math.max(0, merged - 5),
+    avg_review_rounds: 0.6,
+    avg_hours_to_merge: 9.5,
+    median_hours_to_merge_at_most: 8,
+    median_past_hours: null,
+    ...extra,
+  };
+}
+
+/** GET /api/learning/scorecard: the team's counters and each repository's; `empty` is an install nothing was counted on yet. */
+export function scorecardFixture(o: { repo: string; repo2: string; months?: number; only?: string; empty?: boolean }) {
+  const none = { ...scoreRow(0, 0, 0), reverted: 0, human_edited: 0, merged_as_written: 0, open_items: 0, reviewed: 0, first_pass: 0, revert_rate: null, human_edited_rate: null, avg_review_rounds: null, avg_hours_to_merge: null, median_hours_to_merge_at_most: null };
+  if (o.empty) return { months: o.months ?? 3, repo: o.only ?? "", since: null, team: none, repos: [], trend: [] };
+  const a = { repo: o.repo, ...scoreRow(18, 12, 3) };
+  const b = { repo: o.repo2, ...scoreRow(6, 4, 1, { avg_review_rounds: null, reviewed: 0, first_pass: 0 }) };
+  const repos = o.only ? [a, b].filter((r) => r.repo === o.only) : [a, b];
+  const team = o.only ? scoreRow(repos[0]?.opened ?? 0, repos[0]?.merged ?? 0, repos[0]?.closed_unmerged ?? 0) : { ...scoreRow(24, 16, 4), reverted: 2 };
+  return { months: o.months ?? 3, repo: o.only ?? "", since: "2026-01", team, repos, trend: [{ month: "2026-01", ...scoreRow(24, 16, 4) }] };
+}
+
+/** GET /api/learning/lessons: one lesson in each state, and a guide pull request waiting for review. */
+export function outcomeLessonsFixture(o: { repo: string; text: string; file: string; empty?: boolean }) {
+  if (o.empty) return { lessons: [], guide_prs: [], guide_min_seen: 2 };
+  const lesson = (id: string, status: string, extra: Record<string, unknown> = {}) => ({
+    id,
+    repo: o.repo,
+    text: `Build image addresses with the shared \`imageUrl\` helper, never from \`image.asset.url\`. ${o.text}`.trim(),
+    check: `Search the diff under ${o.file || "apps/web/src"} for \`asset.url\`: there should be none.`,
+    applies_to: "apps/web",
+    source: "edited",
+    seen: 2,
+    contradicted: 0,
+    prs: [`${o.repo}#12345`, `${o.repo}#12399`],
+    evidence: [
+      "PR #12345: people edited it before merging (`apps/web/src/blocks/card.tsx`)",
+      `PR #12345 in people's words: "Use the shared image builder" ${o.text}`.trim(),
+      "PR #12345 people's change:\napps/web/src/blocks/card.tsx\n-  const src = p.image.asset.url\n+  const src = imageUrl(p.image)",
+    ],
+    created_at: iso(20 * DAY),
+    last_seen_at: iso(2 * DAY),
+    status,
+    guide_declined: false,
+    guide_ready: status === "recalled",
+    ...extra,
+  });
+  return {
+    lessons: [
+      lesson("les_ready", "recalled"),
+      lesson("les_guide", "in_guide", { text: "Name migration files `NNNN_what.sql`.", check: "The new file under `db/migrations` starts with four digits.", source: "closed", seen: 3 }),
+      lesson("les_against", "contradicted", { text: "Keep feature flags in `flags.ts`.", contradicted: 2, guide_declined: true }),
+      lesson("les_area", "recalled", { text: "In `apps/web`: PR #12001 was closed without merging.", check: "", source: "", guide_ready: false, evidence: [] }),
+    ],
+    guide_prs: [{ repo: o.repo, pr: 12400, url: `https://github.com/${o.repo}/pull/12400`, state: "open", path: "AGENTS.md", lessons: 1, at: iso(DAY) }],
+    guide_min_seen: 2,
+  };
+}
+
+/** GET /api/learning/reviewers: one reviewer with an ask in use and one seen once, and a second reviewer. */
+export function reviewerAsksFixture(o: { repo: string; text: string; canManage: boolean; forgotten?: Set<string>; empty?: boolean }) {
+  const gone = o.forgotten ?? new Set<string>();
+  if (o.empty) return { min_seen: 2, can_manage: o.canManage, reviewers: [] };
+  const ask = (id: string, text: string, category: string, seen: number) => ({ id, text, category, seen, prs: Array.from({ length: seen }, (_, i) => `${o.repo}#${12345 + i}`), last_seen_at: iso(2 * DAY), given: seen >= 2 });
+  const reviewers = [
+    { login: "a-reviewer", asks: [ask("ask_tests", `Add a test for the empty state of every new block. ${o.text}`.trim(), "tests", 3), ask("ask_errors", "Return typed errors from the client layer", "error_handling", 1)] },
+    { login: "another-reviewer", asks: [ask("ask_names", "Name handlers after the route they serve", "naming", 2)] },
+  ]
+    .filter((r) => !gone.has(r.login))
+    .map((r) => ({ ...r, asks: r.asks.filter((a) => !gone.has(a.id)) }));
+  return { min_seen: 2, can_manage: o.canManage, reviewers };
+}
+
 export const learningData: Handler = ({ method, path }) => {
   if (path === "/api/learning/health" && method === "GET") return learningHealthFixture({ repo: REPO, text: `${SENTENCE} ${TOKEN}` });
+  if (path === "/api/learning/scorecard" && method === "GET") return scorecardFixture({ repo: REPO, repo2: REPO_2 });
+  if (path === "/api/learning/lessons" && method === "GET") return outcomeLessonsFixture({ repo: REPO, text: `${SENTENCE} ${TOKEN}`, file: FILE });
+  if (path === "/api/learning/reviewers" && method === "GET") return reviewerAsksFixture({ repo: REPO, text: `${SENTENCE} ${TOKEN}`, canManage: true });
+  if (path === "/api/learning/reviewers/forget" && method === "POST") return { forgotten: 1 };
+  if (path === "/api/settings/guide-prs") return { enabled: true, repos: { [REPO_2]: false }, can_manage: true };
   if (path === "/api/learning" && method === "GET") {
     return learningFixture({ repo: REPO, repo2: REPO_2, text: `${TITLE} ${SENTENCE} ${TOKEN}`, file: FILE, canManage: true });
   }

@@ -13,6 +13,7 @@ import {
 import { CardSkeleton, ChartSkeleton } from "@/components/skeleton";
 import { Examples } from "./examples";
 import { LearningHealthSection } from "./health";
+import { OutcomeLessonsSection, ReviewerAsksSection, ScorecardSection } from "./outcomes";
 import { StatGrid, StatTile } from "@/components/stat-tile";
 import { DataTable, type Column } from "@/components/data-table";
 import { Problem } from "@/components/problem";
@@ -593,6 +594,8 @@ export default function LearningPage() {
         <RepoFilter value={repo} onChange={setRepo} repos={repoNames} />
       </div>
 
+      <ScorecardSection repo={repo} />
+
       {error ? (
         <div className="mt-6">
           <Problem title="Couldn't load what Coderhelm learned" onRetry={() => void load()} details={error}>
@@ -703,6 +706,9 @@ export default function LearningPage() {
               </ul>
             )}
           </Section>
+
+          <OutcomeLessonsSection repo={repo} canManage={canManage} />
+          <ReviewerAsksSection canManage={canManage} />
 
           <Examples list={data.exemplars} loading={loading && (data.repo ?? "") !== repo} />
 

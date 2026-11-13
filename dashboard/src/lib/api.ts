@@ -530,6 +530,22 @@ export const api = {
   /** The team's signal weights (admin); `{}` goes back to the defaults. */
   putRewardWeights: (weights: Record<string, number>) =>
     request<{ weights: Record<string, number> }>("/api/learning/weights", { method: "PUT", body: JSON.stringify({ weights }) }),
+  /** What became of the pull requests Coderhelm opened, per team and per repository. `months` 0 is all time. */
+  getScorecard: (months: number, repo?: string) =>
+    request<Scorecard>(`/api/learning/scorecard?months=${months}${repo ? `&repo=${encodeURIComponent(repo)}` : ""}`),
+  /** The coding agent's lessons with their evidence, and each repository's guide pull request. */
+  getOutcomeLessons: (repo?: string) =>
+    request<OutcomeLessons>(`/api/learning/lessons${repo ? `?repo=${encodeURIComponent(repo)}` : ""}`),
+  /** What each reviewer repeatedly asks for on Coderhelm's pull requests. */
+  getReviewerAsks: () => request<ReviewerAsks>("/api/learning/reviewers"),
+  /** Whether Coderhelm may open guide pull requests: for the team, and per repository set apart. */
+  getGuideSetting: () => request<GuideSetting>("/api/settings/guide-prs"),
+  /** Save it (admin). The whole setting is sent. */
+  putGuideSetting: (setting: { enabled: boolean; repos: Record<string, boolean> }) =>
+    request<GuideSetting>("/api/settings/guide-prs", { method: "PUT", body: JSON.stringify(setting) }),
+  /** Forget one ask, or everything kept about a reviewer (admin). */
+  forgetReviewer: (login: string, id?: string) =>
+    request<{ forgotten: number }>("/api/learning/reviewers/forget", { method: "POST", body: JSON.stringify(id ? { login, id } : { login }) }),
 
   // GitHub App installation
   getInstallationStatus: () =>
@@ -4813,6 +4829,114 @@ export interface LearningHealth {
   /** Keys of the quiet loops. */
   quiet: string[];
   loops: LearningLoop[];
+}
+
+/** One scope's numbers on the scorecard. A rate or an average is `null` when nothing is behind it. */
+export interface ScorecardRow {
+  opened: number;
+  merged: number;
+  closed_unmerged: number;
+  open: number;
+  reverted: number;
+  /** Merged out of merged plus closed. */
+  merge_rate: number | null;
+  revert_rate: number | null;
+  /** Merged after a person pushed a commit on top. */
+  human_edited: number;
+  human_edited_rate: number | null;
+  merged_as_written: number;
+  /** Finished with open or deferred items in the description. */
+  open_items: number;
+  open_items_rate: number | null;
+  /** Pull requests whose review rounds are known (approved, or merged). */
+  reviewed: number;
+  /** Approved or merged with no request for changes. */
+  first_pass: number;
+  avg_review_rounds: number | null;
+  avg_hours_to_merge: number | null;
+  /** The median merge took at most this many hours. */
+  median_hours_to_merge_at_most: number | null;
+  /** Set when the median is past the longest span that is counted. */
+  median_past_hours: number | null;
+}
+
+/** GET /api/learning/scorecard. */
+export interface Scorecard {
+  months: number;
+  repo: string;
+  /** The first month anything was counted (`2026-11`), or null when nothing was. */
+  since: string | null;
+  team: ScorecardRow;
+  repos: (ScorecardRow & { repo: string })[];
+  trend: (ScorecardRow & { month: string })[];
+}
+
+/** A lesson the coding agent learned from what people did with a pull request. */
+export interface OutcomeLesson {
+  id: string;
+  repo: string;
+  text: string;
+  /** How to check a change against it; empty for a lesson that only records what happened. */
+  check: string;
+  applies_to: string;
+  /** `edited`, `closed`, `reverted`, or empty. */
+  source: string;
+  seen: number;
+  contradicted: number;
+  /** `owner/name#12`. */
+  prs: string[];
+  evidence: string[];
+  created_at: string;
+  last_seen_at: string;
+  /** `recalled` (given to runs), `in_guide`, `contradicted`, `faded` or `off`. */
+  status: string;
+  guide_declined: boolean;
+  guide_ready: boolean;
+}
+
+export interface GuidePr {
+  repo: string;
+  pr: number;
+  url: string;
+  /** `open`, `merged` or `declined`. */
+  state: string;
+  path: string;
+  lessons: number;
+  at: string;
+}
+
+/** GET /api/learning/lessons. */
+export interface OutcomeLessons {
+  lessons: OutcomeLesson[];
+  guide_prs: GuidePr[];
+  guide_min_seen: number;
+}
+
+export interface ReviewerAsk {
+  id: string;
+  text: string;
+  category: string;
+  seen: number;
+  prs: string[];
+  last_seen_at: string;
+  /** Seen often and recently enough to be given to the agents. */
+  given: boolean;
+}
+
+/** GET and PUT /api/settings/guide-prs. On unless turned off. */
+export interface GuideSetting {
+  /** For every repository that is not set apart. */
+  enabled: boolean;
+  /** `owner/name` to on or off, for the repositories set apart from the team. */
+  repos: Record<string, boolean>;
+  can_manage?: boolean;
+}
+
+/** GET /api/learning/reviewers. */
+export interface ReviewerAsks {
+  min_seen: number;
+  can_manage?: boolean;
+  reviewers: { login: string; asks: ReviewerAsk[] }[];
 }
 
 // ── This install (self-hosted) ──────────────────────────────────────────
