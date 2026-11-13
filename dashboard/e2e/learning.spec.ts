@@ -28,10 +28,12 @@ interface Backend {
   outcomes?: "full" | "empty" | number;
   /** Reviewers and asks forgotten so far. */
   forgotten: Set<string>;
+  /** The guide pull request setting as saved (on unless turned off). */
+  guide: { enabled: boolean; repos: Record<string, boolean> };
 }
 
 async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend> {
-  const db: Backend = { role: "admin", canManage: true, empty: false, writeStatus: 200, reverted: new Set(), pinned: "", weights: {}, calls: [], forgotten: new Set(), ...init };
+  const db: Backend = { role: "admin", canManage: true, empty: false, writeStatus: 200, reverted: new Set(), pinned: "", weights: {}, calls: [], forgotten: new Set(), guide: { enabled: true, repos: {} }, ...init };
   const json = (route: Route, body: unknown, status = 200) =>
     route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
   await page.route((url) => url.hostname !== "localhost", (route) => route.abort());
@@ -55,6 +57,15 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
       if (db.health === undefined) return json(route, { error: "Not found" }, 404);
       if (typeof db.health === "number") return json(route, { error: "Internal error" }, db.health);
       return json(route, db.health);
+    }
+    if (p === "/api/settings/guide-prs") {
+      db.calls.push({ method, path: p, body });
+      if (db.outcomes === undefined) return json(route, { error: "Not found" }, 404);
+      if (method === "PUT") {
+        if (db.writeStatus !== 200) return json(route, { error: "Only admins can change this." }, db.writeStatus);
+        db.guide = { enabled: body.enabled, repos: body.repos };
+      }
+      return json(route, { ...db.guide, can_manage: db.canManage });
     }
     if (["/api/learning/scorecard", "/api/learning/lessons", "/api/learning/reviewers"].includes(p) && method === "GET") {
       db.calls.push({ method, path: `${p}${url.search}`, body });
@@ -698,4 +709,92 @@ test("the scorecard, lessons and reviewer asks fit a phone at 375 wide", async (
   for (const id of ["scorecard", "lessons", "reviewers"]) {
     await page.locator(`#${id}`).screenshot({ path: path.join(SHOTS_DIR, `learning-${id}-phone.png`) });
   }
+});
+
+// ── The switch for guide pull requests ─────────────────────────────────────
+
+const guideSaves = (db: Backend) => db.calls.filter((c) => c.path === "/api/settings/guide-prs" && c.method === "PUT").map((c) => c.body);
+
+test("an admin turns guide pull requests off for the team, then on for one repository", async ({ page }) => {
+  const db = await mockApi(page, { outcomes: "full" });
+  await page.goto("/learning");
+  const team = page.getByTestId("guide-setting-team");
+  const toggle = page.getByRole("switch", { name: "Open guide pull requests" });
+  // On unless a team turns it off.
+  await expect(toggle).toBeChecked();
+  await expect(team).toContainText("its lessons still go to every run");
+  await expect(page.getByTestId("guide-setting-apart")).toContainText("Every repository follows this.");
+  await expect(team).not.toContainText("Not default");
+
+  await toggle.click();
+  await expect(toggle).not.toBeChecked();
+  await expect(team).toContainText("Not default");
+  expect(guideSaves(db).at(-1)).toEqual({ enabled: false, repos: {} });
+
+  // One repository set apart: picked in the page's filter.
+  await page.getByTestId("repo-filter").click();
+  await page.getByTestId("combo-popover").getByRole("option", { name: REPO, exact: true }).first().click();
+  const row = page.getByTestId("guide-setting-repo");
+  await expect(row).toContainText(`In ${REPO}`);
+  await expect(row).toContainText("Follows the team's setting: off.");
+  const choices = page.getByRole("group", { name: `Guide pull requests in ${REPO}` });
+  await choices.getByRole("button", { name: "On", exact: true }).click();
+  await expect(row).toContainText("guide pull requests are opened here");
+  await expect(choices.getByRole("button", { name: "On", exact: true })).toHaveAttribute("aria-pressed", "true");
+  expect(guideSaves(db).at(-1)).toEqual({ enabled: false, repos: { [REPO]: true } });
+  // Back to the team's setting removes the override.
+  await choices.getByRole("button", { name: "Follow the team" }).click();
+  await expect(row).toContainText("Follows the team's setting: off.");
+  expect(guideSaves(db).at(-1)).toEqual({ enabled: false, repos: {} });
+});
+
+test("repositories set apart are named, and the setting survives a reload", async ({ page }) => {
+  await mockApi(page, { outcomes: "full", guide: { enabled: true, repos: { [REPO_2]: false } } });
+  await page.goto("/learning");
+  await expect(page.getByRole("switch", { name: "Open guide pull requests" })).toBeChecked();
+  await expect(page.getByTestId("guide-setting-apart")).toContainText(`Set apart from the team: ${REPO_2} (off).`);
+});
+
+test("a member sees how guide pull requests are set and cannot change it", async ({ page }) => {
+  const db = await mockApi(page, { role: "member", canManage: false, outcomes: "full" });
+  await page.goto("/learning");
+  const toggle = page.getByRole("switch", { name: "Open guide pull requests" });
+  await expect(toggle).toBeChecked();
+  await expect(toggle).toBeDisabled();
+  await expect(page.getByTestId("guide-setting-team")).toContainText("Only an admin or the owner can change this.");
+  await page.getByTestId("repo-filter").click();
+  await page.getByTestId("combo-popover").getByRole("option", { name: REPO, exact: true }).first().click();
+  await expect(page.getByRole("group", { name: `Guide pull requests in ${REPO}` }).getByRole("button", { name: "Off", exact: true })).toBeDisabled();
+  expect(guideSaves(db)).toHaveLength(0);
+});
+
+test("a refused save of the guide setting is said in words and the switch stays", async ({ page }) => {
+  const db = await mockApi(page, { outcomes: "full", writeStatus: 403 });
+  await page.goto("/learning");
+  const toggle = page.getByRole("switch", { name: "Open guide pull requests" });
+  await toggle.click();
+  await expect(page.getByTestId("guide-setting").getByRole("alert")).toContainText("Only an admin or the owner can change it (error 403)");
+  await expect(toggle).toBeChecked();
+  expect(db.guide.enabled).toBe(true);
+});
+
+test("a gateway without the guide setting shows no switch, and the switch fits a phone", async ({ page }) => {
+  await mockApi(page, { outcomes: "full" });
+  await page.route("**/api/settings/guide-prs", (route) => route.fulfill({ status: 404, contentType: "application/json", body: "{}" }));
+  await page.goto("/learning");
+  await expect(page.getByTestId("lesson-les_ready")).toBeVisible();
+  await expect(page.getByTestId("guide-setting")).toHaveCount(0);
+
+  // The repository is picked at desktop width (the filter is the page's own,
+  // tested elsewhere), then the rows are looked at on a phone.
+  await page.unroute("**/api/settings/guide-prs");
+  await page.goto("/learning");
+  await page.getByTestId("repo-filter").click();
+  await page.getByTestId("combo-popover").getByRole("option", { name: REPO, exact: true }).first().click();
+  await expect(page.getByTestId("guide-setting-repo")).toBeVisible();
+  await page.setViewportSize({ width: 375, height: 844 });
+  await expect(page.getByTestId("guide-setting-repo")).toBeVisible();
+  await noSideways(page);
+  fs.mkdirSync(SHOTS_DIR, { recursive: true });
+  await page.getByTestId("guide-setting").screenshot({ path: path.join(SHOTS_DIR, "learning-guide-setting-phone.png") });
 });

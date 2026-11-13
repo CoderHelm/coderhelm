@@ -707,7 +707,7 @@ export default function LearningPage() {
             )}
           </Section>
 
-          <OutcomeLessonsSection repo={repo} />
+          <OutcomeLessonsSection repo={repo} canManage={canManage} />
           <ReviewerAsksSection canManage={canManage} />
 
           <Examples list={data.exemplars} loading={loading && (data.repo ?? "") !== repo} />

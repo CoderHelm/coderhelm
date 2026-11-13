@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
   api,
   errorStatus,
+  type GuideSetting,
   type OutcomeLesson,
   type OutcomeLessons,
   type ReviewerAsks,
@@ -17,6 +18,7 @@ import { Disclosure } from "@/components/disclosure";
 import { ListSkeleton, Time } from "@/components/list";
 import { cardClass, Section } from "@/components/page";
 import { Segmented } from "@/components/segmented";
+import { SettingsRow, Switch } from "@/components/settings";
 import { StatGrid, StatTile } from "@/components/stat-tile";
 import { StatusPill } from "@/components/status-pill";
 import { smallSecondaryButton } from "@/components/ui";
@@ -272,8 +274,104 @@ function LessonCard({ l }: { l: OutcomeLesson }) {
   );
 }
 
+// ── The switch for guide pull requests ─────────────────────────────────────
+
+const isGuideSetting = (v: GuideSetting) => !!v && typeof v.enabled === "boolean" && typeof v.repos === "object" && v.repos !== null;
+
+const REPO_CHOICES = [
+  { value: "team", label: "Follow the team" },
+  { value: "on", label: "On" },
+  { value: "off", label: "Off" },
+] as const;
+type RepoChoice = (typeof REPO_CHOICES)[number]["value"];
+
+/**
+ * Whether Coderhelm may open guide pull requests: one switch for the team,
+ * and, with a repository picked in the page's filter, that repository's own
+ * setting. Each change is saved at once. Everyone sees how it is set; only
+ * an admin can change it.
+ */
+function GuidePrSetting({ repo, canManage }: { repo: string; canManage: boolean }) {
+  const fetcher = useCallback(() => api.getGuideSetting(), []);
+  const { data, error, gone, load } = useSection(fetcher, isGuideSetting);
+  const [saved, setSaved] = useState<GuideSetting | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState("");
+  if (gone) return null;
+  if (error) return <LoadProblem title="Couldn't load the guide pull request setting" error={error} onRetry={() => void load()} />;
+  const setting = saved ?? data;
+  if (!setting) return null;
+
+  const save = async (next: { enabled: boolean; repos: Record<string, boolean> }) => {
+    setBusy(true);
+    setProblem("");
+    try {
+      setSaved(await api.putGuideSetting(next));
+    } catch (e) {
+      setProblem(errorStatus(e) === 403 ? "Your role does not allow this. Only an admin or the owner can change it (error 403)." : e instanceof Error ? e.message : "The request failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const choice: RepoChoice = repo in setting.repos ? (setting.repos[repo] ? "on" : "off") : "team";
+  const setRepo = (c: RepoChoice) => {
+    const repos = { ...setting.repos };
+    if (c === "team") delete repos[repo];
+    else repos[repo] = c === "on";
+    void save({ enabled: setting.enabled, repos });
+  };
+  const apart = Object.entries(setting.repos).sort(([a], [b]) => a.localeCompare(b));
+  const cannot = canManage ? undefined : "Only an admin or the owner can change this.";
+
+  return (
+    <div className="min-w-0 divide-y divide-zinc-800 rounded-lg border border-zinc-800 bg-zinc-900/50" data-testid="guide-setting" aria-busy={busy}>
+      <SettingsRow
+        label="Open guide pull requests"
+        layout="toggle"
+        testId="guide-setting-team"
+        notDefault={!setting.enabled}
+        help={
+          <>
+            When a lesson has been seen on several pull requests, Coderhelm proposes it for the repository&apos;s guide file as a pull request for the team to review. Off, Coderhelm writes nothing to any repository for this; its lessons still go to every run.
+            {cannot ? ` ${cannot}` : ""}
+          </>
+        }
+        control={(ids) => (
+          <Switch id={ids.inputId} checked={setting.enabled} disabled={!canManage || busy} onChange={(on) => void save({ enabled: on, repos: setting.repos })} labelledBy={ids.labelId} describedBy={ids.helpId} testId="guide-switch" />
+        )}
+      />
+      {repo ? (
+        <SettingsRow
+          label={`In ${repo}`}
+          testId="guide-setting-repo"
+          notDefault={choice !== "team"}
+          help={
+            choice === "team"
+              ? `Follows the team's setting: ${setting.enabled ? "on" : "off"}.`
+              : `Set apart from the team: ${choice === "on" ? "guide pull requests are opened here" : "nothing is written to this repository"}.`
+          }
+          control={() => <Segmented label={`Guide pull requests in ${repo}`} options={[...REPO_CHOICES]} value={choice} onChange={setRepo} disabled={!canManage || busy} />}
+        />
+      ) : (
+        <p className="px-4 py-3 text-sm text-zinc-400" data-testid="guide-setting-apart">
+          {apart.length === 0
+            ? "Every repository follows this. To set one apart, pick it in the repository filter at the top."
+            : `Set apart from the team: ${apart.map(([r, on]) => `${r} (${on ? "on" : "off"})`).join(", ")}. To change one, pick it in the repository filter at the top.`}
+        </p>
+      )}
+      {problem && (
+        <div className="px-4 py-3">
+          <Callout variant="error" title="That was not saved">
+            <p>{problem}</p>
+          </Callout>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** The coding agent's lessons from what people did with its pull requests, and the guide pull requests that propose them. */
-export function OutcomeLessonsSection({ repo }: { repo: string }) {
+export function OutcomeLessonsSection({ repo, canManage }: { repo: string; canManage: boolean }) {
   const fetcher = useCallback(() => api.getOutcomeLessons(repo || undefined), [repo]);
   const { data, error, gone, load } = useSection(fetcher, isLessons);
   if (gone) return null;
@@ -289,6 +387,7 @@ export function OutcomeLessonsSection({ repo }: { repo: string }) {
         <ListSkeleton rows={3} label="Loading the lessons" />
       ) : (
         <div className="space-y-3">
+          <GuidePrSetting repo={repo} canManage={canManage} />
           {data.guide_prs.length > 0 && (
             <ul className="space-y-2" data-testid="guide-prs">
               {data.guide_prs.map((g) => {

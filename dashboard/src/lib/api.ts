@@ -538,6 +538,11 @@ export const api = {
     request<OutcomeLessons>(`/api/learning/lessons${repo ? `?repo=${encodeURIComponent(repo)}` : ""}`),
   /** What each reviewer repeatedly asks for on Coderhelm's pull requests. */
   getReviewerAsks: () => request<ReviewerAsks>("/api/learning/reviewers"),
+  /** Whether Coderhelm may open guide pull requests: for the team, and per repository set apart. */
+  getGuideSetting: () => request<GuideSetting>("/api/settings/guide-prs"),
+  /** Save it (admin). The whole setting is sent. */
+  putGuideSetting: (setting: { enabled: boolean; repos: Record<string, boolean> }) =>
+    request<GuideSetting>("/api/settings/guide-prs", { method: "PUT", body: JSON.stringify(setting) }),
   /** Forget one ask, or everything kept about a reviewer (admin). */
   forgetReviewer: (login: string, id?: string) =>
     request<{ forgotten: number }>("/api/learning/reviewers/forget", { method: "POST", body: JSON.stringify(id ? { login, id } : { login }) }),
@@ -4916,6 +4921,15 @@ export interface ReviewerAsk {
   last_seen_at: string;
   /** Seen often and recently enough to be given to the agents. */
   given: boolean;
+}
+
+/** GET and PUT /api/settings/guide-prs. On unless turned off. */
+export interface GuideSetting {
+  /** For every repository that is not set apart. */
+  enabled: boolean;
+  /** `owner/name` to on or off, for the repositories set apart from the team. */
+  repos: Record<string, boolean>;
+  can_manage?: boolean;
 }
 
 /** GET /api/learning/reviewers. */

@@ -292,6 +292,7 @@ export const learningData: Handler = ({ method, path }) => {
   if (path === "/api/learning/lessons" && method === "GET") return outcomeLessonsFixture({ repo: REPO, text: `${SENTENCE} ${TOKEN}`, file: FILE });
   if (path === "/api/learning/reviewers" && method === "GET") return reviewerAsksFixture({ repo: REPO, text: `${SENTENCE} ${TOKEN}`, canManage: true });
   if (path === "/api/learning/reviewers/forget" && method === "POST") return { forgotten: 1 };
+  if (path === "/api/settings/guide-prs") return { enabled: true, repos: { [REPO_2]: false }, can_manage: true };
   if (path === "/api/learning" && method === "GET") {
     return learningFixture({ repo: REPO, repo2: REPO_2, text: `${TITLE} ${SENTENCE} ${TOKEN}`, file: FILE, canManage: true });
   }
