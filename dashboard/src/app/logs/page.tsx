@@ -7,6 +7,7 @@ import {
   api,
   type LogAutofix,
   type LogAutofixState,
+  type LogActivity,
   type LogFinding,
   type LogFindingStatus,
   type LogFindingsList,
@@ -67,10 +68,12 @@ const STATUS_LOOK: Record<LogFindingStatus, StatusLook> = {
   new: { label: "New", tone: "attention" },
   acknowledged: { label: "Acknowledged", tone: "waiting" },
   fixing: { label: "Fixing", tone: "live", live: true },
+  // Open, but the error itself stopped: not a live problem.
+  stopped: { label: "Stopped", tone: "neutral" },
   fixed: { label: "Fixed", tone: "success" },
   ignored: { label: "Ignored", tone: "muted" },
 };
-const STATUS_ORDER: LogFindingStatus[] = ["new", "acknowledged", "fixing", "fixed", "ignored"];
+const STATUS_ORDER: LogFindingStatus[] = ["new", "acknowledged", "fixing", "stopped", "fixed", "ignored"];
 
 const SEVERITY_LOOK: Record<LogSeverity, { label: string; tone: Tone; rank: number }> = {
   critical: { label: "Critical", tone: "danger", rank: 2 },
@@ -119,6 +122,56 @@ function quietWords(f: LogFinding, now = Date.now()): string | null {
     return `${lead} Resolves on its own ${formatDate(f.resolves_at)} unless seen again.`;
   }
   return null;
+}
+
+/** "about 6 hours", "about 40 minutes": the window a log check read. */
+function windowWords(minutes: number): string {
+  if (minutes >= 90) return `about ${plural(Math.round(minutes / 60), "hour")}`;
+  return `about ${plural(Math.max(1, Math.round(minutes)), "minute")}`;
+}
+
+/** What the latest check read, when it read the service's volume. */
+function volumeWords(a: LogActivity): string | null {
+  if (typeof a.scanned !== "number" || typeof a.minutes !== "number" || a.minutes <= 0) return null;
+  return `In the last check (${windowWords(a.minutes)} of logs) the service wrote ${plural(a.scanned, "line")}, none matching.`;
+}
+
+/** When a stopped finding closes, never promising a date that has passed. */
+function closesWords(f: LogFinding, now = Date.now()): string {
+  if (!f.resolves_at) return "";
+  const state = f.resolve?.state ?? (Date.parse(f.resolves_at) > now ? "scheduled" : "due");
+  if (state === "blocked") {
+    const since = f.resolve?.analysis_ok_at ? ` since ${formatDate(f.resolve.analysis_ok_at)}` : "";
+    return ` It was due to close ${formatDate(f.resolves_at)}, but log checks have failed${since}: ${f.resolve?.reason ?? "checks of your AWS logs fail"}.`;
+  }
+  if (state === "due") return " Closes at the next log check (every 6 hours) unless seen again.";
+  return ` Closes on its own ${formatDate(f.resolves_at)} unless seen again.`;
+}
+
+/**
+ * A stopped finding in one line: "Stopped: no matching line since Nov 2,
+ * 5:10 AM. 5 log checks in a row found none while the service kept logging.
+ * Closes on its own Nov 3 unless seen again."; null for any other finding.
+ */
+function stoppedWords(f: LogFinding, now = Date.now()): string | null {
+  if (f.status !== "stopped" || !f.activity) return null;
+  const since = f.last_seen ? ` since ${formatDate(f.last_seen, { time: true })}` : "";
+  return `Stopped: no matching line${since}. ${plural(f.activity.quiet_checks, "log check")} in a row found none while the service kept logging.${closesWords(f, now)}`;
+}
+
+/** Why a stopped finding closes sooner than the default, when a change explains it. */
+function changeWords(f: LogFinding): string | null {
+  const c = f.activity?.change;
+  if (!c || f.quiet_basis !== "change") return null;
+  const what = c.kind === "deploy" ? "a deploy of" : "a change merged in";
+  return `It stopped after ${what} ${c.repo}${c.title ? ` (${c.title})` : ""} on ${formatDate(c.at, { time: true })}, so it closes after ${plural(f.quiet_days ?? 1, "day")} without a line instead of 3.`;
+}
+
+/** No matching line lately, but the service itself went quiet: said, never guessed. */
+function cantTellWords(f: LogFinding): string | null {
+  const a = f.activity;
+  if (!a || a.state !== "unknown" || (f.status !== "new" && f.status !== "acknowledged")) return null;
+  return `No matching line in the last ${plural(a.quiet_checks, "log check")}, but the service itself wrote little or nothing then, so Coderhelm can't tell whether the error stopped. It stays open until the service logs again.`;
 }
 
 function errorText(e: unknown, fallback: string): string {
@@ -226,7 +279,7 @@ function LogsPage() {
     [findings, q, severity, params.group, params.incident],
   );
   const counts = useMemo(() => {
-    const c: Record<LogFindingStatus, number> = { new: 0, acknowledged: 0, fixing: 0, fixed: 0, ignored: 0 };
+    const c: Record<LogFindingStatus, number> = { new: 0, acknowledged: 0, fixing: 0, stopped: 0, fixed: 0, ignored: 0 };
     for (const f of searched) c[f.status] += 1;
     return c;
   }, [searched]);
@@ -268,6 +321,21 @@ function LogsPage() {
       load();
     } catch (e) {
       toast(errorText(e, "Could not update the finding"), "error");
+    } finally {
+      setBusy("");
+    }
+  };
+
+  // One click on a repo Coderhelm offered: the fix starts there, and the
+  // choice is saved for the log group when this person may save it.
+  const fixIn = async (f: LogFinding, repo: string) => {
+    setBusy(`fix:${f.rec_id}`);
+    try {
+      await api.createLogFix(f.rec_id, { repo, remember: canRemember });
+      toast(canRemember ? `Fix run started in ${repo}. Saved for ${f.log_group}.` : `Fix run started in ${repo}`);
+      load();
+    } catch (e) {
+      toast(errorText(e, "Could not start the fix run. Try again."), "error");
     } finally {
       setBusy("");
     }
@@ -438,6 +506,7 @@ function LogsPage() {
                   open={params.finding === r.f.rec_id}
                   onOpenChange={(v) => setParams({ finding: v ? r.f.rec_id : "" }, { replace: true })}
                   onFix={() => setFixing(r.f)}
+                  onFixIn={(repo) => fixIn(r.f, repo)}
                   onStatus={(a) => setStatus(r.f, a)}
                   onRepoSettings={() => openSettings(true)}
                 />
@@ -511,15 +580,19 @@ function IncidentRow({
   const sev = SEVERITY_LOOK[worst];
   const recovered = !!d.recovered_at;
   const fixing = members.some((f) => f.status === "fixing");
+  // Every finding of it stopped: the incident is over, not live.
+  const stopped = members.length > 0 && members.every((f) => f.status === "stopped");
   const look: StatusLook = recovered
     ? { label: "Recovered", tone: "success" }
     : fixing
       ? STATUS_LOOK.fixing
-      : { label: "Incident", tone: "attention" };
+      : stopped
+        ? STATUS_LOOK.stopped
+        : { label: "Incident", tone: "attention" };
   return (
     <ListRow
       testId={`incident-${inc.id}`}
-      data={{ place: d.place }}
+      data={{ place: d.place, state: recovered ? "recovered" : fixing ? "fixing" : stopped ? "stopped" : "live" }}
       status={look}
       title={d.headline || members[0]?.title || "Incident"}
       titleText={d.headline}
@@ -531,11 +604,11 @@ function IncidentRow({
         inc.first_seen ? `began ${timeAgo(inc.first_seen)}` : null,
         recovered ? `stopped ${timeAgo(d.recovered_at)}` : null,
       ]}
-      summary={inc.action || d.summary}
-      summaryTone={recovered ? "success" : fixing ? "live" : "attention"}
+      summary={(stopped && !fixing && !recovered ? stoppedWords(members[0]) : null) ?? (inc.action || d.summary)}
+      summaryTone={recovered ? "success" : fixing ? "live" : stopped ? "neutral" : "attention"}
       chips={
         <>
-          <Chip tone={recovered ? "neutral" : sev.tone}>{sev.label}</Chip>
+          <Chip tone={recovered || stopped ? "neutral" : sev.tone}>{sev.label}</Chip>
           <Chip tone="info" title="Where the fix belongs">
             {PLACE_WORDS[d.place]}
           </Chip>
@@ -727,6 +800,7 @@ function FindingRow({
   open,
   onOpenChange,
   onFix,
+  onFixIn,
   onStatus,
   onRepoSettings,
 }: {
@@ -738,20 +812,27 @@ function FindingRow({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onFix: () => void;
+  onFixIn: (repo: string) => void;
   onStatus: (action: "ignore" | "acknowledge" | "reopen") => void;
   onRepoSettings: () => void;
 }) {
-  const look = STATUS_LOOK[f.status];
+  const look = STATUS_LOOK[f.status] ?? STATUS_LOOK.new;
   const sev = SEVERITY_LOOK[f.severity] ?? SEVERITY_LOOK.info;
+  const stopped = f.status === "stopped";
   const canFix = canAct && f.status !== "fixing" && f.status !== "fixed" && f.status !== "ignored";
   const link = fixLink(f);
-  const autoNote =
-    f.auto && f.auto.status !== "started" && f.status !== "fixing" ? `Not started automatically: ${f.auto.reason}.` : null;
+  // The repos Coderhelm couldn't choose between, best first: one click each.
+  const offered = canFix && !stopped ? (f.repo_ask?.candidates ?? []).slice(0, 3) : [];
+  const autoNote = offered.length
+    ? `Which repo is this log group's code in? ${f.repo_ask?.reason ?? ""}`.trim()
+    : f.auto && f.auto.status !== "started" && f.status !== "fixing"
+      ? `Not started automatically: ${f.auto.reason}.`
+      : null;
 
   return (
     <ListRow
       testId={`finding-${f.rec_id}`}
-      data={{ status: f.status, severity: f.severity }}
+      data={{ status: f.status, severity: f.severity, activity: f.activity?.state ?? "" }}
       status={look}
       title={f.title}
       titleText={f.title}
@@ -771,12 +852,17 @@ function FindingRow({
           </span>
         ) : null,
       ]}
-      summary={fixWords(f) ?? autoNote ?? quietWords(f) ?? undefined}
-      summaryTone={f.fix ? (f.fix.state === "merged" ? "success" : f.fix.state === "failed" || f.fix.state === "pr_closed" ? "attention" : "live") : "muted"}
+      summary={(stopped ? stoppedWords(f) : null) ?? fixWords(f) ?? autoNote ?? cantTellWords(f) ?? quietWords(f) ?? undefined}
+      summaryTone={stopped ? "neutral" : f.fix ? (f.fix.state === "merged" ? "success" : f.fix.state === "failed" || f.fix.state === "pr_closed" ? "attention" : "live") : offered.length ? "attention" : "muted"}
       chips={
         <>
-          {/* A resolved finding's severity is history: shown, not alarming. */}
-          <Chip tone={f.status === "fixed" || f.status === "ignored" ? "neutral" : sev.tone}>{sev.label}</Chip>
+          {/* A resolved or stopped finding's severity is history: shown, not alarming. */}
+          <Chip
+            tone={f.status === "fixed" || f.status === "ignored" || stopped ? "neutral" : sev.tone}
+            title={stopped ? `${sev.label} while it was happening` : undefined}
+          >
+            {sev.label}
+          </Chip>
           <StatusText look={look} />
           {f.fix?.auto && <Chip tone="info" title="Started automatically from this finding">Auto</Chip>}
           {link}
@@ -798,9 +884,23 @@ function FindingRow({
             ))}
         </>
       }
-      // One visible action; the rest in the row's menu.
+      // One visible action; the rest in the row's menu. A stopped finding
+      // has none: a fix PR for an error that isn't happening is a person's
+      // call, from the menu.
       actions={
-        canFix ? (
+        offered.length ? (
+          <button
+            type="button"
+            onClick={() => onFixIn(offered[0].repo)}
+            disabled={!!busy}
+            className={rowActionClass}
+            title={offered[0].reason}
+            aria-label={`Fix ${f.title} in ${offered[0].repo}`}
+            data-testid="repo-choice"
+          >
+            Fix in {offered[0].repo}
+          </button>
+        ) : canFix && !stopped ? (
           <button type="button" onClick={onFix} className={rowActionClass} aria-label={`Create fix PR for ${f.title}`}>
             Create fix PR
           </button>
@@ -811,16 +911,19 @@ function FindingRow({
         ) : undefined
       }
       menu={[
+        ...offered.slice(1).map((c) => ({ label: `Fix in ${c.repo}`, hint: c.reason, onSelect: () => onFixIn(c.repo), disabled: !!busy })),
+        ...(offered.length ? [{ label: "Choose another repo", onSelect: onFix }] : []),
+        ...(canFix && stopped ? [{ label: "Create fix PR anyway", hint: "The error stopped", onSelect: onFix }] : []),
         ...(canAct && f.status === "new" ? [{ label: "Acknowledge", onSelect: () => onStatus("acknowledge"), disabled: !!busy }] : []),
         ...(canAct && f.status !== "ignored" && f.status !== "fixing" && f.status !== "fixed"
-          ? [{ label: "Ignore", onSelect: () => onStatus("ignore"), disabled: !!busy }]
+          ? [{ label: stopped ? "Close now" : "Ignore", onSelect: () => onStatus("ignore"), disabled: !!busy }]
           : []),
         ...(f.console_url
           ? [{ label: "Open logs in CloudWatch", hint: "New tab", onSelect: () => window.open(f.console_url ?? undefined, "_blank", "noopener,noreferrer") }]
           : []),
       ]}
       menuLabel={`More actions for ${f.title}`}
-      details={<FindingDetail f={f} canAct={canAct} onStatus={onStatus} busy={busy} onRepoSettings={onRepoSettings} />}
+      details={<FindingDetail f={f} canAct={canAct} canFix={canFix} onFixIn={onFixIn} onStatus={onStatus} busy={busy} onRepoSettings={onRepoSettings} />}
       detailsFor={`details of ${f.title}`}
       open={open}
       onOpenChange={onOpenChange}
@@ -831,19 +934,73 @@ function FindingRow({
 function FindingDetail({
   f,
   canAct,
+  canFix,
   busy,
+  onFixIn,
   onStatus,
   onRepoSettings,
 }: {
   f: LogFinding;
   canAct: boolean;
+  canFix: boolean;
   busy: string;
+  onFixIn: (repo: string) => void;
   onStatus: (action: "ignore" | "acknowledge" | "reopen") => void;
   onRepoSettings: () => void;
 }) {
   const inc = f.incident;
+  const a = f.activity;
+  const stopped = f.status === "stopped" && !!a;
+  const cantTell = cantTellWords(f);
+  const ask = canFix && f.status !== "stopped" ? f.repo_ask : null;
   return (
     <>
+      {stopped && a && (
+        <DetailBlock title="Stopped">
+          <ul className="list-disc space-y-0.5 pl-5 text-zinc-300" data-testid="finding-stopped">
+            <li>The last matching line was {formatDate(f.last_seen, { time: true })}.</li>
+            <li>
+              {plural(a.quiet_checks, "log check")} in a row since found none
+              {a.checked_at ? ` (the latest ${timeAgo(a.checked_at)})` : ""}, while the service kept logging.
+            </li>
+            {volumeWords(a) && <li>{volumeWords(a)}</li>}
+            {changeWords(f) && a.change && (
+              <li>
+                {changeWords(f)}{" "}
+                {a.change.url && (
+                  <a href={a.change.url} target="_blank" rel="noreferrer" className={`${linkButton} !text-xs gap-1`}>
+                    See the change
+                    <ExternalLinkIcon />
+                    <span className="sr-only"> (opens in a new tab)</span>
+                  </a>
+                )}
+              </li>
+            )}
+            {closesWords(f) && <li>{closesWords(f).trim()}</li>}
+            <li>If a matching line is seen again, it is a live finding again.</li>
+          </ul>
+        </DetailBlock>
+      )}
+      {cantTell && (
+        <DetailBlock title="Still happening?">
+          <p className="text-zinc-300" data-testid="finding-cant-tell">{cantTell}</p>
+        </DetailBlock>
+      )}
+      {ask && ask.candidates.length > 0 && (
+        <DetailBlock title="Which repo">
+          <p className="text-zinc-300">{ask.reason} Choose one and the fix starts there.</p>
+          <ul className="mt-2 space-y-1.5" data-testid="repo-ask">
+            {ask.candidates.map((c) => (
+              <li key={c.repo} className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+                <button type="button" onClick={() => onFixIn(c.repo)} disabled={!!busy} className={rowActionClass} aria-label={`Fix in ${c.repo}`}>
+                  Fix in {c.repo}
+                </button>
+                <span className="min-w-0 break-words text-xs text-zinc-400">{c.reason}</span>
+              </li>
+            ))}
+          </ul>
+        </DetailBlock>
+      )}
       <DetailBlock title="What's wrong">
         <p className="text-zinc-300">{f.summary}</p>
       </DetailBlock>

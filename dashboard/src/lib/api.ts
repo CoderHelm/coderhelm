@@ -3202,7 +3202,33 @@ export interface Recommendation {
 }
 
 export type LogSeverity = "critical" | "warning" | "info";
-export type LogFindingStatus = "new" | "acknowledged" | "fixing" | "fixed" | "ignored";
+/** `stopped`: open, but log checks in a row found no matching line while the
+ *  service kept logging. Never a live problem; closes on its own unless seen again. */
+export type LogFindingStatus = "new" | "acknowledged" | "fixing" | "stopped" | "fixed" | "ignored";
+
+/** Whether an open finding's error is still happening, from the analyzer's log checks. */
+export interface LogActivity {
+  /** `unknown`: no matching line, but the service itself went quiet, so nobody can tell. */
+  state: "happening" | "stopped" | "unknown";
+  /** Log checks in a row, up to the latest, with no new matching line. */
+  quiet_checks: number;
+  /** Those of them at the service's usual volume. */
+  normal_checks: number;
+  checked_at: string;
+  /** Lines the log group wrote in the latest check's window, and its length. */
+  scanned?: number | null;
+  minutes?: number | null;
+  /** A change in the log group's repo as the errors stopped (why it closes sooner). */
+  change?: { kind: "merge" | "deploy"; repo: string; at: string; title: string; url: string } | null;
+}
+
+/** The "which repo?" question an automatic fix waits on. */
+export interface LogRepoAsk {
+  guess?: string | null;
+  reason: string;
+  /** Repos worth choosing between, best first. */
+  candidates: { repo: string; reason: string }[];
+}
 
 /** One finding on the Logs page (`GET /api/log-findings`). */
 export interface LogFinding {
@@ -3250,8 +3276,16 @@ export interface LogFinding {
   reopened_at?: string | null;
   /** How many times it came back after it was resolved. */
   reopen_count?: number;
+  /** Open: whether its error is still happening. Older servers and findings
+   *  stored before log checks were kept leave it out. */
+  activity?: LogActivity | null;
+  /** A live finding whose automatic fix needs the repo chosen. */
+  repo_ask?: LogRepoAsk | null;
   /** Days without a matching line before it resolves on its own. */
   quiet_days?: number;
+  /** Why that long: `returns` (it keeps coming back) or `change` (it stopped
+   *  after a change in its repo, so sooner). */
+  quiet_basis?: "default" | "returns" | "change";
   /** Open: when it resolves on its own unless seen again. */
   resolves_at?: string | null;
   /**

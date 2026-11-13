@@ -120,7 +120,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     if (p === "/api/recommendations/notify") return json(route, { notify_mode: "team", saved: false, webhooks: { teams: { set: false, hint: "" }, slack: { set: false, hint: "" } } });
 
     if (p === "/api/log-findings") {
-      const counts = { new: 0, acknowledged: 0, fixing: 0, fixed: 0, ignored: 0 } as Record<string, number>;
+      const counts = { new: 0, acknowledged: 0, fixing: 0, stopped: 0, fixed: 0, ignored: 0 } as Record<string, number>;
       for (const f of db.findings) counts[f.status] += 1;
       return json(route, {
         findings: db.connected ? db.findings : [],
