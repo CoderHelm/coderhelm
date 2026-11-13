@@ -108,6 +108,10 @@ Admins can pick findings on the Security page and send them as one pull request:
 
 From a finding's page, **Open fix PR** opens a pull request for that package, and **Add to the open PR** adds the fix to the repository's open security pull request (or starts one).
 
+A fix that is already in an open pull request, or that a fix run is working on, can't be picked, and its row says so. When no fix on the page can be picked, the list's header says why and links to the next step, for example "All 20 are in pull request #412" with a link to it, or "A fix run is working on these" with a link to the run.
+
+Closing a fix pull request without merging it gives its fixes back. They can be picked again at once, each finding keeps which pull request was closed, by whom and when, and CoderHelm waits 7 days before it opens one for them by itself. Cancelling or closing a fix run releases its fixes the same way. **Retry** on a fix run whose pull request was closed opens a new pull request from the findings as they stand now; it never reopens the closed one.
+
 A request starts at once even in a preview, for those findings only, within the daily limits; past them the rest wait for tomorrow, unless the admin raises today's limit for that request, which is recorded in the audit log.
 
 ## The pull request

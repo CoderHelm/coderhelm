@@ -145,6 +145,8 @@ export interface FindingGroup {
   epss: number | null;
   manifests: string[];
   pr: Finding["pr"];
+  /** The fix run working on it, or behind its open pull request (older servers: absent). */
+  ticket?: string | null;
   finding_ids: string[];
   advisories: { finding_id: string; primary: string; ids: string[]; title: string; tier: Tier; fixed_version: string | null; status: FindingStatus }[];
   /** Why its fix hasn't started though it's due (a daily limit). */
@@ -213,7 +215,18 @@ export interface Finding {
   waiting?: string | null;
   due_at: string;
   status: FindingStatus;
-  pr: { number: number; url: string; ci: "pending" | "passing" | "failing" | null; state: "open" | "merged" | "closed"; adopted: boolean } | null;
+  pr: {
+    number: number;
+    url: string;
+    ci: "pending" | "passing" | "failing" | null;
+    state: "open" | "merged" | "closed";
+    adopted: boolean;
+    /** Closed without merging: when, and who closed it (a GitHub login, or the person who closed its run). Absent while open, and on older servers. */
+    closed_at?: string;
+    closed_by?: string;
+    /** False when Coderhelm closed it itself. */
+    closed_by_person?: boolean;
+  } | null;
   dependabot_alert: { number: number; url: string } | null;
   /** A private report against the repository's own code (its advisory is still in triage or draft): never posted or fixed in public (older servers: absent). */
   private_report?: boolean;
@@ -530,6 +543,89 @@ export function cannotFix(f: { status: FindingStatus; fixed_version: string | nu
   if (f.status === "fixing") return "A fix run is already working on it";
   if (!f.fixed_version) return "No fixed version yet";
   return null;
+}
+
+/** The runs list, searched for a fix run's ticket. */
+export function runsHref(ticket: string): string {
+  return `/?q=${encodeURIComponent(ticket)}`;
+}
+
+/** "closed by octo on Nov 13": a pull request that closed without merging, with who and when as far as the server knows. */
+export function closedWords(pr: NonNullable<Finding["pr"]>): string {
+  const who = pr.closed_by_person === false ? "Coderhelm" : pr.closed_by;
+  const t = pr.closed_at ? new Date(pr.closed_at).getTime() : NaN;
+  const on = Number.isNaN(t) ? "" : ` on ${new Date(t).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
+  return `closed${who ? ` by ${who}` : ""}${on}`;
+}
+
+/** Why nothing on a page of fixes can be selected, and the next step. */
+export interface NoneSelectable {
+  /** The reason, a sentence without its full stop: "All 20 are in pull request #412". */
+  words: string;
+  /** What to do about it. */
+  next: string;
+  link: { href: string; label: string; external: boolean } | null;
+}
+
+/**
+ * When no row of `rows` can be selected: why, in plain words, with the next
+ * step. Null when the page is empty or at least one row can be selected
+ * (the header checkbox then works as usual).
+ */
+export function whyNoneSelectable(rows: FindingGroup[]): NoneSelectable | null {
+  if (rows.length === 0 || rows.some((g) => !cannotFix(g))) return null;
+  const n = rows.length;
+  const one = n === 1;
+  const inPr = rows.filter((g) => g.pr?.state === "open");
+  const fixing = rows.filter((g) => g.pr?.state !== "open" && g.status === "fixing");
+  const noFix = rows.filter((g) => g.pr?.state !== "open" && g.status !== "fixing" && isActive(g) && !g.fixed_version);
+  const done = n - inPr.length - fixing.length - noFix.length;
+  const prs = [...new Map(inPr.map((g) => [`${g.repo}#${g.pr!.number}`, g.pr!])).values()];
+  const tickets = [...new Set(fixing.map((g) => g.ticket).filter((t): t is string => !!t))];
+  const prLink = prs.length === 1 ? { href: prs[0].url, label: `Open pull request #${prs[0].number}`, external: true } : null;
+  const runLink = tickets.length === 1 ? { href: runsHref(tickets[0]), label: "See the run", external: false } : null;
+  if (inPr.length === n) {
+    if (prs.length === 1)
+      return {
+        words: `${one ? "This fix is" : `All ${n} are`} in pull request #${prs[0].number}`,
+        next: `Merge it to fix ${one ? "it" : "them"}, or close it to ask for a new one: ${one ? "it" : "they"} can be selected again once it closes.`,
+        link: prLink,
+      };
+    return {
+      words: `All ${n} are in ${prs.length} open pull requests`,
+      next: "Each row links to its pull request. A fix can be selected again once its pull request closes.",
+      link: null,
+    };
+  }
+  if (fixing.length === n)
+    return {
+      words: `A fix run is working on ${one ? "this" : "these"}`,
+      next: `${one ? "Its" : "Their"} pull request shows here when it opens. Cancel the run to select ${one ? "it" : "them"} again.`,
+      link: runLink,
+    };
+  if (noFix.length === n)
+    return {
+      words: one ? "This has no fixed version yet" : `None of these ${n} has a fixed version yet`,
+      next: "Coderhelm opens the fix when a fixed version is published. There is nothing to select until then.",
+      link: null,
+    };
+  if (done === n)
+    return {
+      words: one ? "This needs no fix" : `None of these ${n} needs a fix`,
+      next: `${one ? "It is" : "They are"} fixed or dismissed already. Show the open findings to select fixes.`,
+      link: null,
+    };
+  const parts = [
+    inPr.length > 0 ? `${inPr.length} ${inPr.length === 1 ? "is" : "are"} in ${prs.length === 1 ? `pull request #${prs[0].number}` : "open pull requests"}` : null,
+    fixing.length > 0 ? `${fixing.length} ${fixing.length === 1 ? "has" : "have"} a fix run working on ${fixing.length === 1 ? "it" : "them"}` : null,
+    noFix.length > 0 ? `${noFix.length} ${noFix.length === 1 ? "has" : "have"} no fixed version yet` : null,
+    done > 0 ? `${done} ${done === 1 ? "is" : "are"} fixed or dismissed` : null,
+  ].filter(Boolean);
+  return {
+    words: `None of these ${n} can be selected: ${parts.join(", ")}`,
+    next: "Each row says why and links to its pull request or run.",
+    link: prLink ?? runLink,
+  };
 }
 
 export const securityApi = {

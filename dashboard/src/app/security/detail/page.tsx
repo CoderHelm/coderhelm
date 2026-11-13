@@ -23,6 +23,7 @@ import {
   STATUS_LOOK,
   advisoryIds,
   cannotFix,
+  closedWords,
   dueIn,
   epssText,
   isActive,
@@ -373,6 +374,8 @@ function FixBlock({
   onAsk: (c: Combine) => void;
 }) {
   const cannot = cannotFix(f);
+  // Its pull request closed without merging: a new one can be asked for.
+  const reask = !!f.pr && f.pr.state === "closed" && admin && isActive(f) && !!f.fixed_version;
   const ci =
     f.pr?.ci === "passing"
       ? "CI is passing"
@@ -405,7 +408,7 @@ function FixBlock({
           )}
         </div>
         <div className="flex flex-wrap gap-2">
-          {f.pr ? (
+          {f.pr && !reask ? (
             <a href={f.pr.url} target="_blank" rel="noreferrer" className={primaryButton} data-testid="fix-pr-link">
               PR #{f.pr.number}
               {f.pr.state === "merged"
@@ -425,6 +428,11 @@ function FixBlock({
             isActive(f) &&
             f.fixed_version && (
               <>
+                {f.pr && (
+                  <a href={f.pr.url} target="_blank" rel="noreferrer" className={secondaryButton} data-testid="fix-pr-link">
+                    PR #{f.pr.number}, closed
+                  </a>
+                )}
                 {!cannot && openPr && (
                   <button
                     type="button"
@@ -465,6 +473,12 @@ function FixBlock({
           )}
         </div>
       </div>
+      {f.pr?.state === "closed" && isActive(f) && (
+        <p className="text-xs text-zinc-300" data-testid="fix-closed">
+          PR #{f.pr.number} was {closedWords(f.pr)} without merging.{" "}
+          {reask ? "Open a new one when you want the fix; Coderhelm does not open one by itself for a week after a pull request is closed." : "A new one can be opened by an admin."}
+        </p>
+      )}
       {cannot && f.fixed_version && admin && !f.pr && isActive(f) && (
         <p id="fix-cannot" className="text-xs text-zinc-400" data-testid="fix-cannot">
           {cannot}

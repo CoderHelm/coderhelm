@@ -351,10 +351,10 @@ const call = (db: Db, c: string) => db.calls.filter((x) => x.call === c);
 
 // Screenshots for a person to look at: SECURITY_SHOTS=<dir> writes them.
 const SHOTS = process.env.SECURITY_SHOTS;
-async function shot(page: Page, name: string) {
+async function shot(page: Page, name: string, at = "bulk-bar") {
   if (!SHOTS) return;
   // The bar at the top of the view (below the page's top bar), as a person who just used it sees it.
-  await page.getByTestId("bulk-bar").evaluate((e) => e.scrollIntoView({ block: "start" }));
+  await page.getByTestId(at).evaluate((e) => e.scrollIntoView({ block: "start" }));
   await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: false });
 }
 
@@ -1436,5 +1436,157 @@ test.describe("Security", () => {
     await expect(page.getByTestId("tier-pill").filter({ hasText: "?" })).toHaveCount(0);
     const keys = await page.getByTestId("finding-row").evaluateAll((rows) => rows.map((r) => r.getAttribute("data-key")));
     expect(keys.indexOf("acme/web-app|npm|ws|8.17.0")).toBeGreaterThan(keys.indexOf("acme/api|npm|python-multipart|0.0.9"));
+  });
+
+  // A page where no fix can be selected: the header says why and offers the
+  // next step, and each row says its own reason without a pointer over it.
+  const PR412 = { number: 412, url: "https://github.com/acme/web-app/pull/412", ci: "passing", state: "open", adopted: false };
+  const oneRepo = (n: number, over: Record<string, unknown>) =>
+    manyGroups(n).map((g) => ({ ...g, repo: "acme/web-app", key: g.key.replace(/^[^|]+/, "acme/web-app"), ...over }));
+  const listOf = (groups: unknown[]) => ({ groups: { groups, total: groups.length, fixable_total: 0, next_cursor: null } });
+
+  test("every fix on the page is in one pull request: the header says so and links to it, and each row says why", async ({ page }) => {
+    await mockApi(page, listOf(oneRepo(20, { status: "pr_open", pr: PR412, ticket: "SEC-0A1B2C3D4E5F" })));
+    await page.goto("/security?repo=acme/web-app");
+    await expect(page.getByTestId("finding-row")).toHaveCount(20);
+    const none = page.getByTestId("pick-none");
+    await expect(none).toContainText("All 20 are in pull request #412.");
+    await expect(none).toContainText("Merge it to fix them, or close it to ask for a new one: they can be selected again once it closes.");
+    const link = none.getByTestId("pick-none-link");
+    await expect(link).toHaveText("Open pull request #412");
+    await expect(link).toHaveAttribute("href", "https://github.com/acme/web-app/pull/412");
+    // The header checkbox is off, and says why to a pointer and to a screen reader.
+    const all = page.getByTestId("pick-all");
+    await expect(all).toBeDisabled();
+    await expect(all).toHaveAttribute("title", "All 20 are in pull request #412");
+    await expect(all).toHaveAttribute("aria-describedby", "pick-none");
+    await expect(all).toHaveAccessibleName("No fix on this page can be selected: All 20 are in pull request #412");
+    // Each row: off, with the reason in the row itself.
+    await expect(page.getByTestId("finding-row").first().getByTestId("pick")).toBeDisabled();
+    await expect(page.getByTestId("finding-row").getByTestId("pick-why")).toHaveCount(20);
+    await expect(page.getByTestId("finding-row").getByTestId("pick-why").first()).toBeVisible();
+    await expect(page.getByTestId("finding-row").getByTestId("pick-why").first()).toHaveText("Can't be selected: PR #412 is already open.");
+    await expect(page.getByTestId("quick-select")).toHaveCount(0);
+    await expect(page.getByTestId("bulk-bar")).toHaveCount(0);
+    await shot(page, "none-selectable-one-pr", "list-toolbar");
+  });
+
+  test("a fix run working on every fix: the header says so and links to the run", async ({ page }) => {
+    await mockApi(page, listOf(oneRepo(3, { status: "fixing", pr: null, ticket: "SEC-0A1B2C3D4E5F" })));
+    await page.goto("/security");
+    const none = page.getByTestId("pick-none");
+    await expect(none).toContainText("A fix run is working on these.");
+    await expect(none).toContainText("Their pull request shows here when it opens. Cancel the run to select them again.");
+    await expect(none.getByTestId("pick-none-link")).toHaveText("See the run");
+    await expect(none.getByTestId("pick-none-link")).toHaveAttribute("href", /\/\?q=SEC-0A1B2C3D4E5F$/);
+    await expect(page.getByTestId("finding-row").getByTestId("pick-why").first()).toHaveText("Can't be selected: a fix run is already working on it.");
+    await expect(page.getByTestId("finding-row").first().getByTestId("fix-run")).toHaveAttribute("href", /\/\?q=SEC-0A1B2C3D4E5F$/);
+    await expect(page.getByTestId("pick-all")).toBeDisabled();
+  });
+
+  test("no fixed version anywhere, one row alone, and a mix: each says exactly what holds it", async ({ page }) => {
+    const db = await mockApi(page, listOf(oneRepo(3, { fixed_version: null, no_fix: 1 })));
+    await page.goto("/security");
+    await expect(page.getByTestId("pick-none")).toContainText("None of these 3 has a fixed version yet.");
+    await expect(page.getByTestId("pick-none")).toContainText("Coderhelm opens the fix when a fixed version is published.");
+    await expect(page.getByTestId("pick-none-link")).toHaveCount(0);
+    await expect(page.getByTestId("finding-row").getByTestId("pick-why").first()).toHaveText("Can't be selected: no fixed version yet.");
+
+    db.groups = listOf(oneRepo(1, { status: "pr_open", pr: PR412 })).groups;
+    await page.reload();
+    await expect(page.getByTestId("pick-none")).toContainText("This fix is in pull request #412.");
+
+    // Two pull requests: no single one to link to.
+    const two = oneRepo(4, { status: "pr_open", pr: PR412 }).map((g, i) => (i < 2 ? g : { ...g, pr: { ...PR412, number: 413, url: "https://github.com/acme/web-app/pull/413" } }));
+    db.groups = listOf(two).groups;
+    await page.reload();
+    await expect(page.getByTestId("pick-none")).toContainText("All 4 are in 2 open pull requests.");
+    await expect(page.getByTestId("pick-none-link")).toHaveCount(0);
+
+    // A mix: the counts of each reason, and the one pull request's link.
+    const mix = [
+      ...oneRepo(5, { status: "pr_open", pr: PR412 }).slice(0, 2),
+      ...oneRepo(5, { status: "fixing", pr: null, ticket: "SEC-0A1B2C3D4E5F" }).slice(2, 3),
+      ...oneRepo(5, { fixed_version: null, no_fix: 1 }).slice(3, 5),
+    ];
+    db.groups = listOf(mix).groups;
+    await page.reload();
+    await expect(page.getByTestId("pick-none")).toContainText(
+      "None of these 5 can be selected: 2 are in pull request #412, 1 has a fix run working on it, 2 have no fixed version yet.",
+    );
+    await expect(page.getByTestId("pick-none-link")).toHaveAttribute("href", "https://github.com/acme/web-app/pull/412");
+
+    // The fixed list has no checkbox to explain row by row; the header still says why.
+    db.groups = listOf(oneRepo(2, { status: "fixed", pr: { ...PR412, state: "merged" } })).groups;
+    await page.goto("/security?status=fixed");
+    await expect(page.getByTestId("pick-none")).toContainText("None of these 2 needs a fix.");
+    await expect(page.getByTestId("finding-row").getByTestId("pick-why")).toHaveCount(0);
+  });
+
+  test("one selectable row keeps the header as it was, and a closed pull request's fix can be selected again", async ({ page }) => {
+    const closed = { ...PR412, state: "closed", ci: null, closed_at: iso(-2), closed_by: "octo", closed_by_person: true };
+    const rows = [...oneRepo(3, { status: "pr_open", pr: PR412 }).slice(0, 2), ...oneRepo(3, { status: "open", pr: closed }).slice(2)];
+    await mockApi(page, { groups: { groups: rows, total: 3, fixable_total: 1, next_cursor: null }, plan: { ...PLAN, units: [PLAN.units[0]] } });
+    await page.goto("/security");
+    await expect(page.getByTestId("finding-row")).toHaveCount(3);
+    await expect(page.getByTestId("pick-none")).toHaveCount(0);
+    const all = page.getByTestId("pick-all");
+    await expect(all).toBeEnabled();
+    await expect(all).toHaveAccessibleName("Select every fix on this page");
+    await expect(all).not.toHaveAttribute("title", /.+/);
+    // The rows in the open pull request still say why; the released one doesn't.
+    await expect(page.getByTestId("finding-row").getByTestId("pick-why")).toHaveCount(2);
+    const released = rowOf(page, "pkg-002");
+    await expect(released.getByTestId("pick-why")).toHaveCount(0);
+    await expect(released.getByTestId("fix-state")).toContainText("PR #412");
+    await expect(released.getByTestId("fix-state")).toContainText(/closed by octo on \w+ \d+/);
+    await expect(released.getByTestId("pick")).toBeEnabled();
+    await all.check();
+    await expect(page.getByTestId("bulk-summary")).toHaveText(/^1 fix selected in web-app/);
+    await expect(released.getByTestId("pick")).toBeChecked();
+  });
+
+  test("at 390 wide nothing selectable: the reason and its link, no dead checkbox row, nothing scrolls sideways", async ({ page }) => {
+    await mockApi(page, listOf(oneRepo(20, { status: "pr_open", pr: PR412 })));
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/security");
+    await expect(page.getByTestId("finding-card")).toHaveCount(20);
+    await expect(page.getByTestId("pick-none")).toBeVisible();
+    await expect(page.getByTestId("pick-none")).toContainText("All 20 are in pull request #412.");
+    await expect(page.getByTestId("pick-none-link")).toBeVisible();
+    await expect(page.getByTestId("pick-all-cards")).toHaveCount(0);
+    await expect(page.getByTestId("finding-card").first().getByTestId("pick-why")).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await shot(page, "390-none-selectable", "list-toolbar");
+  });
+
+  test("someone who can't select sees no reason about selecting", async ({ page }) => {
+    await mockApi(page, { role: "member", ...listOf(oneRepo(3, { status: "pr_open", pr: PR412 })) });
+    await page.goto("/security");
+    await expect(page.getByTestId("finding-row")).toHaveCount(3);
+    await expect(page.getByTestId("pick-none")).toHaveCount(0);
+    await expect(page.getByTestId("finding-row").getByTestId("pick-why")).toHaveCount(0);
+  });
+
+  test("a finding whose pull request a person closed says who and when, and a new fix can be asked for", async ({ page }) => {
+    const closed = { ...PR412, state: "closed", ci: null, closed_at: iso(-2), closed_by: "octo", closed_by_person: true };
+    const db = await mockApi(page, { detail: { finding: { ...TAR[2], pr: closed }, timeline: [] }, plan: { ...PLAN, units: [PLAN.units[0]] } });
+    await page.goto("/security/detail?id=tar_3");
+    await expect(page.getByTestId("fix-closed")).toContainText(/PR #412 was closed by octo on \w+ \d+ without merging\./);
+    await expect(page.getByTestId("fix-closed")).toContainText("Open a new one when you want the fix");
+    await expect(page.getByTestId("fix-pr-link")).toHaveText("PR #412, closed");
+    const btn = page.getByTestId("open-fix-pr");
+    await expect(btn).toBeEnabled();
+    await btn.click();
+    await page.getByTestId("fix-confirm").click();
+    await expect(page.getByTestId("fix-results")).toContainText("1 started");
+    expect(call(db, "POST /api/security/fix")[0].body).toEqual({ finding_ids: ["tar_3"], raise_limit: false, combine: "per_package" });
+
+    // Still open: the link to it, and no second button.
+    db.detail = { finding: { ...TAR[2], status: "pr_open", pr: PR412 }, timeline: [] };
+    await page.goto("/security/detail?id=tar_3");
+    await expect(page.getByTestId("fix-pr-link")).toHaveText("PR #412, CI passing");
+    await expect(page.getByTestId("open-fix-pr")).toHaveCount(0);
+    await expect(page.getByTestId("fix-closed")).toHaveCount(0);
   });
 });
