@@ -4,7 +4,7 @@ import { useCan } from "@/hooks/use-can";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { api, type RunDetail, type Openspec, type UsageInfo, type PluginDef, type PassTrace, type AgentLog, errorStatus } from "@/lib/api";
+import { api, type RunDetail, type RunMergeStanding, type Openspec, type UsageInfo, type PluginDef, type PassTrace, type AgentLog, errorStatus } from "@/lib/api";
 import { Skeleton } from "@/components/skeleton";
 import { limitName, reachedLimit, usageBreakdown, usageTotal } from "@/lib/usage";
 import { useToast } from "@/components/toast";
@@ -597,6 +597,7 @@ function RunDetailInner() {
       {busy === "review" ? "Starting…" : "Address PR comments"}
     </button>
   );
+  const standing = run.merge_standing ?? null;
   const helpLink = (
     <HelpLink item={{ kind: "run", id: runId, label: run.title || undefined, repo: run.repo || undefined }}>Get help with this run</HelpLink>
   );
@@ -914,7 +915,28 @@ function RunDetailInner() {
           : run.status === "merged"
         ? { tone: "success", title: "Done. The change was merged.", body: "The pull request is merged, so the change is in.", who: "none", actions: openPrButtons("secondary") }
         : done
-          ? {
+          ? standing && prLinks.length
+            ? {
+                // The gateway says where the pull request stands and why: a person is named only for the team's own rule.
+                tone: standing.needs_person || ["merged", "merging"].includes(standing.code) ? "success" : standing.code === "closed" ? "neutral" : "waiting",
+                title: standingTitle(standing, prWords),
+                body: (
+                  <span className="[overflow-wrap:anywhere]" data-testid="merge-standing" data-code={standing.code}>
+                    <InlineMarkdown>{standing.text}</InlineMarkdown>
+                  </span>
+                ),
+                who: standing.needs_person ? "you" : "none",
+                next: standing.next ? <InlineMarkdown>{standing.next}</InlineMarkdown> : undefined,
+                actions: (
+                  <>
+                    {openPrButtons("primary")}
+                    {standingLink(standing)}
+                    {reviewButton}
+                  </>
+                ),
+              }
+            : {
+              // An older gateway doesn't say where the pull request stands.
               tone: "success",
               title: prLinks.length ? `${prWords} is ready for review` : "Done.",
               body: prLinks.length ? "Coderhelm finished the work on it, checked it, and named anything it deferred and why." : "Coderhelm finished this work.",
@@ -1397,6 +1419,45 @@ type RunTab = (typeof RUN_TABS)[number];
 const RUN_TAB_LABEL: Record<RunTab, string> = { overview: "Overview", changes: "Changes", activity: "Activity", log: "Agent log", details: "Details" };
 /** The agent log's own URL state (agent-log.tsx): a link carrying any of these points into the log. */
 const LOG_PARAMS = ["step", "log_q", "log_filter", "log_file", "log_view", "log_time"];
+
+/** The outcome's title for where a finished run's pull request stands. */
+function standingTitle(standing: RunMergeStanding, prWords: string): string {
+  if (standing.needs_person) return standing.code === "auto_merge_off" ? `${prWords} is ready to merge` : `${prWords} is ready for review`;
+  switch (standing.code) {
+    case "merged":
+      return `${prWords} is merged`;
+    case "closed":
+      return `${prWords} was closed without merging`;
+    case "merging":
+      return `${prWords} is approved; Coderhelm merges it`;
+    case "review_changes_requested":
+      return `${prWords} is open; Coderhelm's review asks for changes`;
+    default:
+      return `${prWords} is open; Coderhelm is still working on it`;
+  }
+}
+
+/** The setting a standing comes from: a page in the dashboard, or one on GitHub. Nothing for any other address. */
+function standingLink(standing: RunMergeStanding) {
+  const link = standing.link ?? "";
+  if (link.startsWith("/") && !link.startsWith("//")) {
+    return (
+      <Link href={link} className={secondaryButton} data-testid="merge-standing-link">
+        {link.startsWith("/reviewer/config") ? "Open the reviewer settings" : "Open the setting"}
+      </Link>
+    );
+  }
+  if (link.startsWith("https://github.com/")) {
+    return (
+      <a href={link} target="_blank" rel="noopener noreferrer" className={`${secondaryButton} gap-1.5`} data-testid="merge-standing-link">
+        {standing.code === "repo_requires_person_review" ? "Open the branch rules on GitHub" : "Open the setting on GitHub"}
+        <ExternalLinkIcon />
+        <span className="sr-only"> (opens in a new tab)</span>
+      </a>
+    );
+  }
+  return null;
+}
 
 type OutcomeTone = "success" | "waiting" | "attention" | "live" | "neutral";
 

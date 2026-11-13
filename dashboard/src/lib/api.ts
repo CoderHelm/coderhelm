@@ -2262,6 +2262,20 @@ export interface RunDraftHold {
   since?: string | null;
 }
 
+/** Where a finished run's pull request stands on its way to merge: the one reason that is true now. */
+export interface RunMergeStanding {
+  /** Stable code: `merged`, `closed`, `reviewing`, `fixing_review`, `review_changes_requested`, `checks_running`, `checks_failing`, `conflict`, `draft`, `auto_merge_off`, `needs_person_approval`, `repo_requires_person_review` or `merging`. */
+  code: string;
+  /** What is true now, one sentence. */
+  text: string;
+  /** What happens next, one sentence. */
+  next: string;
+  /** A person has to act for the merge to happen. */
+  needs_person: boolean;
+  /** Where the rule is set, when a setting decides it: a dashboard path or a GitHub URL. */
+  link?: string | null;
+}
+
 /** One reason a pull request stays a draft. */
 export interface RunDraftHoldReason {
   /** What holds it. */
@@ -2358,6 +2372,8 @@ export interface RunDetail extends Run {
   waiting_on?: RunWaitingOn | null;
   /** Set when the run finished and its pull request is still a draft: why, and what to do about each reason. */
   draft_hold?: RunDraftHold | null;
+  /** Where the run's pull request stands on its way to merge, and whether a person has to act; null until the worker has looked at the pull request (missing on older backends). */
+  merge_standing?: RunMergeStanding | null;
   /** While the run waits for GitHub (its hourly limit, or GitHub not answering): when it goes on, in plain words. */
   github_wait?: string | null;
   /** The comment with those questions on the ticket or issue. */

@@ -234,8 +234,11 @@ test("a finished run shows its pull request, steps, documents and tasks without 
   // The outcome leads, with the one next step: open the pull request.
   const outcome = page.getByTestId("run-outcome");
   await expect(outcome).toContainText("Pull request #101 is ready for review");
+  // This answer has no merge standing (an older gateway): the page says what it always said.
   await expect(page.getByTestId("run-who")).toHaveText("Needs a person");
   await expect(page.getByTestId("run-next")).toContainText("Merging it is your team's call: review it and merge.");
+  await expect(page.getByTestId("merge-standing")).toHaveCount(0);
+  await expect(page.getByTestId("merge-standing-link")).toHaveCount(0);
   await expect(outcome.getByRole("link", { name: /Open pull request #101/ })).toHaveAttribute("href", "https://github.com/your-team/web/pull/101");
   // The steps read as what Coderhelm did, in words, not the worker's ids, ending on where the run is.
   const steps = page.getByRole("list", { name: "Steps" });
@@ -391,6 +394,150 @@ test("a merged run offers no start over, since that would close a merged pull re
 
 // The checks on the run's pull request, as GitHub's merge box says them:
 // sorted failed, running, queued, passed, skipped by the server.
+// Where a finished run's pull request stands, as the gateway words it.
+const STANDING = {
+  auto_merge_off: {
+    code: "auto_merge_off",
+    text: "Auto-merge is off for this repo, so CoderHelm leaves the merge to your team.",
+    next: "Merge it, or turn auto-merge on and CoderHelm merges approved pull requests itself.",
+    needs_person: true,
+    link: "/reviewer/config",
+  },
+  needs_person_approval: {
+    code: "needs_person_approval",
+    text: "This repo's auto-merge setting requires an approving review from a person before CoderHelm merges.",
+    next: "Once a person approves this commit, CoderHelm merges it and follows the deploy.",
+    needs_person: true,
+    link: "/reviewer/config",
+  },
+  repo_requires_person_review: {
+    code: "repo_requires_person_review",
+    text: "Your repo's branch rules block the merge: they require an approving review from a person (or another rule GitHub enforces on this branch).",
+    next: "Once the branch's rules are met, CoderHelm merges it and follows the deploy.",
+    needs_person: true,
+    link: "https://github.com/your-team/web/settings/branches",
+  },
+  reviewing: {
+    code: "reviewing",
+    text: "CoderHelm is reviewing the head `9f8e7d6` (its last review was of `1111111`).",
+    next: "Its verdict on this commit decides what follows: a fix round, or the merge.",
+    needs_person: false,
+    link: null,
+  },
+  review_changes_requested: {
+    code: "review_changes_requested",
+    text: "CoderHelm's review asks for changes on `9f8e7d6`; what it could not fix is listed as deferred on the pull request.",
+    next: "CoderHelm does not merge over its own review; the deferred findings say what each needs.",
+    needs_person: false,
+    link: null,
+  },
+  merging: {
+    code: "merging",
+    text: "Approved, checks green, and the repo's rules allow it: CoderHelm merges it.",
+    next: "After the merge CoderHelm watches the deploy of the merge commit.",
+    needs_person: false,
+    link: null,
+  },
+  closed: {
+    code: "closed",
+    text: "The pull request was closed without merging.",
+    next: "Nothing further runs on it.",
+    needs_person: false,
+    link: null,
+  },
+};
+
+async function openStanding(page: Page, standing: Record<string, unknown>) {
+  await mockApi(page, { run: baseRun({ merge_standing: standing }) });
+  await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
+  await expect(page.getByTestId("merge-standing")).toHaveAttribute("data-code", String(standing.code));
+  await expect(page.getByText("Merging it is your team's call")).toHaveCount(0);
+  return page.getByTestId("run-outcome");
+}
+
+test("auto-merge off names the setting as the reason a person merges, and links to it", async ({ page }) => {
+  const errors = watchConsole(page);
+  const outcome = await openStanding(page, STANDING.auto_merge_off);
+  await expect(outcome).toHaveAttribute("data-tone", "success");
+  await expect(outcome).toContainText("Pull request #101 is ready to merge");
+  await expect(page.getByTestId("run-who")).toHaveText("Needs a person");
+  await expect(page.getByTestId("merge-standing")).toHaveText(STANDING.auto_merge_off.text);
+  await expect(page.getByTestId("run-next")).toHaveText(`Next: ${STANDING.auto_merge_off.next}`);
+  const link = page.getByTestId("merge-standing-link");
+  await expect(link).toHaveText("Open the reviewer settings");
+  await expect(link).toHaveAttribute("href", /^\/reviewer\/config\/?$/);
+  await expect(outcome.getByRole("link", { name: /Open pull request #101/ })).toHaveAttribute("href", "https://github.com/your-team/web/pull/101");
+  await shot(page, "run-standing-auto-merge-off");
+  expect(errors).toEqual([]);
+});
+
+test("a repo that asks for a person's approval says so: its own setting, or its branch rules on GitHub", async ({ page }) => {
+  let outcome = await openStanding(page, STANDING.needs_person_approval);
+  await expect(outcome).toContainText("Pull request #101 is ready for review");
+  await expect(page.getByTestId("run-who")).toHaveText("Needs a person");
+  await expect(page.getByTestId("merge-standing")).toHaveText(STANDING.needs_person_approval.text);
+  await expect(page.getByTestId("run-next")).toHaveText(`Next: ${STANDING.needs_person_approval.next}`);
+  await expect(page.getByTestId("merge-standing-link")).toHaveAttribute("href", /^\/reviewer\/config\/?$/);
+
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+  outcome = await openStanding(page, STANDING.repo_requires_person_review);
+  await expect(outcome).toContainText("Pull request #101 is ready for review");
+  await expect(page.getByTestId("run-who")).toHaveText("Needs a person");
+  await expect(page.getByTestId("merge-standing")).toHaveText(STANDING.repo_requires_person_review.text);
+  await expect(page.getByTestId("run-next")).toHaveText(`Next: ${STANDING.repo_requires_person_review.next}`);
+  const link = page.getByTestId("merge-standing-link");
+  await expect(link).toContainText("Open the branch rules on GitHub");
+  await expect(link).toHaveAttribute("href", "https://github.com/your-team/web/settings/branches");
+  await expect(link).toHaveAttribute("target", "_blank");
+  await shot(page, "run-standing-branch-rules");
+});
+
+test("Coderhelm reviewing a newer commit asks nobody: no person chip and no setting link", async ({ page }) => {
+  const outcome = await openStanding(page, STANDING.reviewing);
+  await expect(outcome).toHaveAttribute("data-tone", "waiting");
+  await expect(outcome).toContainText("Pull request #101 is open; Coderhelm is still working on it");
+  await expect(page.getByTestId("run-who")).toHaveText("Nothing needed from you");
+  await expect(page.getByText("Needs a person")).toHaveCount(0);
+  // The commits read as code, without the backticks.
+  await expect(page.getByTestId("merge-standing")).toHaveText("CoderHelm is reviewing the head 9f8e7d6 (its last review was of 1111111).");
+  await expect(page.getByTestId("run-next")).toHaveText(`Next: ${STANDING.reviewing.next}`);
+  await expect(page.getByTestId("merge-standing-link")).toHaveCount(0);
+  await expect(outcome.getByRole("link", { name: /Open pull request #101/ })).toBeVisible();
+  await shot(page, "run-standing-reviewing");
+});
+
+test("the other standings that need nobody say what Coderhelm does, each under its own title", async ({ page }) => {
+  for (const [standing, title, tone] of [
+    [STANDING.merging, "Pull request #101 is approved; Coderhelm merges it", "success"],
+    [STANDING.review_changes_requested, "Pull request #101 is open; Coderhelm's review asks for changes", "waiting"],
+    [STANDING.closed, "Pull request #101 was closed without merging", "neutral"],
+  ] as const) {
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+    const outcome = await openStanding(page, standing);
+    await expect(outcome).toContainText(title);
+    await expect(outcome).toHaveAttribute("data-tone", tone);
+    await expect(page.getByTestId("run-who")).toHaveText("Nothing needed from you");
+    await expect(page.getByTestId("run-next")).toHaveText(`Next: ${standing.next}`);
+    await expect(page.getByTestId("merge-standing-link")).toHaveCount(0);
+  }
+});
+
+test("a standing's link is followed only to the dashboard or GitHub, and a null standing reads as before", async ({ page }) => {
+  const outcome = await openStanding(page, { ...STANDING.auto_merge_off, link: "https://example.com/settings" });
+  await expect(page.getByTestId("run-who")).toHaveText("Needs a person");
+  await expect(page.getByTestId("merge-standing-link")).toHaveCount(0);
+  await expect(outcome.getByRole("link", { name: /Open pull request #101/ })).toBeVisible();
+
+  // Null until the worker has looked at the pull request.
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+  await mockApi(page, { run: baseRun({ merge_standing: null }) });
+  await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
+  await expect(page.getByTestId("run-outcome")).toContainText("Pull request #101 is ready for review");
+  await expect(page.getByTestId("run-who")).toHaveText("Needs a person");
+  await expect(page.getByTestId("run-next")).toContainText("Merging it is your team's call: review it and merge.");
+  await expect(page.getByTestId("merge-standing")).toHaveCount(0);
+});
+
 const CHECKS = {
   sha: "4e1a2b0c9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a",
   items: [
