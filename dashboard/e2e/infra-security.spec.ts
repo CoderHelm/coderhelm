@@ -155,6 +155,20 @@ test.describe("Infrastructure vulnerabilities", () => {
     await shoot(page, "security-infrastructure-off");
   });
 
+  test("in preview, an admin gets a button to the setting that opens fix PRs; a member is told who to ask", async ({ page }) => {
+    await mockApi(page, { overview: infraOverview({ dry_run: true }) });
+    await page.goto("/security/infrastructure");
+    const note = page.getByTestId("infra-dry-run");
+    await expect(note).toContainText("Preview first is on");
+    await expect(note.getByTestId("infra-dry-run-turn-on")).toHaveAttribute("href", /^\/security\/policy\/?#mode$/);
+    await shoot(page, "security-infrastructure-preview");
+
+    await mockApi(page, { role: "member", overview: infraOverview({ dry_run: true }) });
+    await page.goto("/security/infrastructure");
+    await expect(page.getByTestId("infra-dry-run")).toContainText("ask an admin");
+    await expect(page.getByTestId("infra-dry-run-turn-on")).toHaveCount(0);
+  });
+
   test("an answer the page can't read is a problem with a retry, never a crash", async ({ page }) => {
     await mockApi(page, { overview: { error: "boom" }, overviewCode: 500 });
     await page.goto("/security/infrastructure");
