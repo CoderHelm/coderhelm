@@ -22,7 +22,7 @@ import { Disclosure } from "@/components/disclosure";
 import { AwsIcon } from "@/components/icons";
 import { Chip, List, ListRow, ListSkeleton, StatusToggles, Time, type Tone } from "@/components/list";
 import { linkButton, primaryButton, smallSecondaryButton } from "@/components/ui";
-import { SECURITY_ADMIN, TIERS, type Tier } from "@/lib/security";
+import { SECURITY_ADMIN, TIERS, closedWords, type Tier } from "@/lib/security";
 import {
   INFRA_STATUS_LOOK,
   countWords,
@@ -284,7 +284,11 @@ function FindingRow({ f, admin, dryRun, defaultOpen }: { f: InfraFinding; admin:
     }
     setAsking(false);
   };
-  const prWords = f.pr ? (f.pr.state === "merged" ? "merged, waiting for the new version to run" : f.pr.state) : null;
+  const closed = f.pr?.state === "closed";
+  const prWords = f.pr ? (f.pr.state === "merged" ? "merged, waiting for the new version to run" : closed ? closedWords(f.pr) : f.pr.state) : null;
+  // A pull request closed without merging is history, not a fix on its way: the fix is offered again.
+  // (A finding the replacement check moved to its runbook is no longer a "pr" fix, so it gets no button.)
+  const canAsk = admin && f.fix.kind === "pr" && f.status === "open" && (!f.pr || closed) && !asked;
   return (
     <ListRow
       testId="infra-row"
@@ -320,7 +324,7 @@ function FindingRow({ f, admin, dryRun, defaultOpen }: { f: InfraFinding; admin:
         </>
       }
       actions={
-        admin && f.fix.kind === "pr" && !f.pr && f.status === "open" && !asked ? (
+        canAsk ? (
           <button type="button" className={smallSecondaryButton} onClick={askFix} disabled={asking} data-testid="infra-fix" title={dryRun ? "Opens one now, even in a dry run" : undefined}>
             {asking ? "Starting…" : "Open fix PR"}
           </button>
@@ -329,6 +333,12 @@ function FindingRow({ f, admin, dryRun, defaultOpen }: { f: InfraFinding; admin:
       details={<FindingDetails f={f} />}
       detailsFor={`details of ${f.name}`}
     >
+      {closed && f.pr && f.status === "open" && f.fix.kind === "pr" && !asked && (
+        <p className="mt-1 text-xs text-zinc-300" data-testid="infra-pr-closed">
+          PR #{f.pr.number} was {closedWords(f.pr)} without merging.{" "}
+          {admin ? "Open a new one when you want the fix; Coderhelm does not open one by itself for a week after a pull request is closed." : "An admin can open a new one."}
+        </p>
+      )}
       {asked && <p className="mt-1 text-xs text-sky-300">{asked}</p>}
     </ListRow>
   );

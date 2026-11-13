@@ -551,7 +551,7 @@ export function runsHref(ticket: string): string {
 }
 
 /** "closed by octo on Nov 13": a pull request that closed without merging, with who and when as far as the server knows. */
-export function closedWords(pr: NonNullable<Finding["pr"]>): string {
+export function closedWords(pr: { closed_at?: string; closed_by?: string; closed_by_person?: boolean }): string {
   const who = pr.closed_by_person === false ? "Coderhelm" : pr.closed_by;
   const t = pr.closed_at ? new Date(pr.closed_at).getTime() : NaN;
   const on = Number.isNaN(t) ? "" : ` on ${new Date(t).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;

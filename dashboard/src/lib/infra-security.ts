@@ -162,7 +162,16 @@ export interface InfraFinding {
   tier: Tier | null;
   fix: InfraFix;
   status: InfraStatus;
-  pr: { number: number; url: string; state: "open" | "merged" | "closed" | "draft" } | null;
+  pr: {
+    number: number;
+    url: string;
+    state: "open" | "merged" | "closed" | "draft";
+    /** Closed without merging: when, and who closed it (a GitHub login, or the person who closed its run). Absent while open, and on older servers. */
+    closed_at?: string;
+    closed_by?: string;
+    /** False when Coderhelm closed it itself. */
+    closed_by_person?: boolean;
+  } | null;
   inspector?: { exploit_available: boolean; reachable: boolean | null; findings?: number } | null;
   first_seen_at: string;
   updated_at: string;
