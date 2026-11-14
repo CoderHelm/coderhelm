@@ -14,6 +14,8 @@ import { Select } from "@/components/select";
 
 /** `via` of a Confluence connection that goes through the team's Coderhelm Jira app. */
 export const JIRA_APP = "jira_app";
+/** `via` of a Confluence connection agents read with the Atlassian sign-in the team made for Knowledge. */
+export const SIGN_IN = "sign_in";
 
 /** What a key-based connection needs, shown above its form. */
 const NEEDS: Record<KeyConnectorKind, string> = {
@@ -34,7 +36,19 @@ const list = (s: string) =>
  * New Relic, Confluence or OpenSearch: the key or password (sealed for the
  * team, never shown again) and what agents may read. Saving tests it.
  */
-export function ConnectorForm({ item, onSaved }: { item: Connector; onSaved: (c: Connector) => void }) {
+export function ConnectorForm({
+  item,
+  onSaved,
+  bare = false,
+  quiet = false,
+}: {
+  item: Connector;
+  onSaved: (c: Connector) => void;
+  /** Inside a titled part of a card: no rule above it. */
+  bare?: boolean;
+  /** Not the card's main action (settings of something already connected): its button is secondary. */
+  quiet?: boolean;
+}) {
   const k = item.kind as KeyConnectorKind;
   const [key, setKey] = useState("");
   const [region, setRegion] = useState(item.region || "us");
@@ -59,6 +73,10 @@ export function ConnectorForm({ item, onSaved }: { item: Connector; onSaved: (c:
   // its own API token.
   const [useToken, setUseToken] = useState(false);
   const viaApp = k === "confluence" && item.via === JIRA_APP && !useToken;
+  // Confluence read with the team's Atlassian sign-in: no address, email or
+  // token either, and never a write (the sign-in only reads).
+  const viaSignIn = k === "confluence" && item.via === SIGN_IN && !useToken;
+  const noKey = viaApp || viaSignIn;
   // A new REST API, or another OpenSearch cluster, is named here; a saved one
   // keeps its name (it's its key).
   const naming = !item.connected && (k === "rest" || Boolean(item.needs_name));
@@ -76,7 +94,7 @@ export function ConnectorForm({ item, onSaved }: { item: Connector; onSaved: (c:
     if (k === "newrelic") Object.assign(body, { region, account_ids: list(accountIds) });
     if (k === "confluence") {
       const writes = { spaces: list(spaces), write_enabled: writeEnabled, write_pages: writeEnabled ? list(writePages) : [] };
-      Object.assign(body, viaApp ? { via: JIRA_APP, ...writes } : { via: "", site, email, ...writes });
+      Object.assign(body, viaSignIn ? { via: SIGN_IN, spaces: list(spaces) } : viaApp ? { via: JIRA_APP, ...writes } : { via: "", site, email, ...writes });
     }
     if (k === "opensearch") Object.assign(body, { site, email, indexes: list(indexes), hidden_fields: list(hiddenFields) });
     if (k === "rest") Object.assign(body, { site, header_name: headerName, paths: list(paths), hidden_fields: list(hiddenFields) });
@@ -109,13 +127,23 @@ export function ConnectorForm({ item, onSaved }: { item: Connector; onSaved: (c:
 
   return (
     <form
-      className="mt-4 flex flex-col gap-4 border-t border-zinc-800 pt-4"
+      className={bare ? "flex flex-col gap-4" : "mt-4 flex flex-col gap-4 border-t border-zinc-800 pt-4"}
       onSubmit={(e) => {
         e.preventDefault();
         save();
       }}
     >
-      {viaApp ? (
+      {viaSignIn ? (
+        <div className="text-sm text-zinc-400" data-testid="confluence-via-sign-in">
+          <p>
+            Agents read pages with the team&apos;s Atlassian sign-in{item.site ? ` on ${item.site}` : ""}, the one Knowledge syncs with. No token is
+            needed, and it only reads.
+          </p>
+          <button type="button" onClick={() => setUseToken(true)} className={`mt-1 ${linkButton}`}>
+            Use an API token instead
+          </button>
+        </div>
+      ) : viaApp ? (
         <div className="text-sm text-zinc-400" data-testid="confluence-via-jira-app">
           <p>
             Connected through the Jira app{item.site ? ` on ${item.site}` : ""}. Agents read the pages the Coderhelm app can see there; no token
@@ -139,7 +167,7 @@ export function ConnectorForm({ item, onSaved }: { item: Connector; onSaved: (c:
             : `How agents pick this one, like ${k === "rest" ? "billing or bookings" : "search or logs"}. It can't be changed later.`,
           k === "rest" ? "bookings" : "search",
         )}
-      {viaApp ? null : replacingKey ? (
+      {noKey ? null : replacingKey ? (
         <Field
           id={id("key")}
           label={k === "newrelic" ? "User key" : k === "opensearch" ? "Password" : k === "rest" ? "API key" : "API token"}
@@ -183,7 +211,7 @@ export function ConnectorForm({ item, onSaved }: { item: Connector; onSaved: (c:
       )}
       {k === "confluence" && (
         <>
-          {!viaApp && (
+          {!noKey && (
             <>
               {text("site", "Confluence address", site, setSite, undefined, "https://yourcompany.atlassian.net")}
               {text("email", "Account email", email, setEmail, "The Atlassian account the token belongs to. Coderhelm sees what it can see.")}
@@ -194,17 +222,19 @@ export function ConnectorForm({ item, onSaved }: { item: Connector; onSaved: (c:
             "Spaces",
             spaces,
             setSpaces,
-            `Space keys agents may read, like ENG. Leave empty for every space the ${viaApp ? "app" : "account"} can see.`,
+            `Space keys agents may read, like ENG. Leave empty for every space the ${viaSignIn ? "sign-in" : viaApp ? "app" : "account"} can see.`,
             "ENG, OPS",
           )}
-          <label className="flex items-start gap-2 text-sm text-zinc-200">
-            <input type="checkbox" className="mt-1" checked={writeEnabled} onChange={(e) => setWriteEnabled(e.target.checked)} />
-            <span>
-              Allow agents to add text to the end of the pages listed below
-              <span className="block text-zinc-500">Off by default. Nothing else can be written; every addition is logged.</span>
-            </span>
-          </label>
-          {writeEnabled && text("pages", "Writable page ids", writePages, setWritePages, "The number in the page's address, after /pages/.", "123456789")}
+          {!viaSignIn && (
+            <label className="flex items-start gap-2 text-sm text-zinc-200">
+              <input type="checkbox" className="mt-1" checked={writeEnabled} onChange={(e) => setWriteEnabled(e.target.checked)} />
+              <span>
+                Allow agents to add text to the end of the pages listed below
+                <span className="block text-zinc-500">Off by default. Nothing else can be written; every addition is logged.</span>
+              </span>
+            </label>
+          )}
+          {writeEnabled && !viaSignIn && text("pages", "Writable page ids", writePages, setWritePages, "The number in the page's address, after /pages/.", "123456789")}
         </>
       )}
       {k === "opensearch" && (
@@ -265,7 +295,7 @@ export function ConnectorForm({ item, onSaved }: { item: Connector; onSaved: (c:
         </p>
       )}
       <div>
-        <button type="submit" disabled={saving} className={primaryButton}>
+        <button type="submit" disabled={saving} className={quiet ? secondaryButton : primaryButton}>
           {saving ? "Saving and testing…" : "Save and test"}
         </button>
       </div>

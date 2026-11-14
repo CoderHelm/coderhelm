@@ -79,8 +79,11 @@ test("an expired knowledge state still reads as Knowledge from its tag", async (
 
 test("a state from an older gateway (no kind) still finishes through the API", async ({ page }) => {
   const calls = await mockApi(page, () => ({ status: 200, body: { server: { id: "ks-notion", name: "Notion (knowledge)", catalog_id: "source:notion" }, tools_error: null } }));
+  // Knowledge reads ?connected= and takes it out of the address at once, so
+  // the arrival is caught as it happens rather than by polling the address.
+  const arrived = page.waitForURL(/\/knowledge\/\?connected=notion$/, { waitUntil: "commit" });
   await page.goto("/settings/integrations/mcp-callback/?code=c1&state=plainrandomstate");
-  await expect(page).toHaveURL(/\/knowledge\/\?connected=notion$/);
+  await arrived;
   expect(calls.callback).toHaveLength(1);
 });
 

@@ -1,90 +1,418 @@
 "use client";
 
-import { useState } from "react";
-import { api, type Integration, type McpServer, type OwnAppState, type PluginDef } from "@/lib/api";
+import { useEffect, useState, type ReactNode } from "react";
+import { api, type Integration, type KnowledgeSignIn, type McpServer, type OwnAppState, type PluginDef, type SignInStart } from "@/lib/api";
 import { errorMessage } from "@/lib/data-sources";
+import { useCan } from "@/hooks/use-can";
 import { Field, SecretInput } from "./field";
 import { Disclosure } from "./disclosure";
 import { MarkdownEditor } from "./markdown-editor";
 import { useConfirm } from "./confirm-dialog";
 import { useToast } from "./toast";
 import { inputClass, linkButton, primaryButton, secondaryButton } from "./ui";
-import { connectCatalogServer, startMcpSignIn } from "./mcp-servers";
+import { McpManage, beginCatalogSignIn, viewerStatus } from "./mcp-servers";
 import { CopyButton } from "./copy-button";
+import { Code } from "./settings/code";
 import { HybridAppChoice } from "./hybrid-app-choice";
+import { KnowledgeDisconnect, KnowledgeSignInControl } from "./knowledge-connection";
+import { Attention, ConnectionFacts, DangerRow, OtherWays, PanelDetails, PanelLink, PanelSection, SignInControl, UsesList, Way, type Fact } from "./integration-panel";
 
-// A catalog MCP server (Sentry, Linear, Notion…), opened in place on
-// Integrations and on Connections: signing in through the vendor's remote
-// server when it has one, or a key, its instructions and turning it off.
+// A catalog product (Figma, Sentry, Linear, Notion, Sanity…), opened in
+// place on Integrations. One pattern whatever it connects with:
+//
+// - Not connected: what Coderhelm will be able to do, the one default way
+//   to connect (Coderhelm's app, else the vendor's own sign-in, else the
+//   team's own app, else a key), and every other way under "Other ways to
+//   connect".
+// - Connected: who connected it and when, what it is used for, then Manage
+//   (tools, instructions, recent calls: each only when there is something),
+//   and Disconnect last.
+// - Needs attention: the reason and one action.
+//
+// The card's status comes from the API, worked out from every record the
+// team has for the product, so a sign-in made for Knowledge shows here too.
 
-/** An MCP server: credentials (entered here, never shown again), its test, its instructions, and turning it off. */
-export function PluginPanel({ item, onChanged, onClose }: { item: Integration; onChanged: () => Promise<void>; onClose: () => void }) {
-  const d = item.detail as {
-    plugin: PluginDef;
-    enabled: boolean;
-    has_credentials: boolean;
-    custom_prompt: string;
-    remote?: McpServer | null;
-    own_app?: OwnAppState | null;
-    own_app_redirect_uri?: string | null;
-    coderhelm_app?: boolean;
-  };
+type WayId = "ours" | "remote" | "own" | "key";
+
+interface Unused {
+  id: string;
+  name: string;
+  kind: string;
+  note: string;
+}
+
+interface Detail {
+  plugin: PluginDef;
+  enabled: boolean;
+  has_credentials: boolean;
+  custom_prompt: string;
+  remote?: McpServer | null;
+  own_app?: OwnAppState | null;
+  own_app_redirect_uri?: string | null;
+  coderhelm_app?: boolean;
+  knowledge?: KnowledgeSignIn | null;
+  unused?: Unused[];
+}
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
+}
+
+/** What Coderhelm will be able to do, in a sentence, for the way a card connects by default. */
+function accessOf(p: PluginDef, way: WayId): string {
+  if (way === "ours" || way === "own") {
+    return p.own_app?.reads ?? `Coderhelm reads ${p.name} with this sign-in. It can't change anything in ${p.name}.`;
+  }
+  if (way === "remote") {
+    return `You sign in at ${p.name}, then pick which of its tools agents may use. Agents get none until you do, and tools that only read are marked.`;
+  }
+  const least = p.recommended_permissions ? ` Give it the least access that works: ${p.recommended_permissions.toLowerCase()}.` : "";
+  return `Agents use ${p.name} with a key you paste here. It is sealed when saved and never shown again.${least}`;
+}
+
+export function CatalogPanel({
+  item,
+  canEdit,
+  onChanged,
+  onClose,
+}: {
+  item: Integration;
+  canEdit: boolean;
+  onChanged: () => Promise<void>;
+  onClose: () => void;
+}) {
+  const d = item.detail as unknown as Detail;
   const p = d.plugin;
-  const keyForm = <PluginKeyPanel item={item} onChanged={onChanged} onClose={onClose} />;
-  // The vendor's MCP server takes only apps it approved, but its API takes
-  // Coderhelm's app or the team's own: sign in with one, or use a key.
-  if (p.own_app) {
-    const signedIn = d.own_app?.status === "connected";
-    const mine = d.own_app && (d.own_app.source ?? "own") === "own" ? d.own_app : null;
-    const ownPanel = <OwnAppPanel plugin={p} state={mine} redirectUri={d.own_app_redirect_uri ?? ""} onChanged={onChanged} />;
-    if (d.coderhelm_app) {
-      // Coderhelm's app: one sign-in button; the team's own app and a key
-      // are the other choices, behind their disclosures.
-      const ours = d.own_app && d.own_app.source === "coderhelm" ? d.own_app : null;
+  const [remote, setRemote] = useState<McpServer | null>(d.remote ?? null);
+  useEffect(() => setRemote(d.remote ?? null), [d.remote]);
+  const { can } = useCan();
+  const { toast } = useToast();
+  const { confirm } = useConfirm();
+  const [busy, setBusy] = useState("");
+
+  const own = d.own_app ?? null;
+  const ours = own && own.source === "coderhelm" ? own : null;
+  const mine = own && (own.source ?? "own") === "own" ? own : null;
+  const personalRemote = remote?.auth === "oauth" && remote.sharing === "personal";
+  const mayConnectRemote = personalRemote ? can("mcp_connect") : canEdit;
+  const rv = remote ? viewerStatus(remote) : null;
+  const k = d.knowledge ?? null;
+
+  // The ways this product can connect, the default first.
+  const ways: WayId[] = [];
+  if (p.own_app && d.coderhelm_app) ways.push("ours");
+  if (p.remote_url || remote?.auth === "oauth") ways.push("remote");
+  if (p.own_app) ways.push("own");
+  // A key for a vendor's own server sets that server up, so it is offered until the server is.
+  if (p.credential_fields.length > 0 && !p.key_unavailable && !(p.remote_key && remote)) ways.push("key");
+  // The way it is connected now, if it is.
+  const current: WayId | null =
+    own?.status === "connected" ? (ours ? "ours" : "own") : rv?.status === "connected" ? "remote" : d.enabled && d.has_credentials ? "key" : null;
+  const uses = item.uses ?? [];
+  const runs = uses.find((u) => u.id === "runs");
+  // Whether agents have it: the API's word when it says, else the records'.
+  const runsOn = runs ? runs.state === "on" : current !== null;
+  // An admin takes the default way; a member only ever signs in their own account.
+  const primary: WayId | undefined = canEdit ? ways[0] : ways.includes("remote") && mayConnectRemote ? "remote" : undefined;
+  const ids = [p.id, `app-${p.id}`, `app:${p.id}`];
+
+  const act = async (label: string, fn: () => Promise<void>) => {
+    setBusy(label);
+    try {
+      await fn();
+    } catch (e) {
+      toast(errorMessage(e, "That didn't work."), "error");
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const beginOurs = async (): Promise<SignInStart> => {
+    const r = await api.connectCoderhelmApp(p.id);
+    return { ...r, server_id: r.server_id ?? r.own_app.id };
+  };
+  const beginRemote = async (): Promise<SignInStart> => (remote ? { ...(await api.connectMcpServer(remote.id)), server_id: remote.id } : beginCatalogSignIn(p.id));
+
+  const signIn = (way: "ours" | "remote", label: string, variant: "primary" | "secondary" = "primary") => (
+    <SignInControl
+      name={p.name}
+      ids={ids}
+      label={label}
+      begin={way === "ours" ? beginOurs : beginRemote}
+      onConnected={onChanged}
+      onReturn={onChanged}
+      variant={variant}
+      disabled={way === "remote" && !!remote?.needs_client && !remote.has_client}
+      testId={way === "ours" ? "coderhelm-app-sign-in" : "oauth-sign-in"}
+    />
+  );
+
+  // A form is the main action only where it is the default way; among the other ways it is quiet.
+  const ownForm = (quiet: boolean) => <OwnAppForm plugin={p} state={mine} redirectUri={d.own_app_redirect_uri ?? ""} ids={ids} quiet={quiet} onChanged={onChanged} />;
+  const keyForm = (quiet: boolean) =>
+    p.remote_key && ways.includes("remote") && !d.enabled ? <RemoteKeyForm plugin={p} onChanged={onChanged} /> : <KeyFields item={item} quiet={quiet} onChanged={onChanged} />;
+
+  // ── Needs attention: which part is broken, and its one action ──────
+  const fix = (): ReactNode => {
+    if (item.action === "reconnect") {
+      if (own && own.status !== "connected" && own.status !== "not_connected") {
+        return ours ? signIn("ours", "Sign in again") : <SignInControl name={p.name} ids={ids} label="Sign in again" begin={async () => ({ ...(await api.connectMcpServer(own.id)), server_id: own.id })} onConnected={onChanged} onReturn={onChanged} testId="own-app-sign-in" />;
+      }
+      if (rv && (rv.status === "needs_reconnect" || rv.status === "failed")) return mayConnectRemote ? signIn("remote", "Reconnect") : null;
+      if (k && k.status !== "connected") return <KnowledgeSignInControl k={k} onChanged={onChanged} />;
+      return null;
+    }
+    if (item.action === "check_again" && canEdit) {
       return (
-        <div className="mt-4 flex flex-col gap-4">
-          <HybridAppChoice id={p.id} name={p.name} onChanged={() => void onChanged()} />
-          <CoderhelmAppSignIn plugin={p} state={ours} />
-          <Disclosure summary={`Use my own ${p.name} app`} defaultOpen={!!mine}>
-            {ownPanel}
-          </Disclosure>
-          <Disclosure summary="Use a key instead" defaultOpen={!signedIn && !mine && d.has_credentials}>
-            {keyForm}
-          </Disclosure>
-        </div>
+        <button
+          type="button"
+          disabled={!!busy}
+          className={secondaryButton}
+          onClick={() =>
+            act("check", async () => {
+              if (remote && rv?.status !== "not_connected") {
+                const r = await api.checkMcpServer(remote.id);
+                toast(r.error ? r.error : `${p.name} works`, r.error ? "error" : "success");
+              } else {
+                const r = await api.testPluginConnection(p.id);
+                toast(r.status === "ok" ? `${p.name} works` : r.message || "The test failed", r.status === "ok" ? "success" : "error");
+              }
+              await onChanged();
+            })
+          }
+        >
+          {busy === "check" ? "Checking…" : "Check again"}
+        </button>
       );
     }
+    return null;
+  };
+
+  // ── Other ways to connect ──────────────────────────────────────────
+  const others = (skip: WayId | null) => {
+    const parts: ReactNode[] = [];
+    if (!canEdit) return null;
+    for (const w of ways) {
+      if (w === skip) continue;
+      if (w === "ours") {
+        parts.push(
+          <Way key="ours" title={`Sign in with ${p.name}`} when={`Coderhelm's own app with ${p.name}: nothing to create or paste.`} testId="way-ours">
+            {signIn("ours", `Sign in with ${p.name}`, "secondary")}
+          </Way>,
+        );
+      } else if (w === "remote" && mayConnectRemote) {
+        parts.push(
+          <Way key="remote" title={`Sign in at ${p.name}'s own server`} when="You pick which of its tools agents may use." testId="way-remote">
+            {signIn("remote", `Sign in with ${p.name}`, "secondary")}
+          </Way>,
+        );
+      } else if (w === "own") {
+        parts.push(
+          <Way key="own" title={`Use your own ${p.name} app`} when={`For a team that wants its own app with ${p.name}: the sign-in never passes through Coderhelm's app.`} testId="way-own">
+            {ownForm(true)}
+          </Way>,
+        );
+      } else if (w === "key") {
+        parts.push(
+          <Way key="key" title="Use a key" when={`Paste a key from ${p.name} instead of signing in.`} testId="way-key">
+            {keyForm(true)}
+          </Way>,
+        );
+      }
+    }
+    // Why no key works, when none does: with the other ways when there are
+    // some, else as a plain line (never a disclosure holding one sentence).
+    const noKey = p.key_unavailable ? (
+      <p key="no-key" className="text-sm text-zinc-400" data-testid="key-unavailable">
+        {p.key_unavailable}
+      </p>
+    ) : null;
+    for (const u of d.unused ?? []) {
+      parts.push(
+        <Way key={`unused-${u.id}`} title="An unfinished sign-in" when={u.note} testId="unused-record">
+          <div>
+            <button
+              type="button"
+              disabled={!!busy}
+              className={secondaryButton}
+              onClick={() =>
+                act("unused", async () => {
+                  const ok = await confirm({
+                    title: `Remove the unfinished ${u.name} sign-in?`,
+                    message: "Nothing uses it. Removing it changes nothing agents can do.",
+                    confirmLabel: "Remove",
+                    destructive: true,
+                  });
+                  if (!ok) return;
+                  await api.removeMcpServer(u.id);
+                  await onChanged();
+                })
+              }
+            >
+              Remove it
+            </button>
+          </div>
+        </Way>,
+      );
+    }
+    if (parts.length === 0) return noKey;
     return (
-      <div className="mt-4 flex flex-col gap-4">
-        <HybridAppChoice id={p.id} name={p.name} onChanged={() => void onChanged()} />
-        {ownPanel}
-        <Disclosure summary="Use a key instead" defaultOpen={!signedIn && d.has_credentials}>
-          {keyForm}
-        </Disclosure>
-      </div>
+      <OtherWays open={item.action === "add_credentials" && skip !== "key"}>
+        {parts}
+        {noKey}
+      </OtherWays>
+    );
+  };
+
+  // ── Details: the technical side ────────────────────────────────────
+  const detailRows = (way: WayId | null): Fact[] => {
+    const app = p.own_app;
+    const viaApp = way === "ours" || way === "own";
+    const address = way === "remote" ? (remote?.url ?? p.remote_url ?? "") : "";
+    const scopes = viaApp ? (app?.scopes ?? []) : way === "remote" ? (remote?.scopes ?? []) : [];
+    return [
+      { label: "Signs in at", value: viaApp && app ? hostOf(app.authorize) : way === "remote" && (remote?.issuer || address) ? hostOf(remote?.issuer || address) : "" },
+      { label: "Server address", value: address ? <Code className="text-xs">{address}</Code> : "" },
+      { label: "Permissions asked for", value: scopes.length ? <span data-testid="scopes">{scopes.join(", ")}</span> : "" },
+      { label: "Who signs in", value: viaApp ? "One account for the team" : way === "remote" ? (personalRemote ? "Each person, with their own account" : "One account for the team") : "" },
+    ];
+  };
+
+  // ── Disconnect ─────────────────────────────────────────────────────
+  const disconnect = () =>
+    act("disconnect", async () => {
+      if (current === "key") {
+        const ok = await confirm({ title: `Turn off ${p.name}?`, message: "Agents stop using it and its saved key is deleted.", confirmLabel: "Turn off", destructive: true });
+        if (!ok) return;
+        await api.disablePlugin(p.id);
+        onClose();
+      } else {
+        const id = current === "remote" ? remote!.id : own!.id;
+        const ok = await confirm({
+          title: personalRemote && current === "remote" ? `Disconnect your ${p.name} account?` : `Disconnect ${p.name}?`,
+          message: `Coderhelm revokes the sign-in where ${p.name} allows it and forgets it. Agents stop using it until someone signs in again.`,
+          confirmLabel: "Disconnect",
+          destructive: true,
+        });
+        if (!ok) return;
+        const r = await api.disconnectMcpServer(id);
+        toast(r.revoked ? "Disconnected and revoked" : "Disconnected");
+      }
+      await onChanged();
+    });
+  const attention = item.status !== "connected" && item.status !== "not_connected";
+  const connectedSomehow = uses.some((u) => u.state === "on") || current !== null;
+  const facts: Fact[] = uses.length < 2 && current ? [{ label: "Used for", value: "Runs and reviews" }] : [];
+  // The way agents would use that is set up and broken: its fix is the card's one action.
+  const stopped = (st: string | undefined) => !!st && st !== "connected" && st !== "not_connected";
+  const brokenWay: WayId | null =
+    !attention || runsOn || (runs && runs.state !== "attention")
+      ? null
+      : stopped(own?.status)
+        ? ours
+          ? "ours"
+          : "own"
+        : stopped(rv?.status)
+          ? "remote"
+          : // Switched on with no key saved, where a sign-in exists: nothing is
+            // broken, it was never connected. The default way is offered, with
+            // the key among the other ways.
+            d.enabled && (d.has_credentials || ways[0] === "key" || ways.length === 0)
+            ? "key"
+            : null;
+
+  return (
+    <div className="mt-3 flex min-w-0 flex-col gap-5" data-testid={`catalog-${p.id}`} data-way={current ?? ""}>
+      {attention && <Attention item={item}>{fix()}</Attention>}
+      {/* A note the facts below don't already say ("No tools are allowed yet, so agents don't get it."). */}
+      {item.status === "connected" && item.reason && uses.length < 2 && current !== "ours" && current !== "own" && (
+        <p className="text-sm text-zinc-400" data-testid="integration-reason">
+          {item.reason}
+        </p>
+      )}
+      {connectedSomehow && <ConnectionFacts item={item} extra={facts} />}
+      {connectedSomehow && uses.length > 1 && <UsesList uses={uses} canEdit={canEdit} />}
+
+      {/* Not connected for runs: what it will do, one action, what happens next. */}
+      {!runsOn && primary && !brokenWay && (
+        <ConnectSection title={connectedSomehow ? "Use it in runs and reviews" : ""}>
+          {p.own_app && canEdit && <HybridAppChoice id={p.id} name={p.name} onChanged={() => void onChanged()} />}
+          <p className="text-sm text-zinc-300" data-testid="access">
+            {accessOf(p, primary)}
+          </p>
+          {primary === "ours" && signIn("ours", `Sign in with ${p.name}`)}
+          {primary === "remote" && signIn("remote", personalRemote ? "Connect your account" : `Sign in with ${p.name}`)}
+          {primary === "own" && ownForm(false)}
+          {primary === "key" && keyForm(false)}
+          <PanelDetails rows={detailRows(primary)} />
+          {others(primary)}
+        </ConnectSection>
+      )}
+      {!runsOn && !primary && p.key_unavailable && (
+        <p className="text-sm text-zinc-400" data-testid="key-unavailable">
+          {p.key_unavailable}
+        </p>
+      )}
+      {brokenWay === "key" && canEdit && (
+        <PanelSection title={d.has_credentials ? "Replace the key" : "Add the key"} testId="add-credentials">
+          <KeyFields item={item} onChanged={onChanged} />
+        </PanelSection>
+      )}
+      {brokenWay && others(brokenWay)}
+
+      {/* Connected: Manage, each part only when there is something in it. */}
+      {current === "remote" && remote && <McpManage server={remote} canEdit={canEdit} onSaved={setRemote} onChanged={onChanged} />}
+      {current && current !== "remote" && canEdit && (
+        <PanelSection title="Manage" testId="catalog-manage">
+          {d.enabled && <PackageInstructions item={item} />}
+          {current === "key" && (
+            <Disclosure summary="Replace the key">
+              <KeyFields item={item} onChanged={onChanged} />
+            </Disclosure>
+          )}
+          {current === "ours" && signIn("ours", "Sign in again", "secondary")}
+          {current === "own" && ownForm(true)}
+        </PanelSection>
+      )}
+      {runsOn && <PanelDetails rows={detailRows(current)} />}
+      {runsOn && others(current)}
+      {k && canEdit && !k.personal && (
+        <p className="text-sm text-zinc-400">
+          <PanelLink href="/knowledge/">Manage {k.label} sources in Knowledge</PanelLink>
+        </p>
+      )}
+
+      {/* Disconnect: last, and worded as what it is. */}
+      {current && (current === "remote" ? mayConnectRemote : canEdit) && (
+        <DangerRow
+          title={current === "key" ? `Turn off ${p.name}` : personalRemote && current === "remote" ? `Disconnect your ${p.name} account` : `Disconnect ${p.name}`}
+          label={current === "key" ? "Turn off" : "Disconnect"}
+          onClick={disconnect}
+          busy={!!busy}
+        >
+          {current === "key" ? "Agents stop using it and the saved key is deleted." : `Agents stop using ${p.name} until someone signs in again.${current === "remote" ? " The tools you allowed stay picked." : ""}`}
+        </DangerRow>
+      )}
+      {k && canEdit && !k.personal && <KnowledgeDisconnect k={k} beside={current !== null} onChanged={onChanged} />}
+    </div>
+  );
+}
+
+function ConnectSection({ title, children }: { title: string; children: ReactNode }) {
+  if (title) {
+    return (
+      <PanelSection title={title} testId="connect">
+        {children}
+      </PanelSection>
     );
   }
-  const noKey = p.key_unavailable ? (
-    <p className="text-sm text-zinc-400" data-testid="key-unavailable">
-      {p.key_unavailable}
-    </p>
-  ) : null;
-  if (!p.remote_url) return <div className="mt-4">{noKey ?? keyForm}</div>;
-  const hasKeys = p.credential_fields.length > 0;
   return (
-    <div className="mt-4 flex flex-col gap-4">
-      {!d.remote && <OAuthOffer plugin={p} />}
-      {noKey}
-      {!noKey && hasKeys && !d.remote && (
-        <Disclosure summary="Use a key instead">
-          {p.remote_key ? <RemoteKeyForm plugin={p} onChanged={onChanged} /> : keyForm}
-        </Disclosure>
-      )}
-      {!noKey && hasKeys && d.remote && !p.remote_key && (
-        <Disclosure summary="Or use a key instead" defaultOpen={false}>
-          {keyForm}
-        </Disclosure>
-      )}
+    <div className="flex min-w-0 flex-col gap-3" data-testid="connect">
+      {children}
     </div>
   );
 }
@@ -132,7 +460,7 @@ function RemoteKeyForm({ plugin, onChanged }: { plugin: PluginDef; onChanged: ()
         </p>
       )}
       <div>
-        <button type="submit" disabled={saving || !key.trim()} className={primaryButton}>
+        <button type="submit" disabled={saving || !key.trim()} className={secondaryButton}>
           {saving ? "Connecting…" : "Connect with this key"}
         </button>
       </div>
@@ -140,122 +468,44 @@ function RemoteKeyForm({ plugin, onChanged }: { plugin: PluginDef; onChanged: ()
   );
 }
 
-/** Signing in through the vendor's own remote server: no key to paste, and tools allowed one by one. */
-function OAuthOffer({ plugin }: { plugin: PluginDef }) {
-  const [busy, setBusy] = useState(false);
-  const { toast } = useToast();
-  return (
-    <div className="flex flex-col gap-2 rounded-lg border border-zinc-800 bg-zinc-900/60 p-3" data-testid="oauth-offer">
-      <p className="text-sm text-zinc-300">
-        You sign in at {plugin.name} and choose which of its tools agents may use. No key to paste.
-      </p>
-      <div>
-        <button
-          type="button"
-          disabled={busy}
-          className={primaryButton}
-          onClick={async () => {
-            setBusy(true);
-            try {
-              await connectCatalogServer(plugin.id);
-            } catch (e) {
-              toast(errorMessage(e, "Couldn't start the sign-in."), "error");
-              setBusy(false);
-            }
-          }}
-        >
-          {busy ? "Opening sign-in…" : `Sign in with ${plugin.name}`}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/** Signing in with Coderhelm's own app with the vendor: nothing to create or paste. */
-function CoderhelmAppSignIn({ plugin, state }: { plugin: PluginDef; state: OwnAppState | null }) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const scopes = plugin.own_app?.scopes ?? [];
-  const go = async () => {
-    setBusy(true);
-    setError("");
-    try {
-      const r = await api.connectCoderhelmApp(plugin.id);
-      window.location.assign(r.authorize_url);
-    } catch (e) {
-      setError(errorMessage(e, "Couldn't start the sign-in."));
-      setBusy(false);
-    }
-  };
-  return (
-    <div className="flex flex-col gap-2 rounded-lg border border-zinc-800 bg-zinc-900/60 p-3" data-testid="coderhelm-app">
-      {state?.status === "connected" ? (
-        <p className="text-sm text-emerald-400" data-testid="coderhelm-app-status">
-          Signed in{state.connected_by ? ` by ${state.connected_by}` : ""} with Coderhelm&apos;s app. Agents read {plugin.name} with this sign-in.
-        </p>
-      ) : state?.status_reason ? (
-        <p role="alert" className="text-sm text-amber-400" data-testid="coderhelm-app-status">
-          {state.status_reason}
-        </p>
-      ) : (
-        <p className="text-sm text-zinc-300">
-          You sign in at {plugin.name} and allow Coderhelm to read{scopes.length ? ` (${scopes.join(", ")})` : ""}. Nothing is changed in {plugin.name}.
-        </p>
-      )}
-      {error && (
-        <p role="alert" className="text-sm text-red-400">
-          {error}
-        </p>
-      )}
-      <div>
-        <button type="button" disabled={busy} className={primaryButton} onClick={() => void go()} data-testid="coderhelm-app-sign-in">
-          {busy ? "Opening sign-in…" : state?.status === "connected" ? "Sign in again" : `Sign in with ${plugin.name}`}
-        </button>
-      </div>
-    </div>
-  );
-}
-
 /** The team's own OAuth app with the vendor: where to create it, its client id and secret, and signing in with it. */
-function OwnAppPanel({ plugin, state, redirectUri, onChanged }: { plugin: PluginDef; state: OwnAppState | null; redirectUri: string; onChanged: () => Promise<void> }) {
+function OwnAppForm({
+  plugin,
+  state,
+  redirectUri,
+  ids,
+  quiet,
+  onChanged,
+}: {
+  plugin: PluginDef;
+  state: OwnAppState | null;
+  redirectUri: string;
+  ids: string[];
+  /** Among the other ways, or already signed in: not the card's main action. */
+  quiet: boolean;
+  onChanged: () => Promise<void>;
+}) {
   const app = plugin.own_app!;
   const [clientId, setClientId] = useState(state?.client_id ?? "");
   const [secret, setSecret] = useState("");
-  const [busy, setBusy] = useState<"" | "save" | "connect" | "remove">("");
-  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
   const { toast } = useToast();
   const { confirm } = useConfirm();
   // The API names this install's callback; the page's own address is the same one.
   const redirect = redirectUri || state?.redirect_uri || `${window.location.origin}/settings/integrations/mcp-callback/`;
   const sameApp = !!state && clientId.trim() === state.client_id;
   const canSave = !!clientId.trim() && (!!secret.trim() || (sameApp && state!.has_secret));
+  const unchanged = sameApp && !secret.trim();
 
-  const connect = async (id: string) => {
-    setBusy("connect");
-    try {
-      await startMcpSignIn(id);
-    } catch (e) {
-      setError(errorMessage(e, "Couldn't start the sign-in."));
-      setBusy("");
-    }
-  };
-  const save = async (thenConnect: boolean) => {
-    setBusy("save");
-    setError("");
-    try {
+  // Saves what was typed (when it changed), then asks where the sign-in page is.
+  const begin = async (): Promise<SignInStart> => {
+    let id = state?.id ?? "";
+    if (!unchanged) {
       const r = await api.saveOwnApp(plugin.id, clientId.trim(), secret.trim());
       setSecret("");
-      if (thenConnect) {
-        await connect(r.own_app.id);
-        return;
-      }
-      toast(`Your ${plugin.name} app is saved`);
-      await onChanged();
-    } catch (e) {
-      setError(errorMessage(e, "Couldn't save the app."));
-    } finally {
-      setBusy((b) => (b === "save" ? "" : b));
+      id = r.own_app.id;
     }
+    return { ...(await api.connectMcpServer(id)), server_id: id };
   };
   const remove = async () => {
     if (!state) return;
@@ -266,7 +516,7 @@ function OwnAppPanel({ plugin, state, redirectUri, onChanged }: { plugin: Plugin
       destructive: true,
     });
     if (!ok) return;
-    setBusy("remove");
+    setBusy(true);
     try {
       await api.removeMcpServer(state.id);
       setClientId("");
@@ -274,19 +524,18 @@ function OwnAppPanel({ plugin, state, redirectUri, onChanged }: { plugin: Plugin
     } catch (e) {
       toast(errorMessage(e, "Couldn't remove it."), "error");
     } finally {
-      setBusy("");
+      setBusy(false);
     }
   };
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-zinc-800 bg-zinc-900/60 p-3" data-testid="own-app">
-      <p className="text-sm font-medium text-zinc-200">Use my own {plugin.name} app</p>
+    <div className="flex min-w-0 flex-col gap-3" data-testid="own-app">
       {state?.status === "connected" ? (
-        <p className="text-sm text-emerald-400" data-testid="own-app-status">
-          Signed in{state.connected_by ? ` by ${state.connected_by}` : ""}. Agents use {plugin.name} with this sign-in.
+        <p className="text-sm text-zinc-300" data-testid="own-app-status">
+          Signed in{state.connected_by ? ` by ${state.connected_by}` : ""} with your own app. Agents use {plugin.name} with this sign-in.
         </p>
       ) : state?.status_reason ? (
-        <p role="alert" className="text-sm text-amber-400" data-testid="own-app-status">
+        <p className="text-sm text-amber-300" data-testid="own-app-status">
           {state.status_reason}
         </p>
       ) : null}
@@ -310,66 +559,53 @@ function OwnAppPanel({ plugin, state, redirectUri, onChanged }: { plugin: Plugin
         </li>
         <li>Publish it as a private app (no review needed), then paste its client id and secret here.</li>
       </ol>
-      <form
-        className="flex flex-col gap-3"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void save(true);
-        }}
-      >
-        <Field id={`${plugin.id}-own-client-id`} label="Client ID">
-          {(props) => <input {...props} className={inputClass} value={clientId} onChange={(e) => setClientId(e.target.value)} autoComplete="off" />}
-        </Field>
-        <Field id={`${plugin.id}-own-client-secret`} label="Client secret">
-          {(props) => (
-            <SecretInput
-              {...props}
-              className={inputClass}
-              placeholder={sameApp && state?.has_secret ? "Saved. Paste a new one to replace it." : ""}
-              value={secret}
-              onChange={(e) => setSecret(e.target.value)}
-              autoComplete="off"
-            />
-          )}
-        </Field>
-        {error && (
-          <p role="alert" className="text-sm text-red-400">
-            {error}
-          </p>
+      <Field id={`${plugin.id}-own-client-id`} label="Client ID">
+        {(props) => <input {...props} className={inputClass} value={clientId} onChange={(e) => setClientId(e.target.value)} autoComplete="off" />}
+      </Field>
+      <Field id={`${plugin.id}-own-client-secret`} label="Client secret">
+        {(props) => (
+          <SecretInput
+            {...props}
+            className={inputClass}
+            placeholder={sameApp && state?.has_secret ? "Saved. Paste a new one to replace it." : ""}
+            value={secret}
+            onChange={(e) => setSecret(e.target.value)}
+            autoComplete="off"
+          />
         )}
-        <div className="flex flex-wrap gap-2">
-          {sameApp && !secret.trim() ? (
-            <button type="button" disabled={!!busy} className={primaryButton} onClick={() => void connect(state!.id)}>
-              {busy === "connect" ? "Opening sign-in…" : state!.status === "connected" ? "Sign in again" : `Connect with ${plugin.name}`}
-            </button>
-          ) : (
-            <button type="submit" disabled={!!busy || !canSave} className={primaryButton}>
-              {busy ? "Saving…" : `Save and connect with ${plugin.name}`}
-            </button>
-          )}
-          {state && (
-            <button type="button" disabled={!!busy} className={secondaryButton} onClick={() => void remove()}>
-              {busy === "remove" ? "Removing…" : "Remove my app"}
-            </button>
-          )}
-        </div>
-      </form>
+      </Field>
+      <SignInControl
+        name={plugin.name}
+        ids={ids}
+        label={unchanged ? (state!.status === "connected" ? "Sign in again" : `Sign in with ${plugin.name}`) : `Save and sign in with ${plugin.name}`}
+        begin={begin}
+        onConnected={onChanged}
+        onReturn={onChanged}
+        disabled={!canSave}
+        variant={quiet || state?.status === "connected" ? "secondary" : "primary"}
+        testId="own-app-sign-in"
+      />
+      {state && (
+        <p>
+          <button type="button" disabled={busy} className={linkButton} onClick={() => void remove()}>
+            {busy ? "Removing…" : `Remove your ${plugin.name} app`}
+          </button>
+        </p>
+      )}
     </div>
   );
 }
 
-/** An MCP server run with a key: credentials (entered here, never shown again), its test, its instructions, and turning it off. */
-function PluginKeyPanel({ item, onChanged, onClose }: { item: Integration; onChanged: () => Promise<void>; onClose: () => void }) {
-  const d = item.detail as { plugin: PluginDef; enabled: boolean; has_credentials: boolean; custom_prompt: string };
+/** The key for a vendor's package: entered here, never shown again, and tested when saved. */
+function KeyFields({ item, quiet = false, onChanged }: { item: Integration; quiet?: boolean; onChanged: () => Promise<void> }) {
+  const d = item.detail as unknown as Detail;
   const p = d.plugin;
   const [creds, setCreds] = useState<Record<string, string>>(() => Object.fromEntries(p.credential_fields.map((f) => [f.key, ""])));
-  const [prompt, setPrompt] = useState(d.custom_prompt || p.default_prompt);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const { toast } = useToast();
-  const { confirm } = useConfirm();
 
-  const saveCreds = async () => {
+  const save = async () => {
     setSaving(true);
     setError("");
     try {
@@ -390,113 +626,110 @@ function PluginKeyPanel({ item, onChanged, onClose }: { item: Integration; onCha
       setSaving(false);
     }
   };
-  const savePrompt = async () => {
-    try {
-      await api.updatePluginPrompt(p.id, prompt);
-      toast("Instructions saved");
-    } catch (e) {
-      toast(errorMessage(e, "Couldn't save the instructions."), "error");
-    }
-  };
-  const turnOff = async () => {
-    const ok = await confirm({
-      title: `Turn off ${p.name}?`,
-      message: "Agents stop using it and its saved credentials are deleted.",
-      confirmLabel: "Turn off",
-      destructive: true,
-    });
-    if (!ok) return;
-    try {
-      await api.disablePlugin(p.id);
-      onClose();
-      await onChanged();
-    } catch (e) {
-      toast(errorMessage(e, "Couldn't turn it off."), "error");
-    }
-  };
 
   return (
-    <div className="mt-4 flex flex-col gap-4">
-      <form
-        className="flex flex-col gap-4"
-        onSubmit={(e) => {
-          e.preventDefault();
-          saveCreds();
-        }}
-      >
-        <p className="text-sm text-zinc-400">
-          {d.has_credentials ? "Credentials are saved. Enter new ones to replace them." : "Agents get this server once its credentials are saved."}{" "}
-          {p.recommended_permissions && <>Use the least access that works: {p.recommended_permissions.toLowerCase()}.</>}{" "}
-          <a href={p.docs_url} target="_blank" rel="noreferrer" className={linkButton}>
-            Where to get them
-          </a>
-        </p>
-        {p.credential_fields.map((f) => (
-          <Field key={f.key} id={`${p.id}-${f.key}`} label={f.label}>
-            {(props) =>
-              f.secret ? (
-                <SecretInput
-                  {...props}
-                  className={inputClass}
-                  placeholder={f.placeholder}
-                  value={creds[f.key] ?? ""}
-                  onChange={(e) => setCreds((c) => ({ ...c, [f.key]: e.target.value }))}
-                  autoComplete="off"
-                />
-              ) : (
-                <input
-                  {...props}
-                  className={inputClass}
-                  placeholder={f.placeholder}
-                  value={creds[f.key] ?? ""}
-                  onChange={(e) => setCreds((c) => ({ ...c, [f.key]: e.target.value }))}
-                  autoComplete="off"
-                />
-              )
-            }
-          </Field>
-        ))}
-        {error && (
-          <p role="alert" className="text-sm text-red-400">
-            {error}
-          </p>
-        )}
-        <div>
-          <button type="submit" disabled={saving || p.credential_fields.some((f) => !(creds[f.key] ?? "").trim())} className={primaryButton}>
-            {saving ? "Saving and testing…" : "Save and test"}
-          </button>
-        </div>
-      </form>
-      {d.enabled && (
-      <Disclosure summary="Instructions agents follow with this server">
-        <Field id={`${p.id}-prompt`} label="Instructions">
-          {(props) => (
-            <MarkdownEditor
-              {...props}
-              variant="instructions"
-              minRows={4}
-              maxLength={4000}
-              value={prompt}
-              onChange={setPrompt}
-              previewNote="Agents get this text as written with the server's tools."
-            />
-          )}
+    <form
+      className="flex flex-col gap-4"
+      data-testid="key-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void save();
+      }}
+    >
+      <p className="text-sm text-zinc-400">
+        {d.has_credentials ? "Credentials are saved. Enter new ones to replace them." : "Agents get this server once its credentials are saved."}{" "}
+        {p.recommended_permissions && <>Use the least access that works: {p.recommended_permissions.toLowerCase()}.</>}{" "}
+        <a href={p.docs_url} target="_blank" rel="noreferrer" className={linkButton}>
+          Where to get them
+        </a>
+      </p>
+      {p.credential_fields.map((f) => (
+        <Field key={f.key} id={`${p.id}-${f.key}`} label={f.label}>
+          {(props) =>
+            f.secret ? (
+              <SecretInput
+                {...props}
+                className={inputClass}
+                placeholder={f.placeholder}
+                value={creds[f.key] ?? ""}
+                onChange={(e) => setCreds((c) => ({ ...c, [f.key]: e.target.value }))}
+                autoComplete="off"
+              />
+            ) : (
+              <input
+                {...props}
+                className={inputClass}
+                placeholder={f.placeholder}
+                value={creds[f.key] ?? ""}
+                onChange={(e) => setCreds((c) => ({ ...c, [f.key]: e.target.value }))}
+                autoComplete="off"
+              />
+            )
+          }
         </Field>
-        <p className="mt-2">
-          <button type="button" onClick={savePrompt} className={secondaryButton}>
-            Save instructions
-          </button>
-        </p>
-      </Disclosure>
-      )}
-      {d.enabled && (
-        <p>
-          <button type="button" onClick={turnOff} className={linkButton}>
-            Turn off {p.name}
-          </button>
+      ))}
+      {error && (
+        <p role="alert" className="text-sm text-red-400">
+          {error}
         </p>
       )}
-    </div>
+      <div>
+        <button type="submit" disabled={saving || p.credential_fields.some((f) => !(creds[f.key] ?? "").trim())} className={quiet ? secondaryButton : primaryButton}>
+          {saving ? "Saving and testing…" : "Save and test"}
+        </button>
+      </div>
+    </form>
   );
 }
 
+/** The instructions agents follow with a vendor's package. One link to add some when there are none. */
+function PackageInstructions({ item }: { item: Integration }) {
+  const d = item.detail as unknown as Detail;
+  const p = d.plugin;
+  const [prompt, setPrompt] = useState(d.custom_prompt || p.default_prompt);
+  const [adding, setAdding] = useState(false);
+  const { toast } = useToast();
+  const has = !!(d.custom_prompt || p.default_prompt);
+  if (!has && !adding) {
+    return (
+      <p>
+        <button type="button" onClick={() => setAdding(true)} className={`${linkButton} text-left`}>
+          Add instructions agents follow with this server
+        </button>
+      </p>
+    );
+  }
+  return (
+    <Disclosure summary="Instructions agents follow with this server" defaultOpen={adding}>
+      <Field id={`${p.id}-prompt`} label="Instructions">
+        {(props) => (
+          <MarkdownEditor
+            {...props}
+            variant="instructions"
+            minRows={4}
+            maxLength={4000}
+            value={prompt}
+            onChange={setPrompt}
+            previewNote="Agents get this text as written with the server's tools."
+          />
+        )}
+      </Field>
+      <p className="mt-2">
+        <button
+          type="button"
+          className={secondaryButton}
+          onClick={async () => {
+            try {
+              await api.updatePluginPrompt(p.id, prompt);
+              toast("Instructions saved");
+            } catch (e) {
+              toast(errorMessage(e, "Couldn't save the instructions."), "error");
+            }
+          }}
+        >
+          Save instructions
+        </button>
+      </p>
+    </Disclosure>
+  );
+}

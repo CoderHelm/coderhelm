@@ -12,6 +12,8 @@ import {
   type KeyConnectorKind,
   type IntegrationSection,
   type IntegrationStatus,
+  type IntegrationUse,
+  type KnowledgeSignIn,
   type McpServer,
 } from "@/lib/api";
 import { errorMessage, timeAgo } from "@/lib/data-sources";
@@ -20,7 +22,7 @@ import { Page, PageHeader, Section } from "@/components/page";
 import { Callout } from "@/components/callout";
 import { Skeleton } from "@/components/skeleton";
 import { Field } from "@/components/field";
-import { AwsAbilitiesPanel, AwsAbilitySummary, ConnectorForm, JIRA_APP } from "@/components/connections";
+import { AwsAbilitiesPanel, AwsAbilitySummary, ConnectorForm, JIRA_APP, SIGN_IN } from "@/components/connections";
 import { Switch } from "@/components/teams-webhook";
 import { ChannelPicker, channelsPayload, draftDirty, draftFrom, draftValid, NO_WEBHOOKS, type ChannelsDraft } from "@/components/chat-channels";
 import type { AlertNotifySettings, ChatChannel } from "@/lib/api";
@@ -32,8 +34,10 @@ import { BrandIcon } from "@/components/brand-icons";
 import { EmptyState } from "@/components/empty-state";
 import { Problem } from "@/components/problem";
 import { INTEGRATION_STATUS } from "@/lib/integration-status";
-import { AddMcpServerDialog, McpServerPanel, connectCatalogServer } from "@/components/mcp-servers";
-import { PluginPanel } from "@/components/mcp-server-panel";
+import { AddMcpServerDialog, McpServerPanel } from "@/components/mcp-servers";
+import { CatalogPanel } from "@/components/mcp-server-panel";
+import { Attention, ConnectionFacts, DangerRow, OtherWays, PanelLink, PanelSection, UsesList, Way, type Fact } from "@/components/integration-panel";
+import { KnowledgeDisconnect, KnowledgeSignInControl } from "@/components/knowledge-connection";
 
 // Settings → Integrations: every outside system Coderhelm connects to, as one
 // list per kind of tool. One row per integration with the same columns in the
@@ -41,6 +45,12 @@ import { PluginPanel } from "@/components/mcp-server-panel";
 // runs down a column instead of zigzagging across cards. A row opens its
 // settings: in place, or on its own page for GitHub, Jira and AWS. Why
 // something isn't working is said inside, not on the row.
+//
+// Every opened row follows one pattern (components/integration-panel.tsx):
+// not connected, one sentence and one action; connected, who connected it
+// and what it is used for, then Manage, then Disconnect; needs attention,
+// the reason and one action. A product's status is the API's, worked out
+// from every record the team has for it.
 
 export default function IntegrationsPageGuarded() {
   return (
@@ -88,6 +98,7 @@ const SHORT: Record<string, string> = {
   aws: "Logs, metrics and Airflow through a read-only role",
   newrelic: "Queries, deploy markers and error rates",
   confluence: "Reads pages for context",
+  google_drive: "Folders, Docs, Sheets and PDFs, synced into Knowledge",
   opensearch: "Searches the indexes your app reads",
   rest: "Reads records from an API you use",
   teams: "Posts alerts and pull request links to a Teams channel",
@@ -133,7 +144,10 @@ function IntegrationsPage() {
   // Whether you may connect or change integrations: your role, not the
   // answer's `can_edit` (which a custom role's request reads as its floor).
   const { can } = useCan();
-  const data = items ? { items, canEdit: can("integrations") } : null;
+  const canEdit = can("integrations");
+  // Kept the same between renders: the row a link points at is scrolled to
+  // and focused when this changes, never on every keystroke in a card.
+  const data = useMemo(() => (items ? { items, canEdit } : null), [items, canEdit]);
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
@@ -494,13 +508,13 @@ function IntegrationRow({
       {open && (canEdit || personal) && (
         <div id={panelId} data-testid="integration-panel" className="border-t border-zinc-800 bg-zinc-950/40 px-4 pb-4 pt-3 sm:pl-[3.75rem]">
           <p className="text-sm text-zinc-400">{item.does}</p>
-          {item.reason && !remote && (
+          {item.reason && (kind === "aws_account" || kind === "chat") && (
             <p className={`mt-2 text-sm ${item.status === "error" ? "text-red-300" : item.status === "needs_credentials" ? "text-amber-300" : "text-zinc-400"}`}>
               {item.reason}
             </p>
           )}
           {aws && <AwsAbilitySummary a={aws} />}
-          {item.status === "error" && kind !== "chat" && !remote && (
+          {item.status === "error" && kind === "aws_account" && (
             <p className="mt-3">
               <button type="button" onClick={checkAgain} disabled={busy} className={secondaryButton}>
                 {busy ? "Checking…" : "Check again"}
@@ -514,17 +528,10 @@ function IntegrationRow({
               onChange={(r) => onChange({ ...item, status: r.status, reason: r.reason, last_check: r.last_check, detail: r.account as unknown as Record<string, unknown> })}
             />
           )}
-          {kind === "connector" && (
-            <ConnectorPanel
-              item={item}
-              onSaved={async () => {
-                await onReload();
-              }}
-            />
-          )}
+          {kind === "connector" && <ConnectorPanel item={item} canEdit={canEdit} checking={busy} onCheck={checkAgain} onSaved={onReload} />}
+          {kind === "knowledge" && <KnowledgePanel item={item} canEdit={canEdit} onChanged={onReload} />}
           {kind === "remote" && remote && <McpServerPanel server={remote} canEdit={canEdit} onChanged={onReload} onRemoved={() => setOpen(false)} />}
-          {kind === "plugin" && remote && <McpServerPanel server={remote} canEdit={canEdit} onChanged={onReload} />}
-          {kind === "plugin" && canEdit && <PluginPanel item={item} onChanged={onReload} onClose={() => setOpen(false)} />}
+          {kind === "plugin" && <CatalogPanel item={item} canEdit={canEdit} onChanged={onReload} onClose={() => setOpen(false)} />}
           {kind === "chat" && <ChatPanel channel={item.id as ChatChannel} onSaved={onReload} />}
           <p className="mt-4 flex flex-wrap gap-x-4 gap-y-2">
             <button type="button" onClick={() => setOpen(false)} className={linkButton}>
@@ -542,7 +549,7 @@ function IntegrationRow({
   );
 }
 
-type Kind = "github" | "jira" | "aws_connect" | "aws_account" | "connector" | "chat" | "remote" | "plugin";
+type Kind = "github" | "jira" | "aws_connect" | "aws_account" | "connector" | "chat" | "remote" | "plugin" | "knowledge";
 
 function kindOf(item: Integration): Kind {
   if (item.id === "github") return "github";
@@ -552,23 +559,78 @@ function kindOf(item: Integration): Kind {
   if (["newrelic", "confluence", "opensearch", "rest"].includes(item.id.split(":")[0])) return "connector";
   if (item.id === "teams" || item.id === "slack") return "chat";
   if (item.id.startsWith("mcp:")) return "remote";
+  // A product that is only ever synced into Knowledge (Google Drive).
+  if (!(item.detail as { plugin?: unknown }).plugin) return "knowledge";
   return "plugin";
 }
 
-function ConnectorPanel({ item, onSaved }: { item: Integration; onSaved: () => Promise<void> }) {
+/** The sign-in a card's product has for Knowledge, when the team made one. */
+function knowledgeOf(item: Integration): KnowledgeSignIn | null {
+  return ((item.detail as { knowledge?: KnowledgeSignIn | null }).knowledge ?? null) as KnowledgeSignIn | null;
+}
+
+/** The Knowledge sign-in of a product whose sign-in was removed, to start it again. */
+function signedOut(item: Integration): KnowledgeSignIn {
+  const kind = item.id.split(":")[0];
+  return { kind, label: item.name, server_id: `ks-${kind.replace(/_/g, "-")}`, personal: false, status: "not_connected", reason: "", connected_by: "", connected_at: "", sources: 0 };
+}
+
+/** "Knowledge (3 sources)". */
+function knowledgeUse(k: KnowledgeSignIn): string {
+  return k.sources > 0 ? `Knowledge (${k.sources} source${k.sources === 1 ? "" : "s"})` : "Knowledge (no sources yet)";
+}
+
+/**
+ * New Relic and Confluence. Confluence is one product reached several ways
+ * (an API token, the Jira app, the Atlassian sign-in made for Knowledge):
+ * the API says which work and what each use takes, and this lays them out.
+ */
+function ConnectorPanel({
+  item,
+  canEdit,
+  checking,
+  onCheck,
+  onSaved,
+}: {
+  item: Integration;
+  canEdit: boolean;
+  checking: boolean;
+  onCheck: () => Promise<void>;
+  onSaved: () => Promise<void>;
+}) {
   const { confirm } = useConfirm();
   const { toast } = useToast();
+  const [busy, setBusy] = useState("");
   const c = item.detail as unknown as Connector;
+  const k = knowledgeOf(item);
+  const uses = item.uses ?? [];
   // Confluence through the Jira app: removing only resets its settings (the
   // app keeps connecting it, reading only).
   const viaApp = c.via === JIRA_APP;
+  const viaSignIn = c.via === SIGN_IN;
+  const saved = Boolean(c.connected);
+  const attention = item.status !== "connected" && item.status !== "not_connected";
+  // The form is the card's main action only while nothing is connected.
+  const form = (bare: boolean) => (
+    <ConnectorForm
+      bare={bare}
+      quiet={saved || Boolean(k)}
+      item={{ ...c, kind: item.id.split(":")[0] as KeyConnectorKind, id: item.id, label: item.name, connected: saved }}
+      onSaved={() => {
+        void onSaved();
+      }}
+    />
+  );
+
   const remove = async () => {
     const ok = await confirm({
-      title: viaApp ? `Reset ${item.name}?` : `Remove ${item.name}?`,
+      title: viaApp ? `Reset ${item.name}?` : viaSignIn ? `Stop using ${item.name} in runs?` : `Remove ${item.name}?`,
       message: viaApp
         ? "Writes turn off and the page list and spaces are cleared. Agents keep reading through the Jira app."
-        : "Agents stop using it right away and the saved key is deleted.",
-      confirmLabel: viaApp ? "Reset" : "Remove",
+        : viaSignIn
+          ? "Agents stop reading pages during runs and reviews. Knowledge keeps syncing with the same sign-in."
+          : "Agents stop using it right away and the saved key is deleted.",
+      confirmLabel: viaApp ? "Reset" : viaSignIn ? "Turn off" : "Remove",
       destructive: true,
     });
     if (!ok) return;
@@ -579,25 +641,107 @@ function ConnectorPanel({ item, onSaved }: { item: Integration; onSaved: () => P
       toast(errorMessage(e, "Couldn't remove it."), "error");
     }
   };
+
+  // The same sign-in, switched on for runs: nobody signs in a second time.
+  const act = async (u: IntegrationUse) => {
+    if (u.action?.kind !== "use_in_runs") return;
+    setBusy("use_in_runs");
+    try {
+      const r = await api.saveConnector(item.id as ConnectorId, { via: SIGN_IN, enabled: true });
+      if (r.connector.status === "ready") toast(`Agents can now read ${item.name} during runs and reviews`);
+      else toast(r.connector.status_message || "The check didn't pass.", "error");
+      await onSaved();
+    } catch (e) {
+      toast(errorMessage(e, "Couldn't turn it on."), "error");
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const facts: Fact[] = [];
+  if (!item.connected_by && c.updated_by) facts.push({ label: "Last saved by", value: <span className="wrap-anywhere">{c.updated_by}</span> });
+  if (uses.length < 2 && saved) facts.push({ label: "Used for", value: "Runs and reviews" });
+
   return (
-    <>
-      {c.kind === "confluence" && c.write_enabled && (c.write_pages?.length ?? 0) > 0 && (
-        <p className="mt-3 text-sm text-amber-300">Writes on: may add text to pages {c.write_pages?.join(", ")}.</p>
+    <div className="mt-3 flex min-w-0 flex-col gap-5" data-testid={`connector-${item.id}`}>
+      {attention && (
+        <Attention item={item}>
+          {item.action === "reconnect" && (k || viaSignIn) ? (
+            // The sign-in agents read with is the one Knowledge syncs with:
+            // signing in again renews both, even after it was disconnected.
+            <KnowledgeSignInControl k={k ?? signedOut(item)} onChanged={onSaved} />
+          ) : item.action === "check_again" && canEdit ? (
+            <button type="button" onClick={() => void onCheck()} disabled={checking} className={secondaryButton}>
+              {checking ? "Checking…" : "Check again"}
+            </button>
+          ) : null}
+        </Attention>
       )}
-      <ConnectorForm
-        item={{ ...c, kind: item.id.split(":")[0] as KeyConnectorKind, id: item.id, label: item.name, connected: Boolean(c.connected) }}
-        onSaved={() => {
-          onSaved();
-        }}
-      />
-      {c.connected && (!viaApp || Boolean(c.updated_at)) && (
-        <p className="mt-3">
-          <button type="button" onClick={remove} className={linkButton}>
-            {viaApp ? `Reset ${item.name} settings` : `Remove ${item.name}`}
-          </button>
+      {item.status === "connected" && item.reason && uses.length < 2 && (
+        <p className="text-sm text-zinc-400" data-testid="integration-reason">
+          {item.reason}
         </p>
       )}
-    </>
+      {(saved || k) && <ConnectionFacts item={item} extra={facts} />}
+      {(saved || k) && uses.length > 1 && <UsesList uses={uses} canEdit={canEdit} busy={busy} onAction={(u) => void act(u)} />}
+      {c.kind === "confluence" && c.write_enabled && (c.write_pages?.length ?? 0) > 0 && (
+        <p className="text-sm text-amber-300">Writes on: may add text to pages {c.write_pages?.join(", ")}.</p>
+      )}
+
+      {/* Not connected: what it needs and the one form. */}
+      {!saved && !k && canEdit && form(true)}
+      {/* Connected for Knowledge only: runs take one switch above; a token is the other way. */}
+      {!saved && k && canEdit && (
+        <OtherWays>
+          <Way title="Use an API token" when="Agents read pages with an Atlassian account's token, and can add text to pages you list.">
+            {form(true)}
+          </Way>
+        </OtherWays>
+      )}
+      {saved && canEdit && (
+        <PanelSection title="Manage" testId="connector-manage">
+          {form(true)}
+        </PanelSection>
+      )}
+      {k && canEdit && (
+        <p className="text-sm text-zinc-400">
+          <PanelLink href="/knowledge/">Manage {k.label} sources in Knowledge</PanelLink>
+        </p>
+      )}
+
+      {saved && canEdit && (!viaApp || Boolean(c.updated_at)) && (
+        <DangerRow
+          title={viaApp ? `Reset ${item.name} settings` : viaSignIn ? `Stop using ${item.name} in runs` : `Remove ${item.name}`}
+          label={viaApp ? "Reset" : viaSignIn ? "Turn off" : "Remove"}
+          onClick={() => void remove()}
+          testId="connector-remove"
+        >
+          {viaApp
+            ? "Writes turn off and the page list and spaces are cleared. Agents keep reading through the Jira app."
+            : viaSignIn
+              ? "Agents stop reading pages during runs. Knowledge keeps syncing with the same sign-in."
+              : "Agents stop using it right away and the saved key is deleted."}
+        </DangerRow>
+      )}
+      {k && canEdit && !k.personal && <KnowledgeDisconnect k={k} beside={saved} onChanged={onSaved} />}
+    </div>
+  );
+}
+
+/** A product that is only synced into Knowledge (Google Drive): its sign-in, seen where sign-ins are. */
+function KnowledgePanel({ item, canEdit, onChanged }: { item: Integration; canEdit: boolean; onChanged: () => Promise<void> }) {
+  const k = knowledgeOf(item);
+  if (!k) return null;
+  const attention = item.status !== "connected" && item.status !== "not_connected";
+  return (
+    <div className="mt-3 flex min-w-0 flex-col gap-5" data-testid={`knowledge-${item.id}`}>
+      {attention && <Attention item={item}>{canEdit && <KnowledgeSignInControl k={k} onChanged={onChanged} />}</Attention>}
+      <ConnectionFacts item={item} extra={[{ label: "Used for", value: knowledgeUse(k) }]} />
+      <p className="text-sm text-zinc-400">
+        <PanelLink href={item.manage_href || "/knowledge/"}>Manage {k.label} sources in Knowledge</PanelLink>
+      </p>
+      {canEdit && !k.personal && <KnowledgeDisconnect k={k} onChanged={onChanged} />}
+    </div>
   );
 }
 

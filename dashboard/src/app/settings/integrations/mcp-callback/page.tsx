@@ -10,8 +10,9 @@ import { Callout } from "@/components/callout";
 import { linkButton, secondaryButton } from "@/components/ui";
 import { takeReturn } from "@/lib/knowledge";
 import { destination, failureView, flowOfState, providerWords, readCallback, resolveFlow, type FailureView, type OAuthFlow } from "@/lib/oauth-callback";
-import { MCP_CONNECTED_MESSAGE } from "@/components/sign-in-card";
 import { hybridOAuthHandoff } from "@/lib/hybrid";
+import { ApiError } from "@/lib/api";
+import { SIGNED_IN, SIGN_IN_FAILED, announceSignIn } from "@/lib/sign-in-flow";
 
 // Where every OAuth sign-in comes back to: an MCP server's, a catalog
 // app's, a knowledge source's, and a self-hosted install's through
@@ -23,6 +24,11 @@ import { hybridOAuthHandoff } from "@/lib/hybrid";
 // knowledge source's sign-in returns to Knowledge, never to this page's
 // MCP wording. The code is taken out of the address bar first, so it isn't
 // kept in the history.
+//
+// A sign-in opened in its own tab (from a card on Integrations, a sign-in
+// card in a chat or a run, or Knowledge) ends by telling the page that
+// started it how it went, connected or not and why, and closing this tab:
+// that page is never left waiting. With nobody waiting, it carries on here.
 
 export default function McpCallbackGuarded() {
   return (
@@ -35,8 +41,8 @@ export default function McpCallbackGuarded() {
 type View =
   | { kind: "working"; flow: OAuthFlow | null }
   | { kind: "idle" }
-  | ({ kind: "failed" } & FailureView)
-  | { kind: "done"; flow: OAuthFlow; name: string; note: string; ownApp: boolean };
+  | ({ kind: "failed"; heard: boolean } & FailureView)
+  | { kind: "done"; flow: OAuthFlow; name: string; note: string; ownApp: boolean; heard: boolean };
 
 function McpCallback() {
   const [view, setView] = useState<View>({ kind: "working", flow: null });
@@ -59,7 +65,11 @@ function McpCallback() {
       // shown as the provider said it.
       if (p.error) {
         window.history.replaceState(null, "", window.location.pathname);
-        setView({ kind: "failed", ...failureView(new Error(providerWords(p.error, p.error_description)), "", "") });
+        const view = failureView(new Error(providerWords(p.error, p.error_description)), "", "");
+        void announceSignIn({ type: SIGN_IN_FAILED, message: view.message, code: p.error }).then((heard) => {
+          setView({ kind: "failed", heard: heard.acked, ...view });
+          if (heard.acked) window.close();
+        });
       } else {
         setView({ kind: "idle" });
       }
@@ -69,27 +79,39 @@ function McpCallback() {
     window.history.replaceState(null, "", window.location.pathname);
     api
       .finishMcpSignIn(p)
-      .then((r) => {
+      .then(async (r) => {
         const s = r.server;
         const flow = resolveFlow(r.flow, s.catalog_id, p.state);
         const knowledgeApp = flow === "ks";
-        setView({ kind: "done", flow, name: knowledgeApp ? s.name.replace(/ \(knowledge\)$/, "") : s.name, note: knowledgeApp ? "" : (r.tools_error ?? ""), ownApp: !!r.own_app });
-        // Opened as a popup (a sign-in card in a chat or a run, or Knowledge
-        // signing in without leaving its page): tell the page that opened
-        // it, and close. That page carries on by itself.
-        const opener = window.opener as Window | null;
-        if (opener && !opener.closed) {
-          try {
-            opener.postMessage({ type: MCP_CONNECTED_MESSAGE, server: s.id, catalog_id: s.catalog_id ?? "" }, window.location.origin);
-            window.close();
-            return;
-          } catch {
-            // Fall through to the page it was started from.
-          }
+        const done = { kind: "done" as const, flow, name: knowledgeApp ? s.name.replace(/ \(knowledge\)$/, "") : s.name, note: knowledgeApp ? "" : (r.tools_error ?? ""), ownApp: !!r.own_app };
+        setView({ ...done, heard: false });
+        // Opened in its own tab (a card on Integrations, a sign-in card in
+        // a chat or a run, or Knowledge signing in without leaving its
+        // page): tell the page that started it, and close. That page
+        // carries on by itself.
+        const heard = await announceSignIn({ type: SIGNED_IN, server: s.id, catalog_id: s.catalog_id ?? "" });
+        if (heard.opener || heard.acked) {
+          setView({ ...done, heard: true });
+          window.close();
+          return;
         }
         window.location.replace(destination(flow, s, r.return_to, knowledgeApp ? takeReturn() : null));
       })
-      .catch((e) => setView({ kind: "failed", ...failureView(e, p.state, "The sign-in didn't finish.") }));
+      .catch(async (e) => {
+        const view = failureView(e, p.state, "The sign-in didn't finish.");
+        const body = (e instanceof ApiError ? e.body : undefined) ?? {};
+        const heard = await announceSignIn({
+          type: SIGN_IN_FAILED,
+          catalog_id: typeof body.catalog_id === "string" ? body.catalog_id : "",
+          message: e instanceof Error ? e.message : "",
+          code: view.code,
+        });
+        setView({ kind: "failed", heard: heard.acked, ...view });
+        // A card that answered shows why itself, so this tab closes. A page
+        // that only opened it (a sign-in card, Knowledge) doesn't: the
+        // reason stays here to read.
+        if (heard.acked) window.close();
+      });
   }
 
   return (
@@ -114,7 +136,9 @@ function McpCallback() {
         {view.kind === "done" && (
           <Callout variant="success" title={`${view.name} is connected`}>
             <p>
-              {view.flow === "ks"
+              {view.heard
+              ? "You can close this tab. The page you started from has been updated."
+              : view.flow === "ks"
               ? "Taking you back to Knowledge…"
               : view.ownApp
                 ? view.note
@@ -136,7 +160,7 @@ function McpCallback() {
               </Link>
             }
           >
-            {view.message}
+            {view.heard ? view.message.replace(/ Go back to (Knowledge|Integrations) and connect it again\.$/, " You can close this tab: the page you started from says what to do next.") : view.message}
             {view.code && <TechnicalDetails text={`Error code: ${view.code}`} />}
           </Problem>
         )}
