@@ -409,11 +409,7 @@ export function CompatSection({
         {(c?.needs_detail?.length ?? 0) > 0 && badge !== "stale" && <NeedsList needs={c!.needs_detail!} />}
 
         {steps.length > 0 ? (
-          <ol aria-label="Steps" className="p-5">
-            {steps.map((s, i) => (
-              <StepRow key={`${i}-${s.title}`} step={s} index={i} last={i === steps.length - 1} />
-            ))}
-          </ol>
+          <StepList steps={steps} />
         ) : c && badge !== "failed" && badge !== "partial" ? (
           <p className="p-5 text-sm text-zinc-400">No steps were found in this item.</p>
         ) : null}
@@ -466,15 +462,60 @@ function NeedsList({ needs }: { needs: CompatNeed[] }) {
   );
 }
 
+/** Whether a step is left out on Coderhelm: it only set up a person's own
+ * machine. An older check marks it `dropped` with another status. */
+export const notNeeded = (s: Pick<CompatStep, "status" | "dropped">) => s.status === "not_needed" || s.dropped;
+
+/** The steps that run, numbered as the item numbers them, then one quiet
+ * line for the steps not needed on Coderhelm (closed until opened). */
+function StepList({ steps }: { steps: CompatStep[] }) {
+  const runs = steps.map((s, i) => ({ s, i })).filter(({ s }) => !notNeeded(s));
+  const skipped = steps.map((s, i) => ({ s, i })).filter(({ s }) => notNeeded(s));
+  return (
+    <div className="p-5">
+      {runs.length > 0 && (
+        <ol aria-label="Steps" className="min-w-0">
+          {runs.map(({ s, i }, k) => (
+            <StepRow key={`${i}-${s.title}`} step={s} index={i} last={k === runs.length - 1} />
+          ))}
+        </ol>
+      )}
+      {skipped.length > 0 && (
+        <details className={`group ${runs.length > 0 ? "mt-4 border-t border-zinc-800 pt-3" : ""}`} data-testid="compat-not-needed">
+          <summary className={`flex min-h-9 cursor-pointer list-none items-center gap-1.5 rounded text-xs text-zinc-400 hover:text-zinc-300 [&::-webkit-details-marker]:hidden ${focusRing}`}>
+            <span aria-hidden="true" className="transition-transform group-open:rotate-90 motion-reduce:transition-none">
+              <ChevronRightIcon />
+            </span>
+            Not needed on Coderhelm ({skipped.length})
+          </summary>
+          <p className="mt-1 text-xs text-zinc-400">
+            These only set up a person&apos;s own computer. Coderhelm already works through your GitHub installation and keeps files with the run.
+          </p>
+          <ul className="mt-2 space-y-1">
+            {skipped.map(({ s, i }) => (
+              <li key={`${i}-${s.title}`} className="text-sm text-zinc-400 [overflow-wrap:anywhere]" data-testid="compat-step-not-needed">
+                <span className="mr-1.5 tabular-nums text-zinc-500">{i + 1}.</span>
+                {s.title}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
+  );
+}
+
 /** One step: a status dot on a line, its title and what it does, and what it
- * relies on, opened on demand. */
+ * relies on. The mapping shows by itself for a step that runs another way or
+ * needs something; a step that runs as written opens it on demand. */
 function StepRow({ step, index, last }: { step: CompatStep; index: number; last: boolean }) {
-  const s = STEP_STATUS[step.status] ?? STEP_STATUS.available;
-  const [open, setOpen] = useState(step.status === "missing" || step.status === "blocked");
+  const status: RequirementStatus = step.status === "not_needed" ? "available" : step.status;
+  const s = STEP_STATUS[status] ?? STEP_STATUS.available;
+  const [open, setOpen] = useState(status !== "available");
   const reqs = step.requirements;
   const id = `step-${index}-details`;
   return (
-    <li className="relative flex gap-3 pb-5 last:pb-0" data-testid="compat-step" data-status={step.status}>
+    <li className="relative flex gap-3 pb-5 last:pb-0" data-testid="compat-step" data-status={status}>
       {!last && <span aria-hidden="true" className="absolute left-[15px] top-8 bottom-0 w-px bg-zinc-800" />}
       <span aria-hidden="true" className={`relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border ${s.dot}`}>
         {s.icon}
@@ -487,7 +528,6 @@ function StepRow({ step, index, last }: { step: CompatStep; index: number; last:
           </p>
           <span className={`text-xs font-medium ${s.text}`} title={s.means}>
             {s.label}
-            {step.dropped && <span className="text-zinc-500"> · left out of the translation</span>}
           </span>
         </div>
         {step.does && <p className="mt-0.5 text-sm text-zinc-400">{step.does}</p>}
