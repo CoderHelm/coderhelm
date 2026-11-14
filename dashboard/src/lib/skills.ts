@@ -159,11 +159,17 @@ export type CompatStatus = "ready" | "translated" | "needs_tools" | "partial";
  * (the integration is already there, or it can't run in Coderhelm). */
 export type CompatAction = "connect" | "credentials" | "none";
 export type RequirementStatus = "available" | "translated" | "missing" | "blocked";
+/** A step's status: a requirement's, or "not_needed" for a step that only
+ * set up a person's own machine (a login check, an output folder, an
+ * install). Such a step is left out on Coderhelm and never counts against
+ * the item. */
+export type StepStatus = RequirementStatus | "not_needed";
 
 /** The short form of an item's last check, as lists get it. */
 export interface CompatShort {
   status: CompatStatus | "";
-  /** "7 of 10 steps run as written · 2 translated · 1 needs New Relic". */
+  /** "7 of 7 steps run · 3 with Coderhelm's tools · 2 not needed here", or
+   * "4 of 10 steps run as written · 2 translated · 1 needs New Relic". */
   summary: string;
   /** What it needs that the team hasn't connected, by name. */
   needs: string[];
@@ -214,9 +220,9 @@ export interface CompatStep {
   title: string;
   does: string;
   requirements: Requirement[];
-  /** Left out of the translated version. */
+  /** Not needed on Coderhelm: left out of the translated version. */
   dropped: boolean;
-  status: RequirementStatus;
+  status: StepStatus;
 }
 
 export interface CompatNeed {
@@ -235,7 +241,7 @@ export interface CompatNeed {
 /** An item's full check, as its page gets it. */
 export interface Compat extends CompatShort {
   steps?: CompatStep[];
-  counts?: { steps: number; as_written: number; translated: number; missing: number; blocked: number };
+  counts?: { steps: number; as_written: number; translated: number; missing: number; blocked: number; not_needed?: number };
   needs_detail?: CompatNeed[];
   /** What was fixed up in the model's answer, in plain words. */
   notes?: string[];

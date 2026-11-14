@@ -77,6 +77,17 @@ export async function request<T>(path: string, options?: RequestInit): Promise<T
   return text ? JSON.parse(text) : (undefined as T);
 }
 
+/** One file a run kept as its outputs. */
+export interface RunOutput {
+  name: string;
+  bytes: number;
+}
+
+/** Where one of a run's outputs downloads from (the session cookie goes with it). */
+export function runOutputUrl(runId: string, name: string): string {
+  return `${apiBase()}/api/runs/${encodeURIComponent(runId)}/outputs/file?name=${encodeURIComponent(name)}`;
+}
+
 /** Fired when the server holds this session until it has a second factor. */
 export const TWO_FACTOR_REQUIRED = "coderhelm:two-factor-required";
 
@@ -411,6 +422,8 @@ export const api = {
     ),
   getRun: (id: string) => request<RunDetail>(`/api/runs/${id}`),
   getRunOpenspec: (id: string) => request<Openspec>(`/api/runs/${id}/openspec`),
+  /** Files the run kept as its outputs (a skill's reports and tables). */
+  getRunOutputs: (id: string) => request<{ outputs: RunOutput[] }>(`/api/runs/${id}/outputs`),
   getAgentLog: (id: string) => request<AgentLog>(`/api/runs/${id}/agent-log`),
   retryRun: (id: string) =>
     request<{ status: string }>(`/api/runs/${id}/retry`, { method: "POST" }),

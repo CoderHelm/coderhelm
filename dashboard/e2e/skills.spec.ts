@@ -492,6 +492,22 @@ test("a run's page lists the team agents it asked, linked to each agent", async 
   await expect(section.getByText("Check this ticket for contradictions before I plan it.")).toBeVisible();
 });
 
+test("a run's page lists the files it kept as outputs, each a download, the linked one marked", async ({ page }) => {
+  await mockApi(page);
+  await page.route((url) => url.pathname === "/api/runs/run_77/outputs", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ outputs: [{ name: "report.html", bytes: 20480 }, { name: "tables.md", bytes: 900 }] }) }),
+  );
+  await page.goto("/runs/detail?id=run_77&output=report.html");
+  const outputs = page.getByTestId("run-outputs");
+  await expect(outputs.getByRole("heading", { name: "Outputs 2" })).toBeVisible();
+  const rows = outputs.getByTestId("run-output");
+  await expect(rows).toHaveCount(2);
+  await expect(rows.nth(0).getByRole("link", { name: "report.html" })).toHaveAttribute("href", /\/api\/runs\/run_77\/outputs\/file\?name=report\.html$/);
+  await expect(rows.nth(0)).toHaveAttribute("aria-current", "true");
+  await expect(rows.nth(1)).not.toHaveAttribute("aria-current", "true");
+  await expect(rows.nth(0)).toContainText("20 KB");
+});
+
 const DEBUG_URL = "/skills/item?repo=acme%2Fplaybook&path=skills%2Fdebug%2FSKILL.md";
 
 test("the overview counts items by how Coderhelm runs them and filters by what they need", async ({ page }) => {
@@ -562,7 +578,8 @@ test("an item's page: each step, what it relies on, what to connect, and the two
   await expect(steps.nth(3).getByText("list_change_events")).toBeVisible();
   await expect(steps.nth(3).getByRole("link", { name: "Connect Monitoring in Connected accounts" })).toHaveAttribute("href", /^\/connections\/?$/);
   await expect(steps.nth(4).getByText("writes outside")).toBeVisible();
-  await steps.nth(1).getByRole("button", { name: "Show what it relies on (1)" }).click();
+  // A translated step shows what it asks for and what Coderhelm uses instead.
+  await expect(steps.nth(1).getByRole("button", { name: "Hide what it relies on (1)" })).toBeVisible();
   await expect(steps.nth(1).getByText("CloudWatch logs")).toBeVisible();
   await expect(steps.nth(1).getByText("logs_search")).toBeVisible();
   await shot(page, "skill-item-compat");
@@ -588,6 +605,74 @@ test("an item's page: each step, what it relies on, what to connect, and the two
   expect(db.calls.find((c) => c.path === "/api/skills/recheck")?.body).toEqual({ repo: "acme/playbook", path: "skills/debug/SKILL.md" });
   await expect(page.getByText("debug checked")).toBeVisible({ timeout: 15_000 });
 });
+
+// A report skill whose every step runs on Coderhelm: two setup steps for a
+// laptop are not needed, the script runs in the sandbox, its files are kept.
+const REPORT_URL = "/skills/item?repo=acme%2Fplaybook&path=skills%2Freport-rate%2FSKILL.md";
+const REPORT_SUMMARY = "7 of 7 steps run · 3 with Coderhelm's tools · 2 not needed here";
+const reportItem = () => ({
+  ...item({ path: "skills/report-rate/SKILL.md", kind: "skill", name: "report-rate", description: "Merge rate by contributor across the team's repositories.", files: ["skills/report-rate/report_rate.py"] }),
+  body: "---\nname: report-rate\n---\n1. Parse the arguments.\n2. Choose an output directory.\n3. Check access with `gh auth status`.\n",
+  translated: "1. Read the arguments.\n2. Run `run_skill_script` with skill:report-rate.\n",
+  compat: {
+    ...checked("translated", REPORT_SUMMARY),
+    steps: [
+      { title: "Parse the arguments", does: "Repos, since, until.", dropped: false, status: "available", requirements: [] },
+      { title: "Choose an output directory", does: "A folder for the files.", dropped: true, status: "not_needed", requirements: [req("./reports/<date>", "missing", [], { kind: "path", write: "repo" })] },
+      { title: "Check GitHub access", does: "Log in if it fails.", dropped: true, status: "not_needed", requirements: [req("gh auth status", "missing", [], { kind: "command" })] },
+      { title: "Run the bundled script", does: "Fetch every pull request and compute the figures.", dropped: false, status: "translated", requirements: [req("python3 report_rate.py", "translated", ["run_skill_script"], { kind: "command" })] },
+      { title: "Read the tables", does: "Read tables.md and summary.json.", dropped: false, status: "translated", requirements: [req("tables.md", "translated", ["read_output"], { kind: "path" })] },
+      { title: "Write the narrative", does: "From the tables, linking report.html.", dropped: false, status: "translated", requirements: [req("report.md", "translated", ["save_output"], { kind: "path" })] },
+      { title: "Say where everything is", does: "Give the links.", dropped: false, status: "available", requirements: [req("Tell the user", "available", [], { kind: "person" })] },
+    ],
+    counts: { steps: 7, as_written: 2, translated: 3, missing: 0, blocked: 0, not_needed: 2 },
+    needs_detail: [],
+    notes: ['Step "Run the bundled script" changed from missing to translated: Coderhelm\'s or the team\'s tools changed since the last check.'],
+  },
+});
+
+for (const width of [1280, 390]) {
+  test(`a skill whose every step runs: the mapping per step, setup steps in one quiet line (${width}px)`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    const db = await mockApi(page);
+    await page.route((url) => url.pathname === "/api/skills/item" && url.searchParams.get("path") === "skills/report-rate/SKILL.md", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(reportItem()) }),
+    );
+    await page.goto(REPORT_URL);
+    const section = page.getByTestId("compat-section");
+    await expect(section.getByTestId("compat-summary")).toHaveText(REPORT_SUMMARY);
+    await expect(section.getByText("Translated", { exact: true }).first()).toBeVisible();
+    // Only the steps that run are listed, numbered as the skill numbers them.
+    const steps = section.getByTestId("compat-step");
+    await expect(steps).toHaveCount(5);
+    await expect(steps.nth(1)).toContainText("4.Run the bundled script");
+    // Each translated step shows what the skill asks for and what Coderhelm uses.
+    await expect(steps.nth(1).getByText("python3 report_rate.py")).toBeVisible();
+    await expect(steps.nth(1).getByText("run_skill_script")).toBeVisible();
+    await expect(steps.nth(2).getByText("read_output")).toBeVisible();
+    await expect(steps.nth(3).getByText("save_output")).toBeVisible();
+    // No gaps, no warnings, nothing to connect.
+    await expect(section.getByTestId("compat-needs")).toHaveCount(0);
+    await expect(section.getByText("Needs a tool")).toHaveCount(0);
+    await expect(section.getByText(/left out of the translation|Assumes a local machine/)).toHaveCount(0);
+    // The setup steps: one closed, quiet line that opens to name them.
+    const skipped = section.getByTestId("compat-not-needed");
+    await expect(skipped.getByText("Not needed on Coderhelm (2)")).toBeVisible();
+    await expect(skipped.getByTestId("compat-step-not-needed").first()).toBeHidden();
+    await skipped.getByText("Not needed on Coderhelm (2)").click();
+    await expect(skipped.getByTestId("compat-step-not-needed")).toHaveText(["2.Choose an output directory", "3.Check GitHub access"]);
+    // The re-check says what got better.
+    await expect(section.getByTestId("compat-notes")).toContainText("changed from missing to translated");
+    // The version switch behaves as before.
+    const choice = page.getByRole("switch", { name: "Give agents the translated version of report-rate" });
+    await choice.click();
+    expect(db.calls.find((c) => c.method === "PUT" && c.path === "/api/skills/translated")?.body).toEqual({ repo: "acme/playbook", path: "skills/report-rate/SKILL.md", enabled: true });
+    // Nothing runs off the side of a phone.
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
+    await shot(page, `skill-item-every-step-runs-${width}`);
+  });
+}
 
 test("a gap on GitHub, which is always connected, offers no connect link; a partial check says why", async ({ page }) => {
   const db = await mockApi(page);
