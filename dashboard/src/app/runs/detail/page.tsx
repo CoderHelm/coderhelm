@@ -37,6 +37,7 @@ import { activePass, PASSES, runSteps } from "@/lib/run-steps";
 import { checksSentence, runTimeline, spanSeconds, stillToCome } from "@/lib/run-timeline";
 import { ChecksPanel, FilesChanged, noFilesNote, RunTimeline } from "./run-timeline";
 import { AgentLogPanel, BuildDigest } from "./agent-log";
+import { RunActivity } from "./run-activity";
 import { VerdictPill } from "@/app/reviewer/labels";
 import { reviewHref } from "@/app/reviewer/session/session";
 import { planCheckResult, taskPath } from "@/lib/plan-check";
@@ -181,7 +182,9 @@ function RunDetailInner() {
   const [loadError, setLoadError] = useState<"missing" | "failed" | null>(null);
   const [busy, setBusy] = useState<"retry" | "review" | "reset" | "cancel" | "close" | "reopen" | "close-superseded" | null>(null);
   const [closeOpen, setCloseOpen] = useState(false);
-  const [specTab, setSpecTab] = useState<keyof Openspec>("proposal");
+  // The plan's documents have been asked for and answered (or failed): a
+  // `?tab=plan` link to a run without one can then fall back to the Overview.
+  const [planChecked, setPlanChecked] = useState(false);
   const [usage, setUsage] = useState<UsageInfo | null>(null);
   const { can } = useCan();
   const [catalog, setCatalog] = useState<PluginDef[]>([]);
@@ -213,7 +216,7 @@ function RunDetailInner() {
         if (r.status !== "running" || PASSES.indexOf(r.current_pass ?? "") >= 1) {
           if (!openspecLoaded.current) {
             openspecLoaded.current = true;
-            api.getRunOpenspec(runId).then(setOpenspec).catch(() => { openspecLoaded.current = false; });
+            api.getRunOpenspec(runId).then(setOpenspec).catch(() => { openspecLoaded.current = false; }).finally(() => setPlanChecked(true));
           }
         }
         if (r.status !== "running" && r.status !== "queued") {
@@ -359,8 +362,13 @@ function RunDetailInner() {
   const specTabs = openspec
     ? (Object.keys(openspec) as (keyof Openspec)[]).filter((k) => openspec[k] && k !== "tasks")
     : [];
-  // The first spec document may not be the proposal; never show an empty tab.
-  const activeSpecTab = specTabs.includes(specTab) ? specTab : specTabs[0];
+  // The document named in the link (`&doc=spec`), else the proposal, else the
+  // first that exists; never an empty one.
+  const docParam = searchParams.get("doc") as keyof Openspec | null;
+  const activeSpecTab = docParam && specTabs.includes(docParam) ? docParam : specTabs.includes("proposal") ? "proposal" : specTabs[0];
+  const hasPlan = specTabs.length > 0;
+  // The plan's documents are still on their way: they load once the run is past triage.
+  const planPending = !hasPlan && !planChecked && (run.status !== "running" || PASSES.indexOf(run.current_pass ?? "") >= 1);
 
   const implementStarted = maxPassIdx >= 2 || ["completed", "merged", "failed", "archived", "cancelled", "closed"].includes(run.status);
   const showTaskSidebar = taskItems.length > 0 && implementStarted;
@@ -565,7 +573,12 @@ function RunDetailInner() {
       </Link>
     </p>
   ) : null;
-  const tab: RunTab = onLogTab ? "log" : (RUN_TABS as readonly string[]).includes(tabParam ?? "") ? (tabParam as RunTab) : "overview";
+  const asked: RunTab = onLogTab ? "log" : (RUN_TABS as readonly string[]).includes(tabParam ?? "") ? (tabParam as RunTab) : "overview";
+  // A run without a plan has no Plan tab: a link to it lands on the Overview.
+  // While the run is still planning, its plan is what there is to read: it opens there.
+  const planning = run.status === "running" && (run.current_pass ?? "").startsWith("plan");
+  const tab: RunTab = asked === "plan" && !hasPlan && !planPending ? "overview" : !tabParam && !oldLogLink && planning && hasPlan ? "plan" : asked;
+  const shownTabs = RUN_TABS.filter((t) => t !== "plan" || hasPlan || tab === "plan");
   const tabHref = (t: RunTab) => `/runs/detail?id=${encodeURIComponent(runId)}${t === "overview" ? "" : `&tab=${t}`}`;
   const sourceWord = run.ticket_source === "jira" ? "Jira ticket" : run.ticket_source === "alert" ? "Alert" : "Issue";
   // "your-team/web#1234" in "your-team/web" says the repo twice: show "Issue #1234".
@@ -1127,7 +1140,7 @@ function RunDetailInner() {
         label="Run views"
         selectAbove={3}
         value={tab}
-        items={RUN_TABS.map((t) => ({ value: t, label: RUN_TAB_LABEL[t], href: tabHref(t) }))}
+        items={shownTabs.map((t) => ({ value: t, label: RUN_TAB_LABEL[t], href: tabHref(t) }))}
       />
 
       <CloseRunDialog open={closeOpen} onOpenChange={setCloseOpen} count={1} prNumbers={openPrs} tickets={[{ source: run.ticket_source, id: run.ticket_id }]} busy={busy === "close"} onConfirm={closeRun} />
@@ -1231,6 +1244,38 @@ function RunDetailInner() {
         </div>
       )}
 
+      {tab === "plan" && (
+        <section aria-labelledby="plan-heading" className="mt-6 min-w-0 space-y-3" data-testid="run-tab-plan">
+          <h2 id="plan-heading" className="sr-only">Plan</h2>
+          {!hasPlan ? (
+            <p className="text-sm text-zinc-400" role="status">Loading the plan…</p>
+          ) : (
+            <div className="min-w-0 overflow-hidden rounded-lg border border-zinc-800">
+              <div role="group" aria-label="Plan documents" className="flex flex-wrap gap-1 border-b border-zinc-800 bg-zinc-900 p-1">
+                {specTabs.map((t) => (
+                  <Link
+                    key={t}
+                    href={`${tabHref("plan")}&doc=${t}`}
+                    replace
+                    scroll={false}
+                    role="button"
+                    aria-pressed={activeSpecTab === t}
+                    className={`inline-flex min-h-8 items-center rounded-md px-3 text-sm capitalize transition-colors ${focusRing} ${
+                      activeSpecTab === t ? "bg-zinc-800 text-zinc-100" : "text-zinc-400 hover:text-zinc-200"
+                    }`}
+                  >
+                    {t}
+                  </Link>
+                ))}
+              </div>
+              <div className="min-w-0 p-4 [overflow-wrap:anywhere]">
+                <Markdown>{String(openspec?.[activeSpecTab] ?? "")}</Markdown>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
       {tab === "changes" && (
         <div className="mt-6 space-y-8" data-testid="run-tab-changes">
           {(prLinks.length > 0 || reviewButton) && (
@@ -1273,30 +1318,12 @@ function RunDetailInner() {
             )}
           </section>
 
-          {specTabs.length > 0 && (
-            <section aria-labelledby="plan-heading" className="space-y-3">
-              <SectionHeading id="plan-heading">Plan</SectionHeading>
-              <div className="overflow-hidden rounded-lg border border-zinc-800">
-                <div role="group" aria-label="Plan documents" className="flex flex-wrap gap-1 border-b border-zinc-800 bg-zinc-900 p-1">
-                  {specTabs.map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      aria-pressed={activeSpecTab === t}
-                      onClick={() => setSpecTab(t)}
-                      className={`min-h-8 rounded-md px-3 text-sm capitalize transition-colors ${focusRing} ${
-                        activeSpecTab === t ? "bg-zinc-800 text-zinc-100" : "text-zinc-400 hover:text-zinc-200"
-                      }`}
-                    >
-                      {t}
-                    </button>
-                  ))}
-                </div>
-                <div className="max-h-96 overflow-y-auto p-4">
-                  <Markdown>{String(openspec?.[activeSpecTab] ?? "")}</Markdown>
-                </div>
-              </div>
-            </section>
+          {hasPlan && (
+            <p className="text-sm text-zinc-400" data-testid="changes-plan-link">
+              <Link href={tabHref("plan")} className="text-zinc-200 underline underline-offset-4 hover:text-zinc-100">
+                See the plan
+              </Link>
+            </p>
           )}
 
           {run.mcp_servers && run.mcp_servers.length > 0 && (
@@ -1322,11 +1349,17 @@ function RunDetailInner() {
               <TechnicalDetails text={sanitizeError(run.error)} />
             </Callout>
           )}
+          {/* The run's story first, so the tab is never blank for a real run. */}
+          <RunActivity runId={runId} run={run} live={isActive(run.status) || run.status === "needs_input"} />
           <AsksHistory data={asks} live={asksAreCurrent} note={run.policy_note} prompts={run.sign_in_prompts} />
           <TeamAgentAsks runId={runId} status={run.status} traces={traces} />
+          {/* Read again on every change to the run and, while it works, on a timer:
+              its reads and asks are recorded while the status stays "running". */}
           <WorkUsedLine
             query={run.created_at ? { run_id: run.run_id || runId, since: run.created_at } : null}
-            refreshKey={run.status}
+            refreshKey={`${run.status}|${run.updated_at ?? ""}`}
+            live={isActive(run.status)}
+            showFailure
             standardNames={run.applied_standards}
             title="What the run used"
           />
@@ -1416,9 +1449,9 @@ function RunDetailInner() {
   );
 }
 
-const RUN_TABS = ["overview", "changes", "activity", "log", "details"] as const;
+const RUN_TABS = ["overview", "plan", "changes", "activity", "log", "details"] as const;
 type RunTab = (typeof RUN_TABS)[number];
-const RUN_TAB_LABEL: Record<RunTab, string> = { overview: "Overview", changes: "Changes", activity: "Activity", log: "Agent log", details: "Details" };
+const RUN_TAB_LABEL: Record<RunTab, string> = { overview: "Overview", plan: "Plan", changes: "Changes", activity: "Activity", log: "Agent log", details: "Details" };
 /** The agent log's own URL state (agent-log.tsx): a link carrying any of these points into the log. */
 const LOG_PARAMS = ["step", "log_q", "log_filter", "log_file", "log_view", "log_time"];
 

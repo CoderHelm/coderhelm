@@ -373,8 +373,8 @@ test("a run that learned the fix was elsewhere shows the lesson it saved", async
 
 test("the spec documents open on a document that exists, never an empty tab", async ({ page }) => {
   await mockApi(page);
-  await page.goto("/runs/detail/?id=01RUNDONE000000000000000A&tab=changes");
-  await expect(page.getByRole("heading", { name: "Plan", exact: true })).toBeVisible();
+  await page.goto("/runs/detail/?id=01RUNDONE000000000000000A&tab=plan");
+  await expect(page.getByTestId("run-tab-plan")).toBeVisible();
   await expect(page.getByRole("button", { name: "design" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByText("Add a schedule table to the details page.")).toBeVisible();
   await expect(page.getByText("undefined")).toHaveCount(0);
