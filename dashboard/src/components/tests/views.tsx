@@ -2,13 +2,11 @@
 
 import { Code } from "@/components/settings";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { api, type TestCase, type TestRun, type TestSummary } from "@/lib/api";
 import { CAUSE_LABEL, githubPrUrl, minutes, plural, runHref, shortSha, testHref } from "@/lib/tests";
-import { errorMessage, formatDuration } from "@/lib/data-sources";
-import { useToast } from "@/components/toast";
-import { useConfirm } from "@/components/confirm-dialog";
-import { linkButton, secondaryButton, smallSecondaryButton } from "@/components/ui";
+import { formatDuration } from "@/lib/data-sources";
+import { linkButton } from "@/components/ui";
 import {
   DetailBlock,
   GROUP_LABEL,
@@ -22,8 +20,7 @@ import {
   type StatusLook,
 } from "@/components/list";
 import { EmptyBox, LoadError, Loading, StatCard } from "./common";
-import { SetupPointer } from "./setup";
-import { TestList, impactFacts, quarantineFacts, slowFacts, testMatches } from "./test-list";
+import { TestList, impactFacts, slowFacts, testMatches } from "./test-list";
 import { useLoad } from "./use-load";
 
 /** A search box over a loaded list of tests, kept in the address as `?q=`. */
@@ -301,91 +298,3 @@ export function SlowestView({ repo }: { repo: string }) {
     </ListSection>
   );
 }
-
-// ── Quarantine ────────────────────────────────────────────────────
-
-export function QuarantineView({ repo, canEdit, ticketDays = 2 }: { repo: string; canEdit: boolean; ticketDays?: number }) {
-  const { toast } = useToast();
-  const { confirm } = useConfirm();
-  const { data, setData, error, loading, reload } = useLoad(
-    () => api.listTests({ repo, state: "quarantined", limit: 200 }),
-    `quarantine:${repo}`,
-  );
-  const [busy, setBusy] = useState("");
-
-  const release = async (t: TestCase) => {
-    const ok = await confirm({
-      title: "Let this test fail builds again?",
-      message: "It goes back to blocking pull requests when it fails. Do this once a fix has landed.",
-      confirmLabel: "Release",
-    });
-    if (ok !== "primary") return;
-    setBusy(t.id);
-    try {
-      await api.quarantineTest(t.id, false);
-      setData((prev) => (prev ? { ...prev, tests: prev.tests.filter((x) => x.id !== t.id) } : prev));
-      toast("Released from quarantine");
-    } catch (e) {
-      toast(errorMessage(e, "Couldn't release it."), "error");
-    } finally {
-      setBusy("");
-    }
-  };
-
-  const { q, search, clear } = useTestSearch();
-  const tests = data?.tests ?? [];
-  const shown = tests.filter((t) => testMatches(t, q));
-  const old = tests.filter((t) => t.quarantined_since && Date.now() - new Date(t.quarantined_since).getTime() > ticketDays * 86_400_000);
-
-  return (
-    <ListSection
-      id="quarantine"
-      title="Quarantine"
-      count={tests.length || undefined}
-      description={
-        <>
-          Quarantined tests still run and are still recorded. When only quarantined tests fail, Coderhelm treats the run as passing. When
-          tickets are on, the owner gets one after {plural(ticketDays, "day")} without a fix.
-        </>
-      }
-    >
-      <div className="mb-4 mt-3">
-        <SetupPointer>GitHub still fails the build on a quarantined test until the workflow skips it. Setup adds that step for you.</SetupPointer>
-      </div>
-      {error ? (
-        <LoadError what="the quarantine list" message={error} onRetry={reload} />
-      ) : loading && !data ? (
-        <Loading what="the quarantine list" />
-      ) : tests.length === 0 ? (
-        <EmptyBox>No test is quarantined.</EmptyBox>
-      ) : (
-        <>
-          {tests.length > 3 && <ListToolbar className="mb-3" search={search} onClear={q ? clear : undefined} />}
-          {old.length > 0 && (
-            <p className="mb-3 text-sm text-amber-200">{plural(old.length, "test has", "tests have")} been quarantined for over {plural(ticketDays, "day")}.</p>
-          )}
-          {shown.length === 0 && (
-            <EmptyBox>No test matches. <button type="button" onClick={clear} className={linkButton}>Clear filters</button></EmptyBox>
-          )}
-          {shown.length > 0 && <TestList
-            label="Quarantined tests"
-            tests={shown}
-            facts={quarantineFacts}
-            actions={(t) => (
-              <>
-                {t.ticket_url && <a href={t.ticket_url} target="_blank" rel="noreferrer" className={linkButton}>Ticket</a>}
-                {t.fix_pr_url && <a href={t.fix_pr_url} target="_blank" rel="noreferrer" className={linkButton}>Fix PR</a>}
-                {canEdit && (
-                  <button type="button" onClick={() => release(t)} disabled={busy === t.id} className={`${smallSecondaryButton}`}>
-                    {busy === t.id ? "Releasing…" : "Release from quarantine"}
-                  </button>
-                )}
-              </>
-            )}
-          />}
-        </>
-      )}
-    </ListSection>
-  );
-}
-
