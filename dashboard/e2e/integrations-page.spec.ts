@@ -105,8 +105,10 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
   const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
   const at = (min: Role) => LEVEL[db.role] >= LEVEL[min];
   const forbidden = (r: Route) => json(r, { error: "Forbidden" }, 403);
-  await page.route((url) => url.hostname !== "localhost", (route) => route.abort());
-  await page.route((url) => url.hostname === "localhost" && /^\/(api|auth)\//.test(url.pathname), async (r) => {
+  // On the context, so a sign-in opened in its own tab is answered here too.
+  const context = page.context();
+  await context.route((url) => url.hostname !== "localhost", (route) => route.abort());
+  await context.route((url) => url.hostname === "localhost" && /^\/(api|auth)\//.test(url.pathname), async (r) => {
     const req = r.request();
     const p = new URL(req.url()).pathname;
     const method = req.method();
@@ -630,8 +632,9 @@ test("a saved webhook shows only as a hint, is tested without the page knowing i
   });
 });
 
-test("Figma signs in with the team's own app, its redirect URL and scopes shown, a key still possible", async ({ page }) => {
+test("Figma signs in with the team's own app, its redirect URL and scopes shown, a key still possible", async ({ page, context }) => {
   const db = await mockApi(page);
+  db.items = db.items.map((i) => (i.id === "figma" ? pluginCard("figma", "Figma", "docs", false, false) : i));
   const figma = db.items.find((i) => i.id === "figma")!;
   (figma.detail as Record<string, unknown>).own_app_redirect_uri = "https://coderhelm.example.com/settings/integrations/mcp-callback/";
   (figma.detail as { plugin: Record<string, unknown> }).plugin.own_app = {
@@ -643,28 +646,33 @@ test("Figma signs in with the team's own app, its redirect URL and scopes shown,
     guide: "https://developers.figma.com/docs/rest-api/oauth-apps/",
   };
   await page.goto("/settings/integrations#integration-figma");
+  // Where Coderhelm has no app of its own, the team's own app is the default way.
   const panel = row(page, "figma").getByTestId("own-app");
-  await expect(panel).toContainText("Use my own Figma app");
+  await expect(panel).toBeVisible();
   await expect(panel.getByTestId("own-app-redirect")).toHaveText("https://coderhelm.example.com/settings/integrations/mcp-callback/");
   await expect(panel).toContainText("current_user:read, file_content:read");
   await expect(panel.getByRole("link", { name: "www.figma.com/developers/apps" })).toHaveAttribute("href", "https://www.figma.com/developers/apps");
-  // The key form waits behind its disclosure.
-  await expect(row(page, "figma").getByText("Use a key instead")).toBeVisible();
-  const go = panel.getByRole("button", { name: "Save and connect with Figma" });
+  // A key waits with the other ways to connect, behind one disclosure.
+  await expect(row(page, "figma").getByTestId("other-ways").locator("summary")).toHaveText("Other ways to connect");
+  await expect(row(page, "figma").getByTestId("way-key")).toBeHidden();
+  const go = panel.getByRole("button", { name: "Save and sign in with Figma" });
   await expect(go).toBeDisabled();
   await panel.getByLabel("Client ID").fill("client-1");
   await panel.getByLabel("Client secret").fill("secret-1");
+  const tab = context.waitForEvent("page");
   await go.click();
-  // Saved, then sent to Figma's sign-in, whose answer the callback page finishes.
+  // Saved, then Figma's sign-in opens in its own tab, whose answer the callback page finishes.
+  await (await tab).waitForEvent("close");
   await expect.poll(() => db.calls.some((c) => c.path === "/api/mcp-servers/oauth/callback")).toBe(true);
   const saved = db.calls.find((c) => c.method === "PUT" && c.path === "/api/mcp-servers/apps/figma");
   expect(saved?.body).toEqual({ client_id: "client-1", client_secret: "secret-1" });
   expect(db.calls.some((c) => c.method === "POST" && c.path === "/api/mcp-servers/app-figma/connect")).toBe(true);
-  await expect(page).toHaveURL(/\/settings\/integrations\/#integration-figma$/);
+  await expect(page).toHaveURL(/\/settings\/integrations\/?#integration-figma$/);
 });
 
-test("Figma signs in with Coderhelm's app in one click; my own app and a key are the other choices", async ({ page }) => {
+test("Figma signs in with Coderhelm's app in one click; my own app and a key are the other choices", async ({ page, context }) => {
   const db = await mockApi(page);
+  db.items = db.items.map((i) => (i.id === "figma" ? pluginCard("figma", "Figma", "docs", false, false) : i));
   const figma = db.items.find((i) => i.id === "figma")!;
   const detail = figma.detail as Record<string, unknown> & { plugin: Record<string, unknown> };
   detail.own_app_redirect_uri = "https://app.coderhelm.com/settings/integrations/mcp-callback/";
@@ -679,13 +687,17 @@ test("Figma signs in with Coderhelm's app in one click; my own app and a key are
   };
   await page.goto("/settings/integrations#integration-figma");
   const card = row(page, "figma");
-  const ours = card.getByTestId("coderhelm-app");
-  await expect(ours).toContainText("current_user:read, file_content:read");
-  // The own app's steps and the key wait behind their disclosures.
-  await expect(card.getByText("Use my own Figma app", { exact: true }).first()).toBeVisible();
-  await expect(card.getByText("Use a key instead", { exact: true })).toBeVisible();
+  // What it will do in plain words; the scope names wait behind Details.
+  await expect(card.getByTestId("access")).toHaveText("Coderhelm reads Figma with this sign-in. It can't change anything in Figma.");
+  await expect(card.getByTestId("scopes")).toBeHidden();
+  // The own app's steps and the key wait together, behind one disclosure.
+  await expect(card.getByTestId("other-ways").locator("summary")).toHaveText("Other ways to connect");
   await expect(card.getByTestId("own-app")).toBeHidden();
-  await ours.getByRole("button", { name: "Sign in with Figma" }).click();
+  await expect(card.getByTestId("way-key")).toBeHidden();
+  await expect(card.getByRole("button", { name: "Sign in with Figma" })).toHaveCount(1);
+  const tab = context.waitForEvent("page");
+  await card.getByRole("button", { name: "Sign in with Figma" }).click();
+  await (await tab).waitForEvent("close");
   await expect.poll(() => db.calls.some((c) => c.path === "/api/mcp-servers/oauth/callback")).toBe(true);
   expect(db.calls.some((c) => c.method === "POST" && c.path === "/api/mcp-servers/apps/figma/coderhelm")).toBe(true);
   expect(db.calls.some((c) => c.method === "PUT" && c.path === "/api/mcp-servers/apps/figma")).toBe(false);

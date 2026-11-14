@@ -63,6 +63,8 @@ export function destination(
   if (flow === "ks") {
     const kind = (server.catalog_id ?? "").replace(/^source:/, "");
     const back = safePath(returnTo);
+    // Renewed from the product's card on Integrations: back to that card.
+    if (back && back.startsWith("/settings/integrations")) return back;
     if (back && back.startsWith("/knowledge")) {
       return returnAddress({ path: back, kind: (remembered?.kind ?? kind) as FlowReturn["kind"], kbId: remembered?.kbId }, kind);
     }

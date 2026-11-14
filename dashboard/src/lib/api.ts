@@ -1523,9 +1523,12 @@ export const api = {
   declineSignIn: (thread_id: string, server_id: string) =>
     request<{ declined: boolean }>("/api/agents/sign-in/decline", { method: "POST", body: JSON.stringify({ thread_id, server_id }) }),
 
-  /** Where to send the browser to sign in. */
+  /** Where to send the browser to sign in, and how long the sign-in can still be finished. */
   connectMcpServer: (id: string) =>
-    request<{ authorize_url: string }>(`/api/mcp-servers/${encodeURIComponent(id)}/connect`, { method: "POST" }),
+    request<SignInStart>(`/api/mcp-servers/${encodeURIComponent(id)}/connect`, { method: "POST" }),
+  /** Ends the sign-ins this person started for a connection and didn't finish; nothing connected changes. */
+  cancelMcpSignIn: (id: string) =>
+    request<{ cancelled: number }>(`/api/mcp-servers/${encodeURIComponent(id)}/sign-in`, { method: "DELETE" }),
   /** Finishes any sign-in that came back to the callback page; `flow` and `return_to` say where it goes next. */
   finishMcpSignIn: (body: { state: string; code?: string; error?: string; error_description?: string; iss?: string }) =>
     request<{ server: McpServer; tools_error: string | null; own_app?: boolean; flow?: string; return_to?: string }>("/api/mcp-servers/oauth/callback", {
@@ -1544,7 +1547,7 @@ export const api = {
     }),
   /** Signs in with Coderhelm's own app for a catalog server (Figma): replaces the team's own app, if one was saved, and answers where to send the browser. */
   connectCoderhelmApp: (catalogId: string) =>
-    request<{ authorize_url: string; own_app: OwnAppState }>(`/api/mcp-servers/apps/${encodeURIComponent(catalogId)}/coderhelm`, { method: "POST" }),
+    request<SignInStart & { own_app: OwnAppState }>(`/api/mcp-servers/apps/${encodeURIComponent(catalogId)}/coderhelm`, { method: "POST" }),
   setMcpClient: (id: string, client_id: string, client_secret: string) =>
     request<{ server: McpServer }>(`/api/mcp-servers/${encodeURIComponent(id)}/client`, {
       method: "PUT",
@@ -3454,6 +3457,8 @@ export interface OwnAppDef {
   refresh: string;
   /** The scopes to tick on the app, exactly. */
   scopes: string[];
+  /** What those scopes let Coderhelm do, in plain words. Missing from older gateways. */
+  reads?: string;
   /** Where the app is created. */
   console: string;
   /** The vendor's guide to creating one. */
@@ -3461,6 +3466,15 @@ export interface OwnAppDef {
 }
 
 /** A team's own app for a catalog server, as its card shows it (never the secret). */
+/** A sign-in that was started: where to send the browser, and what the page waiting on it needs. */
+export interface SignInStart {
+  authorize_url: string;
+  /** The connection being signed in to (`figma`, `app-figma`, `ks-confluence`), for cancelling. Missing from older gateways. */
+  server_id?: string;
+  /** Seconds the sign-in can still be finished in. Missing from older gateways (ten minutes). */
+  expires_in?: number;
+}
+
 export interface OwnAppState {
   /** The connection's id, for connect, disconnect and remove. */
   id: string;
@@ -4352,7 +4366,10 @@ export interface Connector {
   spaces?: string[];
   write_enabled?: boolean;
   write_pages?: string[];
-  /** Confluence: `jira_app` when it goes through the team's Coderhelm Jira app (no token), else empty. */
+  /**
+   * Confluence: `jira_app` when it goes through the team's Coderhelm Jira app, `sign_in` when agents read
+   * with the Atlassian sign-in the team made for Knowledge (no token either way), else empty.
+   */
   via?: string;
   environments?: string[];
   indexes?: string[];
@@ -4474,6 +4491,46 @@ export interface Integration {
   /** A page with more settings, or empty. */
   manage_href: string;
   detail: Record<string, unknown>;
+  /**
+   * What the product is used for, worked out by the API from every way the team reaches it (a key, the
+   * Jira app, a sign-in for agents, a sign-in for Knowledge). Empty for a product with one use and one way.
+   */
+  uses?: IntegrationUse[];
+  /** The way that works, in words ("the team's Atlassian sign-in", "a key"); empty when the card doesn't say. */
+  how?: string;
+  /** Who connected it and when, when the record says. */
+  connected_by?: string;
+  connected_at?: string;
+}
+
+/** One use of a product. `on` works; `attention` is set up but broken; `ready` a working sign-in can serve it; `needs` takes a different grant. */
+export interface IntegrationUse {
+  id: "runs" | "knowledge";
+  label: string;
+  state: "on" | "attention" | "ready" | "needs" | "off";
+  /** The way it is served ("an API token"); empty when nothing serves it. */
+  how: string;
+  /** What it takes, or why it is broken. */
+  detail: string;
+  /** The one next step: `use_in_runs`, `connect`, `reconnect`, `check_again`, `add_credentials` or `link` (to `href`). */
+  action: { kind: string; label: string; href: string } | null;
+}
+
+/** The sign-in made so Knowledge can sync a product (`detail.knowledge` on its card). */
+export interface KnowledgeSignIn {
+  /** The Knowledge source kind: `confluence`, `notion`, `sanity`, `google_drive`. */
+  kind: string;
+  label: string;
+  /** Its connection (`ks-confluence`), for cancelling a sign-in. */
+  server_id: string;
+  /** One person's sign-in (Sanity) and not the team's. */
+  personal: boolean;
+  status: IntegrationStatus;
+  reason: string;
+  connected_by: string;
+  connected_at: string;
+  /** How many Knowledge sources sync from it. */
+  sources: number;
 }
 
 export interface IntegrationsResponse {
