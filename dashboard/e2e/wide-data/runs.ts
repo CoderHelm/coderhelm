@@ -456,6 +456,7 @@ export const runsData: Handler = ({ method, path, url }) => {
     if (sub === "/openspec") return OPENSPEC;
     if (sub === "/traces") return { traces: TRACES };
     if (sub === "/agent-log") return AGENT_LOG;
+    if (sub === "/outputs") return { outputs: [{ name: "reports/payments-reconciliation-merge-rate-by-contributor-across-every-repository.html", bytes: 1048576 }, { name: "tables.md", bytes: 900 }] };
     return undefined;
   }
   if (path === "/api/plugins/catalog") return { plugins: PLUGINS };

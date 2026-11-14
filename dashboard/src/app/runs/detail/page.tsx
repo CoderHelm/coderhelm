@@ -19,6 +19,7 @@ import { Chip, Time, formatDuration as sharedDuration, formatMs } from "@/compon
 import { usePaletteActions, type PageAction } from "@/components/command-palette";
 import type { CloseRunRequest } from "@/lib/api";
 import { TeamAgentAsks } from "./team-asks";
+import { RunOutputs } from "./run-outputs";
 import { RunAnswered, RunQuestions } from "./run-questions";
 import { AsksHistory, WaitingOnYou, useRunApprovals } from "./agent-asks";
 import { WorkUsedLine } from "@/components/work-used";
@@ -1226,6 +1227,7 @@ function RunDetailInner() {
               </dl>
             </div>
           </div>
+          <RunOutputs runId={runId} status={run.status} focus={searchParams.get("output")} />
         </div>
       )}
 
