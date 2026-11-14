@@ -46,6 +46,14 @@ export interface LogStep {
   /** For a retry: the step it tries again, and which try this is (2 = second). */
   retryOf?: string;
   attempt?: number;
+  /** A problem a later step fixed: the same change applied, the checks passed. Not counted among the pass's problems. */
+  recoveredBy?: string;
+  /** Looked at the change again with nothing changed since the last look: drawn folded into that one. */
+  repeatOf?: string;
+  /** How many later looks at an unchanged change fold into this one. */
+  repeats?: number;
+  /** The name the model called (`bash`, `Edit`) when it ran as this tool. */
+  calledAs?: string;
   /** The raw call and result as stored, for the raw view. */
   raw: { call: unknown; result: unknown };
   /** Lower-cased text the in-page search matches. */
@@ -67,7 +75,7 @@ export interface LogGroup {
 export type LogItem =
   | { kind: "step"; step: LogStep }
   | LogGroup
-  | { kind: "note"; id: string; noteKind: string; text: string; raw: string; at?: string };
+  | { kind: "note"; id: string; noteKind: string; text: string; raw: string; at?: string; quiet?: boolean };
 
 export interface LogSection {
   id: string;
@@ -98,8 +106,10 @@ export interface LogPass {
   sections: LogSection[];
   /** Every step, in order. */
   steps: LogStep[];
-  /** Ids of the steps with a problem, in order. */
+  /** Ids of the steps with a problem nothing after them fixed, in order. */
   problems: string[];
+  /** Ids of the problems a later step fixed (an edit that applied on its next try, checks that passed after). */
+  recovered: string[];
   final?: { text: string; cutOff: boolean };
   /** "Used every step (40 of 40)" and the like. */
   endNote?: string;
@@ -499,6 +509,44 @@ function retryKey(s: LogStep): string | null {
 
 export const isProblem = (s: Pick<LogStep, "status">) => s.status === "soft_fail" || s.status === "refused" || s.status === "error";
 
+/**
+ * The pass's problems that mattered, and those a later step fixed: an edit
+ * that applied to the same file on a later try, checks that passed on a
+ * later run. A fixed problem stays on its row (with its reason) and leaves
+ * the "didn't work" count.
+ */
+export function settleProblems(steps: LogStep[]): { problems: string[]; recovered: string[] } {
+  const problems: string[] = [];
+  const recovered: string[] = [];
+  steps.forEach((s, i) => {
+    if (!isProblem(s)) return;
+    const key = retryKey(s);
+    const fix = key ? steps.slice(i + 1).find((t) => t.status === "ok" && retryKey(t) === key) : undefined;
+    if (fix) {
+      s.recoveredBy = fix.id;
+      recovered.push(s.id);
+    } else problems.push(s.id);
+  });
+  return { problems, recovered };
+}
+
+/** A second look at the change with no change made since the first folds into it ("Looked at the change so far · twice"). */
+function foldRepeatLooks(sections: LogSection[], steps: LogStep[]) {
+  let last: LogStep | null = null;
+  const folded = new Set<string>();
+  for (const s of steps) {
+    if (s.category === "change" && s.status === "ok") last = null;
+    if (s.tool !== "get_diff" || s.status !== "ok") continue;
+    if (last) {
+      s.repeatOf = last.id;
+      last.repeats = (last.repeats ?? 0) + 1;
+      folded.add(s.id);
+    } else last = s;
+  }
+  if (!folded.size) return;
+  for (const sec of sections) sec.items = sec.items.filter((it) => !(it.kind === "step" && folded.has(it.step.id)));
+}
+
 // ── Sections ─────────────────────────────────────────────────────────
 
 const FILLER = /^(?:okay|ok|great|good|now|alright|perfect|first)[,.!]?\s+|^(?:let me|i'll|i will|i'm going to|i need to)\s+/i;
@@ -522,6 +570,14 @@ export function splitIntent(text: string): { heading: string | null; prose: stri
     return { heading, prose: rest.join("\n").trim() };
   }
   return { heading: null, prose: t };
+}
+
+/** A step-budget reminder far from the limit: kept out of the plain view (the Structured and Raw views show it). */
+export function quietNote(kind: string, text: string): boolean {
+  if (kind !== "turn_budget") return false;
+  const m = text.match(/used (\d+) of (\d+)/i);
+  if (!m) return true;
+  return Number(m[2]) - Number(m[1]) > 2;
 }
 
 /** Plain words for a note the worker put in the conversation. */
@@ -593,7 +649,7 @@ function group(steps: LogStep[], id: string): LogGroup {
   ].filter(Boolean);
   const said = parts.length > 1 ? `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}` : parts[0];
   const title = said.charAt(0).toUpperCase() + said.slice(1);
-  const names = [...new Set(steps.map((s) => (s.files[0] ? basename(s.files[0]) : s.target.replace(/^"|"$/g, ""))))];
+  const names = [...new Set(steps.map((s) => (s.files[0] ? basename(s.files[0]) : s.target.replace(/^"|"$/g, "").trim())))].filter(Boolean);
   const shown = names.slice(0, 3).join(", ");
   return { kind: "group", id, title, names: names.length > 3 ? `${shown} and ${names.length - 3} more` : shown, steps };
 }
@@ -643,7 +699,7 @@ function buildPass(p: AgentLogPass, idx: number): LogPass {
       continue;
     }
     if (e.role === "system_note") {
-      sb.current.items.push({ kind: "note", id: `${id}-n${i}`, noteKind: e.kind, text: noteWords(e.kind, e.text), raw: e.text, at: e.started_at });
+      sb.current.items.push({ kind: "note", id: `${id}-n${i}`, noteKind: e.kind, text: noteWords(e.kind, e.text), raw: e.text, at: e.started_at, quiet: quietNote(e.kind, e.text) });
       continue;
     }
     if (e.role !== "assistant") continue;
@@ -670,7 +726,11 @@ function buildPass(p: AgentLogPass, idx: number): LogPass {
     uses.forEach((u, k) => {
       n += 1;
       const r = u.id ? results.get(u.id) : positional[k];
-      const step = makeStep({ id: u.id || r?.tool_use_id || `${id}-t${n}`, tool: u.name || r?.tool || "tool", input: u.input && typeof u.input === "object" ? u.input : {}, result: r, call: u });
+      // A call that ran as another tool (`bash` as `read_file`) is drawn as the tool that did the work.
+      const ranAs = r?.called_as && r.tool ? r.tool : null;
+      const input = ranAs && r?.input && typeof r.input === "object" ? r.input : u.input && typeof u.input === "object" ? u.input : {};
+      const step = makeStep({ id: u.id || r?.tool_use_id || `${id}-t${n}`, tool: ranAs || u.name || r?.tool || "tool", input, result: r, call: u });
+      if (ranAs) step.calledAs = r?.called_as;
       const key = retryKey(step);
       if (key) {
         const prev = lastTry.get(key);
@@ -689,6 +749,8 @@ function buildPass(p: AgentLogPass, idx: number): LogPass {
     .map((s) => ({ ...s, items: fold(s.items, id) }))
     // A divider with nothing under it still says the model was called again; an empty untitled section says nothing.
     .filter((s) => s.items.length || s.heading || s.prose || s.thinking.length || s.divider);
+  const { problems, recovered } = settleProblems(steps);
+  foldRepeatLooks(sections, steps);
   let endNote: string | undefined;
   if (maxTurns && lastTurn >= maxTurns) endNote = `Used every step it had (${lastTurn} of ${maxTurns})`;
   return {
@@ -704,7 +766,8 @@ function buildPass(p: AgentLogPass, idx: number): LogPass {
     format,
     sections,
     steps,
-    problems: steps.filter(isProblem).map((s) => s.id),
+    problems,
+    recovered,
     final,
     endNote,
     live: false,
@@ -726,6 +789,8 @@ export function parseInputSummary(s: string): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   const re = /(?:^|,\s)([A-Za-z_][\w]*): ([\s\S]*?)(?=,\s[A-Za-z_][\w]*: |$)/g;
   for (const m of t.matchAll(re)) out[m[1]] = m[2];
+  // Older live events summed a call up as its bare path ("src/a.ts").
+  if (!Object.keys(out).length && /^[\w@.\-/[\]()]+\.[\w]+$/.test(t)) out.path = t;
   return out;
 }
 
@@ -754,6 +819,7 @@ function livePasses(events: AgentLogLiveEvent[], logged: Set<string>, hasLogs: b
       }),
     );
     const items = fold(steps.map((step) => ({ kind: "step" as const, step })), id);
+    const { problems, recovered } = settleProblems(steps);
     return {
       id,
       pass,
@@ -764,7 +830,8 @@ function livePasses(events: AgentLogLiveEvent[], logged: Set<string>, hasLogs: b
       format: 2 as const,
       sections: [{ id: `${id}-s1`, heading: null, prose: "", thinking: [], items }],
       steps,
-      problems: steps.filter(isProblem).map((s) => s.id),
+      problems,
+      recovered,
       live: true,
     };
   });
@@ -882,7 +949,7 @@ export function buildLog(log: AgentLog | null | undefined, traces: PassTrace[] =
     counts: {
       changes: steps.filter((s) => s.category === "change").length,
       checks: steps.filter((s) => s.category === "check").length,
-      problems: steps.filter(isProblem).length,
+      problems: passes.reduce((n, p) => n + p.problems.length, 0),
       reading: steps.filter((s) => s.category === "read").length,
     },
     truncated: !!log?.live_events_truncated,
@@ -897,7 +964,7 @@ export type LogFilter = "all" | "changes" | "checks" | "problems";
 export function stepMatches(s: LogStep, filter: LogFilter, file: string, q: string): boolean {
   if (filter === "changes" && s.category !== "change") return false;
   if (filter === "checks" && s.category !== "check") return false;
-  if (filter === "problems" && !isProblem(s)) return false;
+  if (filter === "problems" && (!isProblem(s) || s.recoveredBy)) return false;
   if (file && !s.files.includes(file)) return false;
   if (q && !s.haystack.includes(q.toLowerCase())) return false;
   return true;

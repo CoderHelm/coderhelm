@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { buildLog, decodeResult, filterPass, parseInputSummary, splitIntent, type LogStep } from "../src/lib/agent-log";
 import { runTimeline } from "../src/lib/run-timeline";
-import { formatOneLog, formatTwoLog, liveTail, RUN_ID } from "./agent-log-data";
+import { at, formatOneLog, formatTwoLog, liveTail, RUN_ID } from "./agent-log-data";
 import { LOG_TRACES, logRun, mockRunApi } from "./agent-log-mock";
 
 // The run page's agent log: the pure model (lib/agent-log.ts) on old and new
@@ -47,19 +47,23 @@ test.describe("buildLog", () => {
   test("soft fails, refusals and errors are problems, never folded, and a retry is the 2nd try", () => {
     const m = buildLog(formatTwoLog());
     const build = m.passes[2];
+    // A problem a later step fixed (the edit applied on its 2nd try, the checks passed on their 2nd run) leaves the count.
     const problems = build.problems.map((id) => step(m, id));
-    expect(problems.map((s) => [s.tool, s.status])).toEqual([
-      ["check_url", "refused"],
+    expect(problems.map((s) => [s.tool, s.status])).toEqual([["check_url", "refused"]]);
+    const recovered = build.recovered.map((id) => step(m, id));
+    expect(recovered.map((s) => [s.tool, s.status])).toEqual([
       ["edit_file", "soft_fail"],
       ["run_checks", "soft_fail"],
     ]);
-    expect(problems[2].summary).toBe("failed: tests");
+    expect(recovered[1].summary).toBe("failed: tests");
+    expect(recovered.every((s) => !!s.recoveredBy)).toBe(true);
     for (const s of build.sections) {
       for (const it of s.items) if (it.kind === "group") expect(it.steps.some((x) => x.status !== "ok")).toBe(false);
     }
     const retry = allSteps(m).find((s) => s.tool === "edit_file" && s.files[0] === "src/components/venue-subnav.ts" && s.status === "ok")!;
     expect(retry.attempt).toBe(2);
-    expect(retry.retryOf).toBe(problems[1].id);
+    expect(retry.retryOf).toBe(recovered[0].id);
+    expect(recovered[0].recoveredBy).toBe(retry.id);
     const checks = build.steps.filter((s) => s.tool === "run_checks");
     expect(checks[1].attempt).toBe(2);
     expect(m.passes[3].problems).toHaveLength(1);
@@ -99,7 +103,8 @@ test.describe("buildLog", () => {
     expect(byFile.sections.flatMap((s) => s.items).length).toBe(4);
     const found = filterPass(build, "all", "", "menuitem3");
     expect(found.sections.flatMap((s) => s.items).length).toBeGreaterThan(0);
-    expect(m.counts.problems).toBe(4);
+    // Only the problems nothing after them fixed.
+    expect(m.counts.problems).toBe(2);
   });
 
   test("an old log (format 1): results decoded, outcomes read from the text, the second call found, times from events", () => {
@@ -200,16 +205,23 @@ test("the new log reads as sentences under the agent's words, with problems firs
   // The last part opens by itself; Build opens on a click and lists its problems first.
   await passes.nth(2).getByRole("button", { name: /^Build/ }).click();
   const build = passes.nth(2);
-  await expect(build.getByTestId("log-problems")).toContainText("3 things didn't work");
+  // Only what nothing fixed counts, in a neutral note (the run didn't fail because of it).
+  await expect(build.getByTestId("log-problems")).toContainText("1 thing didn't work · 2 more worked on a later try");
+  await expect(build.getByTestId("log-problems")).toHaveAttribute("data-tone", "neutral");
   await expect(build.getByRole("heading", { name: "Finding where the More menu is defined" })).toBeVisible();
   await expect(build.getByRole("button", { name: /Read 3 files and searched once · export function MoreMenu, index\.tsx, venue-subnav\.ts and 1 more/ })).toHaveAttribute("aria-expanded", "false");
   // A problem is open by default with its reason.
   const failedEdit = build.locator('[data-testid="log-step"][data-status="soft_fail"][data-tool="edit_file"]');
   await expect(failedEdit).toContainText("Didn't apply: Edited");
+  // It worked on its 2nd try: closed by default, its reason a click away.
+  await expect(failedEdit.getByTestId("log-step-detail")).toHaveCount(0);
+  await failedEdit.getByRole("button").first().click();
   await expect(failedEdit.getByTestId("log-step-detail")).toContainText("the text to replace wasn't found");
   await expect(build.getByText("2nd try").first()).toBeVisible();
   await expect(build.getByRole("button", { name: /^Not allowed: Checked internal\.example\.net\/admin\/menu/ })).toBeVisible();
-  await expect(build.getByTestId("log-note").first()).toContainText("used 30 of its 40 steps");
+  // A step reminder far from the limit is left out of the plain view.
+  await expect(build.getByTestId("log-note").filter({ hasText: "used 30 of its 40 steps" })).toHaveCount(0);
+  await expect(build.locator('[data-testid="log-step"][data-tool="edit_file"][data-status="soft_fail"]').getByTestId("log-step-recovered").first()).toBeVisible();
   await expect(build.getByRole("separator", { name: "Fixing the failing checks" })).toBeVisible();
   // No raw JSON or escaped newlines in the plain view.
   await expect(page.getByTestId("agent-log-panel")).not.toContainText('{"');
@@ -224,8 +236,8 @@ test("filters, search and the view are kept in the URL; a step link opens that s
   const panel = page.getByTestId("agent-log-panel");
   await panel.getByRole("button", { name: /^Problems/ }).click();
   await expect(page).toHaveURL(/log_filter=problems/);
-  await expect(panel.getByTestId("log-filter-count")).toContainText("4 of 115 steps");
-  await expect(panel.getByTestId("log-step")).toHaveCount(4);
+  await expect(panel.getByTestId("log-filter-count")).toContainText("2 of 115 steps");
+  await expect(panel.getByTestId("log-step")).toHaveCount(2);
   await panel.getByRole("button", { name: /^Changes/ }).click();
   await expect(panel.getByTestId("log-step").first()).toContainText("Edited");
   await panel.getByRole("button", { name: "Clear" }).click();
@@ -269,7 +281,9 @@ test("the old log (format 1) still reads, with its problems and times", async ({
   await expect(pass).toHaveCount(1);
   await expect(pass.getByRole("heading", { name: /Build/ })).toBeVisible();
   await expect(pass.getByText("Let me find the schedule table first.")).toBeVisible();
-  await expect(pass.getByTestId("log-problems")).toContainText("2 things didn't work");
+  // Both of its problems worked on a later try: no banner, each row says so.
+  await expect(pass.getByTestId("log-problems")).toHaveCount(0);
+  await expect(pass.getByTestId("log-step-recovered")).toHaveCount(2);
   await expect(pass.locator('[data-tool="run_checks"]').first()).toContainText("1m 4s");
   await expect(pass.locator('[data-tool="run_checks"]').last()).toContainText(/Ran the checks.*· passed/);
   expect(errors).toEqual([]);
@@ -319,4 +333,85 @@ test("the Overview shows the build in three lines instead of a note per tool", a
   await expect(page).toHaveURL(/tab=log.*step=toolu_build_/);
   await expect(page.getByTestId("agent-log-panel")).toBeVisible();
   expect(errors).toEqual([]);
+});
+
+// ── A fix round: retried edits, aliases, refusals, budget notes ──────
+
+/** One fix round as the worker logs it: a shell call that ran as a read, an edit that applied on its 2nd try, two looks at an unchanged change, an edit refused outside the round's files, and two step reminders. */
+function fixRoundLog() {
+  const t = (s: number) => at(s);
+  const res = (id: string, tool: string, content: string, status: "ok" | "soft_fail" | "refused", summary: string, extra: Record<string, unknown> = {}) => ({
+    type: "tool_result",
+    tool_use_id: id,
+    tool,
+    content: JSON.stringify(content),
+    content_encoding: "json",
+    started_at: t(10),
+    duration_ms: 200,
+    outcome: { status, summary },
+    ...(status === "ok" ? {} : { is_error: false }),
+    ...extra,
+  });
+  const turn = (n: number, uses: { id: string; name: string; input: Record<string, unknown> }[], results: unknown[]) => [
+    { role: "assistant", call: 1, turn: n, started_at: t(n * 10), ended_at: t(n * 10 + 1), content: uses.map((u) => ({ type: "tool_use", ...u })) },
+    { role: "tool_results", call: 1, turn: n, started_at: t(n * 10 + 1), ended_at: t(n * 10 + 2), content: results },
+  ];
+  const conversation = [
+    { role: "call_started", call: 1, turn: 0, started_at: t(0), model: "model-large", max_turns: 40 },
+    { role: "system_note", call: 1, turn: 5, kind: "turn_budget", text: "[SYSTEM NOTE] You have used 5 of 40 tool-use turns. 35 turns remaining.", started_at: t(5) },
+    ...turn(1, [{ id: "tu_sh", name: "bash", input: { command: "cat src/cart/total.ts" } }], [res("tu_sh", "read_file", "export const total = 1;\n", "ok", "1 lines", { called_as: "bash", input: { path: "src/cart/total.ts" } })]),
+    ...turn(2, [{ id: "tu_e1", name: "edit_file", input: { path: "src/cart/total.ts", edits: "[]", message: "m" } }], [res("tu_e1", "edit_file", "NO edits applied to src/cart/total.ts", "soft_fail", "no edits applied: 1 of 1 did not match")]),
+    ...turn(3, [{ id: "tu_e2", name: "edit_file", input: { path: "src/cart/total.ts", edits: [{ old_text: "1", new_text: "2" }], message: "m" } }], [res("tu_e2", "edit_file", "Edited src/cart/total.ts", "ok", "1 edit(s), +1/-1 lines")]),
+    ...turn(4, [{ id: "tu_d1", name: "get_diff", input: {} }], [res("tu_d1", "get_diff", "modified src/cart/total.ts", "ok", "")]),
+    ...turn(5, [{ id: "tu_d2", name: "get_diff", input: {} }], [res("tu_d2", "get_diff", "modified src/cart/total.ts", "ok", "")]),
+    ...turn(6, [{ id: "tu_out", name: "edit_file", input: { path: "src/theme/colors.ts", edits: [{ old_text: "a", new_text: "b" }], message: "m" } }], [
+      res("tu_out", "edit_file", "NOT EDITED: src/theme/colors.ts is outside this round's files.", "soft_fail", "refused: src/theme/colors.ts is outside the round's files (edited once a reason is given)"),
+    ]),
+    { role: "system_note", call: 1, turn: 38, kind: "turn_budget", text: "[SYSTEM NOTE] You have used 38 of 40 tool-use turns. 2 turns remaining.", started_at: t(380) },
+    { role: "assistant", call: 1, turn: 7, started_at: t(390), ended_at: t(391), content: [{ type: "text", text: "Done." }], stop_reason: "end_turn" },
+  ];
+  return { passes: [{ pass: "ci_fix", id: "ci_fix-1", format: 2, started_at: t(0), ended_at: t(400), conversation }], live_events: [] };
+}
+
+test.describe("a fix round's log", () => {
+  test("counts only what nothing fixed, draws aliases as the tool that ran, folds repeated looks, keeps far reminders quiet", () => {
+    const m = buildLog(fixRoundLog() as never);
+    const p = m.passes[0];
+    expect(p.problems.map((id) => step(m, id).target)).toEqual(["src/theme/colors.ts"]);
+    expect(p.recovered).toEqual(["tu_e1"]);
+    const sh = step(m, "tu_sh");
+    expect([sh.tool, sh.calledAs, `${sh.verb} ${sh.target}`]).toEqual(["read_file", "bash", "Read src/cart/total.ts"]);
+    expect(step(m, "tu_d1").repeats).toBe(1);
+    expect(step(m, "tu_d2").repeatOf).toBe("tu_d1");
+    const notes = p.sections.flatMap((s) => s.items).filter((i) => i.kind === "note") as { quiet?: boolean; text: string }[];
+    expect(notes.map((n) => !!n.quiet)).toEqual([true, false]);
+    // Older live events summed a call up as its bare path; newer ones as `path: ...`.
+    expect(parseInputSummary("src/cart/total.ts")).toEqual({ path: "src/cart/total.ts" });
+    expect(parseInputSummary("path: src/cart/total.ts")).toEqual({ path: "src/cart/total.ts" });
+    expect(parseInputSummary("query: scrollWidth <= window.innerWidth")).toEqual({ query: "scrollWidth <= window.innerWidth" });
+  });
+
+  test("in the browser: a neutral banner of one, the refusal names its file, reminders only near the limit", async ({ page }) => {
+    const errors = watchConsole(page);
+    await mockRunApi(page, { log: fixRoundLog(), traces: [] });
+    await openLog(page);
+    const pass = page.getByTestId("log-pass");
+    const banner = pass.getByTestId("log-problems");
+    await expect(banner).toContainText("1 thing didn't work · 1 more worked on a later try");
+    await expect(banner).toHaveAttribute("data-tone", "neutral");
+    await expect(banner).toContainText("src/theme/colors.ts is outside the round's files");
+    await expect(pass.getByTestId("log-step-repeats")).toContainText("2 times");
+    await expect(pass.locator('[data-testid="log-step"][data-tool="get_diff"]')).toHaveCount(1);
+    await expect(pass.getByTestId("log-note")).toHaveCount(1);
+    await expect(pass.getByTestId("log-note")).toContainText("used 38 of its 40 steps");
+    await page.getByRole("button", { name: "Structured" }).click();
+    await expect(pass.getByTestId("log-note")).toHaveCount(2);
+    expect(errors).toEqual([]);
+  });
+
+  test("a failed run draws its problems as a warning", async ({ page }) => {
+    await mockRunApi(page, { log: fixRoundLog(), traces: [], run: logRun({ status: "failed" }) });
+    await openLog(page);
+    await expect(page.getByTestId("log-problems")).toHaveAttribute("data-tone", "warning");
+  });
 });

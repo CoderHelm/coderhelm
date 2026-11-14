@@ -1379,7 +1379,7 @@ function RunDetailInner() {
             ) : !agentLog ? (
               <div className="p-4 text-sm text-zinc-400" role="status">Loading the agent log…</div>
             ) : (
-              <AgentLogPanel log={agentLog} traces={traces} runId={runId} live={isActive(run.status)} diffUrl={prLinks.length === 1 && run.pr_url ? `${run.pr_url.replace(/\/$/, "")}/files` : undefined} />
+              <AgentLogPanel log={agentLog} traces={traces} runId={runId} live={isActive(run.status)} failed={run.status === "failed"} diffUrl={prLinks.length === 1 && run.pr_url ? `${run.pr_url.replace(/\/$/, "")}/files` : undefined} />
             )}
           </div>
         </section>
