@@ -575,7 +575,9 @@ function RunDetailInner() {
   ) : null;
   const asked: RunTab = onLogTab ? "log" : (RUN_TABS as readonly string[]).includes(tabParam ?? "") ? (tabParam as RunTab) : "overview";
   // A run without a plan has no Plan tab: a link to it lands on the Overview.
-  const tab: RunTab = asked === "plan" && !hasPlan && !planPending ? "overview" : asked;
+  // While the run is still planning, its plan is what there is to read: it opens there.
+  const planning = run.status === "running" && (run.current_pass ?? "").startsWith("plan");
+  const tab: RunTab = asked === "plan" && !hasPlan && !planPending ? "overview" : !tabParam && !oldLogLink && planning && hasPlan ? "plan" : asked;
   const shownTabs = RUN_TABS.filter((t) => t !== "plan" || hasPlan || tab === "plan");
   const tabHref = (t: RunTab) => `/runs/detail?id=${encodeURIComponent(runId)}${t === "overview" ? "" : `&tab=${t}`}`;
   const sourceWord = run.ticket_source === "jira" ? "Jira ticket" : run.ticket_source === "alert" ? "Alert" : "Issue";
@@ -1318,11 +1320,9 @@ function RunDetailInner() {
 
           {hasPlan && (
             <p className="text-sm text-zinc-400" data-testid="changes-plan-link">
-              The plan this run followed is on the{" "}
               <Link href={tabHref("plan")} className="text-zinc-200 underline underline-offset-4 hover:text-zinc-100">
-                Plan tab
+                See the plan
               </Link>
-              .
             </p>
           )}
 

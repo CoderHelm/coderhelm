@@ -18,7 +18,7 @@ const PLAN = {
   tasks: "## Implementation\n- [ ] Add the row in `receipt.tsx`",
 };
 
-function aRun() {
+function aRun(over: Record<string, unknown> = {}) {
   return {
     run_id: "01RUNP",
     status: "completed",
@@ -35,10 +35,11 @@ function aRun() {
     answers: [],
     files_modified: ["src/receipt.tsx"],
     pr_url: "https://github.com/your-team/web/pull/12",
+    ...over,
   };
 }
 
-async function mockApi(page: Page, openspec: Record<string, string> | null) {
+async function mockApi(page: Page, openspec: Record<string, string> | null, run: Record<string, unknown> = aRun()) {
   const json = (route: Route, body: unknown, status = 200) =>
     route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
   await page.route((url) => url.hostname !== "localhost", (route) => route.abort());
@@ -51,7 +52,7 @@ async function mockApi(page: Page, openspec: Record<string, string> | null) {
     if (p === "/api/plugins/catalog") return json(route, { plugins: [] });
     if (p === "/api/agents/approvals") return json(route, { approvals: [], can: { approve: false, always: false } });
     if (p === "/api/skills/asks") return json(route, { asks: [] });
-    if (p === "/api/runs/01RUNP") return json(route, aRun());
+    if (p === "/api/runs/01RUNP") return json(route, run);
     if (p === "/api/runs/01RUNP/openspec") return openspec ? json(route, openspec) : json(route, { error: "No plan." }, 404);
     if (p === "/api/runs/01RUNP/traces") return json(route, { traces: [] });
     if (p === "/api/runs/01RUNP/agent-log") return json(route, { passes: [], live_events: [] });
@@ -104,9 +105,17 @@ test.describe("the run's Plan tab", () => {
     await page.goto("/runs/detail?id=01RUNP&tab=changes");
     await expect(page.getByTestId("run-tab-changes")).toBeVisible();
     await expect(page.getByRole("group", { name: "Plan documents" })).toHaveCount(0);
-    await page.getByTestId("changes-plan-link").getByRole("link", { name: "Plan tab" }).click();
+    await page.getByTestId("changes-plan-link").getByRole("link", { name: "See the plan" }).click();
     await expect(page).toHaveURL(/tab=plan/);
     await expect(page.getByTestId("run-tab-plan")).toContainText("The receipt has no order total.");
+  });
+
+  test("a run that is still planning opens on its plan; a link to another tab still wins", async ({ page }) => {
+    await mockApi(page, PLAN, aRun({ status: "running", current_pass: "plan", pr_url: null, files_modified: [] }));
+    await page.goto("/runs/detail?id=01RUNP");
+    await expect(page.getByTestId("run-tab-plan")).toContainText("The receipt has no order total.");
+    await page.goto("/runs/detail?id=01RUNP&tab=overview");
+    await expect(page.getByTestId("run-tab-overview")).toBeVisible();
   });
 
   test("a run with no plan has no Plan tab, and a link to it shows the Overview", async ({ page }) => {
