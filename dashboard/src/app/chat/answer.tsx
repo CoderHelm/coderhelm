@@ -17,8 +17,13 @@ import {
   DatabaseIcon,
   ExternalLinkIcon,
   LogsIcon,
+  ClipboardIcon,
+  GitBranchIcon,
+  LayersIcon,
   MemoryIcon,
   PaperclipIcon,
+  PlayIcon,
+  ShieldAlertIcon,
   PluginIcon,
   RetryIcon,
   ThumbsDownIcon,
@@ -31,6 +36,7 @@ import {
   activitySummary,
   citationWhen,
   groupSources,
+  isWorkKind,
   linkCitations,
   withoutCitations,
   type Citation,
@@ -74,6 +80,17 @@ export function SourceIcon({ kind }: { kind: string }) {
       return <MemoryIcon />;
     case "skill":
       return <BookIcon />;
+    case "ticket":
+      return <ClipboardIcon />;
+    case "pull_request":
+      return <GitBranchIcon />;
+    case "run":
+    case "work":
+      return <PlayIcon />;
+    case "finding":
+      return <ShieldAlertIcon />;
+    case "record":
+      return <LayersIcon />;
     default:
       return <LogsIcon />;
   }
@@ -97,15 +114,26 @@ export function whereOf(doc: SourceDoc): string {
     const repo = c.code.repo.split("/").pop() ?? c.code.repo;
     return [repo, linesOf(doc)].filter(Boolean).join(" · ");
   }
-  return [c.base || CITATION_KIND[c.kind] || c.kind, c.kind === "knowledge" || c.kind === "upload" ? citationWhen(c.as_of) : ""].filter(Boolean).join(" · ");
+  const dated = c.kind === "knowledge" || c.kind === "upload" || isWorkKind(c.kind);
+  return [c.base || CITATION_KIND[c.kind] || c.kind, dated ? citationWhen(c.as_of) : ""].filter(Boolean).join(" · ");
 }
 
-/** Where a source opens: the file on GitHub at its commit, the synced page, or its page in the dashboard. */
+/** What the link to a source outside Coderhelm says. */
+function originalLabel(c: Citation): string {
+  if (c.code || c.kind === "pull_request") return "Open on GitHub";
+  if (c.kind === "ticket") return "Open the ticket";
+  return "Open the original";
+}
+
+/** Where a source opens: the file on GitHub at its commit, the synced page, or its page in the dashboard. A run, finding or record opens its page in Coderhelm first. */
 function openTarget(doc: SourceDoc): { href: string; external: boolean; label: string } | null {
   const c = doc.parts[0];
   const url = doc.parts.find((p) => p.url)?.url;
+  if ((c.kind === "run" || c.kind === "finding" || c.kind === "record") && c.href && c.href.startsWith("/")) {
+    return { href: c.href, external: false, label: "Open in Coderhelm" };
+  }
   if (url && /^https:\/\//.test(url)) {
-    return { href: url, external: true, label: c.code ? "Open on GitHub" : "Open the original" };
+    return { href: url, external: true, label: originalLabel(c) };
   }
   if (c.href && c.href.startsWith("/")) return { href: c.href, external: false, label: c.kind === "knowledge" ? "Open in Knowledge" : "Open in Coderhelm" };
   return null;
