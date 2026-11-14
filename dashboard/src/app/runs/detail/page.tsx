@@ -611,7 +611,8 @@ function RunDetailInner() {
       {busy === "review" ? "Starting…" : "Address PR comments"}
     </button>
   );
-  const standing = run.merge_standing ?? null;
+  // A finished run's card says what is true now: never a fix round that isn't running.
+  const standing = run.merge_standing ? (done ? finishedStanding(run.merge_standing) : run.merge_standing) : null;
   const helpLink = (
     <HelpLink item={{ kind: "run", id: runId, label: run.title || undefined, repo: run.repo || undefined }}>Get help with this run</HelpLink>
   );
@@ -1455,7 +1456,24 @@ const RUN_TAB_LABEL: Record<RunTab, string> = { overview: "Overview", plan: "Pla
 /** The agent log's own URL state (agent-log.tsx): a link carrying any of these points into the log. */
 const LOG_PARAMS = ["step", "log_q", "log_filter", "log_file", "log_view", "log_time"];
 
-/** The outcome's title for where a finished run's pull request stands. */
+/**
+ * The standing a finished run's card shows. A fix round on the review's findings always moves the run
+ * back to working, so a finished run that still carries "a fix round is taking them" was written before
+ * the run settled: it is shown as what is true now, its review asking for changes with no round running.
+ */
+function finishedStanding(standing: RunMergeStanding): RunMergeStanding {
+  if (standing.code !== "fixing_review") return standing;
+  const sha = /`([0-9a-f]{7,40})`/.exec(standing.text)?.[1];
+  return {
+    ...standing,
+    code: "review_changes_requested",
+    text: `Coderhelm's review asks for changes${sha ? ` on \`${sha.slice(0, 7)}\`` : ""} and no fix round is running on them.`,
+    next: "Coderhelm looks at the pull request again: it takes them in a fix round, or names on the pull request what only a person can do and why.",
+    needs_person: false,
+  };
+}
+
+/** The outcome's title for where a finished run's pull request stands: what is true now, never "still working" for a finished run. */
 function standingTitle(standing: RunMergeStanding, prWords: string): string {
   if (standing.needs_person) return standing.code === "auto_merge_off" ? `${prWords} is ready to merge` : `${prWords} is ready for review`;
   switch (standing.code) {
@@ -1467,8 +1485,18 @@ function standingTitle(standing: RunMergeStanding, prWords: string): string {
       return `${prWords} is approved; Coderhelm merges it`;
     case "review_changes_requested":
       return `${prWords} is open; Coderhelm's review asks for changes`;
+    case "reviewing":
+      return `${prWords} is open; Coderhelm is reviewing its newest commit`;
+    case "checks_running":
+      return `${prWords} is open; its checks are running`;
+    case "checks_failing":
+      return `${prWords} is open; checks fail on it`;
+    case "conflict":
+      return `${prWords} is open; it conflicts with its base branch`;
+    case "draft":
+      return `${prWords} is still a draft`;
     default:
-      return `${prWords} is open; Coderhelm is still working on it`;
+      return `${prWords} is open`;
   }
 }
 
