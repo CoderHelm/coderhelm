@@ -1,6 +1,6 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import { shoot } from "./infra-shots";
-import { ACCOUNT_MISSING, INFRA_FEEDS, INFRA_INSIGHTS, INFRA_RESOURCES, infraFinding, infraOverview } from "./infra-data";
+import { ACCOUNT_MISSING, INFRA_FEEDS, INFRA_INSIGHTS, INFRA_RESOURCES, infraFinding, infraOverview, iso } from "./infra-data";
 
 // Infrastructure vulnerabilities: Security › Infrastructure grouped by fix
 // (pull requests, runbook cards, AWS-managed rows collapsed at the bottom),
@@ -137,6 +137,54 @@ test.describe("Infrastructure vulnerabilities", () => {
     await page.getByTestId("infra-check-now").click();
     await expect(page.getByText("Reading every account now.")).toBeVisible();
     expect(call(db, "POST /api/security/infrastructure/check")).toHaveLength(1);
+  });
+
+  test("a pull request a person closed shows who closed it and when, and the fix is offered again", async ({ page }) => {
+    const closed = { number: 412, url: "https://github.com/acme/infra/pull/412", state: "closed", closed_at: iso(-3), closed_by: "octo", closed_by_person: true };
+    const ng = infraFinding({ id: "f_ng", name: "prod-ng", title: "EKS node group prod-ng runs v20261015 (fixed in v20261031)", tier: "P2", status: "open", pr: closed });
+    const db = await mockApi(page, { overview: infraOverview({ findings: [ng] }) });
+    await page.goto("/security/infrastructure");
+    const row = page.getByRole("list", { name: "Infrastructure findings" }).getByTestId("infra-row");
+    await expect(row).toHaveCount(1);
+    await expect(row.getByTestId("infra-pr")).toHaveAttribute("href", "https://github.com/acme/infra/pull/412");
+    await expect(row.getByTestId("infra-pr")).toHaveText(/PR #412\s*closed by octo on \w+ \d+/);
+    await expect(row.getByTestId("infra-pr-closed")).toHaveText(/PR #412 was closed by octo on \w+ \d+ without merging\. Open a new one when you want the fix/);
+    // The fix is offered again, and asking starts it.
+    await expect(row.getByTestId("infra-fix")).toHaveText("Open fix PR");
+    await row.getByTestId("infra-fix").click();
+    await expect(row).toContainText("Fix run started.");
+    await expect(row.getByTestId("infra-pr-closed")).toHaveCount(0);
+    expect(call(db, "POST /api/security/infrastructure/findings/f_ng/fix")).toHaveLength(1);
+
+    // An older server sends no closer: the page says closed, and still offers the fix.
+    db.overview = infraOverview({ findings: [{ ...ng, pr: { number: 412, url: closed.url, state: "closed" } }] });
+    await page.reload();
+    await expect(row.getByTestId("infra-pr-closed")).toHaveText(/^PR #412 was closed without merging\./);
+    await expect(row.getByTestId("infra-fix")).toBeVisible();
+
+    // Still open, merged, or held as a draft by the replacement check: the link, no button.
+    for (const state of ["open", "merged", "draft"]) {
+      db.overview = infraOverview({ findings: [{ ...ng, status: state === "draft" ? "open" : "pr_open", pr: { number: 412, url: closed.url, state }, fix: { ...ng.fix, kind: state === "draft" ? "runbook" : "pr" } }] });
+      await page.reload();
+      await expect(page.getByTestId("infra-row")).toHaveCount(1);
+      await expect(page.getByTestId("infra-fix")).toHaveCount(0);
+      await expect(page.getByTestId("infra-pr-closed")).toHaveCount(0);
+    }
+
+    // A closed draft on a finding that fell back to its runbook stays a runbook: no button.
+    db.overview = infraOverview({ findings: [{ ...ng, pr: closed, fix: { ...ng.fix, kind: "runbook" } }] });
+    await page.reload();
+    await expect(page.getByTestId("infra-row")).toHaveCount(1);
+    await expect(page.getByTestId("infra-fix")).toHaveCount(0);
+    await expect(page.getByTestId("infra-pr-closed")).toHaveCount(0);
+  });
+
+  test("a member sees who closed the pull request and no button", async ({ page }) => {
+    const closed = { number: 412, url: "https://github.com/acme/infra/pull/412", state: "closed", closed_at: iso(-3), closed_by: "octo", closed_by_person: true };
+    await mockApi(page, { role: "member", overview: infraOverview({ findings: [infraFinding({ id: "f_ng", name: "prod-ng", status: "open", pr: closed })] }) });
+    await page.goto("/security/infrastructure");
+    await expect(page.getByTestId("infra-pr-closed")).toContainText("An admin can open a new one.");
+    await expect(page.getByTestId("infra-fix")).toHaveCount(0);
   });
 
   test("an account switched on without the reads warns, naming the feature, with the one-click update", async ({ page }) => {
