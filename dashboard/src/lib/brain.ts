@@ -151,9 +151,17 @@ export interface CodeRef {
   end_line?: number;
 }
 
+/** The team's own work Chat looks up: a Jira ticket, a pull request or branch, a Coderhelm run, a security, infrastructure or test finding, or another record Coderhelm keeps. */
+export type WorkKind = "ticket" | "pull_request" | "run" | "finding" | "record";
+
+/** Whether a citation is one of the team's own records. */
+export function isWorkKind(kind: string): kind is WorkKind {
+  return kind === "ticket" || kind === "pull_request" || kind === "run" || kind === "finding" || kind === "record";
+}
+
 export interface Citation {
   id: string;
-  kind: "knowledge" | "upload" | "connection" | "data_source" | "code" | "memory" | "skill" | string;
+  kind: "knowledge" | "upload" | "connection" | "data_source" | "code" | "memory" | "skill" | WorkKind | string;
   title: string;
   loc: string;
   as_of: string;
@@ -175,6 +183,8 @@ export interface Picks {
   memories: boolean;
   data_sources: boolean;
   skills: boolean;
+  /** Tickets, pull requests, runs, findings and the records Coderhelm keeps. */
+  work?: boolean;
   repo?: string | null;
   repos?: string[];
   /** Chat chose (everything the asker can see). */
@@ -454,6 +464,11 @@ export const CITATION_KIND: Record<string, string> = {
   code: "Code",
   memory: "Past work",
   skill: "Team know-how",
+  ticket: "Ticket",
+  pull_request: "Pull request",
+  run: "Coderhelm run",
+  finding: "Finding",
+  record: "Coderhelm",
 };
 
 /** A source's short name for a chip: "Leave policy" for "Leave policy.pdf", "leave.ts" for a path. */
