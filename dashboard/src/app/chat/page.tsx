@@ -1,10 +1,10 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useChatNavSlot } from "@/components/chat-nav";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { OwnTitle, Page, PageHeader } from "@/components/page";
 import { Callout } from "@/components/callout";
 import { Modal } from "@/components/modal";
@@ -16,7 +16,7 @@ import { usePaletteActions, type PageAction } from "@/components/command-palette
 import { ComposeIcon, MoreIcon, SidebarIcon } from "@/components/icons";
 import { useCan } from "@/hooks/use-can";
 import { focusRing, inputClass, linkButton, primaryButton, secondaryButton, smallSecondaryButton } from "@/components/ui";
-import { useSmartScroll, ScrollPill } from "@/components/smart-scroll";
+import { JumpToLatest, useFollowScroll } from "@/components/follow-scroll";
 import { KNOWLEDGE_HREF } from "@/lib/routes";
 import {
   askBrain,
@@ -73,6 +73,43 @@ interface LiveAnswer {
 const ATTACH_LIMIT = { max_file_bytes: 10 * 1024 * 1024, extensions: ["pdf", "docx", "md", "markdown", "txt", "text", "csv", "xlsx", "html", "htm"] };
 const MAX_FILES = 3;
 const RAIL_KEY = "coderhelm:chat-rail";
+const DRAFT_KEY = "coderhelm:chat-draft:";
+
+/** Two spellings of one thread id: ids are compared without case. */
+function sameThread(a: string, b: string): boolean {
+  return a.toLowerCase() === b.toLowerCase();
+}
+
+/** The unsent text for a chat ("" for a new one), kept in this browser so a reload or another chat never loses it. */
+function readDraft(threadId: string): string {
+  try {
+    return localStorage.getItem(DRAFT_KEY + (threadId.toLowerCase() || "new")) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function writeDraft(threadId: string, text: string) {
+  try {
+    const key = DRAFT_KEY + (threadId.toLowerCase() || "new");
+    if (text) localStorage.setItem(key, text);
+    else localStorage.removeItem(key);
+  } catch {}
+}
+
+/**
+ * Puts a chat in the address without a navigation: the history entry changes
+ * and useSearchParams follows, but no route is fetched. A router navigation
+ * fetches the page's data from the server, and a tab running an older build
+ * than the one deployed gets a full page load instead (the page reloads under
+ * the reader).
+ */
+function chatUrl(threadId: string, mode: "push" | "replace") {
+  const url = new URL(window.location.href);
+  url.search = threadId ? `?thread=${encodeURIComponent(threadId)}` : "";
+  if (mode === "push") window.history.pushState(null, "", `${url.pathname}${url.search}`);
+  else window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+}
 
 /** A mouse or trackpad: focusing the box there doesn't pop up a keyboard. */
 function finePointer(): boolean {
@@ -81,7 +118,6 @@ function finePointer(): boolean {
 
 function Chat() {
   const params = useSearchParams();
-  const router = useRouter();
   const { toast } = useToast();
   const { confirm } = useConfirm();
   const threadId = params.get("thread") ?? "";
@@ -105,7 +141,14 @@ function Chat() {
   const [loadingThread, setLoadingThread] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [input, setInput] = useState("");
+  /** Changes when another chat opens (not when this one gets its id or its id's spelling), so its blocks mount fresh. */
+  const [convo, setConvo] = useState(0);
+  /** A thread id this page put in the address itself: the chat it names is already on screen. */
+  const ownUrl = useRef<string | null>(null);
   const [live, setLive] = useState<{ question: string; mentions: Mention[]; answer: LiveAnswer } | null>(null);
+  const busy = !!live && !live.answer.done;
+  // Follows the answer only while the reader is at the end of it.
+  const follow = useFollowScroll(busy);
   const [files, setFiles] = useState<PendingFile[]>([]);
   const [ratings, setRatings] = useState<Record<number, Rating | null>>({});
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -116,8 +159,6 @@ function Chat() {
   const navSlot = useChatNavSlot();
   const abortRef = useRef<AbortController | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const { sentinelRef, showPill, scrollToBottom, onNewContent } = useSmartScroll(scrollRef);
 
   useEffect(() => {
     setMac(/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent));
@@ -166,6 +207,13 @@ function Chat() {
 
   // Open the chat in the address.
   useEffect(() => {
+    if (ownUrl.current !== null && ownUrl.current === threadId) {
+      ownUrl.current = null;
+      return;
+    }
+    ownUrl.current = null;
+    setConvo((c) => c + 1);
+    follow.toLatest();
     if (!threadId) {
       setThread(null);
       setMessages([]);
@@ -181,6 +229,11 @@ function Chat() {
       .thread(threadId)
       .then((r) => {
         if (!on) return;
+        // The address may spell the id in another case: show the thread's own spelling, in place.
+        if (r.thread.id !== threadId && sameThread(r.thread.id, threadId)) {
+          ownUrl.current = r.thread.id;
+          chatUrl(r.thread.id, "replace");
+        }
         setThread(r.thread);
         setMessages(r.messages);
         setRatings({});
@@ -197,15 +250,22 @@ function Chat() {
     return () => {
       on = false;
     };
-    // `live` and `thread` are read only to skip reloading mid-answer.
+    // `live` and `thread` are read only to skip reloading mid-answer; `follow` is stable.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [threadId, focusBox]);
 
+  // Each chat keeps its own unsent text; another chat (or a new one) brings back its own.
+  const draftFor = threadId.toLowerCase();
   useEffect(() => {
-    onNewContent(!!live && !live.answer.done);
-  }, [messages, live, onNewContent]);
-
-  const busy = !!live && !live.answer.done;
+    setInput(readDraft(draftFor));
+  }, [draftFor]);
+  const changeInput = useCallback(
+    (text: string) => {
+      setInput(text);
+      writeDraft(draftFor, text);
+    },
+    [draftFor],
+  );
   const uploading = files.some((f) => f.status === "uploading");
 
   const attach = async (list: File[]) => {
@@ -230,12 +290,14 @@ function Chat() {
   const ask = async (question: string, pointedAt: Mention[]) => {
     if (!question || busy || uploading) return;
     setInput("");
+    writeDraft(threadId, "");
     setMentions([]);
     const attachments = files.filter((f) => f.status === "ready" && f.id).map((f) => ({ id: f.id!, name: f.name }));
     setFiles([]);
     const answer: LiveAnswer = { text: "", steps: [], citations: [], known: [], grounded: true, done: false };
     setLive({ question, mentions: pointedAt, answer });
-    window.setTimeout(() => scrollToBottom(true), 0);
+    // Sending goes to the end once; from there the answer is followed while the reader stays.
+    follow.toLatest();
     const ctrl = new AbortController();
     abortRef.current = ctrl;
     let newId = thread?.id ?? "";
@@ -289,17 +351,31 @@ function Chat() {
     const stopped = ctrl.signal.aborted;
     update((a) => ({ ...a, done: true, stopped }));
     loadThreads();
-    if (newId && newId !== threadId) router.replace(`/chat?thread=${encodeURIComponent(newId)}`);
-    else if (newId && !stopped) {
-      brainApi
-        .thread(newId)
-        .then((r) => {
-          setThread(r.thread);
-          setMessages(r.messages);
-          setLive(null);
-        })
-        .catch(() => {});
+    if (!newId) return;
+    const created = !sameThread(newId, threadId);
+    // The new chat's address, or the thread's own spelling of its id: in place, never a navigation.
+    if (newId !== threadId) {
+      // Text typed into a new chat while it answered goes with it.
+      if (created && !threadId) {
+        writeDraft(newId, readDraft(""));
+        writeDraft("", "");
+      }
+      ownUrl.current = newId;
+      chatUrl(newId, "replace");
     }
+    if (stopped && !created) return;
+    brainApi
+      .thread(newId)
+      .then((r) => {
+        setThread(r.thread);
+        setMessages(r.messages);
+        if (created) {
+          setRatings({});
+          setThreadCanAsk(r.can_ask);
+        }
+        setLive(null);
+      })
+      .catch(() => {});
   };
 
   const send = () => ask(input.trim(), mentions);
@@ -309,10 +385,9 @@ function Chat() {
     if (busy) abortRef.current?.abort();
     setSheetOpen(false);
     setLive(null);
-    setInput("");
-    router.push("/chat");
+    chatUrl("", "push");
     focusBox();
-  }, [busy, router, focusBox]);
+  }, [busy, focusBox]);
 
   // ⌘/ (Ctrl+/ elsewhere): a new chat, from anywhere on the page.
   useEffect(() => {
@@ -359,7 +434,8 @@ function Chat() {
     try {
       await brainApi.deleteThread(t.id);
       setThreads((all) => (all ?? []).filter((x) => x.id !== t.id));
-      if (t.id === threadId) router.replace("/chat");
+      writeDraft(t.id, "");
+      if (sameThread(t.id, threadId)) chatUrl("", "replace");
       toast("Chat deleted");
     } catch (e) {
       toast(e instanceof Error ? e.message : "The chat wasn't deleted. Try again.", "error");
@@ -459,7 +535,7 @@ function Chat() {
     <ChatComposer
       ref={inputRef}
       value={input}
-      onChange={setInput}
+      onChange={changeInput}
       onSend={send}
       onStop={stop}
       busy={busy}
@@ -557,6 +633,50 @@ function Chat() {
   const mentionName = (m: Mention) =>
     mentionOptions.find((o) => o.kind === m.kind && o.id === m.id)?.label ?? (m.kind === "run" ? "A run" : m.id.split("/").pop() ?? m.id);
 
+  // One list for saved turns and the live one, keyed by position: when the
+  // answer ends and its saved copy arrives, the same blocks stay mounted
+  // instead of being swapped, so nothing moves under the reader.
+  const turns: ReactNode[] = messages.map((m, i) =>
+    m.role === "user" ? (
+      <Question key={`${convo}-${i}`} anchor={`turn-${i}`} text={m.content} attachments={m.attachments} mentions={(m.mentions ?? []).map(mentionName)} />
+    ) : (
+      <AnswerView
+        key={`${convo}-${i}`}
+        anchor={`turn-${i}`}
+        text={m.content}
+        citations={m.citations}
+        grounded={m.grounded}
+        steps={(m.used ?? []).map((u, j) => ({ id: `${m.seq}-${j}`, label: u.label, name: u.name, repo: u.repo, summary: u.summary, status: "success" as const }))}
+        rating={m.seq in ratings ? ratings[m.seq] : m.feedback ?? null}
+        onRate={mine ? (r) => rate(m.seq, r) : undefined}
+        onRetry={mayAsk && mine && m.seq === lastAnswerSeq && !busy ? () => retry(m.seq) : undefined}
+      />
+    ),
+  );
+  if (live) {
+    const q = messages.length;
+    turns.push(<Question key={`${convo}-${q}`} anchor={`turn-${q}`} text={live.question} attachments={[]} mentions={live.mentions.map(mentionName)} />);
+    turns.push(
+      live.answer.error ? (
+        <Callout key={`${convo}-${q + 1}-error`} variant="error" title={live.answer.error} />
+      ) : live.answer.stopped && !live.answer.text ? (
+        <p key={`${convo}-${q + 1}-stopped`} className="text-sm text-zinc-500" data-testid="answer-stopped">
+          You stopped this answer. Ask again when you&apos;re ready.
+        </p>
+      ) : (
+        <AnswerView
+          key={`${convo}-${q + 1}`}
+          anchor={`turn-${q + 1}`}
+          text={live.answer.text}
+          citations={live.answer.done ? live.answer.citations : live.answer.known}
+          grounded={live.answer.grounded}
+          streaming={!live.answer.done}
+          steps={live.answer.steps}
+        />
+      ),
+    );
+  }
+
   return (
     <Page className="flex h-[calc(100dvh-5.25rem)] flex-col md:h-[calc(100dvh-7.25rem)]" testId="chat-page">
       {/* The empty page draws its own heading; an open chat's name is a hidden one (and the top bar's last crumb). */}
@@ -637,8 +757,17 @@ function Chat() {
             </div>
           ) : (
             <>
-              <div ref={scrollRef} className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden" aria-live="polite" aria-busy={busy}>
-                <div className={`mx-auto flex ${COLUMN} flex-col pb-8 pt-2 [&>[data-testid=answer]]:mt-5 [&>[data-testid=question]:not(:first-child)]:mt-12`}>
+              <div
+                ref={follow.scrollRef}
+                tabIndex={0}
+                role="region"
+                aria-label="Messages"
+                className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden [overflow-anchor:none] focus-visible:outline-none"
+                aria-live="polite"
+                aria-busy={busy}
+                data-testid="chat-scroll"
+              >
+                <div ref={follow.contentRef} className={`mx-auto flex ${COLUMN} flex-col pb-8 pt-2 [&>[data-testid=answer]]:mt-5 [&>[data-testid=question]:not(:first-child)]:mt-12`}>
                   {loadingThread && messages.length === 0 && !live ? (
                     <div className="space-y-4" aria-label="Loading the chat">
                       <Skeleton className="ml-auto h-10 w-1/2 rounded-2xl" />
@@ -647,46 +776,10 @@ function Chat() {
                       <Skeleton className="h-4 w-2/3" />
                     </div>
                   ) : null}
-                  {messages.map((m) =>
-                    m.role === "user" ? (
-                      <Question key={m.seq} text={m.content} attachments={m.attachments} mentions={(m.mentions ?? []).map(mentionName)} />
-                    ) : (
-                      <AnswerView
-                        key={m.seq}
-                        text={m.content}
-                        citations={m.citations}
-                        grounded={m.grounded}
-                        steps={(m.used ?? []).map((u, i) => ({ id: `${m.seq}-${i}`, label: u.label, name: u.name, repo: u.repo, summary: u.summary, status: "success" as const }))}
-                        rating={m.seq in ratings ? ratings[m.seq] : m.feedback ?? null}
-                        onRate={mine ? (r) => rate(m.seq, r) : undefined}
-                        onRetry={mayAsk && mine && m.seq === lastAnswerSeq && !busy ? () => retry(m.seq) : undefined}
-                      />
-                    ),
-                  )}
-                  {live && (
-                    <>
-                      <Question text={live.question} attachments={[]} mentions={live.mentions.map(mentionName)} />
-                      {live.answer.error ? (
-                        <Callout variant="error" title={live.answer.error} />
-                      ) : live.answer.stopped && !live.answer.text ? (
-                        <p className="text-sm text-zinc-500" data-testid="answer-stopped">
-                          You stopped this answer. Ask again when you&apos;re ready.
-                        </p>
-                      ) : (
-                        <AnswerView
-                          text={live.answer.text}
-                          citations={live.answer.done ? live.answer.citations : live.answer.known}
-                          grounded={live.answer.grounded}
-                          streaming={!live.answer.done}
-                          steps={live.answer.steps}
-                        />
-                      )}
-                    </>
-                  )}
-                  <div ref={sentinelRef} className="h-px" />
+                  {turns}
                 </div>
               </div>
-              <ScrollPill visible={showPill} onClick={scrollToBottom} />
+              <JumpToLatest visible={follow.behind} onClick={follow.toLatest} />
               <div className={`mx-auto w-full ${COLUMN} shrink-0 pb-1 pt-2`}>
                 {!capsReady ? null : mayAsk ? composer(false) : readOnlyNote}
               </div>
@@ -712,9 +805,9 @@ function starterKind(s: Starter): string {
   return "code";
 }
 
-function Question({ text, attachments, mentions }: { text: string; attachments: string[]; mentions: string[] }) {
+function Question({ text, attachments, mentions, anchor }: { text: string; attachments: string[]; mentions: string[]; anchor?: string }) {
   return (
-    <div className="animate-chat-in flex flex-col items-end gap-1.5" data-testid="question">
+    <div className="animate-chat-in flex flex-col items-end gap-1.5" data-testid="question" data-scroll-anchor={anchor}>
       <div className="max-w-[85%] min-w-0 rounded-2xl bg-zinc-800/80 px-4 py-2.5 text-sm leading-relaxed text-zinc-100">
         <p className="whitespace-pre-wrap wrap-anywhere">{text}</p>
         {attachments.length > 0 && <p className="mt-1 truncate text-xs text-zinc-400">Attached: {attachments.join(", ")}</p>}

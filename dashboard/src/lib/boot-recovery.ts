@@ -15,13 +15,28 @@ export const RELOAD_WINDOW_MS = 60_000;
 /** Seconds before the loading screen offers Reload when the app has not started. */
 export const RELOAD_OFFER_SECONDS = 10;
 
+/** Fired on window when a file of this build fails to load after the app started: a newer build is deployed. */
+export const UPDATE_READY = "coderhelm:update-ready";
+
+/** The class on <html> once that has happened, for a shell that mounts later. */
+export const UPDATE_READY_CLASS = "ch-update-ready";
+
 /**
- * Reloads the tab once when a /_next file fails to load: a script or
- * stylesheet whose request errors, or a ChunkLoadError when a page loads code
- * on demand. The fresh page names files that exist. A second failure within
- * RELOAD_WINDOW_MS does not reload again (no loop); it marks <html> with
- * `ch-boot-failed` so the loading screen shows Reload right away. Any element
- * with `data-ch-reload` reloads the tab when clicked, with or without React.
+ * Before the app has started, reloads the tab once when a /_next file fails
+ * to load: a script or stylesheet whose request errors, or a ChunkLoadError
+ * when a page loads code on demand. The fresh page names files that exist. A
+ * second failure within RELOAD_WINDOW_MS does not reload again (no loop); it
+ * marks <html> with `ch-boot-failed` so the loading screen shows Reload right
+ * away.
+ *
+ * Once the app has started (ClientShell sets data-ch-mounted) it never
+ * reloads: someone may be reading or typing, and an answer may be streaming.
+ * A file that fails then (the grammar for a code block, a page's code after a
+ * release) marks <html> with UPDATE_READY_CLASS and fires UPDATE_READY, and
+ * the shell offers Reload (components/update-ready.tsx).
+ *
+ * Any element with `data-ch-reload` reloads the tab when clicked, with or
+ * without React.
  */
 export const BOOT_RECOVERY_SCRIPT = `(function () {
   var KEY = ${JSON.stringify(RELOAD_KEY)};
@@ -43,7 +58,17 @@ export const BOOT_RECOVERY_SCRIPT = `(function () {
   function giveUp() {
     document.documentElement.classList.add("ch-boot-failed");
   }
+  function announce() {
+    var root = document.documentElement;
+    if (root.classList.contains(${JSON.stringify(UPDATE_READY_CLASS)})) return;
+    root.classList.add(${JSON.stringify(UPDATE_READY_CLASS)});
+    try {
+      window.dispatchEvent(new Event(${JSON.stringify(UPDATE_READY)}));
+    } catch (e) {}
+  }
   function recover() {
+    // The app is running: never pull the page out from under the person.
+    if (document.documentElement.hasAttribute("data-ch-mounted")) return announce();
     if (done) return;
     done = true;
     var last = 0;

@@ -406,11 +406,14 @@ export function AnswerView({
   rating,
   onRate,
   onRetry,
+  anchor,
 }: {
   text: string;
   citations: Citation[];
   grounded: boolean;
   streaming?: boolean;
+  /** Its place in the conversation, for keeping the reader's place (components/follow-scroll.tsx). */
+  anchor?: string;
   steps?: ToolStep[];
   /** The asker's rating; with `onRate`, the thumbs show. */
   rating?: Rating | null;
@@ -455,7 +458,7 @@ export function AnswerView({
     );
   }
   return (
-    <div className="min-w-0" data-testid="answer" ref={box.ref} style={box.style}>
+    <div className="min-w-0" data-testid="answer" data-scroll-anchor={anchor} ref={box.ref} style={box.style}>
       {((steps && steps.length > 0) || waiting) && <ActivityLine steps={steps ?? []} streaming={!!streaming} />}
       {content}
       {!streaming && grounded && <SourceList docs={docs} onOpen={setOpen} />}

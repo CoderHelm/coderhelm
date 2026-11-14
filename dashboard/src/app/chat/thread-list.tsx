@@ -219,7 +219,17 @@ function ThreadRow({
     <li className="group relative min-w-0" data-testid="thread-row">
       <Link
         href={`/chat?thread=${encodeURIComponent(t.id)}`}
-        onClick={onPick}
+        onClick={(e) => {
+          // Another chat on the same page: change the address in place. A
+          // router navigation fetches the route again, and a tab on an older
+          // build than the one deployed gets a full page load instead. A
+          // modified click (new tab, new window) keeps the link's own behaviour.
+          if (e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+            e.preventDefault();
+            window.history.pushState(null, "", `${window.location.pathname}?thread=${encodeURIComponent(t.id)}`);
+          }
+          onPick?.();
+        }}
         aria-current={current ? "page" : undefined}
         title={t.title}
         className={`flex min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-sm ${canChange ? "pr-9" : ""} ${current ? "bg-zinc-800 text-zinc-100" : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"} ${focusRing}`}
