@@ -37,6 +37,7 @@ import { activePass, PASSES, runSteps } from "@/lib/run-steps";
 import { checksSentence, runTimeline, spanSeconds, stillToCome } from "@/lib/run-timeline";
 import { ChecksPanel, FilesChanged, noFilesNote, RunTimeline } from "./run-timeline";
 import { AgentLogPanel, BuildDigest } from "./agent-log";
+import { RunActivity } from "./run-activity";
 import { VerdictPill } from "@/app/reviewer/labels";
 import { reviewHref } from "@/app/reviewer/session/session";
 import { planCheckResult, taskPath } from "@/lib/plan-check";
@@ -1322,11 +1323,17 @@ function RunDetailInner() {
               <TechnicalDetails text={sanitizeError(run.error)} />
             </Callout>
           )}
+          {/* The run's story first, so the tab is never blank for a real run. */}
+          <RunActivity runId={runId} run={run} live={isActive(run.status) || run.status === "needs_input"} />
           <AsksHistory data={asks} live={asksAreCurrent} note={run.policy_note} prompts={run.sign_in_prompts} />
           <TeamAgentAsks runId={runId} status={run.status} traces={traces} />
+          {/* Read again on every change to the run and, while it works, on a timer:
+              its reads and asks are recorded while the status stays "running". */}
           <WorkUsedLine
             query={run.created_at ? { run_id: run.run_id || runId, since: run.created_at } : null}
-            refreshKey={run.status}
+            refreshKey={`${run.status}|${run.updated_at ?? ""}`}
+            live={isActive(run.status)}
+            showFailure
             standardNames={run.applied_standards}
             title="What the run used"
           />

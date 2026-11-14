@@ -146,31 +146,61 @@ export function UsedLine({
 export function WorkUsedLine({
   query,
   refreshKey,
+  live = false,
+  showFailure = false,
   standardNames,
   title,
   className,
 }: {
   query: UsedQuery | null;
+  /** Read again whenever this changes (a run's status and last update). */
   refreshKey?: string;
+  /** The work is still going: its reads and asks keep arriving, so read again every so often. */
+  live?: boolean;
+  /** Say so, with a retry, when the read fails, instead of showing nothing. */
+  showFailure?: boolean;
   standardNames?: string[] | null;
   title?: string;
   className?: string;
 }) {
   const [used, setUsed] = useState<WorkUsed | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [tries, setTries] = useState(0);
   const key = query ? JSON.stringify(query) : "";
   useEffect(() => {
     if (!key) return;
-    let live = true;
-    skillsApi
-      .used(JSON.parse(key) as UsedQuery)
-      .then((u) => live && setUsed(u))
-      .catch(() => {});
+    let current = true;
+    const read = () =>
+      skillsApi
+        .used(JSON.parse(key) as UsedQuery)
+        .then((u) => {
+          if (!current) return;
+          setUsed(u);
+          setFailed(false);
+        })
+        .catch(() => current && setFailed(true));
+    read();
+    const t = live ? setInterval(read, LIVE_USED_MS) : undefined;
     return () => {
-      live = false;
+      current = false;
+      if (t) clearInterval(t);
     };
-  }, [key, refreshKey]);
+  }, [key, refreshKey, live, tries]);
+  if (failed && !used && showFailure) {
+    return (
+      <p className={`flex flex-wrap items-center gap-x-2 text-xs text-zinc-400 ${className ?? ""}`.trim()} data-testid="work-used-failed">
+        Couldn&apos;t load {title ? title.charAt(0).toLowerCase() + title.slice(1) : "what this used"}.
+        <button type="button" onClick={() => setTries((n) => n + 1)} className={`underline underline-offset-4 hover:text-zinc-200 rounded ${focusRing}`}>
+          Try again
+        </button>
+      </p>
+    );
+  }
   return <UsedLine used={used} standardNames={standardNames} title={title} className={className} />;
 }
+
+/** How often work that is still going reads what it used again. */
+const LIVE_USED_MS = 15_000;
 
 const CHIP_WORDS: Record<UsedRef["kind"], string> = {
   skill: "Read skill",

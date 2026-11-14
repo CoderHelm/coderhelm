@@ -470,6 +470,14 @@ export const api = {
     ),
   getRunTraces: (id: string) =>
     request<{ traces: PassTrace[] }>(`/api/runs/${id}/traces`),
+  /** The run's story in time order, newest last, a page from the newest end. */
+  getRunActivity: (id: string, q: { before?: string; limit?: number } = {}) => {
+    const p = new URLSearchParams();
+    if (q.before) p.set("before", q.before);
+    if (q.limit) p.set("limit", String(q.limit));
+    const qs = p.toString();
+    return request<RunActivityPage>(`/api/runs/${encodeURIComponent(id)}/activity${qs ? `?${qs}` : ""}`);
+  },
 
   // Repos
   listRepos: () => request<{ repos: Repo[] }>("/api/repos"),
@@ -2525,6 +2533,29 @@ export interface AnswerRunResult {
   /** Whether the answers were posted on the ticket or issue. */
   posted: boolean;
   comment_url?: string | null;
+}
+
+/** One thing that happened on a run (`GET /api/runs/:id/activity`). */
+export interface RunActivityEntry {
+  /** Unique within the run and in time order; the page cursor. */
+  id: string;
+  at: string;
+  actor: "coderhelm" | "person" | "github" | "jira";
+  /** The person, when one did it. */
+  who?: string;
+  kind: string;
+  text: string;
+  /** A full URL, or a dashboard path starting with `/`. */
+  link?: string;
+  tone: "neutral" | "good" | "problem";
+}
+
+export interface RunActivityPage {
+  /** Oldest first. */
+  entries: RunActivityEntry[];
+  /** The cursor for the page before this one; null when there is none. */
+  earlier: string | null;
+  total: number;
 }
 
 export interface PassTrace {
