@@ -8,7 +8,7 @@ import { RoleGuard } from "@/components/role-guard";
 import { Page, PageHeader } from "@/components/page";
 import { BrandIcon } from "@/components/brand-icons";
 import { AddMcpServerDialog, McpServerPanel } from "@/components/mcp-servers";
-import { PluginPanel } from "@/components/mcp-server-panel";
+import { CatalogPanel } from "@/components/mcp-server-panel";
 import { Chip, List, ListError, ListSection, ListSkeleton, type Tone } from "@/components/list";
 import { linkButton, secondaryButton } from "@/components/ui";
 import { EmptyState } from "@/components/empty-state";
@@ -100,9 +100,9 @@ function ConnectionsPage() {
         </div>
         {open === item.id && (
           <div id={panelId} className="border-t border-zinc-800 bg-zinc-950/40 px-4 pb-4 pt-3 sm:pl-[3.75rem]">
-            {item.reason && <p className="text-sm text-zinc-400">{item.reason}</p>}
-            {remote && <McpServerPanel server={remote} canEdit={canEdit} onChanged={load} onRemoved={added ? () => setOpen("") : undefined} />}
-            {!added && canEdit && <PluginPanel item={item} onChanged={load} onClose={() => setOpen("")} />}
+            <p className="text-sm text-zinc-400">{item.does}</p>
+            {added && remote && <McpServerPanel server={remote} canEdit={canEdit} onChanged={load} onRemoved={() => setOpen("")} />}
+            {!added && <CatalogPanel item={item} canEdit={canEdit} onChanged={load} onClose={() => setOpen("")} />}
             <p className="mt-4">
               <button type="button" onClick={() => setOpen("")} className={linkButton}>
                 Close

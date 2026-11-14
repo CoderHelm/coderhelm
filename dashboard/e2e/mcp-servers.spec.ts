@@ -108,8 +108,10 @@ function refresh(s: McpServer) {
 async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend> {
   const db: Backend = { role: "admin", me: "dana@example.com", admins: 1, servers: [], calls: [], ...init };
   const json = (r: Route, body: unknown, status = 200) => r.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
-  await page.route((url) => url.hostname !== "localhost", (route) => route.abort());
-  await page.route((url) => url.hostname === "localhost" && /^\/(api|auth)\//.test(url.pathname), async (r) => {
+  // On the context, so a sign-in opened in its own tab is answered here too.
+  const context = page.context();
+  await context.route((url) => url.hostname !== "localhost", (route) => route.abort());
+  await context.route((url) => url.hostname === "localhost" && /^\/(api|auth)\//.test(url.pathname), async (r) => {
     const req = r.request();
     const url = new URL(req.url());
     const p = url.pathname;
@@ -234,7 +236,7 @@ async function shot(page: Page, name: string) {
 
 const row = (page: Page, id: string) => page.getByTestId(`integration-${id}`);
 
-test("adds a server that signs in with OAuth, comes back from the sign-in, and picks its tools", async ({ page }) => {
+test("adds a server that signs in with OAuth, connects it in its own tab, and picks its tools", async ({ page, context }) => {
   const db = await mockApi(page);
   await page.goto("/settings/integrations");
   const section = page.locator("#mcp-servers");
@@ -252,16 +254,24 @@ test("adds a server that signs in with OAuth, comes back from the sign-in, and p
   await expect(dialog.getByRole("group", { name: "Who signs in" })).toBeVisible();
   await shot(page, "mcp-add-oauth");
 
-  await dialog.getByRole("button", { name: "Add and connect" }).click();
-  // Back from the sign-in page, on the server's own row with its tools.
-  await expect(page).toHaveURL(/\/settings\/integrations\/#integration-mcp:docs$/);
+  await dialog.getByRole("button", { name: "Add server" }).click();
+  // Added, and opened on its own row: Connect is the one thing to do next,
+  // with nothing about tools or history yet.
+  await expect(page).toHaveURL(/\/settings\/integrations\/?#integration-mcp:docs$/);
+  const added = row(page, "mcp:docs").getByTestId("integration-panel");
+  await expect(added.getByTestId("mcp-manage")).toHaveCount(0);
+  const tab = context.waitForEvent("page");
+  await added.getByRole("button", { name: "Connect", exact: true }).click();
+  // The sign-in finishes in its own tab, which closes; this page never left.
+  await (await tab).waitForEvent("close");
+  await expect(row(page, "mcp:docs")).toHaveAttribute("data-status", "connected");
+  await expect(page).toHaveURL(/\/settings\/integrations\/?#integration-mcp:docs$/);
   const callback = db.calls.find((c) => c.path === "/api/mcp-servers/oauth/callback");
   expect(callback?.body).toEqual({ state: "state-docs", code: "code-1", iss: ISSUER });
   const created = db.calls.find((c) => c.path === "/api/mcp-servers" && c.method === "POST");
   expect(created?.body).toMatchObject({ url: "https://mcp.docs.example.com/mcp", name: "Docs", sharing: "shared" });
 
   const panel = row(page, "mcp:docs").getByTestId("integration-panel");
-  await expect(panel.getByTestId("mcp-status")).toContainText("Connected");
   const picker = panel.getByTestId("mcp-tool-picker");
   await expect(picker.getByTestId("mcp-tool")).toHaveCount(4);
   await expect(picker.locator('[data-tool="search_docs"]').getByTestId("mcp-tool-access")).toHaveText("Reads");
@@ -299,7 +309,9 @@ test("a server that takes a key checks it, keeps it sealed and never shows it ag
   expect(created?.body).toMatchObject({ header_name: "X-API-Key", header_value: KEY, name: "Search" });
 
   const panel = row(page, "mcp:search").getByTestId("integration-panel");
-  await expect(panel.getByTestId("mcp-status")).toContainText("Key in X-API-Key");
+  // How it signs in is a detail, behind Details.
+  await panel.getByTestId("panel-details").locator("summary").click();
+  await expect(panel.getByTestId("panel-details")).toContainText("A key, sent in the X-API-Key header");
   await expect(page.locator("body")).not.toContainText(KEY);
   // A key server has no sign-in to start.
   await expect(panel.getByRole("button", { name: /^Connect/ })).toHaveCount(0);
@@ -347,7 +359,7 @@ test("with two admins, newly allowed tools wait for the other admin", async ({ p
   expect(db.servers[0].tools.find((t) => t.name === "search_docs")?.approved).toBe(true);
 });
 
-test("a connection that needs reconnecting says why and reconnects", async ({ page }) => {
+test("a connection that needs reconnecting says why and reconnects", async ({ page, context }) => {
   const why = "The sign-in server refused (invalid_grant: refresh token revoked). Reconnect to sign in again.";
   await mockApi(page, {
     servers: [server({ status: "needs_reconnect", status_reason: why, my_connection: { status: "needs_reconnect", status_reason: why, connected_at: "" } })],
@@ -360,41 +372,51 @@ test("a connection that needs reconnecting says why and reconnects", async ({ pa
   await r.getByRole("button", { name: /^Docs, Needs reconnecting\. Reconnect/ }).click();
   const panel = r.getByTestId("integration-panel");
   await expect(panel.getByTestId("mcp-status-reason")).toHaveText(why);
+  // The reason and its one action sit together.
+  await expect(panel.getByTestId("mcp-attention")).toContainText("Needs reconnecting");
   await shot(page, "mcp-needs-reconnect");
-  await panel.getByRole("button", { name: "Reconnect" }).click();
-  await expect(page).toHaveURL(/#integration-mcp:docs$/);
+  const tab = context.waitForEvent("page");
+  await panel.getByTestId("mcp-attention").getByRole("button", { name: "Reconnect" }).click();
+  await (await tab).waitForEvent("close");
   await expect(row(page, "mcp:docs")).toHaveAttribute("data-status", "connected");
 });
 
-test("a catalog server offers its vendor's sign-in first and keeps the key as a fallback", async ({ page }) => {
+test("a catalog server offers its vendor's sign-in first and keeps the key as a fallback", async ({ page, context }) => {
   const db = await mockApi(page);
   await page.goto("/settings/integrations");
   await row(page, "linear").getByRole("button", { name: /^Linear, Not connected/ }).click();
   const panel = row(page, "linear").getByTestId("integration-panel");
-  await expect(panel.getByTestId("oauth-offer")).toContainText("No key to paste");
-  await expect(panel.getByText("Use a key instead")).toBeVisible();
+  await expect(panel.getByTestId("access")).toHaveText(
+    "You sign in at Linear, then pick which of its tools agents may use. Agents get none until you do, and tools that only read are marked.",
+  );
+  // A key is another way to connect, behind one disclosure.
+  await expect(panel.getByTestId("other-ways").locator("summary")).toHaveText("Other ways to connect");
   await expect(panel.getByLabel("API key")).toBeHidden();
   await shot(page, "mcp-catalog-oauth");
+  const tab = context.waitForEvent("page");
   await panel.getByRole("button", { name: "Sign in with Linear" }).click();
-  await expect(page).toHaveURL(/#integration-linear$/);
+  await (await tab).waitForEvent("close");
   expect(db.calls.find((c) => c.path === "/api/mcp-servers" && c.method === "POST")?.body).toEqual({ catalog_id: "linear" });
   await expect(row(page, "linear")).toHaveAttribute("data-status", "connected");
   await expect(row(page, "linear").getByTestId("integration-panel").getByTestId("mcp-tool-picker")).toBeVisible();
 });
 
-test("a member connects their own account to a server each person signs in to", async ({ page }) => {
+test("a member connects their own account to a server each person signs in to", async ({ page, context }) => {
   const db = await mockApi(page, { role: "member", me: "sam@example.com", servers: [server({ sharing: "personal", my_connection: null })] });
   await page.goto("/settings/integrations");
   const r = row(page, "mcp:docs");
   await expect(r).toHaveAttribute("data-status", "not_connected");
   await r.getByRole("button", { name: /^Docs, Not connected/ }).click();
   const panel = r.getByTestId("integration-panel");
-  await expect(panel.getByTestId("mcp-status-reason")).toHaveText("Each person connects their own account. You haven't yet.");
+  await expect(panel.getByTestId("mcp-status-reason")).toHaveText(
+    "Each person signs in to Docs with their own account. Agents use it for that person's work, with only the tools an admin allowed.",
+  );
   // Members don't pick tools or remove servers.
   await expect(panel.getByRole("button", { name: "Save tools" })).toHaveCount(0);
   await expect(panel.getByRole("button", { name: /^Remove/ })).toHaveCount(0);
+  const tab = context.waitForEvent("page");
   await panel.getByRole("button", { name: "Connect your account" }).click();
-  await expect(page).toHaveURL(/#integration-mcp:docs$/);
+  await (await tab).waitForEvent("close");
   expect(db.calls.some((c) => c.path === "/api/mcp-servers/oauth/callback")).toBe(true);
   await expect(row(page, "mcp:docs")).toHaveAttribute("data-status", "connected");
 });
@@ -419,7 +441,7 @@ test("a key for a server whose vendor takes one connects to that server", async 
   await page.goto("/settings/integrations");
   await row(page, "linear").getByRole("button", { name: /^Linear, Not connected/ }).click();
   const panel = row(page, "linear").getByTestId("integration-panel");
-  await panel.getByText("Use a key instead").click();
+  await panel.getByTestId("other-ways").locator("summary").click();
   const form = panel.getByTestId("remote-key-form");
   await form.getByLabel("API key").fill("lin_api_example");
   await form.getByRole("button", { name: "Connect with this key" }).click();
@@ -454,7 +476,7 @@ test("a server no key works for says why, with no key form", async ({ page }) =>
   const hosting = row(page, "hosting").getByTestId("integration-panel");
   await expect(hosting.getByRole("button", { name: "Sign in with Hosting" })).toBeVisible();
   await expect(hosting.getByTestId("key-unavailable")).toHaveText("Hosting's MCP server takes no key: use Sign in with Hosting.");
-  await expect(hosting.getByText("Use a key instead")).toHaveCount(0);
+  await expect(hosting.getByTestId("other-ways")).toHaveCount(0);
   await expect(hosting.locator("input")).toHaveCount(0);
   await row(page, "cache").getByRole("button", { name: /^Cache, Not connected/ }).click();
   const cache = row(page, "cache").getByTestId("integration-panel");

@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { api, type McpCall, type McpDetected, type McpServer, type McpStatus, type McpTool } from "@/lib/api";
+import { useEffect, useMemo, useState } from "react";
+import { api, type McpCall, type McpDetected, type McpServer, type McpStatus, type McpTool, type SignInStart } from "@/lib/api";
 import { errorMessage, timeAgo } from "@/lib/data-sources";
 import { Callout } from "./callout";
 import { Code } from "./settings/code";
@@ -14,18 +14,12 @@ import { useConfirm } from "./confirm-dialog";
 import { useToast } from "./toast";
 import { useCan } from "@/hooks/use-can";
 import { inputClass, linkButton, monoInputClass, primaryButton, secondaryButton, smallSecondaryButton } from "./ui";
+import { DangerRow, PanelDetails, PanelSection, SignInControl } from "./integration-panel";
 
 // Remote MCP servers: added by address, signed in to with OAuth, a key or
 // nothing, their tools allowed one by one. Used on Settings → Integrations,
 // for servers added by address and for catalog servers connected through
 // their vendor's own remote server.
-
-const STATUS: Record<McpStatus, { label: string; tone: string }> = {
-  connected: { label: "Connected", tone: "text-emerald-300" },
-  needs_reconnect: { label: "Needs reconnect", tone: "text-amber-300" },
-  failed: { label: "Not working", tone: "text-red-300" },
-  not_connected: { label: "Not connected", tone: "text-zinc-400" },
-};
 
 const ACCESS: Record<McpTool["access"], { label: string; cls: string; hint: string }> = {
   read: { label: "Reads", cls: "border-emerald-500/30 text-emerald-300", hint: "The server says this tool only reads." },
@@ -33,14 +27,8 @@ const ACCESS: Record<McpTool["access"], { label: string; cls: string; hint: stri
   unknown: { label: "Not said", cls: "border-zinc-700 text-zinc-400", hint: "The server doesn't say whether this tool changes data." },
 };
 
-/** Sends the browser to the server's sign-in page. */
-export async function startMcpSignIn(id: string) {
-  const r = await api.connectMcpServer(id);
-  window.location.assign(r.authorize_url);
-}
-
-/** Connects a catalog server through its vendor's remote server (setting it up first if needed). */
-export async function connectCatalogServer(catalogId: string) {
+/** Starts a catalog server's sign-in through its vendor's remote server (setting it up first if needed). */
+export async function beginCatalogSignIn(catalogId: string): Promise<SignInStart> {
   let id = catalogId;
   try {
     id = (await api.addMcpServer({ catalog_id: catalogId })).server.id;
@@ -51,7 +39,8 @@ export async function connectCatalogServer(catalogId: string) {
     if (!found) throw e;
     id = found.id;
   }
-  await startMcpSignIn(id);
+  const r = await api.connectMcpServer(id);
+  return { ...r, server_id: r.server_id ?? id };
 }
 
 let meEmail: Promise<string> | null = null;
@@ -77,7 +66,7 @@ function hostOf(url: string): string {
 }
 
 /** The connection this person sees: their own on a personal server, the team's otherwise. */
-function viewerStatus(s: McpServer): { status: McpStatus; reason: string } {
+export function viewerStatus(s: McpServer): { status: McpStatus; reason: string } {
   if (s.auth === "oauth" && s.sharing === "personal") {
     return s.my_connection
       ? { status: s.my_connection.status, reason: s.my_connection.status_reason }
@@ -160,15 +149,13 @@ export function AddMcpServerDialog({
         client_id: manual ? clientId.trim() : undefined,
         client_secret: manual && clientSecret.trim() ? clientSecret.trim() : undefined,
       });
-      if (r.server.auth === "oauth") {
-        // Straight on to the sign-in page; the callback brings the person back.
-        await startMcpSignIn(r.server.id);
-        return;
-      }
+      // A server that signs in opens on its row, where Connect is the one
+      // thing to do next.
       onAdded(r.server);
       onOpenChange(false);
     } catch (e) {
       setError(errorMessage(e, "Couldn't add the server."));
+    } finally {
       setBusy(false);
     }
   };
@@ -304,7 +291,7 @@ export function AddMcpServerDialog({
             </button>
           ) : (
             <button type="submit" form="add-mcp-server-form" disabled={busy || !ready} className={primaryButton}>
-              {busy ? (detected.auth === "header" ? "Checking the key…" : "Adding…") : detected.auth === "oauth" ? "Add and connect" : "Add server"}
+              {busy ? (detected.auth === "header" ? "Checking the key…" : "Adding…") : "Add server"}
             </button>
           )}
         </ModalFooter>
@@ -315,6 +302,16 @@ export function AddMcpServerDialog({
 
 // ── One server ──────────────────────────────────────────────────────
 
+/** Who signs in to a server, or what it takes instead. */
+function signsIn(s: McpServer): string {
+  if (s.auth === "oauth") return s.sharing === "personal" ? "Each person, with their own account" : "One account for the team";
+  return s.auth === "header" ? `A key, sent in the ${s.header_name} header` : "Nobody: it needs no sign-in";
+}
+
+/**
+ * A server added by address, opened on Integrations: connecting it, then
+ * its tools, instructions and calls, and disconnecting or removing it last.
+ */
 export function McpServerPanel({
   server,
   canEdit,
@@ -328,7 +325,6 @@ export function McpServerPanel({
 }) {
   const [s, setS] = useState(server);
   useEffect(() => setS(server), [server]);
-  const me = useMyEmail();
   const { toast } = useToast();
   const { confirm } = useConfirm();
   const [busy, setBusy] = useState("");
@@ -338,7 +334,8 @@ export function McpServerPanel({
   // A shared server is connected by whoever may change integrations; a
   // personal one by anyone who may connect their own account.
   const mayConnect = s.auth === "oauth" && (personal ? can("mcp_connect") : canEdit);
-  const st = STATUS[view.status];
+  const connected = view.status === "connected";
+  const noClient = s.needs_client && !s.has_client;
 
   const act = async (label: string, fn: () => Promise<void>) => {
     setBusy(label);
@@ -351,7 +348,6 @@ export function McpServerPanel({
     }
   };
 
-  const connect = () => act("connect", () => startMcpSignIn(s.id));
   const disconnect = () =>
     act("disconnect", async () => {
       const ok = await confirm({
@@ -382,71 +378,149 @@ export function McpServerPanel({
       onRemoved?.();
       await onChanged();
     });
-  const check = () =>
-    act("check", async () => {
-      const r = await api.checkMcpServer(s.id);
-      setS(r.server);
-      toast(r.error ? r.error : `${r.server.tools.length} tools listed`, r.error ? "error" : "success");
-      await onChanged();
-    });
+
+  const signIn = mayConnect && (
+    <SignInControl
+      name={s.name}
+      ids={[s.id]}
+      label={view.status === "needs_reconnect" || view.status === "failed" ? "Reconnect" : personal ? "Connect your account" : "Connect"}
+      begin={async () => ({ ...(await api.connectMcpServer(s.id)), server_id: s.id })}
+      onConnected={onChanged}
+      onReturn={onChanged}
+      disabled={noClient}
+      testId="mcp-sign-in"
+    />
+  );
+  const details = (
+    <PanelDetails
+      rows={[
+        { label: "Server address", value: <Code className="text-xs">{s.url}</Code> },
+        { label: "Signs in", value: signsIn(s) },
+        { label: "Sign-in server", value: s.issuer ? hostOf(s.issuer) : "" },
+        { label: "Permissions asked for", value: s.scopes.length ? s.scopes.join(", ") : "" },
+        { label: "Added", value: s.added_at ? `${timeAgo(s.added_at)}${s.added_by ? ` by ${s.added_by}` : ""}` : "" },
+      ]}
+    />
+  );
 
   return (
     <div className="mt-3 flex flex-col gap-4" data-testid={`mcp-server-${s.id}`} data-status={view.status}>
-      <div className="flex flex-col gap-1">
-        <p className="text-sm text-zinc-400">
-          <Code className="text-xs">{s.url}</Code>
-        </p>
-        <p className="text-sm" data-testid="mcp-status">
-          <span className={st.tone}>{st.label}</span>
-          <span className="text-zinc-500">
-            {" · "}
-            {s.auth === "oauth" ? (personal ? "OAuth, each person signs in" : "OAuth, one account for the team") : s.auth === "header" ? `Key in ${s.header_name}` : "No sign-in"}
-          </span>
-        </p>
-        {view.reason && (
-          <p className={`text-sm ${view.status === "needs_reconnect" ? "text-amber-300" : view.status === "failed" ? "text-red-300" : "text-zinc-400"}`} data-testid="mcp-status-reason">
-            {view.reason}
-          </p>
-        )}
-      </div>
-
-      {s.needs_client && !s.has_client && canEdit && <ClientForm server={s} onSaved={setS} />}
-
-      {(mayConnect || (s.auth === "header" && canEdit) || canEdit) && (
-        <div className="flex flex-wrap items-center gap-3">
-          {mayConnect && view.status !== "connected" && (
-            <button type="button" onClick={connect} disabled={!!busy || (s.needs_client && !s.has_client)} className={primaryButton}>
-              {busy === "connect" ? "Opening sign-in…" : view.status === "needs_reconnect" ? "Reconnect" : personal ? "Connect your account" : "Connect"}
-            </button>
-          )}
-          {mayConnect && view.status === "connected" && (
-            <button type="button" onClick={disconnect} disabled={!!busy} className={secondaryButton}>
-              {personal ? "Disconnect your account" : "Disconnect"}
-            </button>
-          )}
-          {canEdit && (view.status === "connected" || s.auth !== "oauth") && (
-            <button type="button" onClick={check} disabled={!!busy} className={secondaryButton}>
-              {busy === "check" ? "Checking…" : "Check again"}
-            </button>
-          )}
-        </div>
+      {/* Needs attention: the reason and the one action. */}
+      {(view.status === "needs_reconnect" || view.status === "failed") && (
+        <Callout variant={view.status === "failed" ? "error" : "warning"} title={view.status === "failed" ? "Not working" : "Needs reconnecting"} live={false} testId="mcp-attention">
+          <p data-testid="mcp-status-reason">{view.reason || "The sign-in has to be renewed."}</p>
+          <div className="pt-2">{s.auth === "oauth" ? signIn : canEdit && <CheckAgain server={s} onSaved={setS} onChanged={onChanged} />}</div>
+        </Callout>
       )}
 
-      {s.auth === "header" && canEdit && <KeyForm server={s} onSaved={setS} />}
+      {/* Not connected: what happens, one action, what comes next. */}
+      {view.status === "not_connected" && (
+        <>
+          <p className="text-sm text-zinc-300" data-testid="mcp-status-reason">
+            {personal
+              ? `Each person signs in to ${s.name} with their own account. Agents use it for that person's work, with only the tools an admin allowed.`
+              : `You sign in at ${hostOf(s.url)}, then pick which of its tools agents may use. Agents get none until you do.`}
+          </p>
+          {noClient && canEdit && <ClientForm server={s} onSaved={setS} />}
+          {signIn}
+        </>
+      )}
 
-      <ToolPicker server={s} canEdit={canEdit} me={me} onSaved={(n) => { setS(n); void onChanged(); }} />
+      {/* Connected: its tools, instructions and calls. Nothing before that. */}
+      {connected && view.reason && (
+        <p className="text-sm text-zinc-400" data-testid="mcp-status-reason">
+          {view.reason}
+        </p>
+      )}
+      {connected && <McpManage server={s} canEdit={canEdit} onSaved={setS} onChanged={onChanged} />}
+      {details}
 
-      {canEdit && <PromptForm server={s} onSaved={setS} />}
-      {canEdit && <Activity server={s} />}
-
-      {canEdit && (
+      {canEdit && (connected || s.auth !== "oauth") && mayConnect && (
+        <DangerRow title={personal ? `Disconnect your ${s.name} account` : `Disconnect ${s.name}`} label="Disconnect" onClick={disconnect} busy={!!busy} testId="mcp-disconnect">
+          {personal ? "Agents stop using your account. The server and its allowed tools stay." : "Agents stop using it until someone signs in again. The server and its allowed tools stay."}
+        </DangerRow>
+      )}
+      {!canEdit && connected && mayConnect && (
         <p>
-          <button type="button" onClick={remove} disabled={!!busy} className={linkButton}>
-            {s.catalog_id ? `Stop using ${s.name}'s sign-in` : `Remove ${s.name}`}
+          <button type="button" onClick={disconnect} disabled={!!busy} className={secondaryButton}>
+            Disconnect your account
           </button>
         </p>
       )}
+      {canEdit && (
+        <DangerRow title={`Remove ${s.name}`} label="Remove server" onClick={remove} busy={!!busy} testId="mcp-remove">
+          Every connection to it is revoked and forgotten, and agents lose its tools at once.
+        </DangerRow>
+      )}
     </div>
+  );
+}
+
+/** Lists the server's tools again with the saved connection. */
+function CheckAgain({ server, onSaved, onChanged }: { server: McpServer; onSaved: (s: McpServer) => void; onChanged: () => Promise<void> | void }) {
+  const [busy, setBusy] = useState(false);
+  const { toast } = useToast();
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      className={secondaryButton}
+      onClick={async () => {
+        setBusy(true);
+        try {
+          const r = await api.checkMcpServer(server.id);
+          onSaved(r.server);
+          toast(r.error ? r.error : `${r.server.tools.length} tools listed`, r.error ? "error" : "success");
+          await onChanged();
+        } catch (e) {
+          toast(errorMessage(e, "The check failed."), "error");
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      {busy ? "Checking…" : "Check again"}
+    </button>
+  );
+}
+
+/**
+ * What an admin manages on a connected server: which tools agents get, the
+ * instructions agents follow with it, its key (when it uses one) and its
+ * recent calls. Each part shows only when there is something in it.
+ */
+export function McpManage({
+  server,
+  canEdit,
+  onSaved,
+  onChanged,
+}: {
+  server: McpServer;
+  canEdit: boolean;
+  onSaved: (s: McpServer) => void;
+  onChanged: () => Promise<void> | void;
+}) {
+  const me = useMyEmail();
+  return (
+    <PanelSection title={canEdit ? "Manage" : "What agents use"} testId="mcp-manage">
+      <ToolPicker
+        server={server}
+        canEdit={canEdit}
+        me={me}
+        onSaved={(n) => {
+          onSaved(n);
+          void onChanged();
+        }}
+      />
+      {canEdit && <PromptForm server={server} onSaved={onSaved} />}
+      {server.auth === "header" && canEdit && <KeyForm server={server} onSaved={onSaved} />}
+      {canEdit && <Activity server={server} />}
+      {canEdit && (
+        <div>
+          <CheckAgain server={server} onSaved={onSaved} onChanged={onChanged} />
+        </div>
+      )}
+    </PanelSection>
   );
 }
 
@@ -561,9 +635,11 @@ function ToolPicker({ server, canEdit, me, onSaved }: { server: McpServer; canEd
   const mineToApprove = canEdit && waiting.length > 0 && me !== "" && server.changed_by.toLowerCase() !== me;
 
   if (server.tools.length === 0) {
+    // Nothing to pick: said only once the server was asked and listed none.
+    if (!server.tools_listed_at) return null;
     return (
       <p className="text-sm text-zinc-400" data-testid="mcp-no-tools">
-        {server.tools_listed_at ? "The server lists no tools." : "Its tools are listed once it's connected."}
+        The server lists no tools.
       </p>
     );
   }
@@ -681,9 +757,20 @@ function ToolPicker({ server, canEdit, me, onSaved }: { server: McpServer; canEd
 
 function PromptForm({ server, onSaved }: { server: McpServer; onSaved: (s: McpServer) => void }) {
   const [text, setText] = useState(server.custom_prompt);
+  const [adding, setAdding] = useState(false);
   const { toast } = useToast();
+  // No instructions yet: one link to add some, never an empty box.
+  if (!server.custom_prompt && !adding) {
+    return (
+      <p>
+        <button type="button" onClick={() => setAdding(true)} className={`${linkButton} text-left`} data-testid="mcp-add-instructions">
+          Add instructions agents follow with this server
+        </button>
+      </p>
+    );
+  }
   return (
-    <Disclosure summary="Instructions agents follow with this server">
+    <Disclosure summary="Instructions agents follow with this server" defaultOpen={adding}>
       <Field id={`${server.id}-prompt`} label="Instructions">
         {(props) => <textarea {...props} rows={3} maxLength={4000} className={inputClass} value={text} onChange={(e) => setText(e.target.value)} />}
       </Field>
@@ -707,37 +794,31 @@ function PromptForm({ server, onSaved }: { server: McpServer; onSaved: (s: McpSe
   );
 }
 
-/** The last tool calls, from the audit trail. */
+/** The last tool calls, from the audit trail. Nothing until there is one. */
 function Activity({ server }: { server: McpServer }) {
   const [calls, setCalls] = useState<McpCall[] | null>(null);
-  const [error, setError] = useState("");
-  const load = useCallback(() => {
+  useEffect(() => {
+    let live = true;
     api
       .getMcpActivity(server.id)
-      .then((r) => setCalls(r.calls))
-      .catch((e) => setError(errorMessage(e, "Couldn't load the calls.")));
+      .then((r) => live && setCalls(r.calls))
+      .catch(() => live && setCalls([]));
+    return () => {
+      live = false;
+    };
   }, [server.id]);
+  if (!calls || calls.length === 0) return null;
   return (
-    <details className="group rounded-lg border border-zinc-800 text-sm text-zinc-400" onToggle={(e) => (e.currentTarget.open && !calls ? load() : undefined)}>
-      <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-lg px-4 py-2 text-zinc-300 hover:text-zinc-100 [&::-webkit-details-marker]:hidden">
-        Recent tool calls
-      </summary>
-      <div className="px-4 pb-4">
-        {error && <p className="text-red-400">{error}</p>}
-        {!calls && !error && <p>Loading…</p>}
-        {calls && calls.length === 0 && <p>No calls yet.</p>}
-        {calls && calls.length > 0 && (
-          <ul className="flex flex-col gap-1" data-testid="mcp-activity">
-            {calls.map((c, i) => (
-              <li key={i} className="min-w-0">
-                <span className={c.ok ? "text-zinc-300" : "text-red-300"}>{c.ok ? "OK" : "Failed"}</span> <Code className="text-xs">{c.tool}</Code> · {c.actor} ·{" "}
-                {timeAgo(c.at)}
-                {c.detail && <span className="block text-xs text-zinc-400">{c.detail}</span>}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </details>
+    <Disclosure summary={`Recent tool calls (${calls.length})`}>
+      <ul className="flex flex-col gap-1" data-testid="mcp-activity">
+        {calls.map((c, i) => (
+          <li key={i} className="min-w-0">
+            <span className={c.ok ? "text-zinc-300" : "text-red-300"}>{c.ok ? "OK" : "Failed"}</span> <Code className="text-xs">{c.tool}</Code> · {c.actor} ·{" "}
+            {timeAgo(c.at)}
+            {c.detail && <span className="block text-xs text-zinc-400">{c.detail}</span>}
+          </li>
+        ))}
+      </ul>
+    </Disclosure>
   );
 }

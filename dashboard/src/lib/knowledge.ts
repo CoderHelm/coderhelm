@@ -420,7 +420,10 @@ export const knowledge = {
   connectors: () => request<{ connectors: Connector[]; visibility_note: string }>("/api/knowledge/connectors"),
   /** Starts the team's sign-in; the API keeps this page as where the callback returns to. */
   connect: (kind: SourceKind) =>
-    request<{ authorize_url: string }>(`/api/knowledge/connectors/${e(kind)}/connect`, { method: "POST", body: JSON.stringify({ return_to: herePath() }) }),
+    request<{ authorize_url: string; server_id?: string; expires_in?: number }>(`/api/knowledge/connectors/${e(kind)}/connect`, {
+      method: "POST",
+      body: JSON.stringify({ return_to: herePath() }),
+    }),
   /** Your own sign-in for an app (Sanity): already signed in, or where to send the sign-in window. */
   signIn: (kind: SourceKind) =>
     request<{ signed_in: boolean; authorize_url?: string }>(`/api/knowledge/connectors/${e(kind)}/signin`, { method: "POST", body: JSON.stringify({ return_to: herePath() }) }),
