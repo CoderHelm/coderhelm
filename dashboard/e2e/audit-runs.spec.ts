@@ -424,6 +424,14 @@ const STANDING = {
     needs_person: false,
     link: null,
   },
+  // Written while a fix round was queued; the run finished since.
+  fixing_review: {
+    code: "fixing_review",
+    text: "CoderHelm's review asked for changes on `6470f1d` and a fix round is taking them.",
+    next: "The fix is pushed and the new head is reviewed.",
+    needs_person: false,
+    link: null,
+  },
   review_changes_requested: {
     code: "review_changes_requested",
     text: "CoderHelm's review asks for changes on `9f8e7d6`; what it could not fix is listed as deferred on the pull request.",
@@ -495,7 +503,8 @@ test("a repo that asks for a person's approval says so: its own setting, or its 
 test("Coderhelm reviewing a newer commit asks nobody: no person chip and no setting link", async ({ page }) => {
   const outcome = await openStanding(page, STANDING.reviewing);
   await expect(outcome).toHaveAttribute("data-tone", "waiting");
-  await expect(outcome).toContainText("Pull request #101 is open; Coderhelm is still working on it");
+  await expect(outcome).toContainText("Pull request #101 is open; Coderhelm is reviewing its newest commit");
+  await expect(outcome).not.toContainText("still working");
   await expect(page.getByTestId("run-who")).toHaveText("Nothing needed from you");
   await expect(page.getByText("Needs a person")).toHaveCount(0);
   // The commits read as code, without the backticks.
@@ -504,6 +513,22 @@ test("Coderhelm reviewing a newer commit asks nobody: no person chip and no sett
   await expect(page.getByTestId("merge-standing-link")).toHaveCount(0);
   await expect(outcome.getByRole("link", { name: /Open pull request #101/ })).toBeVisible();
   await shot(page, "run-standing-reviewing");
+});
+
+test("a finished run never says a fix round is taking its review's findings", async ({ page }) => {
+  const errors = watchConsole(page);
+  await mockApi(page, { run: baseRun({ merge_standing: STANDING.fixing_review }) });
+  await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
+  const outcome = page.getByTestId("run-outcome");
+  await expect(page.getByTestId("merge-standing")).toHaveAttribute("data-code", "review_changes_requested");
+  await expect(outcome).toContainText("Pull request #101 is open; Coderhelm's review asks for changes");
+  await expect(outcome).not.toContainText("still working");
+  await expect(outcome).not.toContainText("a fix round is taking them");
+  await expect(page.getByTestId("merge-standing")).toHaveText("Coderhelm's review asks for changes on 6470f1d and no fix round is running on them.");
+  await expect(page.getByTestId("run-next")).toContainText("takes them in a fix round, or names on the pull request what only a person can do");
+  await expect(page.getByTestId("run-who")).toHaveText("Nothing needed from you");
+  await shot(page, "run-standing-finished-not-working");
+  expect(errors).toEqual([]);
 });
 
 test("the other standings that need nobody say what Coderhelm does, each under its own title", async ({ page }) => {
