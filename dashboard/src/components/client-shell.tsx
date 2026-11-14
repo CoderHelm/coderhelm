@@ -32,6 +32,7 @@ import { buttonClass } from "./ui";
 import { AlertCircleIcon, InfoIcon, LogFindingsIcon, WarningIcon, XIcon } from "./icons";
 import { apiBase, githubAppUrl, runtimeConfig, siteUrl } from "@/lib/runtime-config";
 import { SetupBanner } from "@/components/setup-banner";
+import { UpdateReady } from "@/components/update-ready";
 import { CopyButton } from "./copy-button";
 import { openInChromeHref, signInProblem, type SignInProblem } from "@/lib/sign-in-errors";
 import { rememberConsentReturn, takeConsentReturn } from "@/lib/connected-apps";
@@ -522,6 +523,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           </main>
         </div>
       </div>
+      <UpdateReady />
     </TopBarProvider>
     </CommandPaletteProvider>
     </ConfirmProvider>

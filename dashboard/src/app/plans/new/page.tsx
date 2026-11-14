@@ -7,7 +7,7 @@ import { api, type Repo, type Template } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { useStreamingChat, messageText, messageServers } from "@/hooks/use-streaming-chat";
 import { prefetchStreamToken } from "@/lib/stream-client";
-import { useSmartScroll, ScrollPill } from "@/components/smart-scroll";
+import { JumpToLatest, useFollowScroll } from "@/components/follow-scroll";
 import { RefreshIcon } from "@/components/stream-icons";
 import { focusRing, secondaryButton } from "@/components/ui";
 import { OwnTitle, Page, PageHeader } from "@/components/page";
@@ -52,7 +52,6 @@ function NewPlan() {
   // When each answer started and finished, for "Worked for 12s".
   const [timing, setTiming] = useState<Record<string, { start: number; end?: number }>>({});
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
   const prefillSent = useRef(false);
@@ -96,7 +95,6 @@ function NewPlan() {
     }
   }, [searchParams, messages.length, status, send]);
 
-  const { sentinelRef, showPill, scrollToBottom, onNewContent } = useSmartScroll(scrollContainerRef);
 
   // Load workflow settings + prefetch stream token
   useEffect(() => {
@@ -131,6 +129,8 @@ function NewPlan() {
     return "";
   }, [messages]);
   const isActive = status === "submitted" || status === "streaming";
+  // Follows the answer only while the reader is at the end of it.
+  const follow = useFollowScroll(isActive);
   const isStreamingPlan = isActive && lastAssistantText.includes("```json") && !lastAssistantText.includes("\n```\n");
 
   // Parse partial plan during streaming for incremental task display (throttled)
@@ -172,25 +172,23 @@ function NewPlan() {
     }
   }, [isActive, timing]);
 
-  // Auto-scroll on new content (merged: new messages + streaming updates)
-  const prevMsgCount = useRef(messages.length);
+  // Sending a message goes to the end once; the hook follows from there while the reader stays.
+  const lastUserId = [...messages].reverse().find((m) => m.role === "user")?.id;
+  const seenUser = useRef(lastUserId);
+  const { toLatest } = follow;
   useEffect(() => {
-    if (messages.length !== prevMsgCount.current) {
-      prevMsgCount.current = messages.length;
-      onNewContent();
-    } else if (status === "streaming") {
-      onNewContent(true);
-    }
-  }, [messages, status, onNewContent]);
+    if (lastUserId && lastUserId !== seenUser.current) toLatest();
+    seenUser.current = lastUserId;
+  }, [lastUserId, toLatest]);
 
   const sendText = useCallback(
     (text: string) => {
       if (!text.trim()) return;
       send(text);
       setTab("chat");
-      scrollToBottom();
+      toLatest();
     },
-    [send, scrollToBottom],
+    [send, toLatest],
   );
 
   const handleSend = useCallback(() => {
@@ -336,8 +334,17 @@ function NewPlan() {
           aria-label="Conversation"
           className={`relative min-h-0 min-w-0 flex-1 flex-col ${panelShown && tab === "plan" ? "hidden lg:flex" : "flex"}`}
         >
-          <div ref={scrollContainerRef} className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden" aria-live="polite" aria-busy={isActive}>
-            <div className="mx-auto max-w-3xl space-y-5 pb-4 pr-1">
+          <div
+            ref={follow.scrollRef}
+            tabIndex={0}
+            role="region"
+            aria-label="Messages"
+            className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden [overflow-anchor:none] focus-visible:outline-none"
+            aria-live="polite"
+            aria-busy={isActive}
+            data-testid="plan-chat-scroll"
+          >
+            <div ref={follow.contentRef} className="mx-auto max-w-3xl space-y-5 pb-4 pr-1">
               {messages.slice(1).map((msg, i, list) => {
                 const divider = timeDivider(list[i - 1], msg);
                 return (
@@ -359,11 +366,10 @@ function NewPlan() {
                   </Fragment>
                 );
               })}
-              <div ref={sentinelRef} className="h-px" />
             </div>
           </div>
 
-          <ScrollPill visible={showPill} onClick={scrollToBottom} />
+          <JumpToLatest visible={follow.behind} onClick={follow.toLatest} />
 
           <div className="mx-auto w-full max-w-3xl shrink-0 space-y-2 border-t border-zinc-800/80 pt-3">
             {status === "error" && error && (
