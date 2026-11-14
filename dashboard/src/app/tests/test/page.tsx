@@ -27,6 +27,7 @@ import {
   ArtifactLinks, AttemptSquares, EmptyBox, ErrorSummary, LoadError, Loading, SectionHeading, StatCard, StatePill, firstError,
 } from "@/components/tests/common";
 import { Switch } from "@/components/tests/settings";
+import { ReleaseProgress, Standing, budgetLine, canDo, useQuarantineActions } from "@/components/tests/quarantine";
 import { useLoad } from "@/components/tests/use-load";
 
 export default function TestDetailGuarded() {
@@ -48,6 +49,7 @@ function TestDetail() {
   const isAdmin = can("tests");
   const [busy, setBusy] = useState("");
   const { data, setData, error, loading, reload } = useLoad(() => (id ? api.getTest(id) : Promise.resolve(null)), `test:${id}`);
+  const actions = useQuarantineActions((t) => setData((prev) => (prev ? { ...prev, test: t } : prev)));
 
   if (!id) return <Page><EmptyBox>No test was named. Go back to <Link href="/tests" className={linkButton}>Tests</Link>.</EmptyBox></Page>;
   if (error) return <Page><LoadError what="this test" message={error} onRetry={reload} /></Page>;
@@ -56,6 +58,7 @@ function TestDetail() {
   const { test, history, events } = data;
 
   const replace = (t: TestCase) => setData((prev) => (prev ? { ...prev, test: t } : prev));
+  const budget = data.auto_fixes;
 
   const quarantine = async (on: boolean) => {
     const ok = await confirm(
@@ -97,28 +100,13 @@ function TestDetail() {
     }
   };
 
-  const fix = async () => {
-    const ok = await confirm({
-      title: "Ask Coderhelm to fix this test?",
-      message:
-        "It reproduces the failure first, writes a fix, and opens a PR only after the test passes 20 runs in a row. It never skips the test or weakens a check to make it pass.",
-      confirmLabel: "Fix it",
-    });
-    if (ok !== "primary") return;
-    setBusy("fix");
-    try {
-      await api.fixTest(test.id);
-      replace({ ...test, fix_status: "reproducing" });
-      toast("Coderhelm is on it");
-    } catch (e) {
-      toast(errorMessage(e, "Couldn't start the fix."), "error");
-    } finally {
-      setBusy("");
-    }
-  };
-
   const quarantined = test.state === "quarantined" || test.flags.includes("quarantined");
   const fixRunning = test.fix_status && ["reproducing", "fixing", "burn_in"].includes(test.fix_status);
+  // A quarantined test's server says what can be asked of it; a flaky one
+  // that is not quarantined can be fixed unless a fix is under way.
+  const canFix = test.quarantine ? canDo(test, "fix") : test.state === "flaky" && !fixRunning;
+  const canRemove = canDo(test, "remove");
+  const cause = test.cause;
 
   return (
     <Page>
@@ -164,15 +152,90 @@ function TestDetail() {
         <StatCard label="Duration" value={formatDuration(test.p50_ms)} hint={`Slow runs ${formatDuration(test.p95_ms)}`} />
       </section>
 
-      {test.cause && (
-        <div className="mt-6">
-          <Callout variant="neutral" title={`Likely cause: ${CAUSE_LABEL[test.cause.label]}`} live={false}>
-            <p className="whitespace-pre-wrap">{test.cause.evidence}</p>
+      {test.removed && test.removal && (
+        <div className="mt-6" data-testid="test-removed">
+          <Callout
+            variant="neutral"
+            title="This test was removed"
+            live={false}
+            actions={
+              test.removal.pr?.url ? (
+                <a href={test.removal.pr.url} target="_blank" rel="noreferrer" className={`${buttonClass("secondary", "sm")} gap-1.5`}>
+                  Open the removal PR
+                  <ExternalLinkIcon />
+                </a>
+              ) : undefined
+            }
+          >
+            <p>
+              {test.removal.approved_by?.length ? `Approved by ${test.removal.approved_by.join(", ")}` : "No approving review is on record"}
+              {test.removal.pr?.by ? `, merged by ${test.removal.pr.by}.` : "."}{" "}
+              {test.removal.by === "coderhelm" ? "Coderhelm proposed the removal." : `Asked for by ${test.removal.by}.`}
+            </p>
           </Callout>
         </div>
       )}
 
-      {(test.fix_status || test.ticket_url) && (
+      {test.release && !quarantined && !test.removed && (
+        <div className="mt-6" data-testid="test-released">
+          <Callout variant="success" title="Left quarantine by itself" live={false}>
+            <p>
+              {test.release.reason} <span className="text-zinc-400"><Time iso={test.release.at} /></span>
+            </p>
+          </Callout>
+        </div>
+      )}
+
+      {test.quarantine && (
+        <section aria-labelledby="standing-heading" className="mt-6" data-testid="test-standing">
+          <SectionHeading id="standing-heading">In quarantine</SectionHeading>
+          <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3">
+            <Standing test={test} />
+            {/* Progress shows here even before the first pass, so the way out is always stated. */}
+            {test.quarantine.state !== "fix_merged" && test.quarantine.progress.passes === 0 && (
+              <div className="mt-2">
+                <ReleaseProgress progress={test.quarantine.progress} />
+              </div>
+            )}
+            {budget && test.quarantine.hold === "eligible" && (
+              <p className="mt-2 text-xs text-zinc-400" data-testid="auto-fix-budget">
+                {budgetLine(budget, false)}{" "}
+                {isAdmin && <Link href="/tests?view=settings#auto-fixes" className={linkButton}>{budget.on ? "Change the weekly limit" : "Turn them on in Settings"}</Link>}
+              </p>
+            )}
+            {test.ticket_url && (
+              <p className="mt-2 text-xs">
+                <a href={test.ticket_url} target="_blank" rel="noreferrer" className={`${linkButton} inline-flex items-center gap-1`}>
+                  Open the ticket
+                  <ExternalLinkIcon />
+                </a>
+              </p>
+            )}
+          </div>
+        </section>
+      )}
+
+      {cause && (
+        <div className="mt-6" data-testid="test-cause" data-out-of-date={cause.out_of_date ? "true" : "false"}>
+          {cause.out_of_date ? (
+            <Callout variant="warning" title={`Earlier diagnosis, now out of date: ${CAUSE_LABEL[cause.label]}`} live={false}>
+              <p className="whitespace-pre-wrap">{cause.out_of_date}</p>
+              <p className="mt-2 text-zinc-400">
+                What it said: <span className="line-through decoration-zinc-600">{cause.evidence}</span>
+              </p>
+              <p className="mt-2 text-zinc-400">Coderhelm works the cause out again if the test fails again.</p>
+            </Callout>
+          ) : (
+            <Callout variant="neutral" title={`Likely cause: ${CAUSE_LABEL[cause.label]}`} live={false}>
+              <p className="whitespace-pre-wrap">{cause.evidence}</p>
+              {cause.depends_on && <p className="mt-2"><span className="text-zinc-400">Depends on:</span> {cause.depends_on}</p>}
+              {cause.independent && <p className="mt-1"><span className="text-zinc-400">Making it independent:</span> {cause.independent}</p>}
+            </Callout>
+          )}
+        </div>
+      )}
+
+      {!test.quarantine && (test.fix_status || test.ticket_url) && (
         <section aria-label="Fix" className="mt-6" data-testid="test-fix">
           <Callout
             variant={test.fix_status === "merged" ? "success" : test.fix_status === "failed" ? "error" : "info"}
@@ -204,9 +267,14 @@ function TestDetail() {
         <section aria-labelledby="actions-heading" className="mt-6">
           <SectionHeading id="actions-heading">Actions</SectionHeading>
           <div className="flex flex-wrap items-center gap-3">
-            {test.state === "flaky" && !fixRunning && (
-              <button type="button" onClick={fix} disabled={busy !== ""} className={primaryButton}>
-                {busy === "fix" ? "Starting…" : "Fix this test"}
+            {canFix && (
+              <button type="button" onClick={() => actions.fix([test])} disabled={busy !== "" || actions.busy !== ""} className={primaryButton}>
+                {actions.busy === `fix:${test.id}` ? "Starting…" : "Fix this test"}
+              </button>
+            )}
+            {canRemove && (
+              <button type="button" onClick={() => actions.remove([test])} disabled={busy !== "" || actions.busy !== ""} className={secondaryButton}>
+                {actions.busy === `remove:${test.id}` ? "Starting…" : "Remove this test"}
               </button>
             )}
             {quarantined ? (
@@ -225,6 +293,7 @@ function TestDetail() {
           </div>
           <p className="mt-2 max-w-prose text-sm text-zinc-400">
             A quarantined test keeps running and is still recorded, but its failures don&apos;t block pull requests.
+            {test.quarantine ? " It leaves quarantine by itself once it has proven healthy; releasing it by hand is there when you know better." : ""}
           </p>
           {test.state === "broken" && (
             <p className="mt-2 max-w-prose text-sm text-zinc-400">
@@ -254,10 +323,17 @@ function TestDetail() {
           <ol aria-label="State changes" className="space-y-2">
             {events.map((ev, i) => (
               <li key={`${ev.at}-${i}`} className="rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3 text-sm">
-                <p className="text-zinc-100">
-                  Changed from {STATE_LABEL[ev.from]} to {STATE_LABEL[ev.to]}
-                </p>
-                <p className="mt-0.5 text-zinc-400">{ev.reason}</p>
+                {/* A note on a test whose state stayed the same is its own headline. */}
+                {ev.from === ev.to ? (
+                  <p className="text-zinc-100 [overflow-wrap:anywhere]">{ev.reason}</p>
+                ) : (
+                  <>
+                    <p className="text-zinc-100">
+                      Changed from {STATE_LABEL[ev.from] ?? ev.from} to {STATE_LABEL[ev.to] ?? ev.to}
+                    </p>
+                    <p className="mt-0.5 text-zinc-400 [overflow-wrap:anywhere]">{ev.reason}</p>
+                  </>
+                )}
                 <p className="mt-1 text-xs text-zinc-400">
                   {ev.actor} · <Time iso={ev.at} />
                 </p>

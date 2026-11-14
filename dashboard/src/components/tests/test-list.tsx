@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import type { TestCase } from "@/lib/api";
 import { CAUSE_LABEL, FIX_LABEL, pct, plural, testHref, testName } from "@/lib/tests";
 import { timeAgo } from "@/lib/data-sources";
-import { List, ListRow, StatusText } from "@/components/list";
+import { List, ListRow, StatusText, type RowSelect } from "@/components/list";
 import { stateLook } from "./common";
 
 /**
@@ -15,11 +15,17 @@ export function TestList({
   tests,
   facts,
   actions,
+  select,
+  below,
   label,
 }: {
   tests: TestCase[];
   facts: (t: TestCase) => { label: string; value: ReactNode }[];
   actions?: (t: TestCase) => ReactNode;
+  /** A checkbox on the rows that can be picked. */
+  select?: (t: TestCase) => RowSelect | undefined;
+  /** More about the test, under its row. */
+  below?: (t: TestCase) => ReactNode;
   label: string;
 }) {
   return (
@@ -30,6 +36,7 @@ export function TestList({
           <ListRow
             key={t.id}
             testId="test-row"
+            select={select?.(t)}
             data={{ state: t.state }}
             status={look}
             title={testName(t)}
@@ -38,7 +45,8 @@ export function TestList({
             meta={[
               <span key="file" className="wrap-anywhere font-mono">{t.file}</span>,
               t.cause && t.cause.label !== "unknown" ? CAUSE_LABEL[t.cause.label] : null,
-              t.fix_status ? <span key="fix" className="text-zinc-300">{FIX_LABEL[t.fix_status]}</span> : null,
+              // Where the server says where a quarantined test stands, that says it.
+              t.fix_status && !t.quarantine ? <span key="fix" className="text-zinc-300">{FIX_LABEL[t.fix_status]}</span> : null,
               t.owner ? `Owner ${t.owner}` : null,
             ]}
             chips={
@@ -55,7 +63,9 @@ export function TestList({
               </>
             }
             actions={actions ? <span className="flex flex-wrap items-center gap-2">{actions(t)}</span> : undefined}
-          />
+          >
+            {below?.(t)}
+          </ListRow>
         );
       })}
     </List>

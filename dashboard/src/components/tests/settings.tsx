@@ -128,6 +128,10 @@ export function SettingsView({
 
   const days = draft.ticket_after_days;
   const daysValid = Number.isInteger(days) && days >= 1 && days <= 30;
+  // Servers from before the weekly number send none: there is nothing to set.
+  const weekly = draft.auto_fixes_per_week;
+  const hasWeekly = form.saved.auto_fixes_per_week !== undefined;
+  const weeklyValid = !hasWeekly || (Number.isInteger(weekly) && (weekly as number) >= 1 && (weekly as number) <= 10);
   const noneTicked = mode === "some" && draft.repos.length === 0;
   const modeChanged = mode !== (form.saved.repos.length ? "some" : "all");
   const count = form.count + (modeChanged && !form.isDirty("repos") ? 1 : 0);
@@ -166,6 +170,10 @@ export function SettingsView({
   const save = async () => {
     if (!daysValid) {
       setProblem("Pick between 1 and 30 days before a ticket.");
+      return;
+    }
+    if (!weeklyValid) {
+      setProblem("Pick between 1 and 10 automatic fixes per repository per week.");
       return;
     }
     if (noneTicked) {
@@ -226,6 +234,36 @@ export function SettingsView({
             <RowSwitch id={ids.inputId} checked={draft.fix_prs} onChange={(v) => form.set("fix_prs", v)} labelledBy={ids.labelId} describedBy={ids.helpId} disabled={off} />
           )}
         />
+        {hasWeekly && (
+          <div id="auto-fixes" className="scroll-mt-24">
+            <SettingsRow
+              label="Automatic fixes per week"
+              controlClassName="sm:w-28"
+              unsaved={form.isDirty("auto_fixes_per_week")}
+              help="How many fix or removal runs Coderhelm starts by itself for each repository in a week, oldest quarantined test first. Each is a full coding run, so this bounds what they cost. A fix you ask for is never counted. Between 1 and 10."
+              control={(ids) => (
+                <div>
+                  <input
+                    id={ids.inputId}
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={10}
+                    aria-describedby={ids.helpId}
+                    aria-invalid={weeklyValid ? undefined : true}
+                    value={Number.isFinite(weekly) ? weekly : ""}
+                    disabled={off || !draft.fix_prs}
+                    onChange={(e) => form.set("auto_fixes_per_week", e.target.value === "" ? Number.NaN : Number(e.target.value))}
+                    className={`${inputClass} w-24 disabled:opacity-50`}
+                  />
+                  {!weeklyValid && (
+                    <p role="alert" className="mt-1.5 text-xs text-red-400">Pick between 1 and 10 automatic fixes per week.</p>
+                  )}
+                </div>
+              )}
+            />
+          </div>
+        )}
         <SettingsRow
           label="Check new tests before merge"
           layout="toggle"

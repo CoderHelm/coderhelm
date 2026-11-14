@@ -1649,9 +1649,11 @@ export const api = {
   getTestRun: (runKey: string) =>
     request<{ run: TestRun; executions: TestRunExecution[] }>(`/api/tests/runs/${encodeURIComponent(runKey)}`),
   listTests: (opts: { repo?: string; state?: TestState; q?: string; sort?: TestSort; before?: string; limit?: number } = {}) =>
-    request<{ tests: TestCase[]; next?: string | null }>(`/api/tests${qs(opts)}`),
+    request<{ tests: TestCase[]; next?: string | null; auto_fixes?: AutoFixBudget[]; auto_fixes_reason?: string }>(`/api/tests${qs(opts)}`),
   getTest: (id: string) =>
-    request<{ test: TestCase; history: TestHistoryRun[]; events: TestStateEvent[] }>(`/api/tests/${encodeURIComponent(id)}`),
+    request<{ test: TestCase; history: TestHistoryRun[]; events: TestStateEvent[]; auto_fixes?: AutoFixBudget | null; auto_fixes_reason?: string }>(
+      `/api/tests/${encodeURIComponent(id)}`,
+    ),
   quarantineTest: (id: string, on: boolean, reason?: string) =>
     request<{ test: TestCase }>(`/api/tests/${encodeURIComponent(id)}/quarantine`, {
       method: "POST",
@@ -1662,8 +1664,12 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ never_quarantine: neverQuarantine }),
     }),
+  /** Starts a fix run now. `test` is the row as it stands after, from servers that send it. */
   fixTest: (id: string) =>
-    request<{ queued: boolean }>(`/api/tests/${encodeURIComponent(id)}/fix`, { method: "POST", body: "{}" }),
+    request<{ queued: boolean; test?: TestCase }>(`/api/tests/${encodeURIComponent(id)}/fix`, { method: "POST", body: "{}" }),
+  /** Opens a pull request that removes a quarantined test. The team merges it; Coderhelm never does. */
+  removeTest: (id: string) =>
+    request<{ queued: boolean; test?: TestCase }>(`/api/tests/${encodeURIComponent(id)}/remove`, { method: "POST", body: "{}" }),
   listFailureGroups: (repo?: string) => request<{ groups: FailureGroup[] }>(`/api/tests/failure-groups${qs({ repo })}`),
   getTestCoverage: (repo?: string) =>
     request<{ areas: CoverageArea[]; recommendations: TestRecommendation[] }>(`/api/tests/coverage${qs({ repo })}`),
@@ -4113,6 +4119,67 @@ export interface TestSettings {
   ticket_after_days: number;
   /** Where each repository's test reports are kept, for fixes of failing and flaky tests. */
   report_sources?: TestReportSource[];
+  /** Fix and removal runs Coderhelm starts by itself, per repository per week (1–10). Absent on older servers. */
+  auto_fixes_per_week?: number;
+}
+
+/** A repository's automatic fix runs this week against the team's number. */
+export interface AutoFixBudget {
+  repo: string;
+  /** Whether fix pull requests are turned on. */
+  on: boolean;
+  cap: number;
+  used: number;
+  /** When the week's count starts again. */
+  resumes_at: string;
+}
+
+export interface QuarantineLink {
+  kind: "pr" | "run";
+  label: string;
+  /** A pull request's address, or a run's id. */
+  target: string;
+}
+
+/** How far a quarantined test is from leaving by itself. */
+export interface QuarantineProgress {
+  passes: number;
+  needed: number;
+  sources: number;
+  sources_needed: number;
+  minutes: number;
+  minutes_needed: number;
+  last_failure_at?: string | null;
+  not_before?: string | null;
+  ready: boolean;
+  line: string;
+}
+
+export type QuarantineState = "idle" | "fix_running" | "fix_pr" | "fix_merged" | "fix_failed" | "removal_running" | "removal_pr";
+export type QuarantineAction = "fix" | "remove" | "release";
+
+/** Where a quarantined test stands and what happens next. */
+export interface QuarantineStanding {
+  state: QuarantineState;
+  headline: string;
+  link?: QuarantineLink | null;
+  /** The attempt before this one that did not hold: what happened. */
+  attempt?: string | null;
+  attempt_link?: QuarantineLink | null;
+  /** Why Coderhelm has not fixed it by itself. Empty while work is in flight. */
+  why: string;
+  hold: string;
+  actions: QuarantineAction[];
+  progress: QuarantineProgress;
+}
+
+export interface TestRemoval {
+  status: "running" | "opened" | "merged" | "declined" | "failed";
+  by: string;
+  at: string;
+  pr?: { url: string; state: string; by?: string | null } | null;
+  reason?: string | null;
+  approved_by?: string[];
 }
 
 export interface TestReportSource {
@@ -4256,7 +4323,16 @@ export interface TestCase {
   state: TestState;
   flags: string[];
   owner?: string | null;
-  cause?: { label: CauseLabel; evidence: string } | null;
+  cause?: {
+    label: CauseLabel;
+    evidence: string;
+    /** What outside the test it depends on. */
+    depends_on?: string | null;
+    /** How the test can be made independent of that, or why not. */
+    independent?: string | null;
+    /** Set once later runs contradict it: what the history shows now. */
+    out_of_date?: string | null;
+  } | null;
   runs_30d: number;
   fail_rate_30d: number;
   flake_rate_30d: number;
@@ -4271,6 +4347,15 @@ export interface TestCase {
   ticket_url?: string | null;
   fix_pr_url?: string | null;
   fix_status?: FixStatus | null;
+  /** Where a quarantined test stands. Absent on older servers, null when not quarantined. */
+  quarantine?: QuarantineStanding | null;
+  /** Why the test is called unstable, when it keeps leaving and re-entering quarantine. */
+  unstable?: string | null;
+  /** The last time it left quarantine by itself, with the evidence. */
+  release?: { at: string; reason: string; passes: number; sources: number; hours: number } | null;
+  removal?: TestRemoval | null;
+  /** Removed by a merged pull request. */
+  removed?: boolean;
 }
 
 export interface TestHistoryRun {

@@ -16,10 +16,21 @@ type State = "healthy" | "flaky" | "broken" | "quarantined" | "fixed";
 
 interface TestRow {
   id: string; repo: string; framework: string; file: string; title: string; project?: string | null; state: State; flags: string[];
-  owner?: string | null; cause?: { label: string; evidence: string } | null; runs_30d: number; fail_rate_30d: number; flake_rate_30d: number;
+  owner?: string | null; cause?: { label: string; evidence: string; depends_on?: string | null; independent?: string | null; out_of_date?: string | null } | null; runs_30d: number; fail_rate_30d: number; flake_rate_30d: number;
   flips_14d: number; prs_blocked_7d: number; minutes_lost_7d: number; p50_ms: number; p95_ms: number; last_seen: string;
   quarantined_since?: string | null; never_quarantine: boolean; ticket_url?: string | null; fix_pr_url?: string | null; fix_status?: string | null;
+  // Sent by servers that say where a quarantined test stands; absent before.
+  quarantine?: Standing | null; unstable?: string | null; removed?: boolean;
+  release?: { at: string; reason: string; passes: number; sources: number; hours: number } | null;
+  removal?: { status: string; by: string; at: string; pr?: { url: string; state: string; by?: string | null } | null; reason?: string | null; approved_by?: string[] } | null;
 }
+
+interface Standing {
+  state: string; headline: string; link?: { kind: string; label: string; target: string } | null; attempt?: string | null;
+  attempt_link?: { kind: string; label: string; target: string } | null; why: string; hold: string; actions: string[];
+  progress: { passes: number; needed: number; sources: number; sources_needed: number; minutes: number; minutes_needed: number; last_failure_at?: string | null; not_before?: string | null; ready: boolean; line: string };
+}
+interface Budget { repo: string; on: boolean; cap: number; used: number; resumes_at: string }
 
 function makeTest(over: Partial<TestRow> & Pick<TestRow, "id" | "title" | "state">): TestRow {
   return {
@@ -43,6 +54,91 @@ const QUARANTINED = makeTest({
   flake_rate_30d: 0.12, flips_14d: 9, quarantined_since: ago(20 * DAY), ticket_url: "https://github.com/your-team/web/issues/42",
   fix_status: "burn_in", fix_pr_url: "https://github.com/your-team/web/pull/88",
 });
+// ── Quarantine: where each test stands ────────────────────────────────────
+
+const CAP_REASON = "Each automatic fix is a full coding run, so the limit bounds what they cost. A fix you ask for is never counted.";
+const CAP_LINE = "Automatic fixes are at this week's limit of 2 for this repository. They resume on Monday 16 November.";
+const RESUMES = "2026-11-16T00:00:00+00:00";
+
+function standing(over: Partial<Standing> = {}): Standing {
+  return {
+    state: "idle", headline: "Nothing in flight", why: "", hold: "eligible", actions: ["fix", "remove", "release"],
+    progress: {
+      passes: 0, needed: 20, sources: 0, sources_needed: 2, minutes: 0, minutes_needed: 120, ready: false,
+      line: "No pass yet since it last failed on 9 November 2026; 20 in a row are needed",
+    },
+    ...over,
+  };
+}
+
+const progress = (passes: number, sources: number, line: string): Standing["progress"] => ({
+  passes, needed: 20, sources, sources_needed: 2, minutes: passes * 12, minutes_needed: 120, ready: false, line,
+});
+
+function quarantined(id: string, title: string, days: number, over: Partial<TestRow> = {}): TestRow {
+  return makeTest({
+    id, title, file: `e2e/specs/${id.replace("q_", "")}.spec.ts`, state: "quarantined", flags: ["flaky"], flake_rate_30d: 0.1, flips_14d: 4,
+    quarantined_since: ago(days * DAY), ...over,
+  });
+}
+
+/** One quarantined test in each state a row can be in. */
+const Q_IDLE = quarantined("q_idle", "basket: keeps items after sign-in", 24, { quarantine: standing({ why: CAP_LINE }) });
+const Q_FIX_PR = quarantined("q_fix_pr", "search: filters by price", 9, {
+  fix_status: "opened", fix_pr_url: "https://github.com/your-team/web/pull/131",
+  quarantine: standing({
+    state: "fix_pr", headline: "Fix pull request open, checks passing", hold: "in_flight", actions: ["release"],
+    link: { kind: "pr", label: "Fix PR", target: "https://github.com/your-team/web/pull/131" },
+  }),
+});
+const Q_RUNNING = quarantined("q_running", "profile: uploads an avatar", 3, {
+  fix_status: "fixing",
+  quarantine: standing({
+    state: "fix_running", headline: "Coderhelm is writing a fix", hold: "in_flight", actions: ["release"],
+    link: { kind: "run", label: "Open the run", target: "01JQRUNFIX00000000000000" },
+  }),
+});
+const Q_FAILED = quarantined("q_failed", "orders: cancels an order", 21, {
+  fix_status: "failed", fix_pr_url: "https://github.com/your-team/web/pull/118",
+  quarantine: standing({
+    state: "fix_failed", headline: "The last fix did not hold", hold: "cooling_off",
+    attempt: "The fix pull request was closed without merging by sam-reviewer on 4 November 2026.",
+    attempt_link: { kind: "pr", label: "The fix PR", target: "https://github.com/your-team/web/pull/118" },
+    why: "The last fix did not hold. Coderhelm tries again by itself after 15 November 2026.",
+  }),
+});
+const Q_MERGED = quarantined("q_merged", "login: remembers the device", 6, {
+  fix_status: "merged", fix_pr_url: "https://github.com/your-team/web/pull/140",
+  quarantine: standing({
+    state: "fix_merged", headline: "Fix merged, proving itself: 12 of 20 passes needed, across 3 pull requests and branches", hold: "in_flight",
+    actions: ["release"], link: { kind: "pr", label: "Fix PR", target: "https://github.com/your-team/web/pull/140" },
+    progress: progress(12, 3, "12 of 20 passes needed, across 3 pull requests and branches"),
+  }),
+});
+const Q_PASSING = quarantined("q_passing", "home: opens the menu", 1, {
+  cause: {
+    label: "environment", evidence: "The failure is deterministic and tied to the preview setup: passed on retry in 0 of the last 30 runs.",
+    out_of_date: "Out of date: this was worked out while the test was failing. Since its last failure on 12 November 2026 it has passed 14 runs in a row on 4 pull requests and branches, with no retry. The test's file has not changed since then, so what changed is outside the test: the environment it runs against or the application.",
+  },
+  quarantine: standing({
+    hold: "passing", why: "It is passing again and leaves quarantine by itself: 14 of 20 passes needed, across 4 pull requests and branches.",
+    progress: progress(14, 4, "14 of 20 passes needed, across 4 pull requests and branches"),
+  }),
+});
+const Q_REMOVAL = quarantined("q_removal", "reports: exports a spreadsheet", 40, {
+  removal: { status: "opened", by: "coderhelm", at: ago(DAY), pr: { url: "https://github.com/your-team/web/pull/152", state: "open" } },
+  quarantine: standing({
+    state: "removal_pr", headline: "Removal pull request open, checks passing: it is your team's to approve and merge", hold: "removal",
+    actions: ["release"], link: { kind: "pr", label: "Removal PR", target: "https://github.com/your-team/web/pull/152" },
+  }),
+});
+const Q_UNSTABLE = quarantined("q_unstable", "cart: applies a voucher", 2, {
+  unstable: "Unstable: it left quarantine by itself and was quarantined again 2 times in 30 days. It now also needs 7 days without a failure before it leaves by itself.",
+  quarantine: standing({ why: "Next in line for an automatic fix: Coderhelm starts it on its next look at this repository." }),
+});
+const QUARANTINE_ROWS = [Q_IDLE, Q_FIX_PR, Q_RUNNING, Q_FAILED, Q_MERGED, Q_PASSING, Q_REMOVAL, Q_UNSTABLE];
+const SPENT: Budget = { repo: WEB, on: true, cap: 2, used: 2, resumes_at: RESUMES };
+
 const HEALTHY = makeTest({ id: "t_ok", title: "home: shows the hero", file: "e2e/specs/home.spec.ts", state: "healthy", p50_ms: 52_000, p95_ms: 71_000 });
 
 function makeRun(i: number, over: Record<string, unknown> = {}) {
@@ -64,7 +160,13 @@ const ATTEMPT_PASS = { retry: 1, status: "passed", duration_ms: 13_000 };
 interface Call { method: string; path: string; body: Record<string, unknown> | null }
 interface Backend {
   role: string;
-  settings: { enabled: boolean; auto_quarantine: boolean; fix_prs: boolean; tickets: string; burn_in: boolean; repos: string[]; ticket_after_days: number; report_sources?: { repo: string; location: string; target_url: string }[] };
+  settings: { enabled: boolean; auto_quarantine: boolean; fix_prs: boolean; tickets: string; burn_in: boolean; repos: string[]; ticket_after_days: number; report_sources?: { repo: string; location: string; target_url: string }[]; auto_fixes_per_week?: number };
+  /** This week's automatic fixes per repository; servers from before send none. */
+  autoFixes?: Budget[];
+  /** A test's runs, newest first, in place of the generated ones. */
+  history?: Record<string, Record<string, unknown>[]>;
+  /** What the server refuses a fix or a removal with, by test id. */
+  refuse?: Record<string, string>;
   tests: TestRow[];
   runs: Record<string, unknown>[];
   empty: boolean;
@@ -300,9 +402,9 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
       let list = db.tests.filter((t) => !state || t.state === state);
       if (sort === "slowest") list = [...list].sort((a, b) => b.p95_ms - a.p95_ms);
       if (sort === "impact") list = [...list].sort((a, b) => b.prs_blocked_7d - a.prs_blocked_7d);
-      return json(route, { tests: list, next: null });
+      return json(route, db.autoFixes ? { tests: list, next: null, auto_fixes: db.autoFixes, auto_fixes_reason: CAP_REASON } : { tests: list, next: null });
     }
-    const action = p.match(/^\/api\/tests\/([^/]+)\/(quarantine|pin|fix)$/);
+    const action = p.match(/^\/api\/tests\/([^/]+)\/(quarantine|pin|fix|remove)$/);
     if (action && method === "POST") {
       const t = db.tests.find((x) => x.id === decodeURIComponent(action[1]));
       if (!t) return json(route, { error: "No such test." }, 404);
@@ -313,13 +415,23 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
         return json(route, { test: t });
       }
       if (action[2] === "pin") { t.never_quarantine = Boolean(body?.never_quarantine); return json(route, { test: t }); }
-      return json(route, { queued: true });
+      if (db.refuse?.[t.id]) return json(route, { error: db.refuse[t.id] }, 400);
+      // Servers that say where a quarantined test stands answer with the row as it now is.
+      if (!t.quarantine) return json(route, { queued: true });
+      if (action[2] === "fix") {
+        t.fix_status = "reproducing";
+        t.quarantine = standing({ state: "fix_running", headline: "Reproducing the failure with 20 repeat runs", hold: "in_flight", actions: ["release"] });
+      } else {
+        t.removal = { status: "running", by: "admin@example.com", at: new Date().toISOString() };
+        t.quarantine = standing({ state: "removal_running", headline: "Coderhelm is writing a pull request that removes this test", hold: "removal", actions: ["release"] });
+      }
+      return json(route, { queued: true, test: t });
     }
     const one = p.match(/^\/api\/tests\/([^/]+)$/);
     if (one && method === "GET") {
       const t = db.tests.find((x) => x.id === decodeURIComponent(one[1]));
       if (!t) return json(route, { error: "No such test." }, 404);
-      const history = Array.from({ length: 24 }, (_, i) => {
+      const history = db.history?.[t.id] ?? Array.from({ length: 24 }, (_, i) => {
         const outcome = t.state === "broken" ? (i % 7 === 0 ? "passed" : "failed") : i % 4 === 1 ? "flaky" : i % 9 === 4 ? "failed" : "passed";
         return {
           run_key: `r_${i + 1}`, sha: `abcdef${i}1234567`, branch: i % 2 ? "main" : "feature/cart", pr: i % 2 ? null : 300 + i, at: ago(i * 3_600_000), outcome,
@@ -330,8 +442,10 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
         test: t,
         history,
         events: [
+          ...(t.release ? [{ at: t.release.at, from: "quarantined", to: "healthy", reason: t.release.reason, actor: "coderhelm" }] : []),
           { at: ago(2 * DAY), from: "healthy", to: t.state === "broken" ? "broken" : "flaky", reason: "Passed and failed on the same commit twice in 14 days.", actor: "Coderhelm" },
         ],
+        ...(db.autoFixes ? { auto_fixes: db.autoFixes.find((b) => b.repo === t.repo) ?? null, auto_fixes_reason: CAP_REASON } : {}),
       });
     }
     return json(route, { error: `Not mocked: ${method} ${p}` }, 404);
@@ -819,4 +933,350 @@ test("setup: long names never push the page sideways on a phone", async ({ page 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow, "the setup view scrolls sideways at 375px").toBeLessThanOrEqual(0);
   expect(unanswered.filter((u) => u.startsWith("/api/tests"))).toEqual([]);
+});
+
+// ── Quarantine: every row has a state and a next step ─────────────────────
+
+const quarantineDb = (page: Page, over: Partial<Backend> = {}) =>
+  mockApi(page, {
+    tests: QUARANTINE_ROWS.map((t) => structuredClone(t)),
+    autoFixes: [SPENT],
+    settings: { enabled: true, auto_quarantine: true, fix_prs: true, tickets: "github", burn_in: false, repos: [], ticket_after_days: 2, auto_fixes_per_week: 2 },
+    ...over,
+  });
+
+const rowOf = (page: Page, title: string) => page.getByTestId("test-row").filter({ hasText: title });
+const dialogOf = (page: Page) => page.getByRole("alertdialog").or(page.getByRole("dialog"));
+
+test("quarantine: every row says where it stands and what happens next", async ({ page }) => {
+  await quarantineDb(page);
+  await page.goto("/tests?view=quarantine");
+  const list = page.getByRole("list", { name: "Quarantined tests" });
+  await expect(list.getByTestId("test-row")).toHaveCount(8);
+  // No row is only a Release button: each has a link to the work in flight, or the actions.
+  for (const row of await list.getByTestId("test-row").all()) {
+    const standingBlock = row.getByTestId("standing");
+    await expect(standingBlock).toBeVisible();
+    const links = await standingBlock.getByRole("link").count();
+    const acts = await row.getByRole("button", { name: /Fix this test|Remove this test/ }).count();
+    expect(links + acts, await row.innerText()).toBeGreaterThan(0);
+    await expect(row.getByRole("button", { name: "Release from quarantine" })).toBeVisible();
+  }
+
+  // A fix pull request: linked, with its state.
+  const fixPr = rowOf(page, "search: filters by price");
+  await expect(fixPr.getByTestId("standing")).toHaveAttribute("data-state", "fix_pr");
+  await expect(fixPr).toContainText("Fix pull request open, checks passing");
+  await expect(fixPr.getByRole("link", { name: "Fix PR" })).toHaveAttribute("href", "https://github.com/your-team/web/pull/131");
+  await expect(fixPr.getByRole("button", { name: "Fix this test" })).toHaveCount(0);
+
+  // A run that is working: linked to the run.
+  const running = rowOf(page, "profile: uploads an avatar");
+  await expect(running).toContainText("Coderhelm is writing a fix");
+  await expect(running.getByRole("link", { name: "Open the run" })).toHaveAttribute("href", /\/runs\/detail\/?\?id=01JQRUNFIX00000000000000/);
+
+  // Nothing in flight: the two actions, and the one reason nothing happened by itself.
+  const idle = rowOf(page, "basket: keeps items after sign-in");
+  await expect(idle).toContainText("Nothing in flight");
+  await expect(idle.getByTestId("why-not-fixed")).toHaveText(CAP_LINE);
+  await expect(idle.getByRole("button", { name: "Fix this test" })).toBeVisible();
+  await expect(idle.getByRole("button", { name: "Remove this test" })).toBeVisible();
+
+  // A fix that did not hold: said, with the link and the reason, and the actions again.
+  const failed = rowOf(page, "orders: cancels an order");
+  await expect(failed).toContainText("The last fix did not hold");
+  await expect(failed.getByTestId("last-attempt")).toContainText("closed without merging by sam-reviewer on 4 November 2026");
+  await expect(failed.getByRole("link", { name: "The fix PR" })).toHaveAttribute("href", /pull\/118/);
+  await expect(failed.getByTestId("why-not-fixed")).toContainText("tries again by itself after 15 November 2026");
+  await expect(failed.getByRole("button", { name: "Fix this test" })).toBeVisible();
+  await expect(failed.getByRole("button", { name: "Remove this test" })).toBeVisible();
+
+  // A merged fix proves itself, and the row shows how far along it is.
+  const merged = rowOf(page, "login: remembers the device");
+  await expect(merged).toContainText("Fix merged, proving itself");
+  await expect(merged.getByRole("progressbar", { name: "Passes toward leaving quarantine" })).toHaveAttribute("aria-valuenow", "12");
+  await expect(merged.getByTestId("release-progress")).toContainText("12 of 20 passes needed, across 3 pull requests and branches");
+
+  // On its way out by itself.
+  const passing = rowOf(page, "home: opens the menu");
+  await expect(passing.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "14");
+  await expect(passing.getByTestId("why-not-fixed")).toContainText("leaves quarantine by itself");
+
+  // A removal waits for the team, and an unstable test is called that.
+  const removal = rowOf(page, "reports: exports a spreadsheet");
+  await expect(removal).toContainText("it is your team's to approve and merge");
+  await expect(removal.getByRole("link", { name: "Removal PR" })).toHaveAttribute("href", /pull\/152/);
+  await expect(removal.getByRole("button", { name: "Remove this test" })).toHaveCount(0);
+  await expect(rowOf(page, "cart: applies a voucher").getByTestId("unstable")).toContainText("quarantined again 2 times in 30 days");
+
+  // The fix status is said once, by the row's state, not twice.
+  await expect(list).not.toContainText("Fix PR open");
+  await shot(page, "quarantine-states");
+});
+
+test("quarantine: the weekly limit is on the page with why and a link to the setting", async ({ page }) => {
+  const db = await quarantineDb(page);
+  await page.goto("/tests?view=quarantine");
+  const note = page.getByTestId("auto-fix-note");
+  await expect(note).toContainText(CAP_LINE);
+  await expect(note).toContainText("Tests are worked oldest in quarantine first.");
+  await expect(note).toContainText("A fix you ask for is never counted.");
+  await note.getByRole("link", { name: "Change the weekly limit" }).click();
+  await expect(page).toHaveURL(/view=settings#auto-fixes/);
+  const field = page.getByRole("spinbutton", { name: "Automatic fixes per week" });
+  await expect(field).toHaveValue("2");
+  await field.fill("40");
+  await expect(page.getByText("Pick between 1 and 10 automatic fixes per week.")).toBeVisible();
+  await field.fill("4");
+  await page.getByRole("button", { name: /^Save/ }).click();
+  await expect(page.getByText("Settings saved")).toBeVisible();
+  expect(callsTo(db, "PUT", /\/api\/tests\/settings/)[0].body).toMatchObject({ auto_fixes_per_week: 4, fix_prs: true });
+});
+
+test("quarantine: the limit reads as used so far, as off, and per repository; a member gets no settings link", async ({ page }) => {
+  await quarantineDb(page, {
+    role: "member",
+    autoFixes: [
+      { repo: MOBILE, on: true, cap: 3, used: 1, resumes_at: RESUMES },
+      { repo: WEB, on: false, cap: 2, used: 0, resumes_at: RESUMES },
+    ],
+  });
+  await page.goto("/tests?view=quarantine");
+  const note = page.getByTestId("auto-fix-note");
+  await expect(note).toContainText(`Coderhelm has started 1 of this week's 3 automatic fixes for ${MOBILE}.`);
+  await expect(note).toContainText(`Automatic fix pull requests are turned off (${WEB})`);
+  await expect(note.getByRole("link")).toHaveCount(0);
+  // A member reads the page: no actions and nothing to select.
+  await expect(page.getByRole("button", { name: /Fix this test|Remove this test|Release from quarantine/ })).toHaveCount(0);
+  await expect(page.getByTestId("quarantine-bulk")).toHaveCount(0);
+});
+
+test("quarantine: Fix this test starts a fix now, after saying what happens", async ({ page }) => {
+  const db = await quarantineDb(page);
+  await page.goto("/tests?view=quarantine");
+  const row = rowOf(page, "basket: keeps items after sign-in");
+  await row.getByRole("button", { name: "Fix this test" }).click();
+  const dialog = dialogOf(page);
+  await expect(dialog).toContainText("Ask Coderhelm to fix this test?");
+  await expect(dialog).toContainText("It starts a fix run now");
+  await expect(dialog).toContainText("not counted against the weekly limit of automatic fixes");
+  await page.getByRole("button", { name: "Fix it" }).click();
+  await expect(page.getByText("Coderhelm is on it")).toBeVisible();
+  // The row now says the run is working, and offers no second fix.
+  await expect(row.getByTestId("standing")).toHaveAttribute("data-state", "fix_running");
+  await expect(row).toContainText("Reproducing the failure with 20 repeat runs");
+  await expect(row.getByRole("button", { name: "Fix this test" })).toHaveCount(0);
+  expect(callsTo(db, "POST", /\/api\/tests\/q_idle\/fix/)).toHaveLength(1);
+});
+
+test("quarantine: Remove this test opens a removal PR, never a deletion on the spot", async ({ page }) => {
+  const db = await quarantineDb(page);
+  await page.goto("/tests?view=quarantine");
+  const row = rowOf(page, "orders: cancels an order");
+  await row.getByRole("button", { name: "Remove this test" }).click();
+  const dialog = dialogOf(page);
+  await expect(dialog).toContainText("Open a pull request that removes this test?");
+  await expect(dialog).toContainText("deletes this one test and what only it used");
+  await expect(dialog).toContainText("what still covers the behaviour");
+  await expect(dialog).toContainText("Nothing is deleted until your team approves and merges it. Coderhelm never merges it.");
+  // Cancelling asks for nothing.
+  await page.getByRole("button", { name: "Cancel" }).click();
+  expect(callsTo(db, "POST", /\/remove/)).toHaveLength(0);
+  await row.getByRole("button", { name: "Remove this test" }).click();
+  await page.getByRole("button", { name: "Open removal PR" }).click();
+  await expect(page.getByText("Coderhelm is writing the removal PR")).toBeVisible();
+  await expect(row.getByTestId("standing")).toHaveAttribute("data-state", "removal_running");
+  await expect(row.getByRole("button", { name: /Fix this test|Remove this test/ })).toHaveCount(0);
+  // The test stays in the list until the team merges the pull request.
+  await expect(page.getByRole("list", { name: "Quarantined tests" }).getByTestId("test-row")).toHaveCount(8);
+  expect(callsTo(db, "POST", /\/api\/tests\/q_failed\/remove/)).toHaveLength(1);
+});
+
+test("quarantine: a refused request says why and changes nothing", async ({ page }) => {
+  await quarantineDb(page, { refuse: { q_idle: "A fix for this test is already in progress." } });
+  await page.goto("/tests?view=quarantine");
+  const row = rowOf(page, "basket: keeps items after sign-in");
+  await row.getByRole("button", { name: "Fix this test" }).click();
+  await page.getByRole("button", { name: "Fix it" }).click();
+  await expect(page.getByText("A fix for this test is already in progress.")).toBeVisible();
+  await expect(row.getByTestId("standing")).toHaveAttribute("data-state", "idle");
+});
+
+test("quarantine: fix selected and remove selected say what will happen first", async ({ page }) => {
+  const db = await quarantineDb(page);
+  await page.goto("/tests?view=quarantine");
+  const bulk = page.getByTestId("quarantine-bulk");
+  // Only rows something can be asked of have a checkbox.
+  const boxes = page.getByRole("list", { name: "Quarantined tests" }).getByRole("checkbox");
+  await expect(boxes).toHaveCount(4);
+  await expect(rowOf(page, "search: filters by price").getByRole("checkbox")).toHaveCount(0);
+  await page.getByRole("checkbox", { name: "Select basket: keeps items after sign-in (chromium)" }).click();
+  await page.getByRole("checkbox", { name: "Select orders: cancels an order (chromium)" }).click();
+  await expect(bulk).toContainText("2 tests selected");
+  await bulk.getByRole("button", { name: "Fix selected (2)" }).click();
+  const dialog = dialogOf(page);
+  await expect(dialog).toContainText("Ask Coderhelm to fix 2 tests?");
+  await expect(dialog).toContainText("It starts 2 fix runs now, one per test: basket: keeps items after sign-in (chromium); orders: cancels an order (chromium).");
+  await expect(dialog).toContainText("not counted against the weekly limit");
+  await page.getByRole("button", { name: "Fix 2 tests" }).click();
+  await expect(page.getByText("Coderhelm started 2 fixes")).toBeVisible();
+  expect(callsTo(db, "POST", /\/fix$/).map((c) => c.path)).toEqual(["/api/tests/q_idle/fix", "/api/tests/q_failed/fix"]);
+  // Both rows are in flight now, so nothing is left selected and they can't be picked again.
+  await expect(boxes).toHaveCount(2);
+  await expect(bulk).toContainText("Select all");
+
+  // Select all, then remove: one pull request per test.
+  await bulk.getByRole("checkbox").click();
+  await expect(bulk).toContainText("2 tests selected");
+  await bulk.getByRole("button", { name: "Remove selected (2)" }).click();
+  await expect(dialog).toContainText("Open 2 pull requests that each remove one test?");
+  await expect(dialog).toContainText("Nothing is deleted until your team approves and merges them.");
+  await page.getByRole("button", { name: "Open 2 removal PRs" }).click();
+  await expect(page.getByText("Coderhelm started 2 removals")).toBeVisible();
+  expect(callsTo(db, "POST", /\/remove$/).map((c) => c.path).sort()).toEqual(["/api/tests/q_passing/remove", "/api/tests/q_unstable/remove"]);
+  await expect(bulk).toHaveCount(0);
+});
+
+test("quarantine: a bulk request that partly fails says how many started and why the rest did not", async ({ page }) => {
+  await quarantineDb(page, { refuse: { q_failed: "A fix pull request is already open: https://github.com/your-team/web/pull/118." } });
+  await page.goto("/tests?view=quarantine");
+  await page.getByTestId("quarantine-bulk").getByRole("checkbox").click();
+  await page.getByRole("button", { name: "Fix selected (4)" }).click();
+  await page.getByRole("button", { name: "Fix 4 tests" }).click();
+  await expect(page.getByText("Started 3 of 4. 1 couldn't start: A fix pull request is already open")).toBeVisible();
+  await expect(rowOf(page, "orders: cancels an order").getByTestId("standing")).toHaveAttribute("data-state", "fix_failed");
+});
+
+test("quarantine: on a phone every row keeps its state, reason and actions", async ({ page }) => {
+  await quarantineDb(page);
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.goto("/tests?view=quarantine");
+  const row = rowOf(page, "orders: cancels an order");
+  await expect(row.getByTestId("standing")).toBeVisible();
+  await expect(row.getByTestId("why-not-fixed")).toBeVisible();
+  for (const name of ["Fix this test", "Remove this test", "Release from quarantine"]) {
+    const box = await row.getByRole("button", { name }).boundingBox();
+    expect(box, name).not.toBeNull();
+    expect(box!.x, `${name} starts on the screen`).toBeGreaterThanOrEqual(0);
+    expect(box!.x + box!.width, `${name} ends on the screen`).toBeLessThanOrEqual(390);
+  }
+  await expect(page.getByTestId("quarantine-bulk")).toBeVisible();
+  await expect(page.getByTestId("auto-fix-note")).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow, "the quarantine view scrolls sideways at 390px").toBeLessThanOrEqual(0);
+});
+
+test("quarantine: a server from before sends no standing, and the row is what it was", async ({ page }) => {
+  const db = await mockApi(page);
+  await page.goto("/tests?view=quarantine");
+  const list = page.getByRole("list", { name: "Quarantined tests" });
+  await expect(list.getByTestId("test-row")).toHaveCount(1);
+  await expect(list.getByRole("link", { name: "Fix PR" })).toHaveAttribute("href", /pull\/88/);
+  await expect(list).toContainText("Proving the fix (20 runs)");
+  await expect(list.getByRole("button", { name: "Release from quarantine" })).toBeVisible();
+  // Nothing it can't do there is offered: no fix or removal, no selection, no limit note.
+  await expect(page.getByRole("button", { name: /Fix this test|Remove this test/ })).toHaveCount(0);
+  await expect(page.getByTestId("standing")).toHaveCount(0);
+  await expect(page.getByTestId("quarantine-bulk")).toHaveCount(0);
+  await expect(page.getByTestId("auto-fix-note")).toHaveCount(0);
+  await expect(list.getByRole("checkbox")).toHaveCount(0);
+  expect(callsTo(db, "POST", /\/remove/)).toHaveLength(0);
+  // The settings page has no weekly number to set either.
+  await page.goto("/tests?view=settings");
+  await expect(page.getByRole("heading", { name: "CI setup" })).toBeVisible();
+  await expect(page.getByRole("spinbutton", { name: "Automatic fixes per week" })).toHaveCount(0);
+});
+
+test("quarantine: a test passing its way out shows progress, a withdrawn cause, and release as the override", async ({ page }) => {
+  const passes = Array.from({ length: 14 }, (_, i) => ({
+    run_key: `p_${i}`, sha: `feed${i}000000`, branch: i % 4 === 0 ? "main" : `feature/${i % 4}`, pr: i % 4 === 0 ? null : 410 + (i % 4),
+    at: ago((i + 1) * 1_200_000), outcome: "passed", attempts: [ATTEMPT_PASS],
+  }));
+  const failures = Array.from({ length: 3 }, (_, i) => ({
+    run_key: `f_${i}`, sha: `dead${i}000000`, branch: "feature/9", pr: 409, at: ago(6 * 3_600_000 + i * 600_000), outcome: "failed",
+    attempts: [ATTEMPT_FAIL, { ...ATTEMPT_FAIL, retry: 1 }],
+  }));
+  const db = await quarantineDb(page, { history: { q_passing: [...passes, ...failures] } });
+  await page.goto("/tests/test?id=q_passing");
+  const where = page.getByTestId("test-standing");
+  await expect(where.getByRole("heading", { name: "In quarantine" })).toBeVisible();
+  await expect(where.getByRole("progressbar", { name: "Passes toward leaving quarantine" })).toHaveAttribute("aria-valuenow", "14");
+  await expect(where.getByTestId("release-progress")).toContainText("14 of 20 passes needed, across 4 pull requests and branches");
+  await expect(where.getByTestId("why-not-fixed")).toContainText("It is passing again and leaves quarantine by itself");
+  // The cause no longer reads as a fact the history disproves.
+  const cause = page.getByTestId("test-cause");
+  await expect(cause).toHaveAttribute("data-out-of-date", "true");
+  await expect(cause).toContainText("Earlier diagnosis, now out of date: Environment");
+  await expect(cause).toContainText("it has passed 14 runs in a row on 4 pull requests and branches");
+  await expect(cause).toContainText("what changed is outside the test");
+  await expect(page.getByText("Likely cause: Environment")).toHaveCount(0);
+  await expect(cause.locator(".line-through")).toContainText("passed on retry in 0 of the last 30 runs");
+  await expect(page.getByRole("img", { name: /Last 17 runs, oldest first: 3 failed, 14 passed/ })).toBeVisible();
+  await shot(page, "quarantine-on-its-way-out");
+  // Release stays, as the manual override.
+  await page.getByRole("button", { name: "Release from quarantine" }).click();
+  await expect(page.getByText(/It goes back to blocking pull requests when it fails/)).toBeVisible();
+  await page.getByRole("button", { name: "Release", exact: true }).click();
+  expect(callsTo(db, "POST", /\/api\/tests\/q_passing\/quarantine/)[0].body).toMatchObject({ on: false });
+});
+
+test("quarantine: a test's page offers the fix and the removal, with the week's limit", async ({ page }) => {
+  const db = await quarantineDb(page);
+  await page.goto("/tests/test?id=q_idle");
+  const where = page.getByTestId("test-standing");
+  await expect(where).toContainText("Nothing in flight");
+  await expect(where.getByTestId("why-not-fixed")).toHaveText(CAP_LINE);
+  // The way out is stated even before the first pass.
+  await expect(where.getByTestId("release-progress")).toContainText("20 in a row are needed");
+  await expect(where.getByTestId("auto-fix-budget")).toContainText(CAP_LINE);
+  await expect(where.getByRole("link", { name: "Change the weekly limit" })).toHaveAttribute("href", /view=settings#auto-fixes/);
+  await shot(page, "quarantine-test-page");
+  await page.getByRole("button", { name: "Remove this test" }).click();
+  await page.getByRole("button", { name: "Open removal PR" }).click();
+  await expect(where.getByTestId("standing")).toHaveAttribute("data-state", "removal_running");
+  await expect(page.getByRole("button", { name: /Fix this test|Remove this test/ })).toHaveCount(0);
+  expect(callsTo(db, "POST", /\/api\/tests\/q_idle\/remove/)).toHaveLength(1);
+});
+
+test("quarantine: a diagnosed environment cause names what the test depends on", async ({ page }) => {
+  const t = quarantined("q_env", "billing: shows the invoice total", 5, {
+    cause: {
+      label: "environment", evidence: "Every failure is a 502 from the preview's rates service.",
+      depends_on: "the preview deployment's rates service",
+      independent: "Stub the rates response in the test's own setup instead of calling the shared preview.",
+    },
+    quarantine: standing({ why: "Next in line for an automatic fix: Coderhelm starts it on its next look at this repository." }),
+  });
+  await quarantineDb(page, { tests: [t] });
+  await page.goto("/tests/test?id=q_env");
+  const cause = page.getByTestId("test-cause");
+  await expect(cause).toHaveAttribute("data-out-of-date", "false");
+  await expect(cause).toContainText("Likely cause: Environment");
+  await expect(cause).toContainText("Depends on: the preview deployment's rates service");
+  await expect(cause).toContainText("Making it independent: Stub the rates response in the test's own setup");
+});
+
+test("quarantine: a test that left by itself, and one that was removed, say why on their page", async ({ page }) => {
+  const reason = "Left quarantine by itself: 20 passes in a row with no failure and no retry, on 5 pull requests and branches, over 3 hours, since it last failed on 12 November 2026.";
+  const released = makeTest({ id: "t_released", title: "home: opens the menu", state: "healthy", quarantine: null, release: { at: ago(3_600_000), reason, passes: 20, sources: 5, hours: 3 } });
+  const removed = makeTest({
+    id: "t_removed", title: "reports: exports a spreadsheet", state: "healthy", quarantine: null, removed: true,
+    removal: { status: "merged", by: "coderhelm", at: ago(2 * DAY), pr: { url: "https://github.com/your-team/web/pull/152", state: "merged", by: "robin-lead" }, approved_by: ["robin-lead", "sam-reviewer"] },
+  });
+  await quarantineDb(page, { tests: [released, removed] });
+  await page.goto("/tests/test?id=t_released");
+  await expect(page.getByTestId("test-released")).toContainText("Left quarantine by itself");
+  await expect(page.getByTestId("test-released")).toContainText("20 passes in a row with no failure and no retry, on 5 pull requests and branches");
+  // The same sentence is in the test's history.
+  const changes = page.getByRole("list", { name: "State changes" });
+  await expect(changes).toContainText("Changed from Quarantined to Healthy");
+  await expect(changes).toContainText(reason);
+  await expect(page.getByTestId("test-standing")).toHaveCount(0);
+
+  await page.goto("/tests/test?id=t_removed");
+  const gone = page.getByTestId("test-removed");
+  await expect(gone).toContainText("This test was removed");
+  await expect(gone).toContainText("Approved by robin-lead, sam-reviewer, merged by robin-lead.");
+  await expect(gone).toContainText("Coderhelm proposed the removal.");
+  await expect(gone.getByRole("link", { name: "Open the removal PR" })).toHaveAttribute("href", /pull\/152/);
 });
