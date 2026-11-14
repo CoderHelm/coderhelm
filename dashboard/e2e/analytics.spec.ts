@@ -534,7 +534,7 @@ test("the page is split into views: each keeps one subject on screen", async ({ 
   await mockApi(page);
   await page.goto("/analytics");
   const views = page.getByRole("navigation", { name: "Analytics views" });
-  await expect(views.getByRole("link")).toHaveText(["Overview", "Compared", "Reliability", "Teams and repos", "Security", "Lookups"]);
+  await expect(views.getByRole("link")).toHaveText(["Overview", "Compared", "Token use", "Reliability", "Teams and repos", "Security", "Lookups"]);
   await expect(views.getByRole("link", { name: "Overview" })).toHaveAttribute("aria-current", "page");
   // The overview holds the scorecard and the charts, not the long tables.
   await expect(page.getByTestId("tile-merged")).toBeVisible();
