@@ -99,6 +99,7 @@ function Sentence({ step, q }: { step: LogStep; q: string }) {
       {lead && <span className="font-medium">{lead}</span>}
       <Mark text={step.verb} q={q} />{" "}
       {step.targetIsPath ? <PathTarget target={step.target} /> : <span className="[overflow-wrap:anywhere]"><Mark text={step.target} q={q} /></span>}
+      {step.repeats ? <span className="ml-1.5 whitespace-nowrap rounded-full border border-zinc-700 px-1.5 text-xs text-zinc-300" data-testid="log-step-repeats">{step.repeats + 1} times, nothing changed between</span> : null}
       {step.attempt && step.attempt > 1 && <span className="ml-1.5 whitespace-nowrap rounded-full border border-zinc-700 px-1.5 text-xs text-zinc-300">{step.attempt === 2 ? "2nd try" : step.attempt === 3 ? "3rd try" : `${step.attempt}th try`}</span>}
       {step.summary && (
         <span className={isProblem(step) ? "text-zinc-300" : "text-zinc-400"}>
@@ -106,6 +107,7 @@ function Sentence({ step, q }: { step: LogStep; q: string }) {
           <Mark text={step.summary} q={q} />
         </span>
       )}
+      {step.recoveredBy && <span className="text-zinc-400" data-testid="log-step-recovered"> · worked on a later try</span>}
       <span className="sr-only"> ({STATUS_WORD[step.status]})</span>
     </span>
   );
@@ -180,13 +182,20 @@ function Fields({ value }: { value: Record<string, unknown> }) {
   );
 }
 
+/** What a step without a stored result says: its outcome in words, and when the full message arrives. */
+function missingResult(step: LogStep): string {
+  const why = step.summary ? `${step.summary.charAt(0).toUpperCase()}${step.summary.slice(1)}.` : "";
+  if (step.live) return `${why} The full message is shown once this part of the run is saved.`.trim();
+  return why || "The tool returned nothing.";
+}
+
 function PlainDetail({ step }: { step: LogStep }) {
   const text = step.result ?? "";
   const path = step.files[0];
   if (isProblem(step) && step.tool !== "run_checks") {
     return (
       <div className="space-y-2">
-        <p className="whitespace-pre-wrap text-sm text-zinc-300 [overflow-wrap:anywhere]">{text || "No message was recorded."}</p>
+        <p className="whitespace-pre-wrap text-sm text-zinc-300 [overflow-wrap:anywhere]">{text || missingResult(step)}</p>
         {step.tool === "edit_file" && <EditDiff step={step} />}
       </div>
     );
@@ -194,7 +203,7 @@ function PlainDetail({ step }: { step: LogStep }) {
   switch (step.tool) {
     case "read_file":
     case "read_file_lines":
-      return text ? <LongText text={text} lang={langFromPath(path)} filename={path} /> : <NoResult />;
+      return text ? <LongText text={text} lang={langFromPath(path)} filename={path} /> : <NoResult step={step} />;
     case "search_code": {
       const hits = searchHits(text);
       if (!hits.length) return <p className="text-sm text-zinc-400">No matches.</p>;
@@ -230,14 +239,14 @@ function PlainDetail({ step }: { step: LogStep }) {
               ))}
             </ul>
           ) : (
-            <p className="whitespace-pre-wrap text-sm text-zinc-300 [overflow-wrap:anywhere]">{text || "No result was recorded."}</p>
+            <p className="whitespace-pre-wrap text-sm text-zinc-300 [overflow-wrap:anywhere]">{text || missingResult(step)}</p>
           )}
           {out && <LongText text={out} wrap />}
         </div>
       );
     }
     case "get_diff":
-      return text ? <LongText text={text} lang="diff" /> : <NoResult />;
+      return text ? <LongText text={text} lang="diff" /> : <NoResult step={step} />;
     default:
       return (
         <div className="space-y-2">
@@ -247,14 +256,14 @@ function PlainDetail({ step }: { step: LogStep }) {
           ) : text ? (
             <LongText text={text} wrap />
           ) : (
-            <NoResult />
+            <NoResult step={step} />
           )}
         </div>
       );
   }
 }
 
-const NoResult = () => <p className="text-sm text-zinc-400">No result was recorded for this step.</p>;
+const NoResult = ({ step }: { step?: LogStep }) => <p className="text-sm text-zinc-400">{step ? missingResult(step) : "The tool returned nothing."}</p>;
 
 /** An edit's changes as a small diff, from its own input. */
 function EditDiff({ step }: { step: LogStep }) {
@@ -272,7 +281,10 @@ function StructuredDetail({ step }: { step: LogStep }) {
     <div className="space-y-3">
       <dl className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-xs">
         <dt className="text-zinc-400">Tool</dt>
-        <dd className="min-w-0 text-zinc-200 [overflow-wrap:anywhere]">{step.tool}</dd>
+        <dd className="min-w-0 text-zinc-200 [overflow-wrap:anywhere]">
+          {step.tool}
+          {step.calledAs ? <span className="text-zinc-400"> (called as {step.calledAs})</span> : null}
+        </dd>
         <dt className="text-zinc-400">Outcome</dt>
         <dd className="text-zinc-200">
           {STATUS_WORD[step.status]}
@@ -301,7 +313,7 @@ function StructuredDetail({ step }: { step: LogStep }) {
       )}
       <div className="space-y-1">
         <p className="text-xs font-medium text-zinc-300">Result{step.truncated ? " (cut at 100 KB when it was stored)" : ""}</p>
-        {step.result !== null ? <LongText text={step.result} wrap /> : <NoResult />}
+        {step.result !== null ? <LongText text={step.result} wrap /> : <NoResult step={step} />}
       </div>
     </div>
   );
@@ -489,7 +501,8 @@ function Thinking({ parts }: { parts: string[] }) {
 }
 
 function SectionView({ section, ctx, limit, long }: { section: LogSection; ctx: RowCtx; limit: number; long: boolean }) {
-  const items = section.items.slice(0, limit);
+  // Step-budget reminders far from the limit are bookkeeping: the Structured and Raw views keep them.
+  const items = section.items.filter((it) => !(it.kind === "note" && it.quiet && ctx.view === "plain")).slice(0, limit);
   return (
     <section
       id={section.id}
@@ -539,7 +552,7 @@ function passSpan(p: LogPass): { start: number; end: number } | null {
   return Number.isFinite(start) && Number.isFinite(end) && end > start ? { start, end } : null;
 }
 
-function PassView({ pass, shown, open, onToggle, ctx, onProblem, limit, onMore, filtered }: {
+function PassView({ pass, shown, open, onToggle, ctx, onProblem, limit, onMore, filtered, failed }: {
   pass: LogPass;
   shown: LogPass;
   open: boolean;
@@ -549,6 +562,8 @@ function PassView({ pass, shown, open, onToggle, ctx, onProblem, limit, onMore, 
   limit: number;
   onMore: () => void;
   filtered: boolean;
+  /** The run failed: its problems are drawn as warnings, not as notes. */
+  failed: boolean;
 }) {
   const span = useMemo(() => passSpan(pass), [pass]);
   const headingId = `pass-${pass.id}`;
@@ -587,7 +602,7 @@ function PassView({ pass, shown, open, onToggle, ctx, onProblem, limit, onMore, 
           </button>
         </h3>
         {problems.length > 0 && (
-          <button type="button" onClick={onProblem} className={`shrink-0 whitespace-nowrap rounded-full border border-amber-500/40 px-2 text-xs leading-5 text-amber-200 hover:bg-amber-500/10 ${focusRing}`} title="Go to the next problem">
+          <button type="button" onClick={onProblem} className={`shrink-0 whitespace-nowrap rounded-full border px-2 text-xs leading-5 ${failed ? "border-amber-500/40 text-amber-200 hover:bg-amber-500/10" : "border-zinc-700 text-zinc-300 hover:bg-zinc-800"} ${focusRing}`} title="Go to the next problem">
             {plural(problems.length, "problem")}
           </button>
         )}
@@ -595,8 +610,11 @@ function PassView({ pass, shown, open, onToggle, ctx, onProblem, limit, onMore, 
       {open && (
         <div className="min-w-0 space-y-3 px-4 pb-4">
           {problems.length > 0 && !filtered && (
-            <div className="rounded-md border border-amber-500/25 bg-amber-500/5 px-3 py-2" data-testid="log-problems">
-              <p className="text-xs font-medium text-amber-200">{problems.length === 1 ? "1 thing didn't work" : `${problems.length} things didn't work`}</p>
+            <div className={`rounded-md border px-3 py-2 ${failed ? "border-amber-500/25 bg-amber-500/5" : "border-zinc-800 bg-zinc-900/60"}`} data-testid="log-problems" data-tone={failed ? "warning" : "neutral"}>
+              <p className={`text-xs font-medium ${failed ? "text-amber-200" : "text-zinc-200"}`}>
+                {problems.length === 1 ? "1 thing didn't work" : `${problems.length} things didn't work`}
+                {pass.recovered.length > 0 && <span className="font-normal text-zinc-400"> · {pass.recovered.length === 1 ? "1 more worked on a later try" : `${pass.recovered.length} more worked on a later try`}</span>}
+              </p>
               <ul className="mt-1 space-y-0.5">
                 {problems.map((s) => (
                   <li key={s.id} className="flex min-w-0 items-start gap-2">
@@ -653,7 +671,7 @@ function locate(model: LogModel, id: string): { pass: LogPass; group?: string } 
   return null;
 }
 
-export function AgentLogPanel({ log, traces, runId, diffUrl, live }: { log: AgentLog; traces: PassTrace[]; runId: string; diffUrl?: string; live: boolean }) {
+export function AgentLogPanel({ log, traces, runId, diffUrl, live, failed = false }: { log: AgentLog; traces: PassTrace[]; runId: string; diffUrl?: string; live: boolean; failed?: boolean }) {
   const model = useMemo(() => buildLog(log, traces), [log, traces]);
   const { filter, file, q, view, timeline, step: linked, set } = useLogParams();
   const phone = usePhone();
@@ -909,6 +927,7 @@ export function AgentLogPanel({ log, traces, runId, diffUrl, live }: { log: Agen
               limit={limits[pass.id] ?? ROW_BUDGET}
               onMore={() => setLimits((m) => ({ ...m, [pass.id]: Infinity }))}
               filtered={filtered}
+              failed={failed}
             />
           ),
         )}

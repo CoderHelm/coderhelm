@@ -2613,6 +2613,9 @@ export interface AgentLogToolResult {
   duration_ms?: number;
   content_encoding?: "json" | "text";
   outcome?: AgentLogOutcome | null;
+  /** The tool name the model called when it ran as another tool (`bash` as `read_file`, `Edit` as `edit_file`); `tool` and `input` are the call as it ran. */
+  called_as?: string;
+  input?: Record<string, unknown>;
 }
 
 /**
