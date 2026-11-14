@@ -229,6 +229,31 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
         db.threads = db.threads.filter((x) => x.id !== one[1]);
         return json(route, { ok: true });
       }
+      if (one[1] === "th_work") {
+        const rec = { loc: "", passage: "", authoritative: false };
+        return json(route, {
+          thread: thread({ id: "th_work", title: "What's the latest on the portal ticket?" }),
+          messages: [
+            { seq: 0, role: "user", content: "What's the latest on “Embed the portal”?", citations: [], grounded: true, attachments: [], used: [], at: iso(5) },
+            {
+              seq: 1,
+              role: "assistant",
+              content: "The ticket is In Review [S1]. Its pull request is open [S2]. The run waits on checks [S3]. A related advisory is fixed [S4].",
+              citations: [
+                { ...rec, id: "S1", kind: "ticket", title: "HAR-7 Embed the portal", loc: "Jira", as_of: "2026-11-12T10:00:00.000+0000", passage: "Status: In Review", url: "https://team.atlassian.net/browse/HAR-7" },
+                { ...rec, id: "S2", kind: "pull_request", title: "#88 Embed the portal", loc: "your-team/web", as_of: "2026-11-12T10:04:00Z", passage: "open", url: "https://github.com/your-team/web/pull/88" },
+                { ...rec, id: "S3", kind: "run", title: "Run: Embed the portal", loc: "your-team/web", as_of: "2026-11-12T10:05:00Z", passage: "awaiting_ci", href: "/runs/detail?id=run_1" },
+                { ...rec, id: "S4", kind: "finding", title: "CVE-2026-1234 in next (web)", loc: "your-team/web", as_of: "2026-11-08T12:00:00Z", passage: "fixed", href: "/security/detail?id=sf1", url: "https://github.com/your-team/web/pull/80" },
+              ],
+              grounded: true,
+              attachments: [],
+              used: [{ kind: "work", name: "work_tickets", label: "Looked up tickets for “Embed the portal”", summary: "1 tickets" }],
+              at: iso(5),
+            },
+          ],
+          can_ask: true,
+        });
+      }
       if (one[1] === "th_shared") {
         return json(route, {
           thread: db.threads.find((x) => x.id === "th_shared"),
@@ -423,6 +448,31 @@ test.describe("chat: asking", () => {
     await expect(page).toHaveURL(/thread=th_new/);
     await expect(page.getByTestId("topbar")).toContainText("How long is parental leave?");
     await expect(box(page)).toHaveAttribute("placeholder", "Ask a follow-up");
+  });
+
+  test("tickets, pull requests, runs and findings are cited with their dates and open where they live", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/chat?thread=th_work");
+    const answer = page.getByTestId("answer");
+    const sources = answer.getByTestId("source");
+    await expect(sources).toHaveCount(4);
+    await expect(sources.nth(0)).toContainText("HAR-7 Embed the portal");
+    await expect(sources.nth(0)).toContainText("Ticket");
+    await expect(sources.nth(1)).toContainText("Pull request");
+    await expect(sources.nth(2)).toContainText("Coderhelm run");
+    await expect(sources.nth(3)).toContainText("Finding");
+    const open = async (n: number) => {
+      await answer.getByTestId("cite-marker").nth(n).click();
+      const link = page.getByTestId("source-card").getByTestId("source-open");
+      const out = { href: await link.getAttribute("href"), text: await link.innerText() };
+      await page.keyboard.press("Escape");
+      return out;
+    };
+    expect(await open(0)).toEqual({ href: "https://team.atlassian.net/browse/HAR-7", text: expect.stringContaining("Open the ticket") });
+    expect(await open(1)).toEqual({ href: "https://github.com/your-team/web/pull/88", text: expect.stringContaining("Open on GitHub") });
+    expect(await open(2)).toEqual({ href: expect.stringMatching(/^\/runs\/detail\/?\?id=run_1$/), text: expect.stringContaining("Open in Coderhelm") });
+    // A finding opens its page in Coderhelm, not the pull request that fixed it.
+    expect(await open(3)).toEqual({ href: expect.stringMatching(/^\/security\/detail\/?\?id=sf1$/), text: expect.stringContaining("Open in Coderhelm") });
   });
 
   test("hovering a number shows its source card", async ({ page }) => {
