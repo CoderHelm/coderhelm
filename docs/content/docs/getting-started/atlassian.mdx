@@ -1,0 +1,59 @@
+---
+title: Connect Atlassian
+description: One Atlassian connection for Jira and Confluence. Start runs from Jira tickets, let agents read Confluence pages and sync them into Knowledge, and give agents Atlassian's own tools.
+---
+
+Jira and Confluence are one connection in CoderHelm. Open **Settings**, **Integrations** and the **Atlassian** row. It has three parts, each with its own status:
+
+| Part | What it does | How it connects |
+| --- | --- | --- |
+| **Jira** | Starts runs from tickets, posts progress and the pull request link back, and reads and creates tickets for [plans](/getting-started/plans). | CoderHelm's Jira app, installed in your Atlassian site by a Jira admin, or a plain Jira webhook. See below. |
+| **Confluence** | Agents read pages during runs and reviews, and [Knowledge](/concepts/knowledge-sources) syncs the spaces you pick. | An Atlassian sign-in (CoderHelm's Atlassian app), an Atlassian API token, or the Jira app (reading only). |
+| **Agent tools** | Agents search and read Jira issues and Confluence pages with Atlassian's own tools, only the ones you allow. | A sign-in to Atlassian's remote MCP server (Rovo). |
+
+**Connect Atlassian** signs you in for the parts that take a sign-in, one Atlassian consent page each: Confluence first, then agent tools. Each part can also be set up on its own from the same row, and a part you don't need can stay off. Connections made before Jira and Confluence were one row keep working as they are, with nothing to reconnect.
+
+If Atlassian's sign-in page is failing on Atlassian's side, CoderHelm says so with the status Atlassian answered, instead of sending you to an error page. Try again a few minutes later. An Atlassian organization admin may need to allow CoderHelm's address under Atlassian Administration, Rovo, Rovo MCP server before agent tools can sign in.
+
+## Jira
+
+CoderHelm reads the ticket (including screenshots attached to it), picks the repository, and posts its progress and the pull request link back on the ticket. In the Atlassian row, **Install the Jira app** opens the Jira page, which has two ways to connect.
+
+<Tabs items={['Jira app (recommended)', 'Jira webhook']}>
+<Tab value="Jira app (recommended)">
+
+The Jira app is installed in your Atlassian site. It sends ticket events to CoderHelm, posts comments back, and lets CoderHelm read and create tickets for [plans](/getting-started/plans). It can also read Confluence pages (the Confluence part shows this as connected through the Jira app) and publish release notes there.
+
+1. **Install the Jira app.** Use the link on the Jira page of the dashboard. You need to be a Jira admin.
+2. **Paste your Team ID and secret.** The dashboard shows both. In Jira, open the app's **Coderhelm Settings** admin page and paste them. This links your Jira site to your CoderHelm team.
+3. **Label and assign a ticket.** See below.
+
+The app listens for tickets being created, assigned, updated and commented on.
+
+</Tab>
+<Tab value="Jira webhook">
+
+If you can't install apps in your Jira site, use a plain Jira webhook instead.
+
+1. On the Jira page of the dashboard, generate webhook credentials. You get a URL of the form `https://api.coderhelm.com/webhooks/jira/<token>` and, optionally, a secret.
+2. In Jira, open **Settings**, then **System**, then **WebHooks**, and create a webhook with that URL. Select the issue events (created, updated) and comment events (created).
+3. If you generated a secret, add it to the webhook so Jira signs each request.
+
+With a webhook, CoderHelm can't post comments back to the ticket or create tickets, so progress shows only in the dashboard.
+
+</Tab>
+</Tabs>
+
+### Choose projects
+
+On the same page, switch on the Jira projects CoderHelm should listen to. Tickets in other projects are ignored. If you never change the project list, every project is allowed.
+
+### Start a run from Jira
+
+Add the label `coderhelm` to a ticket and assign it to the CoderHelm user. In practice either one is enough: the label (or any label starting with `coderhelm:`), or an assignee whose name contains "CoderHelm".
+
+Write the ticket the way you would for a new teammate: what should change, where it shows up, and how to know it works. Screenshots and mockups help; CoderHelm reads them.
+
+A comment on the ticket is handled too. If the run failed, a comment retries it. If the run already opened a pull request, the comment is sent to that pull request as feedback.
+
+A status or field change on its own never starts a run.

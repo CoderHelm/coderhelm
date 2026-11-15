@@ -251,6 +251,11 @@ export function useHybrid(opts: { deep?: boolean } = {}): HybridState {
   return { status, loading, error, reload, set: setStatus, save };
 }
 
+/** The catalog entry for an id: its own, or the one that covers it (`jira` and `confluence` are Atlassian's). */
+export function integrationOf(list: HybridIntegration[] | undefined, id: string): HybridIntegration | undefined {
+  return (list ?? []).find((i) => i.id === id || (i.parts ?? []).includes(id));
+}
+
 /** Can this integration use Coderhelm's app now? Hosted, and Coderhelm's app for it is set up. */
 export function canUseCoderhelm(i: HybridIntegration | undefined): boolean {
   return i?.mode === "hosted" && i.offered !== false;

@@ -1,6 +1,7 @@
 {
   "$comment": "Pages that moved or were removed, and where they went. The docs CloudFront function answers each with a 301 (infra/lib/docs-stack.ts). Keys and targets are page paths ending in /.",
   "redirects": {
-    "/api/routes/": "/api/"
+    "/api/routes/": "/api/",
+    "/getting-started/jira/": "/getting-started/atlassian/"
   }
 }

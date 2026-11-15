@@ -74,7 +74,7 @@ test('the self-host section is served from the platform import', async ({ page }
 
 test('code blocks have a copy button and tabs switch', async ({ page, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-  await page.goto('/getting-started/jira/');
+  await page.goto('/getting-started/atlassian/');
   await page.getByRole('tab', { name: 'Jira webhook' }).click();
   await expect(page.getByText('If you can’t install apps').or(page.getByText("If you can't install apps"))).toBeVisible();
   await page.goto('/api/');
