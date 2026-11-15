@@ -873,9 +873,9 @@ test.describe("chat: how it looks", () => {
         await askIt(page, "How is web put together?");
         const answer = page.getByTestId("answer").last();
         await expect(answer).toContainText("Next.js site");
-        // While working the steps are open: the running one listed, the line says it's working.
-        await expect(answer.getByTestId("tool-step").last()).toContainText("Read src/server.ts in web");
-        await expect(answer.getByTestId("activity-summary")).toHaveText("Working");
+        // Once the answer is coming in the steps fold into one line naming the latest, so the text doesn't move.
+        await expect(answer.getByTestId("tool-step")).toHaveCount(0);
+        await expect(answer.getByTestId("activity-summary")).toHaveText("Read src/server.ts in web");
         await snap(page, `streaming-${width}`, scheme);
 
         await page.evaluate(

@@ -35,6 +35,8 @@ import {
   CITATION_KIND,
   activitySummary,
   citationWhen,
+  stepSource,
+  unavailableNote,
   groupSources,
   isWorkKind,
   linkCitations,
@@ -317,46 +319,127 @@ export function SourceDialog({ doc, onClose }: { doc: SourceDoc | null; onClose:
   );
 }
 
-/** Seconds since `start`, ticking while `on`. */
-function useElapsed(on: boolean): number {
-  const [start] = useState(() => Date.now());
-  const [now, setNow] = useState(start);
+/** Seconds since `start`, ticking while `on`. `start` comes from the answer, so a remount keeps the count. */
+function useElapsed(on: boolean, start?: number): number {
+  const [own] = useState(() => Date.now());
+  const from = start ?? own;
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (!on) return;
+    setNow(Date.now());
     const t = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(t);
   }, [on]);
-  return Math.max(0, Math.floor((now - start) / 1000));
+  return Math.max(0, Math.floor((now - from) / 1000));
 }
 
 /** The first step, shown the moment a question is sent, before Chat reports its own. */
 const FIRST_STEP: ToolStep = { id: "first", label: "Working out where to look", status: "running" };
 
+/** Steps listed while Chat works; earlier ones fold into a count, so the list never pushes the answer far down. */
+const LIVE_STEPS = 4;
+
+/** One row for a step said the same way several times in a row ("Looked up runs" twice). */
+interface StepRow extends ToolStep {
+  times: number;
+}
+
+function rowsOf(steps: ToolStep[]): StepRow[] {
+  const out: StepRow[] = [];
+  for (const s of steps) {
+    const last = out[out.length - 1];
+    if (last && last.status !== "running" && last.label === s.label && last.status === s.status && last.summary === s.summary) last.times += 1;
+    else out.push({ ...s, times: 1 });
+  }
+  return out;
+}
+
+/** What a step's outcome says: its result, or quietly that it couldn't be read. */
+function outcomeOf(s: ToolStep): string {
+  if (s.status === "running") return "";
+  if (s.status === "error") {
+    const said = (s.summary ?? "").trim();
+    return !said || /^couldn.t read$/i.test(said) ? "couldn't be read" : said.charAt(0).toLowerCase() + said.slice(1);
+  }
+  return s.summary ?? "";
+}
+
+function StepItem({ s }: { s: StepRow }) {
+  const failed = s.status === "error";
+  const outcome = outcomeOf(s);
+  return (
+    <li className="flex min-w-0 items-baseline gap-2" data-testid="tool-step" data-status={s.status}>
+      <span
+        aria-hidden="true"
+        className={`relative top-[-1px] h-1.5 w-1.5 shrink-0 rounded-full ${
+          failed ? "border border-zinc-600" : s.status === "running" ? "animate-pulse bg-sky-400 motion-reduce:animate-none" : "bg-zinc-600"
+        }`}
+      />
+      <span className="min-w-0 wrap-anywhere">
+        <span className={s.status === "running" ? "text-zinc-200" : failed ? "text-zinc-500" : "text-zinc-400"}>{s.label}</span>
+        {s.times > 1 ? <span className="tabular-nums text-zinc-600"> ×{s.times}</span> : null}
+        {outcome ? <span className="text-zinc-600"> · {outcome}</span> : null}
+      </span>
+    </li>
+  );
+}
+
 /**
- * What Chat did. While it works the steps are open, as a short live list
- * with the running one marked and the time so far, so the page is never a
- * single still line. When the answer is done they fold into one quiet line
- * ("Read 4 files in web, searched the code") that opens again on a click.
+ * What Chat did, the way the best answer pages show it (ChatGPT's "Thought
+ * for 5s", Cursor's "Explored N tools", AI Elements' reasoning block):
+ * - while Chat looks things up the steps are open, the running one marked,
+ *   with the time so far, and only the latest few listed;
+ * - once the answer starts they fold into one line that names the running
+ *   step, so the text never moves under the reader;
+ * - when done, one quiet line ("Looked up tickets, pull requests and runs")
+ *   that opens to the steps grouped by where they looked;
+ * - a lookup that failed is a muted row, not a red one: Chat carried on. Only
+ *   a source that couldn't be read at all is named on the line.
  */
-export function ActivityLine({ steps, streaming }: { steps: ToolStep[]; streaming: boolean }) {
-  const [open, setOpen] = useState(streaming);
+export function ActivityLine({ steps, streaming, hasText = false, startedAt }: { steps: ToolStep[]; streaming: boolean; hasText?: boolean; startedAt?: number }) {
+  // The reader's choice, else open while Chat works and nothing is written yet.
+  const [chosen, setChosen] = useState<boolean | null>(null);
+  const [wrote, setWrote] = useState(hasText);
+  const [all, setAll] = useState(false);
   useEffect(() => {
-    if (!streaming) setOpen(false);
+    if (hasText) setWrote(true);
+  }, [hasText]);
+  useEffect(() => {
+    if (!streaming) {
+      setChosen(null);
+      setAll(false);
+    }
   }, [streaming]);
-  const elapsed = useElapsed(streaming);
+  const open = chosen ?? (streaming && !wrote);
+  const elapsed = useElapsed(streaming, startedAt);
   const shown = streaming && steps.length === 0 ? [FIRST_STEP] : steps;
   const running = [...shown].reverse().find((s) => s.status === "running");
   const summary = activitySummary(steps);
-  // While working the list says what; the line just says it's working.
+  const gone = streaming ? "" : unavailableNote(steps);
   const label = streaming ? (open ? "Working" : running?.label ?? shown[shown.length - 1]?.label ?? FIRST_STEP.label) : summary;
+  const rows = rowsOf(shown);
+  const hidden = streaming && !all ? Math.max(0, rows.length - LIVE_STEPS) : 0;
+  // Done: grouped by where they looked, in the order each source was first used.
+  const groups = useMemo(() => {
+    if (streaming) return [];
+    const by = new Map<string, { label: string; steps: ToolStep[] }>();
+    for (const s of steps) {
+      const src = stepSource(s.name);
+      const g = by.get(src.key) ?? { label: src.label, steps: [] };
+      g.steps.push(s);
+      by.set(src.key, g);
+    }
+    return [...by.values()];
+  }, [steps, streaming]);
+  const grouped = groups.length > 1;
   return (
-    <div className="mb-3" data-testid="activity">
+    <div className="mb-3 min-w-0" data-testid="activity">
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => setChosen(!open)}
         aria-expanded={open}
         data-testid="activity-toggle"
-        className={`group inline-flex max-w-full min-w-0 items-center gap-2 rounded-md py-0.5 text-[0.8rem] text-zinc-500 hover:text-zinc-300 ${focusRing}`}
+        className={`group inline-flex max-w-full min-w-0 items-center gap-2 rounded-md py-0.5 text-left text-[0.8rem] text-zinc-500 hover:text-zinc-300 ${focusRing}`}
       >
         <span aria-hidden="true" className="shrink-0 [&_svg]:h-3.5 [&_svg]:w-3.5">
           {streaming ? <LoaderIcon className="animate-spin motion-reduce:animate-none" /> : <CheckIcon />}
@@ -364,6 +447,11 @@ export function ActivityLine({ steps, streaming }: { steps: ToolStep[]; streamin
         <span className={`min-w-0 truncate ${streaming ? "animate-chat-shimmer" : ""}`} data-testid="activity-summary">
           {label}
         </span>
+        {gone && (
+          <span className="min-w-0 shrink truncate text-zinc-600" data-testid="activity-unavailable">
+            · {gone}
+          </span>
+        )}
         {streaming && elapsed > 0 && (
           <span className="shrink-0 tabular-nums text-zinc-600" data-testid="activity-elapsed">
             {elapsed}s
@@ -372,23 +460,33 @@ export function ActivityLine({ steps, streaming }: { steps: ToolStep[]; streamin
         <ChevronDownIcon className={`h-3 w-3 shrink-0 transition-transform motion-reduce:transition-none ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
-        <ol className="ml-[0.4rem] mt-1.5 flex flex-col gap-1 border-l border-zinc-800 pl-4 text-[0.8rem] text-zinc-500" aria-label="Steps" aria-live="polite">
-          {shown.map((s) => (
-            <li key={s.id} className="flex min-w-0 items-baseline gap-2" data-testid="tool-step">
-              <span
-                aria-hidden="true"
-                className={`relative top-[-1px] h-1.5 w-1.5 shrink-0 rounded-full ${
-                  s.status === "error" ? "bg-red-400/80" : s.status === "running" ? "animate-pulse bg-sky-400 motion-reduce:animate-none" : "bg-zinc-600"
-                }`}
-              />
-              <span className="min-w-0 wrap-anywhere">
-                <span className={s.status === "running" ? "text-zinc-200" : "text-zinc-400"}>{s.label}</span>
-                {s.summary && s.status !== "running" ? <span className="text-zinc-600"> · {s.summary}</span> : null}
-                {s.status === "error" ? <span className="text-red-300/80"> · didn&apos;t work, Chat carried on</span> : null}
-              </span>
-            </li>
-          ))}
-        </ol>
+        <div className="ml-[0.4rem] mt-1.5 border-l border-zinc-800 pl-4 text-[0.8rem] text-zinc-500" data-testid="activity-steps">
+          {hidden > 0 && (
+            <button type="button" onClick={() => setAll(true)} className={`mb-1 rounded text-zinc-600 hover:text-zinc-300 ${focusRing}`} data-testid="earlier-steps">
+              {hidden} earlier {hidden === 1 ? "step" : "steps"}
+            </button>
+          )}
+          {grouped ? (
+            <div className="flex flex-col gap-2">
+              {groups.map((g) => (
+                <div key={g.label} className="min-w-0" data-testid="step-group">
+                  <p className="mb-0.5 text-[0.7rem] font-medium uppercase tracking-wide text-zinc-600">{g.label}</p>
+                  <ol className="flex flex-col gap-1" aria-label={g.label}>
+                    {rowsOf(g.steps).map((s) => (
+                      <StepItem key={s.id} s={s} />
+                    ))}
+                  </ol>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <ol className="flex flex-col gap-1" aria-label="Steps">
+              {rows.slice(hidden).map((s) => (
+                <StepItem key={s.id} s={s} />
+              ))}
+            </ol>
+          )}
+        </div>
       )}
     </div>
   );
@@ -435,6 +533,8 @@ export function AnswerView({
   onRate,
   onRetry,
   anchor,
+  startedAt,
+  after,
 }: {
   text: string;
   citations: Citation[];
@@ -448,6 +548,10 @@ export function AnswerView({
   onRate?: (r: Rating | null) => void;
   /** Ask the same question again (the latest answer only). */
   onRetry?: () => void;
+  /** When the question was sent (ms), for the time so far. */
+  startedAt?: number;
+  /** What follows a cut-short answer: that it was stopped, or what broke. */
+  after?: ReactNode;
 }) {
   const [open, setOpen] = useState<SourceDoc | null>(null);
   const [copied, setCopied] = useState(false);
@@ -487,8 +591,10 @@ export function AnswerView({
   }
   return (
     <div className="min-w-0" data-testid="answer" data-scroll-anchor={anchor} ref={box.ref} style={box.style}>
-      {((steps && steps.length > 0) || waiting) && <ActivityLine steps={steps ?? []} streaming={!!streaming} />}
+      {/* An answer with no lookups drops the line once it is written; the time so far comes from the answer, so a line that comes back keeps counting. */}
+      {((steps && steps.length > 0) || waiting) && <ActivityLine steps={steps ?? []} streaming={!!streaming} hasText={!!text} startedAt={startedAt} />}
       {content}
+      {after}
       {!streaming && grounded && <SourceList docs={docs} onOpen={setOpen} />}
       {!streaming && text && (
         <div className="-ml-2 mt-3 flex items-center gap-0.5" data-testid="answer-actions">
