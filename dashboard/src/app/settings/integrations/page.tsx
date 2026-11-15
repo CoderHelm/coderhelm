@@ -578,11 +578,18 @@ function JiraAppNotice({ update }: { update: JiraAppUpdate }) {
     <div className="border-t border-zinc-800 px-4 pb-3 pt-2 sm:pl-[3.75rem]">
       <Callout variant="warning" testId="jira-app-update" live={false}>
         <p>{update.message}</p>
-        {update.manage_url && (
-          <p className="mt-2">
-            <a href={update.manage_url} target="_blank" rel="noopener noreferrer" className={linkButton}>
-              Open Manage apps in Jira
-            </a>
+        {(update.install_url || update.manage_url) && (
+          <p className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
+            {update.install_url && (
+              <a href={update.install_url} target="_blank" rel="noopener noreferrer" className={linkButton}>
+                Update with the installation link
+              </a>
+            )}
+            {update.manage_url && (
+              <a href={update.manage_url} target="_blank" rel="noopener noreferrer" className={linkButton}>
+                Open Connected apps in Atlassian Administration
+              </a>
+            )}
           </p>
         )}
       </Callout>

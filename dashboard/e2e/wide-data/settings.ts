@@ -336,9 +336,9 @@ export const settingsData: Handler = ({ method, path, url }) => {
     const missing = ["full comment reading", "mentions", "in-place edits", "extended issue fields", "threaded replies", "issue type"];
     return {
       behind: {
-        version: "", latest: "6.11.0", missing, manage_url: `https://${SHA}${SHA}.atlassian.net/plugins/servlet/upm`, seen_at: iso(30),
-        message: `Your Jira site runs an older Coderhelm app (a version from before the app reported its number, latest 6.11.0). Missing: ${missing.join(", ")}. A Jira admin needs to accept the update: Jira Settings, Apps, Manage apps, Coderhelm, Update.`,
-        run_note: `Comments on this ticket may be incomplete: its Jira site runs an older Coderhelm app (a version from before the app reported its number, latest 6.11.0) without ${missing.join(", ")}. A Jira admin can accept the update in Manage apps.`,
+        version: "", latest: "6.11.0", missing, manage_url: "https://admin.atlassian.com/", seen_at: iso(30),
+        message: `Your Jira site runs an older Coderhelm app (a version from before the app reported its number, latest 6.11.0). Missing: ${missing.join(", ")}. An Atlassian site admin accepts the update in Atlassian Administration (admin.atlassian.com): Apps, Sites, choose the site, Connected apps, Coderhelm, View app details, Update. Jira's own Manage apps page doesn't list it.`,
+        run_note: `Comments on this ticket may be incomplete: its Jira site runs an older Coderhelm app (a version from before the app reported its number, latest 6.11.0) without ${missing.join(", ")}. An Atlassian site admin can accept the update in Atlassian Administration, Connected apps.`,
       },
     };
   }

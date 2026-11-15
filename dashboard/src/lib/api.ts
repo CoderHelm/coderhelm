@@ -3093,8 +3093,10 @@ export interface JiraAppUpdate {
   latest: string;
   /** What the site's version lacks ("threaded replies", ...). */
   missing: string[];
-  /** The site's Manage apps page, where its admin accepts the update. */
+  /** Atlassian Administration, where a site admin accepts the update (Apps, Sites, the site, Connected apps). */
   manage_url: string;
+  /** The app's installation link (one click to update), when published; missing from older gateways. */
+  install_url?: string;
   /** When the site was last heard from. */
   seen_at: string;
   /** The Integrations page's notice. */
