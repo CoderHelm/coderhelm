@@ -13,6 +13,7 @@ import {
   type IntegrationSection,
   type IntegrationStatus,
   type IntegrationUse,
+  type JiraAppUpdate,
   type KnowledgeSignIn,
   type McpServer,
 } from "@/lib/api";
@@ -505,6 +506,8 @@ function IntegrationRow({
         </div>
       )}
 
+      {kind === "jira" && appUpdateOf(item) && <JiraAppNotice update={appUpdateOf(item)!} />}
+
       {open && (canEdit || personal) && (
         <div id={panelId} data-testid="integration-panel" className="border-t border-zinc-800 bg-zinc-950/40 px-4 pb-4 pt-3 sm:pl-[3.75rem]">
           <p className="text-sm text-zinc-400">{item.does}</p>
@@ -546,6 +549,32 @@ function IntegrationRow({
         </div>
       )}
     </li>
+  );
+}
+
+/** The Jira site's app is older than the latest release (the card's `app_update`), or null. */
+function appUpdateOf(item: Integration): JiraAppUpdate | null {
+  return ((item.detail as { app_update?: JiraAppUpdate | null }).app_update ?? null) as JiraAppUpdate | null;
+}
+
+/**
+ * Under the Jira row: the site runs an older Coderhelm app, what it lacks
+ * and how its Jira admin accepts the update. Gone once the site catches up.
+ */
+function JiraAppNotice({ update }: { update: JiraAppUpdate }) {
+  return (
+    <div className="border-t border-zinc-800 px-4 pb-3 pt-2 sm:pl-[3.75rem]">
+      <Callout variant="warning" testId="jira-app-update" live={false}>
+        <p>{update.message}</p>
+        {update.manage_url && (
+          <p className="mt-2">
+            <a href={update.manage_url} target="_blank" rel="noopener noreferrer" className={linkButton}>
+              Open Manage apps in Jira
+            </a>
+          </p>
+        )}
+      </Callout>
+    </div>
   );
 }
 

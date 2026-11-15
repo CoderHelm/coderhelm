@@ -672,6 +672,8 @@ export const api = {
   deleteJiraIntegration: () =>
     request<void>("/api/integrations/jira/check", { method: "DELETE" }),
   getJiraConfig: () => request<JiraConfig>("/api/integrations/jira/config"),
+  /** Whether the team's Jira site runs an older Coderhelm app: `behind` is null when it is current or nothing is known. */
+  getJiraAppStatus: () => request<{ behind: JiraAppUpdate | null }>("/api/integrations/jira/app"),
   updateJiraConfig: (body: Partial<JiraConfig>) =>
     request<void>("/api/integrations/jira/config", {
       method: "PUT",
@@ -3081,6 +3083,24 @@ export interface JiraConfig {
   add_comment_url: string;
   site_url: string;
   projects: JiraProject[];
+}
+
+/** A Jira site running an older Coderhelm app than the latest release. */
+export interface JiraAppUpdate {
+  /** The version the site runs; empty when its app is too old to say. */
+  version: string;
+  /** The latest released version; empty when it couldn't be read. */
+  latest: string;
+  /** What the site's version lacks ("threaded replies", ...). */
+  missing: string[];
+  /** The site's Manage apps page, where its admin accepts the update. */
+  manage_url: string;
+  /** When the site was last heard from. */
+  seen_at: string;
+  /** The Integrations page's notice. */
+  message: string;
+  /** The run page's line, for a ticket from that site. */
+  run_note: string;
 }
 
 export interface JiraProject {
