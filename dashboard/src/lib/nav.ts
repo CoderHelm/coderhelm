@@ -87,7 +87,16 @@ export const NAV_SECTIONS: NavSection[] = [
     countKey: "securityUrgent",
   },
   { key: "chat", label: "Chat", icon: "chat", pages: [{ href: "/chat", label: "Chat", need: "brain_read" }] },
-  { key: "knowledge", label: "Knowledge", icon: "knowledge", pages: [{ href: KNOWLEDGE_HREF, label: "Knowledge", need: "brain_read" }] },
+  {
+    key: "knowledge",
+    label: "Knowledge",
+    icon: "knowledge",
+    pages: [
+      { href: KNOWLEDGE_HREF, label: "Knowledge", need: "brain_read" },
+      // Anyone on the team may connect an AI tool as themselves.
+      { href: "/connect", label: "AI tools" },
+    ],
+  },
   {
     // Packages a team installs; hidden until the team's plugins flag is on.
     key: "plugins",
