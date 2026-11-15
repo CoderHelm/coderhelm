@@ -34,6 +34,9 @@ test('no page draws a diagram in a code fence or puts an arrow glyph in prose', 
     const rel = path.relative(ROOT, file).split(path.sep).join('/');
     for (const p of proseProblems(fs.readFileSync(file, 'utf8'), { file: rel, allow: ALLOW })) found.push(`${rel}:${p.line} ${p.rule}: ${p.text}`);
   }
+  // The release notes at the top of the changelog (scripts/import-platform.mjs).
+  const notes = path.join(ROOT, 'content/release-notes.md');
+  for (const p of proseProblems(fs.readFileSync(notes, 'utf8'), { file: 'content/release-notes.md', allow: ALLOW })) found.push(`content/release-notes.md:${p.line} ${p.rule}: ${p.text}`);
   assert.deepEqual(found, [], `use <Diagram> for pictures and words for menu paths ("Settings, then Team"):\n${found.join('\n')}`);
 });
 

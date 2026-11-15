@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { INSTALL_GUIDE_LINK, UNINSTALL_GUIDE_LINK, importedName, convertGuide, guideOrder, selfHostLead, sitePages, sortByOrder } from './import-platform.mjs';
+import { INSTALL_GUIDE_LINK, UNINSTALL_GUIDE_LINK, importedName, convertGuide, guideOrder, releaseNotes, selfHostLead, sitePages, sortByOrder, stableTags } from './import-platform.mjs';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const REF = '0123456789abcdef0123456789abcdef01234567';
 
@@ -47,4 +50,24 @@ test("the site's own self-host pages follow the install guide in the sidebar", (
   // The platform's uninstall guide sits next to the guided page, which keeps /self-host/uninstall/.
   assert.equal(importedName('uninstall'), 'uninstall-details');
   assert.equal(importedName('faq'), 'faq');
+});
+
+test('release notes lose their leading comment and keep every release heading', () => {
+  assert.equal(releaseNotes('<!--\nhow to write these\n-->\n\n## Nov 15: A\n\n- one\n'), '## Nov 15: A\n\n- one');
+  assert.equal(releaseNotes(''), '');
+  const file = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'content/release-notes.md');
+  const notes = releaseNotes(fs.readFileSync(file, 'utf8'));
+  assert.ok(!notes.includes('<!--'), 'no HTML comment reaches the MDX page');
+  assert.match(notes, /^## /, 'the notes start with a release heading');
+  assert.ok(!/[<>{}]/.test(notes.replace(/`[^`]*`/g, '')), 'no raw MDX syntax outside code');
+});
+
+test('only stable self-host releases are listed, never the beta builds', () => {
+  const tags = [
+    { name: 'v0.8.121-beta.20261115' },
+    { name: 'v0.8.111' },
+    { name: 'v0.8.98' },
+    { name: 'nightly' },
+  ];
+  assert.deepEqual(stableTags(tags).map((t) => t.name), ['v0.8.111', 'v0.8.98']);
 });

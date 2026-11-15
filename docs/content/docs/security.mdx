@@ -9,6 +9,10 @@ This page is about how CoderHelm protects your code and data. For how CoderHelm 
 
 This page is for anyone deciding whether to trust CoderHelm. It says how each part is protected. For the full detail of a self-hosted install, read the [security model](/self-host/security) and [how updates are kept safe](/self-host/updates-security).
 
+## Team isolation
+
+Every path an event takes, from webhooks and live updates to queues, notifications, knowledge, caches and lookups, is keyed by its team, so one team's data never reaches another. Each path is covered by a test that fails if it is shared again.
+
 ## Install identity and request signing
 
 A self-hosted install that uses any part of CoderHelm (its address, GitHub App, Jira app, email or support) registers once and gets its own secret. CoderHelm derives that secret from a master key it keeps to itself, so it's never stored anywhere as a list of secrets, and one key change revokes every install's secret at once.

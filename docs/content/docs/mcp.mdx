@@ -3,7 +3,7 @@ title: Claude, Cursor and VS Code
 description: Add CoderHelm to Claude, Cursor, VS Code or any other MCP app, sign in once, and see runs, start and retry them, read or ask for reviews, and search your team's knowledge from where you already work.
 ---
 
-CoderHelm is an MCP server. Add it to an AI app that supports remote MCP servers, sign in with your CoderHelm account, and the app can see your team's runs and reviews, start work from a ticket, retry a run that stopped, ask the reviewer to look at a pull request, and search the knowledge bases you can read in Chat.
+CoderHelm is an MCP server. Add it to an AI app that supports remote MCP servers, sign in with your CoderHelm account, and the app can see your team's runs and reviews, start work from a ticket, retry a run that stopped, ask the reviewer to look at a pull request, and look up what your team knows the way Chat does: code, tickets, pull requests, runs, findings, AWS resources and your knowledge bases.
 
 The app acts as you. It can do only what your role in CoderHelm allows, in the team you choose when you sign in.
 
@@ -14,7 +14,7 @@ The app acts as you. It can do only what your role in CoderHelm allows, in the t
 | CoderHelm cloud | `https://api.coderhelm.com/mcp` |
 | Your own AWS account | `https://<your CoderHelm address>/mcp`, for example `https://coderhelm.example.com/mcp` |
 
-The same address is on **Settings**, **Connected AI apps** in CoderHelm, with a copy button.
+The same address is on the **AI tools** page in CoderHelm (beside **Knowledge**), with a copy button, a one step setup for each tool, example questions, the scopes the server offers and the tools you connected.
 
 ## Add it to your app
 
@@ -125,7 +125,7 @@ A Jira ticket reaches CoderHelm from Jira, so `start_run` with a Jira key works 
 - **Changes end access.** If you leave the team, your role changes or your two-factor sign-in is reset, the app stops working until you connect it again.
 - **Short-lived access.** The app's access lasts an hour and is renewed while you use it. A renewal that is used twice ends the connection.
 - **Every call is in the log.** Each call an app makes is written to your team's log of access changes before it runs, with the app's name.
-- **Remove it any time.** **Settings**, **Connected AI apps** lists the apps you connected. **Remove** stops an app at once, everywhere it's signed in. Admins see and remove everyone's.
+- **Remove it any time.** **AI tools**, and **Settings**, **Connected AI apps**, list the apps you connected. **Remove** stops an app at once, everywhere it's signed in. Admins see and remove everyone's.
 
 ## For app builders
 

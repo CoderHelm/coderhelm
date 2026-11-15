@@ -21,6 +21,8 @@ Every other finding is a labeled note on the approval:
 | **Suggestion** | An optional improvement, hardening, a refactor, a missing test, or a written team rule the change doesn't follow with no defect shown |
 | **FYI** | A question, a fact worth confirming, or a concern nothing in the change could show |
 
+A possible break of the change's main path, such as a new request path the pull request's own checks never exercised, is never just a suggestion: it blocks until something shows it works.
+
 A request for changes lasts only while what it names does: once those threads are fixed or answered, the next review approves.
 
 ## Turn it on
@@ -70,6 +72,12 @@ Open **Settings** on the **Reviewer** page. **Settings for** at the top picks wh
 | Release notes | Where notes are written: GitHub, a Confluence page, a webhook; a writing guide |
 | Review reminders | Remind people in Slack or Teams |
 | Stale pull requests | Their own tab under **Code review**: **Stale PRs**. See [Stale pull requests](/getting-started/stale-pull-requests) |
+
+## Which model writes reviews
+
+By default a review is written on a lighter model that was measured against the strongest one on the same reviews, and the strongest model then checks it before anything is posted. The part of the review's instructions that is the same for every pull request in a repository (instruction files, team rules and lessons) is cached, so each review pays for it once.
+
+A team that wants every review written on the strongest model sets `review_model_route` to `strongest` in its model settings. The dashboard has no switch for it yet: an admin saves the settings with `PUT /api/settings/model-provider`, sending the team's `primary_model` and `heavy_model` with it. `measured_light` is the default and puts it back, and a save that leaves the field out keeps what was set.
 
 ## Auto-merge is careful
 
