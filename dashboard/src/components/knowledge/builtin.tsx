@@ -71,7 +71,7 @@ export function BuiltinBases() {
         </div>
       </div>
       {list.can_manage && <ReadersToggle enabled={list.readers.enabled} onChange={(enabled) => setList((l) => (l ? { ...l, readers: { enabled } } : l))} />}
-      <ul className="mt-4 grid min-w-0 items-start gap-4 md:grid-cols-2" aria-label="Built-in bases">
+      <ul className="mt-4 grid min-w-0 items-start gap-4 lg:grid-cols-2" aria-label="Built-in bases">
         {list.bases.map((b) => (
           <BuiltinCard key={b.key} b={b} canManage={list.can_manage} onChange={replace} />
         ))}
@@ -132,13 +132,13 @@ function BuiltinCard({ b, canManage, onChange }: { b: BuiltinBase; canManage: bo
         <p className="mt-1 text-sm text-zinc-400" data-testid="builtin-fresh">
           {fresh}
         </p>
-        <dl className="mt-4 grid gap-x-3 gap-y-1.5 text-sm sm:grid-cols-[max-content_1fr]">
+        <dl className="mt-4 grid gap-y-0.5 text-sm">
           <dt className="text-zinc-400">Who reads it</dt>
-          <dd className="min-w-0 text-zinc-200" data-testid="builtin-audience">
+          <dd className="mb-2 min-w-0 text-zinc-200 wrap-anywhere" data-testid="builtin-audience">
             {b.audience.paused ? "Paused: nobody reads it" : b.audience_label}
           </dd>
           <dt className="text-zinc-400">You</dt>
-          <dd className="min-w-0" data-testid="builtin-access">
+          <dd className="min-w-0 wrap-anywhere" data-testid="builtin-access">
             {b.access.open ? (
               <span className="text-emerald-300">Open to you</span>
             ) : (

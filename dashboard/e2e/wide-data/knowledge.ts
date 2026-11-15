@@ -254,8 +254,45 @@ const BEDROCK_SYNC = {
   role_update: null,
 };
 
+// The built-in bases and a shared search, with the longest names they get.
+const WIDE_RESULT = { id: `chk1.code.code.${TOKEN}`, title: FILE, url: LONG_URL, base: "Code", kind: "code", snippet: `${SENTENCE} ${TOKEN}`, updated_at: iso(14) };
+const builtin = (key: string, name: string, open: boolean) => ({
+  key,
+  name,
+  about: `${SENTENCE} ${TOKEN}`,
+  scope: `${key}:read`,
+  builtin: true,
+  counts: [{ label: TITLE, count: 1_284_331 }, { label: "files", count: 18_340 }],
+  total: 1_302_671,
+  live: key === "code",
+  updated_at: iso(14),
+  access: { open, why: open ? null : `${name} is open to ${EMAIL} and admins. ${SENTENCE}` },
+  audience: { roles: ["admin"], people: [EMAIL], readers: false, paused: false },
+  audience_label: `Admins and ${EMAIL}`,
+  mirroring: `Code shows only for repositories your GitHub account can read. ${TOKEN}`,
+});
+
 export const knowledgeData: Handler = ({ method, path }) => {
   if (method !== "GET") return undefined;
+  if (path === "/api/knowledge/builtin")
+    return {
+      bases: [builtin("code", "Code", true), builtin("work", "Work", true), builtin("infra", "Infrastructure", false), builtin("logs", "Logs", true), builtin("security", "Security", false), builtin("team", "Knowledge", true)],
+      readers: { enabled: true },
+      can_manage: true,
+    };
+  if (path.startsWith("/api/share/"))
+    return {
+      id: "sh_wide",
+      base: "code",
+      base_name: "Code",
+      query: `${TITLE} ${TOKEN}`,
+      created_by: EMAIL,
+      expires_at: iso(-7 * 24 * 60),
+      open: true,
+      why: null,
+      results: [WIDE_RESULT, { ...WIDE_RESULT, id: "chk1.code.code.2", title: TOKEN }],
+      withheld: { count: 3, by_base: { Code: 3 }, kinds_not_open_to_you: [], reason: "access" },
+    };
   if (path === "/api/knowledge") return { bases: [BASE, { ...BASE, id: "kb_wide_2", name: TOKEN, sources: [], kinds: ["upload"], synced: 0, uploads: 1, description: "" }], can_manage: true, limits: LIMITS };
   if (path === "/api/knowledge/connectors") return { connectors: CONNECTORS, visibility_note: `Everyone who can read this knowledge base can read what you add. ${SENTENCE}` };
   if (path.startsWith("/api/knowledge/connectors/")) {
