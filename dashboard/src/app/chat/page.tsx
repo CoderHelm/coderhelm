@@ -68,6 +68,8 @@ interface LiveAnswer {
   error?: string;
   /** The asker pressed Stop. */
   stopped?: boolean;
+  /** When the question was sent (ms): the time so far counts from here, whatever remounts. */
+  startedAt: number;
 }
 
 const ATTACH_LIMIT = { max_file_bytes: 10 * 1024 * 1024, extensions: ["pdf", "docx", "md", "markdown", "txt", "text", "csv", "xlsx", "html", "htm"] };
@@ -158,6 +160,12 @@ function Chat() {
   // The app sidebar's chat menu, where the chat list lives (one column of navigation).
   const navSlot = useChatNavSlot();
   const abortRef = useRef<AbortController | null>(null);
+  /**
+   * The answer this page shows. Opening another chat mid-answer lets the
+   * answer finish (it is saved with its chat) but stops showing it, and its
+   * end no longer moves the address back.
+   */
+  const attached = useRef(0);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -222,7 +230,10 @@ function Chat() {
       focusBox();
       return;
     }
-    if (live && !live.answer.done) return;
+    if (live && !live.answer.done) {
+      attached.current += 1;
+      setLive(null);
+    }
     let on = true;
     setLoadingThread(!thread || thread.id !== threadId);
     brainApi
@@ -294,14 +305,19 @@ function Chat() {
     setMentions([]);
     const attachments = files.filter((f) => f.status === "ready" && f.id).map((f) => ({ id: f.id!, name: f.name }));
     setFiles([]);
-    const answer: LiveAnswer = { text: "", steps: [], citations: [], known: [], grounded: true, done: false };
+    const answer: LiveAnswer = { text: "", steps: [], citations: [], known: [], grounded: true, done: false, startedAt: Date.now() };
+    const token = ++attached.current;
     setLive({ question, mentions: pointedAt, answer });
     // Sending goes to the end once; from there the answer is followed while the reader stays.
     follow.toLatest();
     const ctrl = new AbortController();
     abortRef.current = ctrl;
     let newId = thread?.id ?? "";
-    const update = (fn: (a: LiveAnswer) => LiveAnswer) => setLive((l) => (l ? { ...l, answer: fn(l.answer) } : l));
+    // An answer that broke stays on screen with what it got and why; the saved chat isn't fetched over it.
+    let broke = false;
+    const update = (fn: (a: LiveAnswer) => LiveAnswer) => {
+      if (attached.current === token) setLive((l) => (l ? { ...l, answer: fn(l.answer) } : l));
+    };
     try {
       await askBrain(
         { thread_id: thread?.id, question, mentions: pointedAt, attachments },
@@ -336,6 +352,7 @@ function Chat() {
               update((a) => ({ ...a, text: e.text, citations: e.citations, grounded: e.grounded }));
               break;
             case "error":
+              broke = true;
               update((a) => ({ ...a, error: e.message }));
               break;
             case "done":
@@ -346,11 +363,16 @@ function Chat() {
         ctrl.signal,
       );
     } catch (e) {
-      if (!ctrl.signal.aborted) update((a) => ({ ...a, error: e instanceof Error ? e.message : "No answer came back. Check your connection and ask again.", done: true }));
+      if (!ctrl.signal.aborted) {
+        broke = true;
+        update((a) => ({ ...a, error: e instanceof Error ? e.message : "No answer came back. Check your connection and ask again.", done: true }));
+      }
     }
     const stopped = ctrl.signal.aborted;
     update((a) => ({ ...a, done: true, stopped }));
     loadThreads();
+    // Another chat was opened meanwhile: this one is saved; leave the page where the reader is.
+    if (attached.current !== token) return;
     if (!newId) return;
     const created = !sameThread(newId, threadId);
     // The new chat's address, or the thread's own spelling of its id: in place, never a navigation.
@@ -363,10 +385,11 @@ function Chat() {
       ownUrl.current = newId;
       chatUrl(newId, "replace");
     }
-    if (stopped && !created) return;
+    if ((stopped || broke) && !created) return;
     brainApi
       .thread(newId)
       .then((r) => {
+        if (attached.current !== token) return;
         setThread(r.thread);
         setMessages(r.messages);
         if (created) {
@@ -382,12 +405,13 @@ function Chat() {
   const stop = () => abortRef.current?.abort();
 
   const startNew = useCallback(() => {
-    if (busy) abortRef.current?.abort();
+    // The answer coming in finishes and is saved with its chat; this page moves on.
+    attached.current += 1;
     setSheetOpen(false);
     setLive(null);
     chatUrl("", "push");
     focusBox();
-  }, [busy, focusBox]);
+  }, [focusBox]);
 
   // ⌘/ (Ctrl+/ elsewhere): a new chat, from anywhere on the page.
   useEffect(() => {
@@ -646,7 +670,7 @@ function Chat() {
         text={m.content}
         citations={m.citations}
         grounded={m.grounded}
-        steps={(m.used ?? []).map((u, j) => ({ id: `${m.seq}-${j}`, label: u.label, name: u.name, repo: u.repo, summary: u.summary, status: "success" as const }))}
+        steps={(m.used ?? []).map((u, j) => ({ id: `${m.seq}-${j}`, label: u.label, name: u.name, repo: u.repo, summary: u.summary, status: u.status === "error" ? ("error" as const) : ("success" as const) }))}
         rating={m.seq in ratings ? ratings[m.seq] : m.feedback ?? null}
         onRate={mine ? (r) => rate(m.seq, r) : undefined}
         onRetry={mayAsk && mine && m.seq === lastAnswerSeq && !busy ? () => retry(m.seq) : undefined}
@@ -656,9 +680,30 @@ function Chat() {
   if (live) {
     const q = messages.length;
     turns.push(<Question key={`${convo}-${q}`} anchor={`turn-${q}`} text={live.question} attachments={[]} mentions={live.mentions.map(mentionName)} />);
+    const a = live.answer;
+    const retryLive = mayAsk && !busy ? () => ask(live.question, live.mentions) : undefined;
+    const broke = a.error ? (
+      <div className="mt-3">
+        <Callout
+          variant="error"
+          title={a.error}
+          testId="answer-error"
+          actions={
+            retryLive ? (
+              <button type="button" className={smallSecondaryButton} onClick={retryLive} data-testid="answer-error-retry">
+                Ask again
+              </button>
+            ) : undefined
+          }
+        />
+      </div>
+    ) : null;
     turns.push(
-      live.answer.error ? (
-        <Callout key={`${convo}-${q + 1}-error`} variant="error" title={live.answer.error} />
+      // An error with nothing read or written yet is the error alone; after some steps or text, those stay and the error follows.
+      a.error && !a.text && a.steps.length === 0 ? (
+        <div key={`${convo}-${q + 1}-error`} className="mt-5">
+          {broke}
+        </div>
       ) : live.answer.stopped && !live.answer.text ? (
         <p key={`${convo}-${q + 1}-stopped`} className="text-sm text-zinc-500" data-testid="answer-stopped">
           You stopped this answer. Ask again when you&apos;re ready.
@@ -672,6 +717,15 @@ function Chat() {
           grounded={live.answer.grounded}
           streaming={!live.answer.done}
           steps={live.answer.steps}
+          startedAt={live.answer.startedAt}
+          after={
+            broke ??
+            (a.stopped && a.done ? (
+              <p className="mt-3 text-sm text-zinc-500" data-testid="answer-stopped">
+                You stopped this answer.
+              </p>
+            ) : null)
+          }
         />
       ),
     );
