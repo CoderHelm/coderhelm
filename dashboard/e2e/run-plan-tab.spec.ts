@@ -118,6 +118,16 @@ test.describe("the run's Plan tab", () => {
     await expect(page.getByTestId("run-tab-overview")).toBeVisible();
   });
 
+  test("on a run still planning, clicking Overview opens the Overview (not the plan again)", async ({ page }) => {
+    await mockApi(page, PLAN, aRun({ status: "running", current_pass: "plan", pr_url: null, files_modified: [] }));
+    await page.goto("/runs/detail?id=01RUNP");
+    await expect(page.getByTestId("run-tab-plan")).toBeVisible();
+    await page.getByRole("link", { name: "Overview", exact: true }).click();
+    await expect(page).toHaveURL(/tab=overview/);
+    await expect(page.getByTestId("run-tab-overview")).toBeVisible();
+    await expect(page.getByTestId("run-tab-plan")).toHaveCount(0);
+  });
+
   test("a run with no plan has no Plan tab, and a link to it shows the Overview", async ({ page }) => {
     await mockApi(page, null);
     await page.goto("/runs/detail?id=01RUNP&tab=plan");
