@@ -15,6 +15,7 @@ import { linkButton } from "@/components/ui";
 import {
   CONFIDENCE_LOOK,
   FIX_LOOK,
+  isClosed,
   howWords,
   locationHref,
   locationWords,
@@ -109,7 +110,7 @@ export function dayWords(day: string): string {
 export function showFromTo(f: InfraFinding): boolean {
   const to = f.fix.to?.trim() ?? "";
   if (!to) return false;
-  if (f.fix.kind === "runbook" && f.sources.some((s) => s.kind === "maintenance" && s.id.split(":").includes(to))) return false;
+  if ((f.fix.kind === "runbook" || f.fix.kind === "apply") && f.sources.some((s) => s.kind === "maintenance" && s.id.split(":").includes(to))) return false;
   return to !== f.fix.summary && !/^(system-update|db-upgrade|os-patch|service-update|service-software)$/.test(to);
 }
 
@@ -374,13 +375,63 @@ export function PrNotesBlocks({ n }: { n: InfraPrNotes }) {
   );
 }
 
+/** What Coderhelm applies after an approval, and what AWS answered. */
+function ApplyBlock({ f }: { f: InfraFinding }) {
+  const plan = f.fix.apply;
+  if (!plan) return null;
+  const a = f.apply;
+  return (
+    <DetailBlock title="What Coderhelm applies">
+      <p className="max-w-prose text-sm leading-relaxed text-zinc-300 [overflow-wrap:anywhere]" data-testid="apply-plan">
+        <Code>{plan.action}</Code> through AWS&apos;s apply-pending-maintenance-action, on {plan.arns.length} resource{plan.arns.length === 1 ? "" : "s"}, in the next
+        maintenance window unless you pick now. {plan.effect}
+      </p>
+      {a?.approved_at && (
+        <p className="mt-1 text-xs text-zinc-400" data-testid="apply-approved">
+          Approved by {a.approved_by || "an admin"} <Time iso={a.approved_at} />
+          {a.opt_in === "immediate" ? ", to apply now" : ", for the next maintenance window"}.
+          {a.applied_at ? (
+            <>
+              {" "}
+              AWS accepted it <Time iso={a.applied_at} />.
+            </>
+          ) : null}
+        </p>
+      )}
+      {a?.missing_permission && (
+        <p className="mt-1 text-xs text-amber-300" data-testid="apply-missing-permission">
+          The role in this account lacks <Code>{a.missing_permission}</Code>. Turn ApplyMaintenance on in the role&apos;s update stack, or follow the runbook below.
+        </p>
+      )}
+    </DetailBlock>
+  );
+}
+
 /** What opens under a finding's row. */
 export function FindingDetails({ f }: { f: InfraFinding }) {
   const fix = f.fix;
-  const rb = fix.kind === "runbook" ? (fix.runbook ?? null) : null;
-  const order = fix.order ?? [];
+  const done = isClosed(f);
+  // A runbook is shown for a runbook fix, and behind an apply only when the
+  // role may not apply it. A closed finding shows no steps at all.
+  const rb = !done && (fix.kind === "runbook" || (fix.kind === "apply" && !!f.apply?.missing_permission)) ? (fix.runbook ?? null) : null;
+  const order = done ? [] : (fix.order ?? []);
   return (
     <>
+      {done && (
+        <DetailBlock title={f.status === "removed" ? "Removed" : "Fixed"}>
+          <p className="max-w-prose text-sm leading-relaxed text-zinc-300" data-testid="closed-why">
+            {f.status === "removed" ? (
+              <>
+                A full read of the account <Time iso={f.removed_at ?? f.fixed_at} /> no longer lists this resource. Nothing to do.
+              </>
+            ) : (
+              <>
+                The read of the account <Time iso={f.fixed_at} /> shows the fix running. Nothing to do.
+              </>
+            )}
+          </p>
+        </DetailBlock>
+      )}
       {fix.kind === "aws" ? (
         <DetailBlock title="Why there's nothing to do">
           <p className="max-w-prose text-sm leading-relaxed text-zinc-300">{fix.reason || "AWS patches this service itself."}</p>
@@ -397,8 +448,9 @@ export function FindingDetails({ f }: { f: InfraFinding }) {
           )}
         </DetailBlock>
       )}
-      {fix.kind !== "aws" && fix.decision && (
-        <DetailBlock title={fix.kind === "pr" ? "Why a pull request" : "Why a runbook"}>
+      {!done && fix.kind === "apply" && <ApplyBlock f={f} />}
+      {!done && fix.kind !== "aws" && fix.decision && (
+        <DetailBlock title={fix.kind === "pr" ? "Why a pull request" : fix.kind === "apply" ? "Why Coderhelm applies it" : "Why a runbook"}>
           <p className="max-w-prose text-sm leading-relaxed text-zinc-300 [overflow-wrap:anywhere]" data-testid="fix-decision">
             <Ticks text={fix.decision} />
           </p>
@@ -436,9 +488,9 @@ export function FindingDetails({ f }: { f: InfraFinding }) {
         </DetailBlock>
       )}
       {fix.kind !== "aws" && <LocationBlock fix={fix} />}
-      {fix.kind === "pr" && fix.notes && <PrNotesBlocks n={fix.notes} />}
+      {!done && fix.kind === "pr" && fix.notes && <PrNotesBlocks n={fix.notes} />}
       {rb && <RunbookBlocks rb={rb} />}
-      {!rb && fix.kind !== "aws" && fix.cli.length > 0 && (
+      {!done && !rb && fix.kind !== "aws" && fix.kind !== "apply" && fix.cli.length > 0 && (
         <DetailBlock title={fix.kind === "runbook" ? "Run this in AWS" : "Then roll it out"}>
           <div className="min-w-0 max-w-full" data-testid="runbook-cli">
             <CodeBlock code={fix.cli.join("\n")} lang="bash" wrap />
@@ -446,14 +498,14 @@ export function FindingDetails({ f }: { f: InfraFinding }) {
           {fix.kind === "runbook" && <p className="mt-1 text-xs text-zinc-400">Coderhelm never runs this. A person with access to the account does.</p>}
         </DetailBlock>
       )}
-      {!rb && fix.kind === "runbook" && fix.console && (
+      {!done && !rb && fix.kind === "runbook" && fix.console && (
         <DetailBlock title="In the AWS console">
           <p className="text-sm text-zinc-300 [overflow-wrap:anywhere]">
             <Ticks text={fix.console} />
           </p>
         </DetailBlock>
       )}
-      {!rb && fix.apply_by && (
+      {!done && !rb && fix.apply_by && (
         <DetailBlock title="AWS's date">
           <p className="text-sm text-zinc-300" data-testid="apply-by">
             Apply by {dayWords(fix.apply_by)}. AWS applies it itself after that, in the maintenance window.
@@ -494,7 +546,8 @@ export function FindingDetails({ f }: { f: InfraFinding }) {
           <ExposureText exposure={f.exposure} />
         </p>
         <p className="mt-1 text-xs text-zinc-400">
-          First seen <Time iso={f.first_seen_at} />. It closes when Coderhelm reads the account again and sees the fix running.
+          First seen <Time iso={f.first_seen_at} />.
+          {done ? "" : " It closes when Coderhelm reads the account again and sees the fix running, or the resource gone."}
         </p>
       </DetailBlock>
     </>
