@@ -216,6 +216,8 @@ export interface BrainThread {
 export interface UsedStep {
   kind: string;
   label: string;
+  /** "error" when the lookup failed; left out when it worked. */
+  status?: "error";
   name?: string;
   repo?: string;
   summary?: string;
@@ -438,13 +440,67 @@ export function activitySummary(steps: { name?: string; label: string; repo?: st
   if (count(isSearch)) parts.push("searched the code");
   if (count((n) => n === "search_knowledge")) parts.push("searched knowledge");
   if (count((n) => n === "search_memories")) parts.push("checked past work");
-  const known = (n: string) => isRead(n) || isOverview(n) || isSearch(n) || n === "search_knowledge" || n === "search_memories" || n === "github__list_repos";
+  // The team's records, by what was looked up: "looked up tickets, pull requests and runs".
+  const work = [...new Set(done.map((s) => WORK_NOUN[s.name ?? ""]).filter(Boolean))];
+  if (work.length) parts.push(`looked up ${andList(work)}`);
+  const known = (n: string) => isRead(n) || isOverview(n) || isSearch(n) || n === "search_knowledge" || n === "search_memories" || n === "github__list_repos" || n in WORK_NOUN;
   const other = done.filter((s) => !known(s.name ?? "") && !s.label.startsWith("Looked further"));
   if (other.length === 1) parts.push(other[0].label.charAt(0).toLowerCase() + other[0].label.slice(1));
   else if (other.length > 1) parts.push(`${other.length} other lookups`);
   if (!parts.length) return done.length === 1 ? done[0].label : `${done.length} steps`;
   const text = parts.join(", ");
   return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/** What each work lookup reads, in the summary's words. */
+const WORK_NOUN: Record<string, string> = {
+  work_tickets: "tickets",
+  work_pull_requests: "pull requests",
+  work_runs: "runs",
+  work_findings: "findings",
+  work_records: "records",
+};
+
+/** "a", "a and b", "a, b and c". */
+function andList(words: string[]): string {
+  return words.length <= 1 ? words.join("") : `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}`;
+}
+
+/** Where a step looked, for grouping the steps: its key and its name ("Runs", "Code"). */
+export function stepSource(name?: string): { key: string; label: string } {
+  const n = name ?? "";
+  if (n.startsWith("github__") || n.startsWith("graph_")) return { key: "code", label: "Code" };
+  if (n === "search_knowledge") return { key: "knowledge", label: "Knowledge" };
+  if (n === "search_memories") return { key: "memories", label: "Past work" };
+  if (WORK_NOUN[n]) {
+    const w = WORK_NOUN[n];
+    return { key: n, label: w.charAt(0).toUpperCase() + w.slice(1) };
+  }
+  // A connected app's tool (`notion__search`): grouped by its app.
+  const app = n.includes("__") ? n.split("__")[0] : "";
+  return app ? { key: `app:${app}`, label: app.charAt(0).toUpperCase() + app.slice(1) } : { key: "other", label: "Other" };
+}
+
+/**
+ * The sources an answer couldn't read at all: every lookup of them failed
+ * ("runs"). A failed lookup that another lookup of the same source made up
+ * for isn't listed: it didn't change the answer.
+ */
+export function unavailableSources(steps: { name?: string; status?: string }[]): string[] {
+  const by = new Map<string, { label: string; ok: boolean }>();
+  for (const s of steps) {
+    if (s.status === "running" || !s.name) continue;
+    const src = stepSource(s.name);
+    const was = by.get(src.key);
+    by.set(src.key, { label: src.label, ok: (was?.ok ?? false) || s.status !== "error" });
+  }
+  return [...by.values()].filter((v) => !v.ok).map((v) => v.label.toLowerCase());
+}
+
+/** "runs couldn't be read", "tickets and runs couldn't be read". */
+export function unavailableNote(steps: { name?: string; status?: string }[]): string {
+  const gone = unavailableSources(steps);
+  return gone.length ? `${andList(gone)} couldn't be read` : "";
 }
 
 /** An answer's text without its `[S1]` markers, for copying. */

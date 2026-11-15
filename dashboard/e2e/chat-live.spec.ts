@@ -21,6 +21,8 @@ interface Backend {
   turns: Record<string, number>;
   /** Exchanges saved by asks in this test, after the ones above. */
   added: Record<string, { question: string; answer: string }[]>;
+  /** The steps saved with each thread's last answer. */
+  used: Record<string, unknown[]>;
 }
 
 const thread = (id: string, title: string) => ({
@@ -34,14 +36,14 @@ const thread = (id: string, title: string) => ({
   messages: 2,
 });
 
-function exchange(turns: number, added: { question: string; answer: string }[] = []) {
+function exchange(turns: number, added: { question: string; answer: string }[] = [], used: unknown[] = []) {
   const all = [
     ...Array.from({ length: turns }, (_, i) => ({ question: `Question ${i + 1}: how do deploys work?`, answer: longAnswer(i + 1) })),
     ...added,
   ];
   return all.flatMap((t, i) => [
     { seq: i * 2, role: "user", content: t.question, citations: [], grounded: true, sources: NONE, mentions: [], attachments: [], used: [], at: iso(30) },
-    { seq: i * 2 + 1, role: "assistant", content: t.answer, citations: [], grounded: true, attachments: [], used: [], at: iso(30) },
+    { seq: i * 2 + 1, role: "assistant", content: t.answer, citations: [], grounded: true, attachments: [], used: i === all.length - 1 ? used : [], at: iso(30) },
   ]);
 }
 
@@ -54,6 +56,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     ],
     turns: { th_long: 8, th_old: 1, TH_CASE: 1 },
     added: {},
+    used: {},
     ...init,
   };
   const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
@@ -74,7 +77,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
       // The API finds a thread whatever the case of its id, and answers with its own spelling.
       const t = db.threads.find((x) => x.id.toLowerCase() === decodeURIComponent(one[1]).toLowerCase());
       if (!t) return json(route, { error: "No such thread." }, 404);
-      return json(route, { thread: thread(t.id, t.title), messages: exchange(db.turns[t.id] ?? 0, db.added[t.id]), can_ask: true });
+      return json(route, { thread: thread(t.id, t.title), messages: exchange(db.turns[t.id] ?? 0, db.added[t.id], db.used[t.id]), can_ask: true });
     }
     return json(route, { error: `Not mocked: ${method} ${p}` }, 404);
   });
@@ -418,3 +421,192 @@ test.describe("chat never reloads on its own", () => {
     await expect(box(page)).toHaveValue("A half-written question about rollbacks");
   });
 });
+
+// What Chat did while it answers, and what it says when something didn't work.
+// A failed lookup Chat recovered from is a quiet row, never a red one; a source
+// that couldn't be read at all is named on the one line, once the answer is
+// done. The steps fold when the answer starts, so the text doesn't move.
+type Feed = Awaited<ReturnType<typeof feed>>;
+const step = async (f: Feed, id: string, name: string, label: string, status: "success" | "error", summary: string) => {
+  await f.push("tool_start", { id, name, kind: "work" });
+  await f.push("tool_result", { id, name, label, kind: "work", status, summary, sources: [] });
+};
+/** The lookups from a real question: runs couldn't be read at all, one pull request search failed but another worked. */
+async function workSteps(f: Feed) {
+  await step(f, "t1", "work_tickets", "Looked up tickets for “fix(deps): security updates for api”", "success", "No tickets matched");
+  await step(f, "t2", "work_runs", "Looked up runs", "error", "Couldn't read");
+  await step(f, "t3", "work_runs", "Looked up runs", "error", "Couldn't read");
+  await step(f, "t4", "work_pull_requests", "Looked up pull requests for “security updates for api”", "error", "Couldn't read");
+  await step(f, "t5", "work_pull_requests", "Looked up pull requests for “#609”", "success", "1 pull requests");
+}
+
+for (const size of [
+  { name: "desktop", width: 1280, height: 800 },
+  { name: "phone", width: 390, height: 844 },
+]) {
+  test.describe(`chat steps (${size.name})`, () => {
+    test.use({ viewport: { width: size.width, height: size.height } });
+    let db: Backend;
+    test.beforeEach(async ({ page }) => {
+      db = await mockApi(page);
+    });
+    /** What the saved answer comes back with once it's done. */
+    const saves = (answer: string, used: unknown[]) => {
+      db.added.th_old = [{ question: "q", answer }];
+      db.used.th_old = used;
+    };
+    const SAVED_WORK = [
+      { kind: "work", name: "work_tickets", label: "Looked up tickets for “fix(deps): security updates for api”", summary: "No tickets matched" },
+      { kind: "work", name: "work_runs", label: "Looked up runs", summary: "Couldn't read", status: "error" },
+      { kind: "work", name: "work_runs", label: "Looked up runs", summary: "Couldn't read", status: "error" },
+      { kind: "work", name: "work_pull_requests", label: "Looked up pull requests for “security updates for api”", summary: "Couldn't read", status: "error" },
+      { kind: "work", name: "work_pull_requests", label: "Looked up pull requests for “#609”", summary: "1 pull requests" },
+    ];
+
+    test("a failed lookup is a quiet row; only a source that couldn't be read at all is named", async ({ page }) => {
+      await page.goto("/chat?thread=th_old");
+      await expect(page.getByTestId("answer")).toHaveCount(1);
+      await box(page).fill("What's the latest on the security update?");
+      await box(page).press("Enter");
+      const f = await feed(page, 1);
+      await f.push("thread", { id: "th_old", title: "Which services call the billing API?" });
+      await workSteps(f);
+      const answer = page.getByTestId("answer").last();
+      // While it works: no red, no "didn't work".
+      await expect(answer.getByTestId("tool-step")).toHaveCount(4);
+      await expect(answer.getByTestId("tool-step").filter({ hasText: "×2" })).toHaveCount(1);
+      await expect(answer).not.toContainText("didn't work");
+      await f.text("PR #609 is open; Coderhelm's runs couldn't be read just now.");
+      saves("PR #609 is open; Coderhelm's runs couldn't be read just now.", SAVED_WORK);
+      await f.push("done", {});
+      await f.end();
+      await expect(answer.getByTestId("activity-summary")).toHaveText("Looked up tickets, runs and pull requests");
+      await expect(answer.getByTestId("activity-unavailable")).toHaveText("· runs couldn't be read");
+      await answer.getByTestId("activity-toggle").click();
+      // Grouped by where it looked, the repeats said once.
+      await expect(answer.getByTestId("step-group")).toHaveCount(3);
+      await expect(answer.getByTestId("step-group").nth(1)).toContainText("Looked up runs ×2 · couldn't be read");
+      const colors = await answer.locator('[data-testid=tool-step][data-status=error]').evaluateAll((els) => els.map((e) => getComputedStyle(e.querySelector("span:nth-child(2) span")!).color));
+      expect(colors.length).toBe(2);
+      for (const c of colors) {
+        const [r, g, b] = c.match(/\d+/g)!.map(Number);
+        expect(r - Math.min(g, b), `a failed row is grey, not red (${c})`).toBeLessThan(30);
+      }
+      // Nothing runs off the side, long lookups included.
+      const over = await scroller(page).evaluate((el) => el.scrollWidth - el.clientWidth);
+      expect(over).toBeLessThanOrEqual(0);
+    });
+
+    test("the steps stay short while Chat works, fold when the answer starts, and the text stays put", async ({ page }) => {
+      await page.goto("/chat?thread=th_old");
+      await expect(page.getByTestId("answer")).toHaveCount(1);
+      await box(page).fill("What's running?");
+      await box(page).press("Enter");
+      const f = await feed(page, 1);
+      await f.push("thread", { id: "th_old", title: "Which services call the billing API?" });
+      const answer = page.getByTestId("answer").last();
+      for (let i = 0; i < 7; i++) await step(f, `s${i}`, "work_records", `Looked up record set ${i}`, "success", `${i} records`);
+      // Only the latest few, the rest counted.
+      await expect(answer.getByTestId("tool-step")).toHaveCount(4);
+      await expect(answer.getByTestId("earlier-steps")).toHaveText("3 earlier steps");
+      await f.text("Three runs are working now. ");
+      await expect(answer.getByTestId("tool-step")).toHaveCount(0);
+      await expect(answer.getByTestId("activity-summary")).toHaveText("Looked up record set 6");
+      const at = async () => (await answer.locator(".chat-answer").boundingBox())!.y;
+      const before = await at();
+      // More lookups after the text started: the text doesn't move.
+      await f.push("text_reset", {});
+      await step(f, "s7", "work_runs", "Looked up runs", "success", "3 runs");
+      await f.text("Three runs are working now, one waits on checks.");
+      await expect(answer.getByTestId("activity-summary")).toHaveText("Looked up runs");
+      expect(Math.abs((await at()) - before)).toBeLessThanOrEqual(1);
+      saves("Three runs are working now, one waits on checks.", [
+        ...Array.from({ length: 7 }, (_, i) => ({ kind: "work", name: "work_records", label: `Looked up record set ${i}`, summary: `${i} records` })),
+        { kind: "work", name: "work_runs", label: "Looked up runs", summary: "3 runs" },
+      ]);
+      await f.push("done", {});
+      await f.end();
+      await expect(answer.getByTestId("activity-summary")).toHaveText("Looked up records and runs");
+    });
+
+    test("the time so far keeps counting when a step comes after the answer started", async ({ page }) => {
+      await page.goto("/chat?thread=th_old");
+      await expect(page.getByTestId("answer")).toHaveCount(1);
+      await box(page).fill("A quick one?");
+      await box(page).press("Enter");
+      const f = await feed(page, 1);
+      await f.push("thread", { id: "th_old", title: "Which services call the billing API?" });
+      const answer = page.getByTestId("answer").last();
+      await expect(answer.getByTestId("activity-elapsed")).toHaveText(/^[2-9]s$/, { timeout: 6000 });
+      const was = parseInt((await answer.getByTestId("activity-elapsed").textContent())!, 10);
+      await f.text("Straight to the answer, ");
+      await step(f, "late", "work_runs", "Looked up runs", "success", "1 runs");
+      // The line came back with the step: it counts on from the question, not from 0s.
+      await expect(answer.getByTestId("activity-elapsed")).toBeVisible();
+      const now = parseInt((await answer.getByTestId("activity-elapsed").textContent())!, 10);
+      expect(now).toBeGreaterThanOrEqual(was);
+      await f.push("done", {});
+      await f.end();
+    });
+
+    test("opening another chat mid-answer shows it, and the answer's end leaves it there", async ({ page }) => {
+      await page.goto("/chat?thread=th_old");
+      await expect(page.getByTestId("answer")).toHaveCount(1);
+      await box(page).fill("Still going?");
+      await box(page).press("Enter");
+      const f = await feed(page, 1);
+      await f.push("thread", { id: "th_old", title: "Which services call the billing API?" });
+      await f.text("Half of it ");
+      // Another chat opens (the chat list does this without a page load).
+      await page.evaluate(() => history.pushState(null, "", "/chat?thread=TH_CASE"));
+      await expect(page).toHaveURL(/thread=TH_CASE/);
+      await expect(page.getByTestId("answer")).toHaveCount(1);
+      await expect(page.getByTestId("chat-scroll")).not.toContainText("Half of it");
+      // The other answer ends: the address and the page stay on the chat the reader opened.
+      await f.text("and the rest.");
+      await f.push("done", {});
+      await f.end();
+      await page.waitForTimeout(500);
+      await expect(page).toHaveURL(/thread=TH_CASE/);
+      await expect(page.getByTestId("chat-scroll")).not.toContainText("and the rest");
+      await expect(box(page)).toBeEnabled();
+    });
+
+    test("a stream that breaks after some text keeps it, says what broke, and asks again in one click", async ({ page }) => {
+      await page.goto("/chat?thread=th_old");
+      await expect(page.getByTestId("answer")).toHaveCount(1);
+      await box(page).fill("Half an answer?");
+      await box(page).press("Enter");
+      const f = await feed(page, 1);
+      await f.push("thread", { id: "th_old", title: "Which services call the billing API?" });
+      await step(f, "b1", "work_runs", "Looked up runs", "success", "2 runs");
+      await f.text("The first half of the answer arrives, then ");
+      await f.fail();
+      const answer = page.getByTestId("answer").last();
+      await expect(answer).toContainText("The first half of the answer arrives");
+      await expect(answer.getByTestId("answer-error")).toBeVisible();
+      await answer.getByTestId("answer-error-retry").click();
+      const again = await feed(page, 2);
+      expect(await page.evaluate(() => (window as unknown as { __asks: { question: string }[] }).__asks[1].question)).toBe("Half an answer?");
+      await again.end();
+    });
+
+    test("a saved answer shows its failed lookups the way the live one did", async ({ page }) => {
+      await page.unrouteAll({ behavior: "ignoreErrors" });
+      await mockApi(page, {
+        used: {
+          th_old: [
+            { kind: "work", name: "work_runs", label: "Looked up runs", summary: "Couldn't read", status: "error" },
+            { kind: "work", name: "work_pull_requests", label: "Looked up pull requests for “#609”", summary: "1 pull requests" },
+          ],
+        },
+      });
+      await page.goto("/chat?thread=th_old");
+      const answer = page.getByTestId("answer").last();
+      await expect(answer.getByTestId("activity-summary")).toHaveText("Looked up runs and pull requests");
+      await expect(answer.getByTestId("activity-unavailable")).toHaveText("· runs couldn't be read");
+      await answer.getByTestId("activity-toggle").click();
+      await expect(answer.locator("[data-testid=tool-step][data-status=error]")).toHaveCount(1);
+    });
+  });
+}
