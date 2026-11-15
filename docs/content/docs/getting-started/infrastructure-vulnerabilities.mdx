@@ -1,15 +1,17 @@
 ---
 title: Infrastructure vulnerabilities
-description: How CoderHelm checks what runs in your AWS accounts against AWS's security bulletins and the Amazon Linux and Bottlerocket advisories, says which fixes are yours and which AWS makes, and opens the pull request or shows the step in AWS.
+description: How CoderHelm checks what runs in your AWS accounts against AWS's security bulletins and the Amazon Linux and Bottlerocket advisories, says which fixes are yours and which AWS makes, and opens the pull request, applies an approved update in AWS, or shows the step.
 ---
 
-[Security fixes](/getting-started/security-fixes/) checks the packages your code imports. Infrastructure vulnerabilities checks what you actually run on AWS: the AMIs and kernels of your instances, your EKS clusters and node groups, the container images your services run, your databases, caches and OpenSearch domains, ECS services on Fargate, and the Lambda runtimes in your code. For each one it says whether you have to act, opens the fix pull request or shows the exact step in AWS, and marks what AWS patches for you.
+[Security fixes](/getting-started/security-fixes/) checks the packages your code imports. Infrastructure vulnerabilities checks what you actually run on AWS: the AMIs and kernels of your instances, your EKS clusters and node groups, the container images your services run, your databases, caches and OpenSearch domains, ECS services on Fargate, and the Lambda runtimes in your code. For each one it says whether you have to act, opens the fix pull request, applies a database update in AWS once an admin approves it, or shows the exact step, and marks what AWS patches for you.
 
 It is off for every AWS account until an admin switches it on, in **Settings**, then **Integrations**, then **AWS**, on the account. Findings show in **Security**, then **Infrastructure**, and what runs in each account shows in **Insights**, then **Infrastructure**, under **Running in AWS**, beside the code review of your infrastructure code. Each resource there lists its versions, where it is defined, what AWS has pending for it and links to its open findings. **Insights**, then **Analytics**, shows the last 30 days: open and fixed findings, the median time to fix, and fix pull requests against steps in AWS.
 
 ## The Infrastructure page
 
 Four tiles count what **Needs action now**, the **Fix pull requests**, the **Steps in AWS** and what is **AWS-managed**. Filter the rows by tier or by fix (pull request or in AWS). Each row opens to the fix, where the resource is defined, how to roll it out or what to run in AWS, AWS's date, the advisories and the resources it covers. Admins can open a fix pull request at once with **Open fix PR**, even when security fixes are in a dry run, and read every account again with **Check accounts now**. An account whose role lacks the reads shows **Update the role in AWS**.
+
+The list follows live AWS. The header says when it was last **Checked against AWS**, and opening the page reads your accounts again when that was more than five minutes ago. A finding leaves the open list when the next full read shows it is over: **Fixed** when the fix is running, **Removed** when the resource is gone, and merged into one row when two findings are the same update on one database. Closed findings are under **Fixed / Removed**. A kind of resource that couldn't be read in full (a failed or throttled call) is never closed on that read.
 
 ## Where the vulnerabilities come from
 
@@ -49,7 +51,7 @@ What it never reads:
 
 - **Lambda function settings.** `lambda:ListFunctions` and `lambda:GetFunctionConfiguration` both return environment variables. CoderHelm finds your Lambda functions and their runtimes in your Terraform instead.
 - **User data.** It never reads launch template versions or instance attributes.
-- **Anything it would change.** CoderHelm opens pull requests in your code and shows the AWS steps for a person to run. It never runs them.
+- **Anything it would change**, with one exception you choose: when the role has the `ApplyMaintenance` parameter on, CoderHelm can apply a database update an admin approved (see [Updates CoderHelm applies in AWS](#updates-coderhelm-applies-in-aws)). Everything else it opens as a pull request in your code or shows as steps for a person to run.
 
 Switching the option on when the role lacks these reads shows a warning that names the feature, with the one-click update: an AWS admin signs in to the account and creates the update stack, which adds only these permissions. The stack's `InfrastructureVulnerabilities` parameter is set to `on` by the link.
 
@@ -73,14 +75,15 @@ For a self-hosted install's own account, the card does it for you. Install admin
 
 Infrastructure vulnerabilities are on by default on the install's own account; Inspector and Health are off. The reads also need the install's permission limit to allow them. When it doesn't yet, the card says so: an AWS admin applies the install's access update once (**Settings**, **System**, **Permissions**), because no update can widen that limit.
 
-## Three kinds of fix
+## Four kinds of fix
 
 Matching is by version, with no model, so it costs no tokens. One row is one fix: one AMI, one node group, one database. However many advisories that fix clears, it is still one row.
 
 | Fix | When | What you get |
 | --- | --- | --- |
 | **Fix PR** | The update has a code equivalent, and CoderHelm found the code that defines the resource and is sure of it. | A pull request that points the AMI at AWS's latest parameter, sets a node group's `release_version`, changes a Lambda `runtime`, raises a database's engine version or bumps a Dockerfile `FROM`. Its description says when the change takes effect, the expected interruption, what must not change, the checks to run first, what the plan must show and what the real rollback is. It goes through the same daily run and token limits as dependency fixes. |
-| **Runbook** | The update can't be expressed in code (an operating system update, an Aurora PostgreSQL patch, an ElastiCache service update, OpenSearch service software), or CoderHelm didn't find the code, or isn't sure of it. | A card that says why it is a runbook, then the whole runbook: scope and exact identifiers, what it is, the expected interruption, what you need, checks to run first, the backup, the console path, the exact AWS CLI commands with your identifiers and region, how to check it worked, the rollback, and AWS's date. Each fact names the AWS or tool page it came from and the day it was last read. CoderHelm never runs it. |
+| **Apply in AWS** | A pending RDS or Aurora action with no code equivalent: an operating system update, an engine patch or upgrade, a serverless platform update. | An admin approves it, and CoderHelm applies it through AWS's own pending maintenance action. See [Updates CoderHelm applies in AWS](#updates-coderhelm-applies-in-aws). When the role can't apply it, the row names the missing permission and shows the runbook instead. |
+| **Runbook** | The update can't be expressed in code and CoderHelm doesn't apply it (an ElastiCache service update, OpenSearch service software), or CoderHelm didn't find the code, or isn't sure of it. | A card that says why it is a runbook, then the whole runbook: scope and exact identifiers, what it is, the expected interruption, what you need, checks to run first, the backup, the console path, the exact AWS CLI commands with your identifiers and region, how to check it worked, the rollback, and AWS's date. Each fact names the AWS or tool page it came from and the day it was last read. CoderHelm never runs it. |
 | **AWS-managed** | AWS patches it itself. | A row with the bulletin's reason, collapsed at the bottom. It is never counted as open and has no tier. |
 
 ### Where the code is
@@ -107,7 +110,18 @@ Several updates pending on one database are separate rows, numbered in the order
 
 Urgency uses the same tiers as dependency fixes. Whether the internet can reach the resource takes the place of whether your code reaches the vulnerable part: a public IP address, an internet-facing load balancer or a publicly accessible database.
 
-A finding closes only when CoderHelm reads the account again and sees the fix running, such as the new AMI on every instance. A merged pull request isn't enough. That also catches a fix that was merged but never rolled out.
+A finding closes as fixed only when CoderHelm reads the account again and sees the fix running, such as the new AMI on every instance. A merged pull request isn't enough. A finding whose resource is gone closes as removed. That also catches a fix that was merged but never rolled out.
+
+## Updates CoderHelm applies in AWS
+
+Some database updates have no code equivalent. For a pending RDS or Aurora action (an operating system update, an engine patch or upgrade, or a serverless platform update), the row offers two buttons to admins:
+
+- **Apply in next maintenance window**: AWS applies it in the database's next maintenance window.
+- **Apply now**: AWS applies it right away.
+
+The row then says who approved it and when. The copy outside production goes first: a production database waits until its other copy is done. CoderHelm reads the database again afterwards, and the finding closes once AWS no longer lists the action. Nothing is applied without an approval.
+
+Applying needs one permission on the account's `CoderHelmLogReader` role, which is off until you turn it on: set the `ApplyMaintenance` parameter to `on` on the role's stack, or on its update stack (`CoderHelmLogReaderUpdate-<id>`). It allows only `rds:ApplyPendingMaintenanceAction`, only on that account's own database clusters and instances. While it is off, the row says the role lacks the permission and shows the runbook, so there is still a way to apply the update by hand.
 
 ## A worked example: bulletin 2026-160-AWS
 
@@ -125,7 +139,7 @@ CVE-2026-98432 is a use-after-free in the Linux kernel's IPv4 TCP code, rated Im
 | --- | --- | --- |
 | Auto Scaling group `web-asg` | Fix PR, P1 | Amazon Linux 2023 is fixed in release `2023.12.20261102`. The pull request changes `aws_launch_template.web`, then an instance refresh rolls it out. Internet-facing, so P1. |
 | EKS node group `prod-ng` | Fix PR, P2 | EKS optimized AMIs are fixed in `v20261031`. The pull request sets the node group's `release_version`. |
-| Aurora cluster `orders` | Runbook | RDS lists an operating system update as pending on one of the cluster's instances, with a date. An operating system update can't be expressed in code, so it is a runbook even though the cluster is in the team's Terraform. The card shows `aws rds apply-pending-maintenance-action` with that instance's ARN. AWS publishes no CVE list for the update, so the card names none: the bulletin, which tells RDS customers to patch the database OS, is shown as related. |
+| Aurora cluster `orders` | Apply in AWS | RDS lists an operating system update as pending on one of the cluster's instances, with a date. An operating system update can't be expressed in code, so an admin approves it and CoderHelm applies it, even though the cluster is in the team's Terraform. Without `ApplyMaintenance` on the role, the card shows the runbook with `aws rds apply-pending-maintenance-action` and that instance's ARN. AWS publishes no CVE list for the update, so the card names none: the bulletin, which tells RDS customers to patch the database OS, is shown as related. |
 | ECS service `api` on Fargate | AWS-managed | Tasks started after the fix run patched, and AWS retires older ones. Forcing a new deployment replaces them sooner. |
 | Lambda `thumbs` | AWS-managed | The bulletin says Lambda is not affected. |
 

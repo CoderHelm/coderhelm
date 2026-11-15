@@ -26,6 +26,13 @@ When a limit stops a ticket, CoderHelm comments on it. The comment names the lim
 
 Only admins can change limits. Teams that set a single limit before the split keep it until they save the new fields.
 
+## What keeps spend down
+
+- Reviews are written on a lighter model measured against the strongest one, and the strongest model checks each one. See [Which model writes reviews](/getting-started/reviewer#which-model-writes-reviews).
+- The part of a review's or fix round's instructions shared by every pull request in a repository is cached, so it is paid for once.
+- A burst of the same log error is one analysis, known errors are counted without a model, and each team has an hourly cap on log analyses.
+- When GitHub's hourly request budget runs low, work waits instead of failing, and runs get the budget before background sweeps.
+
 ## Example
 
 A team that wants to spend at most about the price of 20 million new tokens a month, without counting cheap re-reads, might set:

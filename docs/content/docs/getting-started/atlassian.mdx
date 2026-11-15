@@ -8,7 +8,7 @@ Jira and Confluence are one connection in CoderHelm. Open **Settings**, **Integr
 | Part | What it does | How it connects |
 | --- | --- | --- |
 | **Jira** | Starts runs from tickets, posts progress and the pull request link back, and reads and creates tickets for [plans](/getting-started/plans). | CoderHelm's Jira app, installed in your Atlassian site by a Jira admin, or a plain Jira webhook. See below. |
-| **Confluence** | Agents read pages during runs and reviews, and [Knowledge](/concepts/knowledge-sources) syncs the spaces you pick. | An Atlassian sign-in (CoderHelm's Atlassian app), an Atlassian API token, or the Jira app (reading only). |
+| **Confluence** | Agents read pages during runs and reviews, and [Knowledge](/concepts/knowledge-sources) syncs the spaces you pick. | An Atlassian sign-in (CoderHelm's Atlassian app) or an Atlassian API token. A Jira app that hasn't taken the Jira only update yet also reads pages. |
 | **Agent tools** | Agents search and read Jira issues and Confluence pages with Atlassian's own tools, only the ones you allow. | A sign-in to Atlassian's remote MCP server (Rovo). |
 
 **Connect Atlassian** signs you in for the parts that take a sign-in, one Atlassian consent page each: Confluence first, then agent tools. Each part can also be set up on its own from the same row, and a part you don't need can stay off. Connections made before Jira and Confluence were one row keep working as they are, with nothing to reconnect.
@@ -60,6 +60,8 @@ Add the label `coderhelm` to a ticket and assign it to the CoderHelm user. In pr
 
 Write the ticket the way you would for a new teammate: what should change, where it shows up, and how to know it works. Screenshots and mockups help; CoderHelm reads them.
 
-A comment on the ticket is handled too. If the run failed, a comment retries it. If the run already opened a pull request, the comment is sent to that pull request as feedback.
+A comment on the ticket is handled too. If the run failed, a comment retries it. If the run already opened a pull request, the comment is sent to that pull request as feedback. A comment written while a run is still working is kept, acknowledged and taken into the run.
+
+CoderHelm's reply goes under your comment in Jira's thread where your site allows it, otherwise as a new comment. Either way it mentions you and quotes your comment, so you are notified. Each reply is written from the thread, the ticket and the run's records: what it understood, what it did (with the commit or pull request), or the one thing it needs.
 
 A status or field change on its own never starts a run.

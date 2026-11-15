@@ -3,7 +3,20 @@ title: Your first run
 description: What CoderHelm does between a ticket and a pull request, stage by stage, and where to watch it.
 ---
 
-A **run** is one piece of work: one ticket turned into one pull request. Open **Runs** to see every run with its status, and click one for its live log.
+A **run** is one piece of work: one ticket turned into one pull request. Open **Runs** to see every run with its status, and click one to follow it.
+
+## The run page
+
+A run's page has six tabs:
+
+| Tab | What it shows |
+| --- | --- |
+| **Overview** | Where the run stands, its pull request, its CI checks and review verdict, and what CoderHelm finished. When a finished run's pull request waits, it says why, and names a person only when one is needed. |
+| **Plan** | The plan the run wrote: which files change and how. Shown once the run has a plan. |
+| **Changes** | The pull request and the files the run changed. |
+| **Activity** | The run's story in time order, newest last: each step, approval, question and fix round, and what the run used. |
+| **Agent log** | Every timed step, tool call and decision, for when you want the detail. |
+| **Details** | Tokens used, time per step, and the run's id and branch. |
 
 ## The stages
 
@@ -16,13 +29,23 @@ The run detail page shows each stage as it happens.
 | **Build** | Writes the change on a new `coderhelm/` branch. |
 | **Test** | Runs your build, linter and tests in a sandbox with no credentials, and fixes what fails. |
 | **Security** | Checks the change for security problems, such as secrets in code or unsafe input handling. |
-| **Pull request** | Opens a draft pull request that explains the change, links the ticket, and is marked ready when the checks pass. |
+| **Pull request** | Opens a draft pull request that explains the change, links the ticket, and is marked ready when the checks pass. See [The description](#the-description). |
 | **Review** | Reviews its own pull request the way the [PR reviewer](/getting-started/reviewer) reviews yours. |
 
 After the pull request is open, two more stages can run:
 
-- **CI fix**: if your CI fails on the pull request, CoderHelm reads the failure and pushes a fix. It gives up after 8 automatic fix pushes, so a broken pipeline can't loop forever.
-- **Feedback**: comment on the pull request (or the ticket) and CoderHelm makes the change you asked for.
+- **CI fix**: if your CI fails on the pull request, CoderHelm reads the failure and pushes a fix. Fix rounds go on while they make progress (red checks turn green, review findings close), and stop when they don't, so a broken pipeline can't loop forever. A change that keeps a check red is taken back out, and the rest is delivered.
+- **Feedback**: comment on the pull request (or the ticket) and CoderHelm makes the change you asked for. A comment written on the ticket while the run is still working is kept, acknowledged and taken into the run.
+
+CoderHelm does the work around the code itself where it can: reading workflow runs, running checks of the pages it changed, and starting a staging deploy when the repository has a deploy workflow it can start or a label that starts one. When a tool fails, it is tried again where that helps, then set aside for ten minutes while the run takes another way, and the run page says so once.
+
+## The description
+
+Every pull request description is built from the code on the pull request's head, and rebuilt whenever the head changes. Before it is posted, a final review removes repeated lines, filler and raw ids, and keeps checks that are still running apart from results.
+
+When the repository has a pull request template (such as `.github/pull_request_template.md`), its headings are the description's layout, in the template's order, filled with the summary, checks, risk, screenshots and ticket.
+
+Anything only a person can do, such as granting a permission or a credential, is listed once under **Needed from you**. Everything else is CoderHelm's to do, so a run that needs work outside the code still makes the change and opens the pull request.
 
 ## Which branch the pull request targets
 
@@ -35,7 +58,7 @@ Write the branch name exactly as it appears in the repository. If several ticket
 
 ## When a run stops
 
-A run can end without a pull request. The run page always says why in plain words, for example "The ticket doesn't say which page to change". Answer on the ticket and the run starts again. You can also **Retry**, **Reset and re-run** from scratch, or **Cancel** from the run page.
+A run finishes its work, or stops only for a listed reason, such as a ticket too unclear to act on. The run page always says why in plain words, for example "The ticket doesn't say which page to change". Answer on the ticket and the run starts again. You can also **Retry**, **Reset and re-run** from scratch, or **Cancel** from the run page.
 
 New runs also pause when your team reaches a [token limit](/concepts/token-limits).
 

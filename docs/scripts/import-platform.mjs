@@ -8,7 +8,7 @@
 //   public/openapi.json             the same document, published at /openapi.json
 //   .generated/webhook-events.md    the event catalog on /api/webhooks/, from the
 //                                   document's `webhooks` section
-//   content/docs/changelog.mdx      platform tags and merged pull requests
+//   content/docs/changelog.mdx      content/release-notes.md, then merged pull requests and stable tags
 //   content/docs/plugins/manifest-reference.mdx   rendered from schemas/plugin-manifest.schema.json
 //
 // The platform repo is read at the commit pinned in platform.lock.json
@@ -310,6 +310,20 @@ function importOpenApi(platform) {
 
 const MONTHS = 6;
 const PR = /^(.*)\s\(#(\d+)\)$/;
+/** Hand-written release notes, newest first, shown above the pull request list. */
+const RELEASE_NOTES = path.join(ROOT, 'content/release-notes.md');
+/** Pull requests that only move a pinned version (the dashboard a release ships with). */
+const PIN_ONLY = /^Pin the dashboard\b/i;
+
+/** The release notes without their leading comment, or '' when there are none. */
+export function releaseNotes(text) {
+  return text.replace(/^\s*<!--[\s\S]*?-->\s*/, '').trim();
+}
+
+/** Stable self-host releases (no beta builds), newest first. */
+export function stableTags(tags) {
+  return tags.filter((t) => /^v\d+\.\d+\.\d+$/.test(t.name));
+}
 
 function prLog(dir, rev, since) {
   try {
@@ -322,7 +336,7 @@ function prLog(dir, rev, since) {
         const m = subject.match(PR);
         return m ? { date, title: m[1].trim(), number: Number(m[2]) } : null;
       })
-      .filter(Boolean);
+      .filter((pr) => pr && !PIN_ONLY.test(pr.title));
   } catch {
     return null;
   }
@@ -363,27 +377,34 @@ function writeChangelog(platform) {
   const out = [
     '---',
     'title: Changelog',
-    `description: What changed in CoderHelm, month by month, from the merged pull requests of both repos.`,
+    `description: What changed in CoderHelm, release by release, then every merged pull request of both repos.`,
     `editUrl: ${yamlString('https://github.com/CoderHelm/coderhelm/blob/main/docs/scripts/import-platform.mjs')}`,
     'generated: true',
     '---',
     '',
-    `Generated at build time from the merged pull requests of [coderhelm-platform](${REPO_URL}) (the agents and API, at \`${platform.ref.slice(0, 12)}\`) and [coderhelm](https://github.com/CoderHelm/coderhelm) (the dashboard and these docs), covering the last ${MONTHS} months. CoderHelm ships from \`main\` continuously, so there are no version numbers after the tags listed at the end.`,
+    `What changed for your team, release by release, newest first. After the release notes comes every merged pull request of [coderhelm-platform](${REPO_URL}) (the agents and API, at \`${platform.ref.slice(0, 12)}\`) and [coderhelm](https://github.com/CoderHelm/coderhelm) (the dashboard and these docs) for the last ${MONTHS} months, and the self-hosted releases.`,
     '',
   ];
+  const notes = fs.existsSync(RELEASE_NOTES) ? releaseNotes(fs.readFileSync(RELEASE_NOTES, 'utf8')) : '';
+  if (notes) out.push(plainArrows(notes), '', '## Every merged pull request', '');
   for (const key of [...months.keys()].sort().reverse()) {
     const m = months.get(key);
-    out.push(`## ${monthName(key)}`, '');
-    if (m.platform.length) out.push('### Agents and API', '', ...m.platform, '');
-    if (m.app.length) out.push('### Dashboard and docs', '', ...m.app, '');
+    const h = notes ? '###' : '##';
+    out.push(`${h} ${monthName(key)}`, '');
+    if (m.platform.length) out.push(`${h}# Agents and API`, '', ...m.platform, '');
+    if (m.app.length) out.push(`${h}# Dashboard and docs`, '', ...m.app, '');
   }
-  if (tags.length) {
-    out.push('## Tagged releases', '', 'The platform was tagged during its first weeks:', '');
-    for (const t of tags) out.push(`- [\`${t.name}\`](${REPO_URL}/releases/tag/${t.name}) (${t.date}): ${escapeMdx(t.subject)}`);
+  const stable = stableTags(tags);
+  if (stable.length) {
+    out.push('## Self-hosted releases', '', `Stable releases of the self-hosted platform, newest first. Beta builds and each release's full list of changes are on [GitHub](${REPO_URL}/releases).`, '');
+    for (const t of stable) {
+      const about = t.subject && t.subject !== t.name ? `: ${escapeMdx(t.subject)}` : '';
+      out.push(`- [\`${t.name}\`](${REPO_URL}/releases/tag/${t.name}) (${t.date})${about}`);
+    }
     out.push('');
   }
   write('changelog.mdx', out.join('\n'));
-  return { platformPrs: platformPrs.length, appPrs: appPrs.length, tags: tags.length, shallow: isShallow };
+  return { platformPrs: platformPrs.length, appPrs: appPrs.length, tags: stable.length, shallow: isShallow };
 }
 
 // --- Manifest reference -----------------------------------------------------

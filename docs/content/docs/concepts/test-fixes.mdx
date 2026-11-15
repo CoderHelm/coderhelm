@@ -115,6 +115,10 @@ When the failure is unrelated to the change, CoderHelm spends no fix rounds on t
 
 When CoderHelm writes or fixes a check like "a way to register", it accepts every valid state of the page (open, full with a waitlist, not open yet, restricted), or it picks test data in the state it needs instead of the first item listed. The reviewer checks the same in every review.
 
+## Quarantined tests
+
+The **Quarantine** tab on **Tests** lists every quarantined test with where it stands and what happens next, such as a fix pull request open, a run working on it, or waiting for its next runs to prove it healthy. CoderHelm works the oldest first, and a test that proves healthy leaves quarantine by itself. When nothing is in flight, a row offers **Fix this test** and **Remove this test**; removing goes through a pull request your team approves. CoderHelm proposes a removal by itself only after 30 days in quarantine, two fixes that did not hold, and another healthy test covering the same ground.
+
 ## Let CoderHelm repeat tests on CI
 
 Add a `repeat_each` input to your end-to-end workflow so CoderHelm can start a repeat run on the pull request's branch:

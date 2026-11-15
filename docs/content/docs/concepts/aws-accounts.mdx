@@ -49,6 +49,24 @@ CoderHelm keeps only the findings and their error patterns, never raw log lines.
 
 Every finding shows on the **Logs** page with how often and when its error happened. Press **Create fix PR** on any finding to start a fix run, or let CoderHelm open them by itself.
 
+### How a finding is judged
+
+Errors are seen within minutes. Findings with one cause are one incident: one row, one card and one fix, placed where the cause is (a setting, infrastructure code, AWS or the code). Each new sighting is judged against its own last week before anyone is told:
+
+| Judgment | When | What happens |
+| --- | --- | --- |
+| **Noise** | It happens at its usual rate. | Counted, with no card and no fix. |
+| **Watch** | It is new, or back after a quiet week. | Said once. |
+| **Act** | It is new and critical, or rising. | A card, and a fix where one is on. |
+
+A burst of the same error is folded into one entry before any model reads it, known errors are counted without a model, and each team has an hourly cap on analyses; past it, findings are counted only. For a timeout, a refused call or a 503, the card names the host and setting the code calls, with its timeout and retries.
+
+A finding whose error stopped while the service kept logging as usual reads as **stopped**, with the evidence, and is resolved sooner instead of looking like a live emergency.
+
+### Which repo the fix goes to
+
+CoderHelm traces the repo instead of asking: the running image's commit, the workflows, Dockerfiles and task definitions that ship it, image names, and the error's own classes and lines found in the code. When the evidence points at one repo, the fix starts there, the log group is remembered as **learned**, and the card says why in one line. When the evidence is split, the fix starts on the best guess with **Wrong repo? Move it**. Only a log group nothing ties to a repo asks you to pick.
+
 The card at the top of the Logs page says whether automatic fix PRs are on. While they are off, it says what turning them on does; **Turn on** switches them on for critical findings, up to 3 a day, and **Change what counts** opens the settings:
 
 - **Open fix PRs automatically for**: critical findings (the default), warning and critical findings, or every finding.
