@@ -256,6 +256,37 @@ const home: Page = {
       ],
     },
     {
+      id: "every-ai-tool",
+      eyebrow: "In every AI tool",
+      heading: "Your team's knowledge, in the AI tools you already use.",
+      blocks: [
+        {
+          type: "p",
+          text: "CoderHelm keeps six knowledge bases for every team with nothing to set up: Code (repositories, files and docs), Work (tickets, pull requests, runs and plans), Infrastructure (your AWS resources and where each one is defined), Logs (log findings and alerts), Security, and Knowledge (the documents your team adds). Connect Claude, ChatGPT, Cursor or VS Code to them in one step and ask from where you work. Every answer cites where it came from, with a link to the line, the ticket or the resource.",
+        },
+        { type: "frame", id: "connect", caption: "A question asked in Cursor, answered from the team's code, tickets and AWS, each citation naming the base it came from. Example data." },
+        {
+          type: "cards",
+          items: [
+            { title: "One step to connect", text: "Paste one address into your AI tool, or press Add to Cursor or Add to VS Code. Sign in with your CoderHelm account, or with GitHub if your team lets people connect as readers: no new account, no password, no seat." },
+            { title: "Ask anything your team knows", text: "\"How do refunds work?\" \"What's left on WEB-42?\" \"Which stack deploys the orders queue?\" \"What failed in last night's deploy?\"" },
+            { title: "You see what you could see anyway", text: "Each base has its own readers. Access follows your CoderHelm role and the readers your admins choose for each base, and code follows the repositories your GitHub account can read. Anything held back is counted, never shown." },
+            { title: "Your data stays yours", text: "Self hosted, every base and every answer stays in your own AWS account. Secrets and personal data in logs are removed before anything leaves, and every call is in your audit log." },
+          ],
+        },
+        {
+          type: "list",
+          items: [
+            "Works with Claude, Claude Code, ChatGPT, Cursor, VS Code, Windsurf and any app that speaks MCP",
+            "Read only unless you allow more",
+            "Every call recorded in your audit log",
+            "Admins choose what each AI tool may read, base by base",
+          ],
+        },
+        { type: "actions", items: [{ label: "Connect your AI tools", href: "https://docs.coderhelm.com/mcp/" }, { label: "How access works", href: "/security/" }] },
+      ],
+    },
+    {
       id: "around-the-work",
       eyebrow: "Around the work",
       heading: "What it uses to get the change right.",
@@ -293,7 +324,7 @@ const home: Page = {
         },
         {
           type: "p",
-          text: "Works with GitHub, Jira, Microsoft Teams, AWS, Playwright, JUnit and Cucumber reports, 17 MCP servers, and Claude models through your own Anthropic API key or Amazon Bedrock. Use it from Claude, Cursor or VS Code through [its MCP server](https://docs.coderhelm.com/mcp/): see runs, start and retry them, and ask for reviews, as yourself. Build on it with the [public API](https://docs.coderhelm.com/api/) and [signed webhooks](https://docs.coderhelm.com/api/webhooks/) that tell your systems what it did.",
+          text: "Works with GitHub, Jira, Microsoft Teams, AWS, Playwright, JUnit and Cucumber reports, 17 MCP servers, and Claude models through your own Anthropic API key or Amazon Bedrock. Use it from [your AI tools](#every-ai-tool) through [its MCP server](https://docs.coderhelm.com/mcp/): ask what your team knows, see runs, start and retry them, and ask for reviews, as yourself. Build on it with the [public API](https://docs.coderhelm.com/api/) and [signed webhooks](https://docs.coderhelm.com/api/webhooks/) that tell your systems what it did.",
         },
       ],
     },
@@ -399,6 +430,8 @@ const home: Page = {
             { q: "Which AI models does it use?", a: "Claude models from Anthropic, through your team's own Anthropic API key. A self-hosted install can use Amazon Bedrock in its own AWS account instead. Admins can choose the models and set monthly token limits." },
             { q: "Can we run it ourselves?", a: "Yes. CoderHelm runs entirely in your own AWS account, installed from your browser with the [install guide](https://docs.coderhelm.com/self-host/install/). It is licensed under FSL-1.1-ALv2: you can run it, change it and self-host it for your own company, and each release becomes Apache 2.0 two years after it ships. See [self-hosting](/self-host/)." },
             { q: "How much does it cost?", a: "CoderHelm is in open beta. Each team brings its own Anthropic API key, so model usage is billed to your Anthropic account, and admins can cap it with a monthly token limit." },
+            { q: "Do people need a CoderHelm account to use it from their AI tool?", a: "No, if your admins allow it. Someone in your GitHub organization signs in with GitHub when they connect their AI tool, reads only the bases open to readers and only the repositories their GitHub account can read, and takes no seat." },
+            { q: "Does my code or data go to the AI tool?", a: "Only what a person asks for and is allowed to see. Logs leave only with secrets and personal data removed. Self hosted, CoderHelm itself sends nothing outside your AWS account." },
             { q: "Can it change data in my database?", a: "No. Lookups are read only, enforced in code at several independent points: the query is checked, the transaction is read only and rolled back, and the database user cannot write." },
           ],
         },

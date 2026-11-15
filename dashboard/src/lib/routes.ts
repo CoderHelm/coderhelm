@@ -78,6 +78,7 @@ export const ROUTES: Record<string, RouteInfo> = {
   "/knowledge": { label: "Knowledge", description: "The documents and sources Chat answers from, and how fresh each one is." },
   "/connect": { label: "AI tools", parent: "/knowledge", tab: "Connect your AI tools", description: "Use your team's knowledge from Claude, ChatGPT, Cursor, VS Code and other AI tools: the address, the setup for each tool and what each may read." },
   "/knowledge/bedrock": { label: "Use in Bedrock", parent: "/knowledge", description: "Let Amazon Bedrock search your team's knowledge live, or keep chosen knowledge bases copied into your AWS account." },
+  "/s": { label: "Shared search", parent: "/knowledge", detail: true, description: "A search someone shared from the team's knowledge, run again as you." },
   "/knowledge/base": { label: "Knowledge base", parent: "/knowledge", detail: true, description: "One knowledge base: its sources, what it holds and when it was last read." },
   // Knowledge's old addresses, which redirect to it.
   "/brain/knowledge": { label: "Knowledge", description: "The documents and sources Chat answers from, and how fresh each one is." },

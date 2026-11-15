@@ -628,6 +628,42 @@ function InfraFrame() {
   );
 }
 
+function ConnectFrame() {
+  const cites = [
+    { n: 1, what: "payments/src/refunds.ts, lines 40 to 88", base: "Code" },
+    { n: 2, what: "PAY-311 Partial refunds for split orders, in review", base: "Work" },
+    { n: 3, what: "refunds-worker Lambda, payments-prod, us-east-1, defined in infra/payments.ts", base: "Infrastructure" },
+  ];
+  return (
+    <Window url="Cursor · Chat" label="Any AI tool">
+      <div className="grid grid-cols-1 gap-3 [&>*]:min-w-0">
+        <div className="flex flex-wrap gap-2 text-[12px]">
+          <Pill tone="info">Cursor</Pill>
+          <Pill tone="muted">Claude</Pill>
+          <Pill tone="muted">ChatGPT</Pill>
+          <Pill tone="muted">VS Code</Pill>
+        </div>
+        <div className="ml-auto max-w-[85%] rounded-lg border border-line bg-white/[0.03] px-3 py-2 text-text-primary">Where are refunds handled, and what&apos;s open on them?</div>
+        <p className="text-[12px] text-text-muted">Used CoderHelm: code_search, find_tickets, infra_resources</p>
+        <p className="leading-relaxed text-text-secondary">
+          Refunds are worked out in the payments service <span className="font-mono text-[11px] text-accent-text">[1]</span>. Partial refunds for split orders are in review <span className="font-mono text-[11px] text-accent-text">[2]</span>. They run in the refunds worker in production <span className="font-mono text-[11px] text-accent-text">[3]</span>.
+        </p>
+        <div className="grid gap-1.5">
+          {cites.map((c) => (
+            <div key={c.n} className="flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-lg border border-line px-3 py-2 text-[12px]">
+              <span className="font-mono text-accent-text">[{c.n}]</span>
+              <span className="min-w-0 text-text-secondary">{c.what}</span>
+              <span className="ml-auto">
+                <Pill tone="muted">{c.base}</Pill>
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </Window>
+  );
+}
+
 const FRAMES: Record<FrameId, () => ReactNode> = {
   maintain: MaintainFrame,
   review: ReviewFrame,
@@ -645,6 +681,7 @@ const FRAMES: Record<FrameId, () => ReactNode> = {
   setup: SetupFrame,
   knowledge: KnowledgeFrame,
   infra: InfraFrame,
+  connect: ConnectFrame,
 };
 
 export function Frame({ id, caption, priority = false, hideCaption = false }: { id: FrameId; caption: string; priority?: boolean; hideCaption?: boolean }) {

@@ -16,6 +16,21 @@ export interface ConsentScope {
   requested: boolean;
   /** Always given: reading. */
   always: boolean;
+  /** One word for what it reads: Code, Work, Infrastructure, Logs, Security, Knowledge, Runs. */
+  plain?: string;
+  /** The built-in bases it opens, by name. */
+  opens?: string[];
+}
+
+/** A team lookup the person may give the app or not (`code:read`, `infra:read`...). */
+export interface LookupScope {
+  key: string;
+  label: string;
+  requested: boolean;
+  /** Ticked unless the person unticks it. */
+  default: boolean;
+  plain?: string;
+  opens?: string[];
 }
 
 export interface ConsentRequest {
@@ -32,6 +47,10 @@ export interface ConsentRequest {
   /** The person's role can start runs or ask for reviews. */
   can_act: boolean;
   mcp_url: string;
+  /** The team lookups the page offers as choices. */
+  lookup_scopes?: LookupScope[];
+  /** The person is a reader (connected an AI tool without an account): not a seat, reads only. */
+  reader?: boolean;
 }
 
 export interface Connection {
@@ -78,10 +97,16 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 export const connectedAppsApi = {
   describe: (requestToken: string) =>
     request<ConsentRequest>("/api/mcp/authorize/describe", { method: "POST", body: JSON.stringify({ request: requestToken }) }),
-  decide: (requestToken: string, approve: boolean, allowWrite: boolean, allowKnowledge = false) =>
+  decide: (requestToken: string, approve: boolean, allowWrite: boolean, allowKnowledge = false, allowScopes?: string[]) =>
     request<{ redirect_to: string }>("/api/mcp/authorize", {
       method: "POST",
-      body: JSON.stringify({ request: requestToken, approve, allow_write: allowWrite, allow_knowledge: allowKnowledge }),
+      body: JSON.stringify({
+        request: requestToken,
+        approve,
+        allow_write: allowWrite,
+        allow_knowledge: allowKnowledge,
+        ...(allowScopes ? { allow_scopes: allowScopes } : {}),
+      }),
     }),
   list: () => request<ConnectionList>("/api/mcp/connections"),
   revoke: (id: string) => request<{ status: string; id: string }>(`/api/mcp/connections/${encodeURIComponent(id)}`, { method: "DELETE" }),
@@ -115,6 +140,16 @@ export function rememberConsentReturn(loc: Pick<Location, "pathname" | "search">
   } catch {
     // No storage: a Google or GitHub sign-in lands on the start page, and the app asks again.
   }
+}
+
+/**
+ * The consent page's own path and query, when this is one: where a GitHub
+ * sign-in started from it comes back to (`/auth/github?return_to=...`), so
+ * someone without a Coderhelm account can sign in as a reader and answer.
+ */
+export function consentReturnTo(loc: Pick<Location, "pathname" | "search">): string | null {
+  if (!loc.pathname.replace(/\/+$/, "").endsWith("/authorize") || !isConsentQuery(loc.search)) return null;
+  return `${CONSENT_PATH}${loc.search}`;
 }
 
 /** Where to go back to once signed in, if a consent link was kept. Read once. */

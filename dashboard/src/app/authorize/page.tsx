@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/skeleton";
 import { Code } from "@/components/settings/code";
 import { CheckIcon } from "@/components/icons";
 import { focusRing, fullWidthOnPhone, primaryButton, secondaryButton } from "@/components/ui";
-import { connectedAppsApi, KNOWLEDGE_SCOPE, WRITE_SCOPE, type ConsentRequest } from "@/lib/connected-apps";
+import { connectedAppsApi, KNOWLEDGE_SCOPE, WRITE_SCOPE, type ConsentRequest, type ConsentScope, type LookupScope } from "@/lib/connected-apps";
 
 // The consent page an MCP client (Claude, Cursor, VS Code...) sends someone
 // to: who is asking, where the answer goes, what the app may do. The answer
@@ -43,6 +43,7 @@ function Consent() {
   const [error, setError] = useState(token ? "" : "This page needs the link the app opened. Go back to the app and connect again.");
   const [allowWrite, setAllowWrite] = useState(false);
   const [allowKnowledge, setAllowKnowledge] = useState(false);
+  const [lookups, setLookups] = useState<string[]>([]);
   const [sending, setSending] = useState<"" | "allow" | "deny">("");
   const [leaving, setLeaving] = useState("");
   const writeId = useId();
@@ -59,6 +60,7 @@ function Consent() {
         const write = r.scopes.find((s) => s.key === WRITE_SCOPE);
         setAllowWrite(!!write?.requested && r.can_act);
         setAllowKnowledge(!!r.scopes.find((s) => s.key === KNOWLEDGE_SCOPE)?.requested);
+        setLookups((r.lookup_scopes ?? []).filter((s) => s.default).map((s) => s.key));
       })
       .catch((e) => live && setError(e instanceof Error ? e.message : "The request failed."));
     return () => {
@@ -70,7 +72,7 @@ function Consent() {
     if (!req) return;
     setSending(approve ? "allow" : "deny");
     try {
-      const r = await connectedAppsApi.decide(token, approve, approve && allowWrite, approve && allowKnowledge);
+      const r = await connectedAppsApi.decide(token, approve, approve && allowWrite, approve && allowKnowledge, req.lookup_scopes ? (approve ? lookups : []) : undefined);
       setLeaving(approve ? `Done. Going back to ${req.client_name}…` : `Going back to ${req.client_name}…`);
       window.location.assign(r.redirect_to);
     } catch (e) {
@@ -93,7 +95,8 @@ function Consent() {
   }
   if (!req) return <Loading />;
 
-  const read = req.scopes.filter((s) => s.key !== WRITE_SCOPE && s.key !== KNOWLEDGE_SCOPE);
+  const lookupKeys = new Set((req.lookup_scopes ?? []).map((s) => s.key));
+  const read = req.scopes.filter((s) => s.key !== WRITE_SCOPE && s.key !== KNOWLEDGE_SCOPE && !lookupKeys.has(s.key));
   const write = req.scopes.find((s) => s.key === WRITE_SCOPE);
   const know = req.scopes.find((s) => s.key === KNOWLEDGE_SCOPE);
 
@@ -140,8 +143,16 @@ function Consent() {
                 <span aria-hidden="true" className="mt-0.5 text-emerald-400">
                   <CheckIcon />
                 </span>
-                <span>{s.label}</span>
+                <ScopeWords s={s} />
               </li>
+            ))}
+            {(req.lookup_scopes ?? []).map((s) => (
+              <LookupChoice
+                key={s.key}
+                s={s}
+                checked={lookups.includes(s.key)}
+                onChange={(on) => setLookups((l) => (on ? [...l, s.key] : l.filter((k) => k !== s.key)))}
+              />
             ))}
             {write && (
               <li className="flex items-start gap-2" data-testid="consent-scope">
@@ -170,7 +181,7 @@ function Consent() {
                   data-testid="consent-knowledge"
                 />
                 <label htmlFor={knowledgeId} className="text-zinc-200">
-                  {know.label}
+                  <ScopeWords s={know} />
                   <span className="block text-xs text-zinc-400">
                     {know.requested
                       ? "The app gets passages from the knowledge bases you can read in Chat, nothing more."
@@ -180,6 +191,11 @@ function Consent() {
               </li>
             )}
           </ul>
+          {req.reader && (
+            <p className="mt-3 text-xs text-zinc-400" data-testid="consent-reader">
+              You signed in as a reader: you read what the team opens to readers, change nothing, and don&apos;t take a seat.
+            </p>
+          )}
           {!req.can_act && (
             <p className="mt-3 text-xs text-zinc-400" data-testid="consent-read-only">
               Your role only reads, so the app can only read too.
@@ -209,5 +225,33 @@ function Consent() {
         </p>
       </div>
     </Page>
+  );
+}
+
+/** A scope in plain words: what it reads, then the bases it opens. */
+function ScopeWords({ s }: { s: Pick<ConsentScope, "label" | "plain" | "opens"> }) {
+  return (
+    <span>
+      {s.plain ? <strong className="font-medium text-zinc-100">{s.plain}: </strong> : null}
+      {s.label}
+      {s.opens && s.opens.length > 0 && (
+        <span className="block text-xs text-zinc-400" data-testid="consent-opens">
+          Opens {s.opens.join(", ")}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function LookupChoice({ s, checked, onChange }: { s: LookupScope; checked: boolean; onChange: (on: boolean) => void }) {
+  const id = useId();
+  return (
+    <li className="flex items-start gap-2" data-testid="consent-lookup" data-key={s.key}>
+      <input id={id} type="checkbox" className={`mt-0.5 h-4 w-4 shrink-0 accent-blue-500 ${focusRing}`} checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <label htmlFor={id} className="text-zinc-200">
+        <ScopeWords s={s} />
+        {s.requested && !s.default && <span className="block text-xs text-zinc-400">The app asked for this. Tick it only if you want the app to read it.</span>}
+      </label>
+    </li>
   );
 }
