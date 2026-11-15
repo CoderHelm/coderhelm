@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { Page, PageHeader, SectionHeading, cardClass } from "@/components/page";
 import { Problem } from "@/components/problem";
@@ -13,7 +14,7 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { useToast } from "@/components/toast";
 import { relativeTime } from "@/lib/team";
 import { linkButton, smallDangerButton } from "@/components/ui";
-import { MCP_DOCS_URL, WRITE_SCOPE, connectedAppsApi, type Connection, type ConnectionList } from "@/lib/connected-apps";
+import { WRITE_SCOPE, connectedAppsApi, type Connection, type ConnectionList } from "@/lib/connected-apps";
 
 // The AI apps (MCP clients) people connected to Coderhelm, and the address
 // to add. Everyone sees and removes their own; people who manage API keys
@@ -96,9 +97,9 @@ export default function ConnectedAppsPage() {
             </div>
             <p className="mt-2 text-sm text-zinc-400">
               The app opens Coderhelm in your browser so you can sign in and choose what it may do.{" "}
-              <a href={MCP_DOCS_URL} target="_blank" rel="noreferrer" className={linkButton}>
-                How to add it to Claude, Cursor and VS Code
-              </a>
+              <Link href="/connect/" className={linkButton}>
+                Set it up in Claude, ChatGPT, Cursor, VS Code or Windsurf
+              </Link>
             </p>
           </section>
         )}
