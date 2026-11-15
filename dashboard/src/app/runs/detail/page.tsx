@@ -4,7 +4,7 @@ import { useCan } from "@/hooks/use-can";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { api, type RunDetail, type RunMergeStanding, type Openspec, type UsageInfo, type PluginDef, type PassTrace, type AgentLog, errorStatus } from "@/lib/api";
+import { api, type JiraAppUpdate, type RunDetail, type RunMergeStanding, type Openspec, type UsageInfo, type PluginDef, type PassTrace, type AgentLog, errorStatus } from "@/lib/api";
 import { Skeleton } from "@/components/skeleton";
 import { limitName, reachedLimit, usageBreakdown, usageTotal } from "@/lib/usage";
 import { useToast } from "@/components/toast";
@@ -200,6 +200,21 @@ function RunDetailInner() {
   useEffect(() => { api.getUsage().then(setUsage).catch(() => {}); }, []);
   // Only the catalog is needed: it turns the run's server ids into names.
   useEffect(() => { api.getPluginCatalog().then((c) => setCatalog(c.plugins)).catch(() => {}); }, []);
+  // A ticket from a Jira site whose Coderhelm app is older than the latest
+  // release: one quiet line saying the run may have missed comments, and why.
+  const fromJira = run?.ticket_source === "jira" || run?.trigger?.kind === "jira";
+  const [jiraApp, setJiraApp] = useState<JiraAppUpdate | null>(null);
+  useEffect(() => {
+    if (!fromJira) return;
+    let live = true;
+    api
+      .getJiraAppStatus()
+      .then((r) => live && setJiraApp(r.behind ?? null))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [fromJira]);
   // Any one monthly limit reached stops new work.
   const limitHit = usage ? reachedLimit(usage) : undefined;
   const tokensExceeded = limitHit !== undefined;
@@ -1134,6 +1149,20 @@ function RunDetailInner() {
         }
         more={more.length ? more : undefined}
       />
+
+      {fromJira && jiraApp?.run_note && (
+        <p className="mt-2 text-sm text-zinc-400" data-testid="run-jira-app-note">
+          {jiraApp.run_note}
+          {jiraApp.manage_url && (
+            <>
+              {" "}
+              <a href={jiraApp.manage_url} target="_blank" rel="noopener noreferrer" className="text-sky-300 underline-offset-2 hover:underline">
+                Open Manage apps
+              </a>
+            </>
+          )}
+        </p>
+      )}
 
       <div className="mt-6">{outcome}</div>
 

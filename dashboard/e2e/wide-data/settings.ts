@@ -331,6 +331,17 @@ export const settingsData: Handler = ({ method, path, url }) => {
     return { ready: true, secret_configured: true, configured_repos: { total: 2, enabled: 2 }, enabled_repos: [REPO, REPO_2], jira_events_seen: true, last_jira_event_at: iso(120), jira_event_count: 41, installation_id: 7, team_id: "t_1", forge_secret: `forge-secret-${SHA}${SHA}` };
   }
   if (p === "/api/integrations/jira/config") return JIRA_CONFIG;
+  // The site runs an older Coderhelm app: the longest notice and run-page line.
+  if (p === "/api/integrations/jira/app") {
+    const missing = ["full comment reading", "mentions", "in-place edits", "extended issue fields", "threaded replies", "issue type"];
+    return {
+      behind: {
+        version: "", latest: "6.11.0", missing, manage_url: `https://${SHA}${SHA}.atlassian.net/plugins/servlet/upm`, seen_at: iso(30),
+        message: `Your Jira site runs an older Coderhelm app (a version from before the app reported its number, latest 6.11.0). Missing: ${missing.join(", ")}. A Jira admin needs to accept the update: Jira Settings, Apps, Manage apps, Coderhelm, Update.`,
+        run_note: `Comments on this ticket may be incomplete: its Jira site runs an older Coderhelm app (a version from before the app reported its number, latest 6.11.0) without ${missing.join(", ")}. A Jira admin can accept the update in Manage apps.`,
+      },
+    };
+  }
   if (p === "/api/integrations/jira/events") {
     return { events: [{ event_id: "e1", event_type: "issue_updated", ticket_key: "WEBPLATFORM-123456", title: SENTENCE, status: "processed", repo: REPO, created_at: iso(120) }], total: 1 };
   }
