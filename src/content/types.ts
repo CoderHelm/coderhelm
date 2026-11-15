@@ -21,7 +21,8 @@ export type FrameId =
   | "stale"
   | "setup"
   | "knowledge"
-  | "infra";
+  | "infra"
+  | "connect";
 
 // Screenshots of the dashboard in public/shots/, taken from its end to end
 // tests' made up data (see src/content/shots.ts).

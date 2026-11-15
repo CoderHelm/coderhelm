@@ -365,7 +365,7 @@ Other events, and events from an installation not linked to a team, are accepted
 
 ### Jira webhook
 
-`POST /webhooks/jira/<token>`, from a plain Jira webhook you create when you can't install the app ([Connect Jira](/getting-started/jira)). **Verified by** the team's token in the address (unknown: `401`) and, if you generated a secret, `X-Hub-Signature: sha256=<hex>`, an HMAC-SHA256 of the raw body. **Triggers:** an issue labelled `coderhelm` (or `coderhelm:…`), or assigned to a CoderHelm user, in a project you switched on, starts a run; a comment retries a failed run or sends feedback to one with a pull request. Add `repo_owner` and `repo_name` (top level or under `coderhelm`) to pin the repository.
+`POST /webhooks/jira/<token>`, from a plain Jira webhook you create when you can't install the app ([Connect Atlassian](/getting-started/atlassian)). **Verified by** the team's token in the address (unknown: `401`) and, if you generated a secret, `X-Hub-Signature: sha256=<hex>`, an HMAC-SHA256 of the raw body. **Triggers:** an issue labelled `coderhelm` (or `coderhelm:…`), or assigned to a CoderHelm user, in a project you switched on, starts a run; a comment retries a failed run or sends feedback to one with a pull request. Add `repo_owner` and `repo_name` (top level or under `coderhelm`) to pin the repository.
 
 Sending from your own automation? Sign the exact bytes you send:
 

@@ -71,9 +71,28 @@ On a self-hosted install, use your own address in each of these instead of `http
 When you connect, the app opens a CoderHelm page in your browser. Sign in if you aren't already, then check:
 
 - **Which app is asking.** The app chooses its own name, so check the address it will send you back to (for Claude, `claude.ai`). If you didn't just add CoderHelm to an app, choose **Don't allow**.
-- **What it may do.** Seeing runs and reviews is always included. Starting and retrying runs and asking for reviews is a separate choice: leave it off and the app can only read. Searching your knowledge is a choice too, ticked when the app asks for it.
+- **What it may do.** Seeing runs and reviews is always included. Starting and retrying runs and asking for reviews is a separate choice: leave it off and the app can only read. Each of the team's bases is a choice in plain words: Code and Work are ticked, Infrastructure, Logs and Security only when you tick them, and Knowledge when the app asks for it.
 
 The app gets access for the team you are signed in to. To connect it to another team, switch teams in CoderHelm first.
+
+### Readers without an account
+
+An admin can turn on **Let people connect AI tools as readers** on the **Knowledge** page. Then someone in the team's GitHub organization who has no CoderHelm account chooses **Continue with GitHub** on the consent page and connects as a reader: they read only the bases open to readers, change nothing, and take no seat. Code follows each person's own GitHub access: a reader sees code only from the repositories their GitHub account can read.
+
+## The team's bases
+
+Every team has six knowledge bases with nothing to set up. Each has its own readers, chosen on the **Knowledge** page, and its own scope:
+
+| Base | What it holds | Scope | Ticked at first |
+| --- | --- | --- | --- |
+| Code | The team's repositories: files, code search, the code graph and history | `code:read` | Yes |
+| Work | Tickets, pull requests, runs, reviews and plans | `work:read` | Yes |
+| Infrastructure | AWS accounts and resources, where each is defined in Terraform, CDK or CloudFormation, and pending updates | `infra:read` | No |
+| Logs | Log findings and alerts, and the repository and service each belongs to | `logs:read` | No |
+| Security | Dependency advisories and CVEs, infrastructure findings and quarantined tests | `security:read` | No |
+| Knowledge | The knowledge bases your team made: Confluence, Notion, Google Drive, uploads and more | `knowledge:read` | When asked |
+
+An app reads a base only when three things agree: your CoderHelm role opens what the base holds, the base is open to you, and the connection holds its scope. Results that aren't open to you are counted, never shown.
 
 ## What the app can do
 
@@ -86,6 +105,13 @@ The app gets access for the team you are signed in to. To connect it to another 
 | `list_reviews` | Lists the reviewer's reviews, newest first. | Reading |
 | `get_review` | One review with its findings, by its id or by pull request address. | Reading |
 | `request_review` | Asks the reviewer to review a pull request now, the same as **Re-review**. | Starting runs |
+| `search` | Searches every base you and the connection can read, or one with `base` (`code`, `work`, `infra`, `logs`, `security`, `team`). Each result has an id, title, link and the base it came from. | A base's scope |
+| `fetch` | Reads one search result in full by its id, checking access again and reading it again now. Takes `base` too. | The result's base |
+| `list_bases` | The six bases, each with what it holds, counts, when it was last updated and whether you and this connection may read it. | Reading |
+| `find_tickets`, `find_pull_requests`, `find_runs` | Tickets, pull requests and runs, with status, links and dates. | `work:read` |
+| `find_findings` | Security and infrastructure findings, quarantined tests, reviews, alerts, log findings and plans. | The kind's base |
+| `infra_resources` | AWS resources: name, type, account, region, where each is defined in code and what AWS has pending for it. | `infra:read` |
+| `code_search`, `read_file`, `code_symbol`, `history` | Search code, read lines at a commit, ask the code graph, and read a repository's history. | `code:read` |
 | `knowledge_list` | Lists the knowledge bases you can read in Chat. | Searching knowledge |
 | `knowledge_search` | Finds the best passages for a question in those knowledge bases (or one of them), each with its source's title, link, last updated time and score. | Searching knowledge |
 
@@ -107,8 +133,8 @@ CoderHelm follows the MCP authorization spec:
 
 - Protected resource metadata: `/.well-known/oauth-protected-resource/mcp`
 - Authorization server metadata: `/.well-known/oauth-authorization-server`
-- Dynamic client registration at `/oauth/register`. Clients are public: PKCE with `S256` is required and there is no client secret.
-- Scopes: `runs:read`, `runs:write` and `knowledge:read`. A first sign-in is asked for `runs:read`; a tool that needs `runs:write` or `knowledge:read` answers `403` with `insufficient_scope`, so a client can ask again.
+- Client ID Metadata Documents: an `https` address as `client_id` is read and checked (its `client_id` must be its own address, and the redirect must be one it lists). Dynamic client registration at `/oauth/register` still works. Clients are public: PKCE with `S256` is required and there is no client secret.
+- Scopes: `runs:read`, `runs:write`, `knowledge:read`, `code:read`, `work:read`, `infra:read`, `logs:read` and `security:read`. A first sign-in is asked for `runs:read knowledge:read code:read work:read`; a tool that needs another scope answers `403` with `insufficient_scope`, so a client can ask again.
 - Access tokens last an hour. Refresh tokens last 30 days from their last use and are replaced on every use.
 - Tokens are revoked at `/oauth/revoke`.
 - Programs that sign in without a person, such as Amazon Bedrock AgentCore Gateway, use a **knowledge key** made on **Knowledge**, **Use in Bedrock**. It holds only `knowledge:read`, and works as an API key (`Authorization: Bearer chkb_...` or `X-Api-Key`) or as OAuth client credentials (`grant_type=client_credentials` at `/oauth/token`, with `client_secret_basic` or `client_secret_post`). See [Connect CoderHelm knowledge to Amazon Bedrock](/bedrock).

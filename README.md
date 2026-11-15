@@ -39,7 +39,7 @@ This repository holds the dashboard, the docs site and the website. The agent, t
 
 | Feature | What you get |
 |---|---|
-| [Tickets to pull requests](https://docs.coderhelm.com/getting-started/first-run) | Assign a [GitHub issue](https://docs.coderhelm.com/getting-started/github) or [Jira ticket](https://docs.coderhelm.com/getting-started/jira), add the `coderhelm` label or comment `/coderhelm`. A plan, the change, your tests, a self review and a pull request. |
+| [Tickets to pull requests](https://docs.coderhelm.com/getting-started/first-run) | Assign a [GitHub issue](https://docs.coderhelm.com/getting-started/github) or [Jira ticket](https://docs.coderhelm.com/getting-started/atlassian), add the `coderhelm` label or comment `/coderhelm`. A plan, the change, your tests, a self review and a pull request. |
 | [PR reviewer](https://docs.coderhelm.com/getting-started/reviewer) | Add the review label (`ch-review` by default) to any pull request. A real GitHub review with line comments, a risk level and a verdict: it requests changes only for a named correctness, security or data loss problem with its evidence, and everything else is a labeled note. |
 | [CI and review comment fixes](https://docs.coderhelm.com/getting-started/review-fixes) | Fixes failing CI on its pull requests, answers review comments, resolves conflicts and, with auto merge on, merges only the exact commit it reviewed. |
 | [Alerts to fixes](https://coderhelm.com/alerts) | Route CloudWatch alarms and EventBridge events through SNS. Matching alerts become analyzed pull requests that a person approves. |
