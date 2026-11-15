@@ -9,6 +9,7 @@ import { StatusDot } from "@/components/list/status";
 import { useCan } from "@/hooks/use-can";
 import { buttonClass, focusRing, primaryButton, secondaryButton } from "@/components/ui";
 import { AddFlow } from "@/components/knowledge/add-flow";
+import { BuiltinBases } from "@/components/knowledge/builtin";
 import { SyncLimits } from "@/components/knowledge/sync-limits";
 import { LogoStack, SourceLogo } from "@/components/knowledge/logos";
 import { KIND_LABEL, READ_SHORT, baseHealth, itemWord, knowledge, type AddKind, type Base, type KnowledgeLimits, type SourceKind, connectedInPlace } from "@/lib/knowledge";
@@ -96,6 +97,12 @@ function Knowledge() {
         }
       />
       <div className="mt-8">
+        <BuiltinBases />
+      </div>
+      <div className="mt-10">
+        <h2 className="mb-4 text-base font-semibold text-zinc-100" data-testid="custom-heading">
+          Made by your team
+        </h2>
         {error ? (
           <ListError title="Couldn't load Knowledge" onRetry={load}>
             {error}

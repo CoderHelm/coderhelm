@@ -52,6 +52,7 @@ async function mockApi(page: Page, init: Partial<Db> = {}): Promise<Db> {
     if (p === "/api/security/infrastructure/insights") return json(route, INFRA_INSIGHTS);
     if (p === "/api/security/infrastructure/check") return json(route, { status: "queued" }, 202);
     if (/^\/api\/security\/infrastructure\/findings\/[^/]+\/fix$/.test(p)) return json(route, { status: "started", reason: null });
+    if (/^\/api\/security\/infrastructure\/findings\/[^/]+\/apply$/.test(p)) return json(route, { status: "queued", when: (body as { when?: string } | null)?.when ?? "next-maintenance" });
     if (p === "/api/infra/analysis" || p.startsWith("/api/infra")) return json(route, { analysis: null });
     return json(route, { error: `Not mocked: ${method} ${p}` }, 404);
   });
@@ -61,6 +62,61 @@ async function mockApi(page: Page, init: Partial<Db> = {}): Promise<Db> {
 const call = (db: Db, c: string) => db.calls.filter((x) => x.call === c);
 
 test.describe("Infrastructure vulnerabilities", () => {
+  test("fixed and removed rows leave the open list, an update in AWS is approved, and a stale read refreshes", async ({ page }) => {
+    const osUpdate = infraFinding({
+      id: "f_os",
+      kind: "rds_cluster",
+      name: "staging-orders-db",
+      title: "Aurora cluster staging-orders-db: operating system update (the cluster and its 1 instance) pending",
+      tier: "P2",
+      fix: {
+        kind: "apply",
+        summary: "CoderHelm applies the operating system update in AWS after your approval (`os-upgrade`)",
+        location: null,
+        from: "16.13",
+        to: "",
+        cli: [],
+        console: "",
+        apply_by: "",
+        reason: "New Operating System patch is available",
+        decision: "CoderHelm applies this in AWS after one approval.",
+        apply: { action: "os-upgrade", arns: ["arn:aws:rds:us-east-1:111122223333:cluster:staging-orders-db"], permission: "rds:ApplyPendingMaintenanceAction", default_opt_in: "next-maintenance", effect: "Each instance restarts." },
+      },
+    });
+    const fixed = infraFinding({ id: "f_fixed", title: "Aurora cluster prod-orders-db: engine version upgrade to 16.13 pending", status: "fixed", fixed_at: iso(-2), actionable: false });
+    const removed = infraFinding({
+      id: "f_removed",
+      kind: "rds_instance",
+      title: "RDS instance legacy-db-0002: operating system update pending",
+      status: "removed",
+      fixed_at: iso(-2),
+      removed_at: iso(-2),
+      actionable: false,
+      fix: { kind: "runbook", summary: "Apply it in AWS", location: null, from: "", to: "", cli: ["aws rds apply-pending-maintenance-action"], console: "", apply_by: "", reason: "" },
+    });
+    const merged = infraFinding({ id: "f_merged", title: "Merged duplicate", status: "merged" });
+    const stale = infraOverview({ findings: [osUpdate, fixed, removed, merged], read_at: iso(-30), oldest_read_at: iso(-30), refreshing: true });
+    const db = await mockApi(page, { overview: stale });
+    await page.goto("/security/infrastructure");
+    await expect(page.getByTestId("infra-refreshing")).toBeVisible();
+    const open = page.getByRole("list", { name: "Infrastructure findings" }).getByTestId("infra-row");
+    await expect(open).toHaveCount(1);
+    await expect(open.first()).toContainText("operating system update");
+    await expect(page.getByText("Merged duplicate")).toHaveCount(0);
+    // Approve: the default is the next maintenance window.
+    await open.first().getByTestId("infra-apply").click();
+    await expect.poll(() => call(db, "POST /api/security/infrastructure/findings/f_os/apply").length).toBe(1);
+    expect(call(db, "POST /api/security/infrastructure/findings/f_os/apply")[0].body).toEqual({ when: "next-maintenance" });
+    // The closed rows sit under their own filter, with nothing to click.
+    await page.getByRole("group", { name: "Show" }).getByRole("button", { name: /Fixed \/ Removed/ }).click();
+    const closed = page.getByRole("list", { name: "Fixed or removed findings" }).getByTestId("infra-row");
+    await expect(closed).toHaveCount(2);
+    await expect(closed.getByTestId("infra-fix")).toHaveCount(0);
+    await expect(closed.getByTestId("infra-apply")).toHaveCount(0);
+    await expect(closed.getByTestId("fix-chip")).toHaveCount(0);
+    await expect(closed.filter({ hasText: "legacy-db-0002" }).getByTestId("infra-closed")).toHaveAttribute("data-status", "removed");
+  });
+
   test("the Infrastructure tab groups by fix: PRs, a runbook card and AWS-managed rows that never count", async ({ page }) => {
     const db = await mockApi(page);
     await page.goto("/security/infrastructure");

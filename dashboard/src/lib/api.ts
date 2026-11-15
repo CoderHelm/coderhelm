@@ -3093,8 +3093,10 @@ export interface JiraAppUpdate {
   latest: string;
   /** What the site's version lacks ("threaded replies", ...). */
   missing: string[];
-  /** The site's Manage apps page, where its admin accepts the update. */
+  /** Atlassian Administration, where a site admin accepts the update (Apps, Sites, the site, Connected apps). */
   manage_url: string;
+  /** The app's installation link (one click to update), when published; missing from older gateways. */
+  install_url?: string;
   /** When the site was last heard from. */
   seen_at: string;
   /** The Integrations page's notice. */
@@ -4628,7 +4630,7 @@ export interface McpAddRequest {
 
 /** One card on Settings → Integrations. */
 export interface Integration {
-  /** `github`, `jira`, `aws` or `aws-<account>`, `newrelic`, `confluence`, `teams`, or an MCP server id. */
+  /** `github`, `atlassian` (Jira, Confluence and Atlassian's own server), `aws` or `aws-<account>`, `newrelic`, `teams`, or an MCP server id. */
   id: string;
   section: IntegrationSection;
   name: string;
@@ -4653,6 +4655,18 @@ export interface Integration {
   /** Who connected it and when, when the record says. */
   connected_by?: string;
   connected_at?: string;
+}
+
+/**
+ * One piece of the one Atlassian card (`detail.parts`): the Jira app, Confluence, and Atlassian's own
+ * server for agent tools. `item` is the piece's own card, set up and fixed as it always was.
+ */
+export interface AtlassianPart {
+  id: "jira" | "confluence" | "agent_tools";
+  name: string;
+  /** What the piece does, in a sentence. */
+  what: string;
+  item: Integration | null;
 }
 
 /** One use of a product. `on` works; `attention` is set up but broken; `ready` a working sign-in can serve it; `needs` takes a different grant. */
@@ -5862,7 +5876,7 @@ export interface DeliveryEmail {
 // ── Hybrid (self-hosted) ────────────────────────────────────────────────
 
 export type HybridCheckStatus = "pass" | "fail" | "wait" | "todo";
-export type HybridIntegrationId = "github" | "jira" | "notion" | "confluence" | "google_drive" | (string & {});
+export type HybridIntegrationId = "github" | "atlassian" | "notion" | "google_drive" | (string & {});
 
 export interface HybridGithubLink {
   installation_id: number;
@@ -5889,6 +5903,8 @@ export interface HybridIntegration {
   offered?: boolean;
   /** Tools under Other apps: the install has its own app for it, which it uses either way. Missing from older gateways. */
   own_app?: boolean;
+  /** The pieces one entry covers, by the ids installs chose before (Atlassian: `jira` and `confluence`). */
+  parts?: string[];
 }
 
 export interface HybridCheck {

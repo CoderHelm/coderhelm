@@ -1153,11 +1153,11 @@ function RunDetailInner() {
       {fromJira && jiraApp?.run_note && (
         <p className="mt-2 text-sm text-zinc-400" data-testid="run-jira-app-note">
           {jiraApp.run_note}
-          {jiraApp.manage_url && (
+          {(jiraApp.install_url || jiraApp.manage_url) && (
             <>
               {" "}
-              <a href={jiraApp.manage_url} target="_blank" rel="noopener noreferrer" className="text-sky-300 underline-offset-2 hover:underline">
-                Open Manage apps
+              <a href={jiraApp.install_url || jiraApp.manage_url} target="_blank" rel="noopener noreferrer" className="text-sky-300 underline-offset-2 hover:underline">
+                {jiraApp.install_url ? "Update the app" : "Open Atlassian Administration"}
               </a>
             </>
           )}

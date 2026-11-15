@@ -22,7 +22,7 @@ import { Page, PageHeader, Section } from "@/components/page";
 import { HybridAppChoice } from "@/components/hybrid-app-choice";
 import { HostedJiraLinked, HostedJiraLinkRequest, HybridJiraLink } from "@/components/hybrid-jira-link";
 import { isSelfHosted } from "@/lib/runtime-config";
-import { useHybrid } from "@/lib/hybrid";
+import { integrationOf, useHybrid } from "@/lib/hybrid";
 import { Code, Field, SaveBar, SettingsRow, SettingsSection, Switch, useDirtyForm } from "@/components/settings";
 import { buttonClass, focusRing, inputClass, linkButton, primaryButton, secondaryButton } from "@/components/ui";
 import { Select } from "@/components/select";
@@ -440,7 +440,7 @@ function SetupGuide({
   const self = isSelfHosted();
   const hybrid = useHybrid();
   const relayed =
-    self && !!hybrid.status?.registered && !!hybrid.status.install_id && hybrid.status.integrations.some((i) => i.id === "jira" && i.uses_coderhelm);
+    self && !!hybrid.status?.registered && !!hybrid.status.install_id && !!integrationOf(hybrid.status.integrations, "jira")?.uses_coderhelm;
   const ownCopy = self && !relayed;
   const [picked, setPicked] = useState<"app" | "webhook" | null>(null);
   const how = picked ?? (ownCopy ? "webhook" : "app");

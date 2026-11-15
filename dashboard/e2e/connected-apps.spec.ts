@@ -40,6 +40,10 @@ interface Opts {
   teamWide?: boolean;
   signedIn?: boolean;
   describeError?: string;
+  /** The gateway sends each scope in plain words, the bases it opens and the team lookups to choose. */
+  bases?: boolean;
+  reader?: boolean;
+  github?: boolean;
 }
 
 async function mockApi(page: Page, o: Opts = {}): Promise<Db> {
@@ -68,7 +72,7 @@ async function mockApi(page: Page, o: Opts = {}): Promise<Db> {
     if (p === "/api/usage") return json(route, { month: "2026-01", total_tokens: 0, tokens_in: 0, tokens_out: 0, total_runs: 0, max_tokens: 0 });
     if (p === "/api/banners") return json(route, { banners: [] });
     if (p === "/api/teams") return json(route, { teams: [{ team_id: "t_1", org: "acme-labs", status: "active", current: true }] });
-    if (p === "/auth/methods") return json(route, { password: true, google: false, github: false });
+    if (p === "/auth/methods") return json(route, { password: true, google: false, github: o.github ?? false });
     if (p === "/api/mcp/authorize/describe") {
       if (o.describeError) return json(route, { error: o.describeError }, 400);
       return json(route, {
@@ -86,6 +90,22 @@ async function mockApi(page: Page, o: Opts = {}): Promise<Db> {
         team_id: "t_1",
         can_act: o.canAct ?? true,
         mcp_url: MCP_URL,
+        ...(o.bases
+          ? {
+              reader: o.reader ?? false,
+              scopes: [
+                { key: "runs:read", label: "See your team's runs and reviews", requested: true, always: true, plain: "Runs", opens: [] },
+                { key: "knowledge:read", label: "Search the knowledge bases you can read in Chat", requested: true, always: false, plain: "Knowledge", opens: ["Knowledge"] },
+              ],
+              lookup_scopes: [
+                { key: "code:read", label: "Read and search your team's code, as Chat does", requested: true, default: true, plain: "Code", opens: ["Code"] },
+                { key: "work:read", label: "Find tickets, pull requests, runs, reviews and plans you can see", requested: true, default: true, plain: "Work", opens: ["Work"] },
+                { key: "infra:read", label: "Read your team's AWS resources and where each is defined", requested: true, default: false, plain: "Infrastructure", opens: ["Infrastructure"] },
+                { key: "logs:read", label: "Read log findings and alerts you can see", requested: false, default: false, plain: "Logs", opens: ["Logs"] },
+                { key: "security:read", label: "Read security findings you can see", requested: false, default: false, plain: "Security", opens: ["Security"] },
+              ],
+            }
+          : {}),
       });
     }
     if (p === "/api/mcp/authorize" && method === "POST") {
@@ -240,4 +260,37 @@ test("knowledge stays off when the app didn't ask, or the person unticks it", as
   await page.getByRole("button", { name: "Allow", exact: true }).click();
   await page.waitForURL(/code=chc_test_code/);
   expect(db.calls.find((c) => c.path === "/api/mcp/authorize")?.body).toMatchObject({ allow_knowledge: false });
+});
+
+test("the consent page names each scope in plain words, the bases it opens, and the lookups to choose", async ({ page }) => {
+  const db = await mockApi(page, { bases: true, reader: true });
+  await page.goto(`/authorize/?request=${REQUEST}`);
+  const list = page.getByRole("list", { name: "What the app may do" });
+  await expect(list.getByText("Runs:", { exact: false })).toBeVisible();
+  const lookups = page.getByTestId("consent-lookup");
+  await expect(lookups).toHaveCount(5);
+  await expect(lookups.nth(0)).toContainText("Code:");
+  await expect(lookups.nth(0)).toContainText("Opens Code");
+  await expect(lookups.nth(2)).toContainText("Opens Infrastructure");
+  // Code and work ticked; infrastructure, logs and security only when the person ticks them.
+  await expect(lookups.nth(0).getByRole("checkbox")).toBeChecked();
+  await expect(lookups.nth(1).getByRole("checkbox")).toBeChecked();
+  await expect(lookups.nth(2).getByRole("checkbox")).not.toBeChecked();
+  await expect(lookups.nth(2)).toContainText("The app asked for this");
+  await expect(page.getByTestId("consent-reader")).toContainText("don't take a seat");
+  await lookups.nth(2).getByRole("checkbox").check();
+  await lookups.nth(1).getByRole("checkbox").uncheck();
+  await shot(page, "consent-bases-1280.png");
+  await page.getByRole("button", { name: "Allow", exact: true }).click();
+  await expect.poll(() => db.calls.find((c) => c.path === "/api/mcp/authorize")?.body).toMatchObject({ approve: true, allow_scopes: ["code:read", "infra:read"] });
+});
+
+test("signed out on the consent page, GitHub sign-in comes back to it and offers reader access", async ({ page }) => {
+  await mockApi(page, { signedIn: false, github: true });
+  await page.goto(`/authorize/?request=${REQUEST}`);
+  await expect(page.getByTestId("sign-in-reader")).toContainText("without a seat");
+  const gh = page.getByRole("link", { name: "Continue with GitHub" });
+  const href = await gh.getAttribute("href");
+  expect(href?.endsWith(`/auth/github?return_to=${encodeURIComponent(`/authorize/?request=${REQUEST}`)}`)).toBe(true);
+  await shot(page, "consent-signed-out-reader-1280.png");
 });

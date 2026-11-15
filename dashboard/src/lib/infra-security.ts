@@ -22,8 +22,35 @@ export type InfraKind =
   | "opensearch_domain"
   | "container_image";
 
-export type FixKind = "pr" | "runbook" | "aws";
-export type InfraStatus = "open" | "fixing" | "pr_open" | "fixed" | "aws_managed" | "dismissed";
+export type FixKind = "pr" | "apply" | "runbook" | "aws";
+export type InfraStatus = "open" | "fixing" | "pr_open" | "fixed" | "aws_managed" | "dismissed" | "removed" | "merged";
+
+/** When to apply a pending action in AWS. */
+export type ApplyWhen = "next-maintenance" | "immediate";
+
+/** How Coderhelm applies a pending action once a person approves it. */
+export interface InfraApplyPlan {
+  /** AWS's name for the action: os-upgrade, system-update, db-upgrade, ... */
+  action: string;
+  arns: string[];
+  /** The IAM action the role needs. */
+  permission: string;
+  default_opt_in: ApplyWhen;
+  /** What applying it does to the database, in a line. */
+  effect: string;
+}
+
+/** A person's approval, and what AWS answered. */
+export interface InfraApplyState {
+  opt_in: ApplyWhen;
+  approved_by: string;
+  approved_at: string;
+  applied_at?: string;
+  applied?: string[];
+  note?: string;
+  /** The IAM action the role lacks, when AWS refused for that. */
+  missing_permission?: string;
+}
 
 export type InfraConfidence = "high" | "medium" | "low";
 
@@ -142,6 +169,8 @@ export interface InfraFix {
   after?: string[];
   /** Why no CVE is named, or that an advisory is only related. */
   advisory_note?: string;
+  /** What Coderhelm applies after one approval (kind "apply"). */
+  apply?: InfraApplyPlan | null;
 }
 
 export interface InfraFinding {
@@ -176,6 +205,12 @@ export interface InfraFinding {
   first_seen_at: string;
   updated_at: string;
   fixed_at?: string | null;
+  /** When a full read of the account stopped listing the resource. */
+  removed_at?: string | null;
+  /** A person's approval of the action Coderhelm applies, and AWS's answer. */
+  apply?: InfraApplyState | null;
+  /** False once the finding is closed: nothing to open, follow or approve. */
+  actionable?: boolean;
   environment?: string;
   /** The lines of a fix run's change that would have replaced or destroyed a data resource. */
   refused?: string[];
@@ -199,15 +234,43 @@ export interface InfraAccount {
   missing: string[];
   update_url: string | null;
   read: { read_at: string; resources: number; errors: InfraReadError[] } | null;
+  /** Whether the role may apply approved maintenance (null until checked). */
+  apply_maintenance?: boolean | null;
 }
 
 export interface InfraOverview {
   enabled: boolean;
   dry_run: boolean;
-  counts: { open: number; p0: number; p1: number; p2: number; p3: number; prs: number; runbooks: number; aws_managed: number; fixed_30d: number };
+  counts: {
+    open: number;
+    p0: number;
+    p1: number;
+    p2: number;
+    p3: number;
+    prs: number;
+    runbooks: number;
+    aws_managed: number;
+    fixed_30d: number;
+    removed_30d?: number;
+    applies?: number;
+  };
   accounts: InfraAccount[];
   findings: InfraFinding[];
   read_at: string | null;
+  /** The oldest of the accounts' latest reads: how old the list can be. */
+  oldest_read_at: string | null;
+  /** Opening the page started a fresh read of the accounts. */
+  refreshing: boolean;
+}
+
+/** Fixed or removed: closed by a read of the account. */
+export function isClosed(f: Pick<InfraFinding, "status">): boolean {
+  return f.status === "fixed" || f.status === "removed";
+}
+
+/** A step in AWS: a runbook, or an action Coderhelm applies after approval. */
+export function inAws(f: Pick<InfraFinding, "fix">): boolean {
+  return f.fix.kind === "runbook" || f.fix.kind === "apply";
 }
 
 export interface InfraPending {
@@ -304,8 +367,10 @@ export function checkInfraOverview(r: unknown): InfraOverview {
     enabled: o.enabled !== false,
     dry_run: o.dry_run === true,
     accounts: Array.isArray(o.accounts) ? (o.accounts as InfraAccount[]) : [],
-    findings,
+    findings: findings.filter((f) => f.status !== "merged"),
     read_at: typeof o.read_at === "string" ? o.read_at : null,
+    oldest_read_at: typeof o.oldest_read_at === "string" ? o.oldest_read_at : typeof o.read_at === "string" ? o.read_at : null,
+    refreshing: o.refreshing === true,
   };
 }
 
@@ -355,6 +420,12 @@ export const infraApi = {
   check: () => request<{ status: string }>("/api/security/infrastructure/check", json("POST")),
   fix: (id: string) =>
     request<{ status: "started" | "queued" | "skipped"; reason: string | null }>(`/api/security/infrastructure/findings/${encodeURIComponent(id)}/fix`, json("POST")),
+  /** Approve a pending action Coderhelm applies in AWS. */
+  apply: (id: string, when: ApplyWhen) =>
+    request<{ status: "queued" | "skipped"; reason?: string | null; when?: ApplyWhen }>(
+      `/api/security/infrastructure/findings/${encodeURIComponent(id)}/apply`,
+      json("POST", { when }),
+    ),
 };
 
 // ── Words ───────────────────────────────────────────────────────────────
@@ -392,6 +463,7 @@ export function countWords(kind: InfraKind, n: number): string {
 
 export const FIX_LOOK: Record<FixKind, { label: string; tone: Tone; hover: string }> = {
   pr: { label: "Fix PR", tone: "info", hover: "A pull request in the code that defines it." },
+  apply: { label: "Applied by Coderhelm", tone: "info", hover: "A step in AWS with no code change. Coderhelm applies it after one approval, non-production first, and checks the result." },
   runbook: { label: "Runbook", tone: "attention", hover: "A step to apply in AWS. Coderhelm shows it; it never runs it." },
   aws: { label: "AWS-managed", tone: "muted", hover: "AWS patches it. Nothing to do." },
 };
@@ -403,6 +475,8 @@ export const INFRA_STATUS_LOOK: Record<InfraStatus, { label: string; tone: Tone 
   fixed: { label: "Fixed", tone: "success" },
   aws_managed: { label: "AWS-managed", tone: "muted" },
   dismissed: { label: "Dismissed", tone: "muted" },
+  removed: { label: "Removed", tone: "muted" },
+  merged: { label: "Merged", tone: "muted" },
 };
 
 /** A GitHub link to where the resource is defined, when the location names a file. */

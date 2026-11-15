@@ -13,6 +13,7 @@ import {
   type IntegrationSection,
   type IntegrationStatus,
   type IntegrationUse,
+  type AtlassianPart,
   type JiraAppUpdate,
   type KnowledgeSignIn,
   type McpServer,
@@ -35,16 +36,16 @@ import { BrandIcon } from "@/components/brand-icons";
 import { EmptyState } from "@/components/empty-state";
 import { Problem } from "@/components/problem";
 import { INTEGRATION_STATUS } from "@/lib/integration-status";
-import { AddMcpServerDialog, McpServerPanel } from "@/components/mcp-servers";
+import { AddMcpServerDialog, McpServerPanel, beginCatalogSignIn } from "@/components/mcp-servers";
 import { CatalogPanel } from "@/components/mcp-server-panel";
-import { Attention, ConnectionFacts, DangerRow, OtherWays, PanelLink, PanelSection, UsesList, Way, type Fact } from "@/components/integration-panel";
-import { KnowledgeDisconnect, KnowledgeSignInControl } from "@/components/knowledge-connection";
+import { Attention, ConnectionFacts, DangerRow, OtherWays, PanelLink, PanelSection, SignInControl, UsesList, Way, type Fact } from "@/components/integration-panel";
+import { KnowledgeDisconnect, KnowledgeSignInControl, beginKnowledgeSignIn } from "@/components/knowledge-connection";
 
 // Settings → Integrations: every outside system Coderhelm connects to, as one
 // list per kind of tool. One row per integration with the same columns in the
 // same places (mark, name and a short line, status, one action), so the eye
 // runs down a column instead of zigzagging across cards. A row opens its
-// settings: in place, or on its own page for GitHub, Jira and AWS. Why
+// settings: in place, or on its own page for GitHub and AWS. Why
 // something isn't working is said inside, not on the row.
 //
 // Every opened row follows one pattern (components/integration-panel.tsx):
@@ -95,10 +96,8 @@ const ORDER: Record<IntegrationStatus, number> = { needs_credentials: 0, needs_r
 /** What each one is for, short enough for one line of a list. The full sentence is inside. */
 const SHORT: Record<string, string> = {
   github: "Reads code, opens and reviews pull requests",
-  jira: "Starts work from tickets and keeps them in step",
   aws: "Logs, metrics and Airflow through a read-only role",
   newrelic: "Queries, deploy markers and error rates",
-  confluence: "Reads pages for context",
   google_drive: "Folders, Docs, Sheets and PDFs, synced into Knowledge",
   opensearch: "Searches the indexes your app reads",
   rest: "Reads records from an API you use",
@@ -121,7 +120,10 @@ const SHORT: Record<string, string> = {
   turso: "Databases and queries",
   neon: "Postgres databases and branches",
   launchdarkly: "Feature flags and targeting",
-  atlassian: "Jira issues and Confluence pages, through Atlassian's own server",
+  atlassian: "Jira tickets, Confluence pages and agent tools",
+  // Older gateways still send Jira and Confluence as rows of their own.
+  jira: "Starts work from tickets and keeps them in step",
+  confluence: "Reads pages for context",
 };
 
 function shortLine(item: Integration): string {
@@ -133,6 +135,12 @@ function shortLine(item: Integration): string {
 function remoteOf(item: Integration): McpServer | null {
   return ((item.detail as { remote?: McpServer | null }).remote ?? null) as McpServer | null;
 }
+
+/** Links made before Jira and Confluence were pieces of the one Atlassian row open that row. */
+const ANCHOR_ALIASES: Record<string, string> = {
+  "integration-jira": "integration-atlassian",
+  "integration-confluence": "integration-atlassian",
+};
 
 /** The anchor a row answers to (`#integration-aws` for the first AWS account). */
 function anchorOf(item: Integration, firstAws: boolean): string {
@@ -167,7 +175,10 @@ function IntegrationsPage() {
   // Open the row a link points at (#integration-sentry from a skill check).
   const [target, setTarget] = useState("");
   useEffect(() => {
-    const read = () => setTarget(window.location.hash.replace(/^#/, ""));
+    const read = () => {
+      const h = window.location.hash.replace(/^#/, "");
+      setTarget(ANCHOR_ALIASES[h] ?? h);
+    };
     read();
     window.addEventListener("hashchange", read);
     return () => window.removeEventListener("hashchange", read);
@@ -506,7 +517,7 @@ function IntegrationRow({
         </div>
       )}
 
-      {kind === "jira" && appUpdateOf(item) && <JiraAppNotice update={appUpdateOf(item)!} />}
+      {(kind === "jira" || kind === "atlassian") && appUpdateOf(item) && <JiraAppNotice update={appUpdateOf(item)!} />}
 
       {open && (canEdit || personal) && (
         <div id={panelId} data-testid="integration-panel" className="border-t border-zinc-800 bg-zinc-950/40 px-4 pb-4 pt-3 sm:pl-[3.75rem]">
@@ -535,6 +546,7 @@ function IntegrationRow({
           {kind === "knowledge" && <KnowledgePanel item={item} canEdit={canEdit} onChanged={onReload} />}
           {kind === "remote" && remote && <McpServerPanel server={remote} canEdit={canEdit} onChanged={onReload} onRemoved={() => setOpen(false)} />}
           {kind === "plugin" && <CatalogPanel item={item} canEdit={canEdit} onChanged={onReload} onClose={() => setOpen(false)} />}
+          {kind === "atlassian" && <AtlassianPanel item={item} canEdit={canEdit} onReload={onReload} onClose={() => setOpen(false)} />}
           {kind === "chat" && <ChatPanel channel={item.id as ChatChannel} onSaved={onReload} />}
           <p className="mt-4 flex flex-wrap gap-x-4 gap-y-2">
             <button type="button" onClick={() => setOpen(false)} className={linkButton}>
@@ -566,11 +578,18 @@ function JiraAppNotice({ update }: { update: JiraAppUpdate }) {
     <div className="border-t border-zinc-800 px-4 pb-3 pt-2 sm:pl-[3.75rem]">
       <Callout variant="warning" testId="jira-app-update" live={false}>
         <p>{update.message}</p>
-        {update.manage_url && (
-          <p className="mt-2">
-            <a href={update.manage_url} target="_blank" rel="noopener noreferrer" className={linkButton}>
-              Open Manage apps in Jira
-            </a>
+        {(update.install_url || update.manage_url) && (
+          <p className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
+            {update.install_url && (
+              <a href={update.install_url} target="_blank" rel="noopener noreferrer" className={linkButton}>
+                Update with the installation link
+              </a>
+            )}
+            {update.manage_url && (
+              <a href={update.manage_url} target="_blank" rel="noopener noreferrer" className={linkButton}>
+                Open Connected apps in Atlassian Administration
+              </a>
+            )}
           </p>
         )}
       </Callout>
@@ -578,11 +597,12 @@ function JiraAppNotice({ update }: { update: JiraAppUpdate }) {
   );
 }
 
-type Kind = "github" | "jira" | "aws_connect" | "aws_account" | "connector" | "chat" | "remote" | "plugin" | "knowledge";
+type Kind = "github" | "jira" | "atlassian" | "aws_connect" | "aws_account" | "connector" | "chat" | "remote" | "plugin" | "knowledge";
 
 function kindOf(item: Integration): Kind {
   if (item.id === "github") return "github";
   if (item.id === "jira") return "jira";
+  if (item.id === "atlassian" && (item.detail as { parts?: unknown }).parts) return "atlassian";
   if (item.id === "aws") return "aws_connect";
   if (item.id.startsWith("aws-")) return "aws_account";
   if (["newrelic", "confluence", "opensearch", "rest"].includes(item.id.split(":")[0])) return "connector";
@@ -620,12 +640,15 @@ function ConnectorPanel({
   checking,
   onCheck,
   onSaved,
+  signInFirst = false,
 }: {
   item: Integration;
   canEdit: boolean;
   checking: boolean;
   onCheck: () => Promise<void>;
   onSaved: () => Promise<void>;
+  /** Inside the Atlassian row, where Connect signs in: the token form is another way, folded away. */
+  signInFirst?: boolean;
 }) {
   const { confirm } = useConfirm();
   const { toast } = useToast();
@@ -718,7 +741,14 @@ function ConnectorPanel({
       )}
 
       {/* Not connected: what it needs and the one form. */}
-      {!saved && !k && canEdit && form(true)}
+      {!saved && !k && canEdit && !signInFirst && form(true)}
+      {!saved && !k && canEdit && signInFirst && (
+        <OtherWays>
+          <Way title="Use an API token" when="Agents read pages with an Atlassian account's token instead of a sign-in, and can add text to pages you list.">
+            {form(true)}
+          </Way>
+        </OtherWays>
+      )}
       {/* Connected for Knowledge only: runs take one switch above; a token is the other way. */}
       {!saved && k && canEdit && (
         <OtherWays>
@@ -753,6 +783,110 @@ function ConnectorPanel({
         </DangerRow>
       )}
       {k && canEdit && !k.personal && <KnowledgeDisconnect k={k} beside={saved} onChanged={onSaved} />}
+    </div>
+  );
+}
+
+/** The pieces of the one Atlassian row, from the API. */
+function partsOf(item: Integration): AtlassianPart[] {
+  return ((item.detail as { parts?: AtlassianPart[] }).parts ?? []) as AtlassianPart[];
+}
+
+/** The next piece one Connect sets up: Confluence's sign-in, then agent tools. The Jira app is installed in Jira. */
+function nextAtlassianStep(parts: AtlassianPart[]): AtlassianPart | null {
+  return parts.find((p) => p.id !== "jira" && p.item && p.item.status === "not_connected") ?? null;
+}
+
+/**
+ * Atlassian: one connection for Jira, Confluence and Atlassian's own server. One Connect signs in
+ * for the next piece that isn't set up (Confluence for runs and Knowledge, then agent tools), and
+ * each piece below keeps its own settings. The Jira app is installed by a Jira admin in Jira, so
+ * its status and the way to install it are shown here, and its page has the rest.
+ */
+function AtlassianPanel({ item, canEdit, onReload, onClose }: { item: Integration; canEdit: boolean; onReload: () => Promise<void>; onClose: () => void }) {
+  const parts = partsOf(item);
+  const next = nextAtlassianStep(parts);
+  const [checking, setChecking] = useState(false);
+  const { toast } = useToast();
+  const begin = async () => {
+    if (!next?.item) throw new Error("Everything Atlassian offers here is already connected.");
+    if (next.id === "confluence") {
+      const k = knowledgeOf(next.item) ?? signedOut(next.item);
+      return beginKnowledgeSignIn(k);
+    }
+    return beginCatalogSignIn("atlassian");
+  };
+  const checkConfluence = async (part: Integration) => {
+    setChecking(true);
+    try {
+      const r = await api.testConnector(part.id as ConnectorId);
+      toast(r.connector.status === "ready" ? "Confluence works" : "Confluence needs attention", r.connector.status === "ready" ? "success" : "error");
+      await onReload();
+    } catch (e) {
+      toast(errorMessage(e, "The check failed."), "error");
+    } finally {
+      setChecking(false);
+    }
+  };
+  return (
+    <div className="mt-3 flex min-w-0 flex-col gap-5" data-testid="atlassian-panel">
+      {item.status !== "connected" && item.status !== "not_connected" && item.reason && (
+        <p className={`text-sm ${item.status === "error" ? "text-red-300" : "text-amber-300"}`} data-testid="atlassian-reason">
+          {item.reason}
+        </p>
+      )}
+      {item.status === "connected" && item.reason && (
+        <p className="text-sm text-zinc-400" data-testid="atlassian-summary">
+          {item.reason}
+        </p>
+      )}
+      {canEdit && next && (
+        <div className="flex min-w-0 flex-col gap-2" data-testid="atlassian-connect" data-next={next.id}>
+          <p className="text-sm text-zinc-300">
+            {item.status === "not_connected"
+              ? "Connect signs you in to Atlassian for Confluence first, then for Atlassian's agent tools. Each is one Atlassian consent page."
+              : `Next: ${next.name.toLowerCase()}. ${next.what}`}
+          </p>
+          <SignInControl
+            name="Atlassian"
+            ids={["atlassian", "ks-confluence", "source:confluence"]}
+            label={item.status === "not_connected" ? "Connect Atlassian" : `Connect ${next.name.toLowerCase()}`}
+            begin={begin}
+            onConnected={onReload}
+            onReturn={onReload}
+            testId="atlassian-connect-sign-in"
+          />
+        </div>
+      )}
+      <ul className="flex min-w-0 flex-col gap-4">
+        {parts.map((p) => {
+          const st = p.item ? STATUS[p.item.status] : STATUS.not_connected;
+          return (
+            <li key={p.id} className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/40 px-4 py-3" data-testid={`atlassian-part-${p.id}`} data-status={p.item?.status ?? "not_connected"}>
+              <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                <h4 className="text-sm font-medium text-zinc-100">{p.name}</h4>
+                <span className={`inline-flex items-center gap-1.5 text-sm ${st.text}`}>
+                  <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${st.dot}`} />
+                  {st.label}
+                </span>
+              </div>
+              <p className="mt-1 text-sm text-zinc-400">{p.what}</p>
+              {p.id === "jira" && p.item && (
+                <p className="mt-2 text-sm">
+                  <Link href={p.item.manage_href || "/settings/integrations/jira"} className={linkButton}>
+                    {p.item.status === "connected" ? "Manage the Jira app" : "Install the Jira app"}
+                  </Link>
+                  <span className="text-zinc-400"> · A Jira admin installs it in Jira; its page walks through it.</span>
+                </p>
+              )}
+              {p.id === "confluence" && p.item && (
+                <ConnectorPanel item={p.item} canEdit={canEdit} checking={checking} onCheck={() => checkConfluence(p.item!)} onSaved={onReload} signInFirst />
+              )}
+              {p.id === "agent_tools" && p.item && <CatalogPanel item={p.item} canEdit={canEdit} onChanged={onReload} onClose={onClose} />}
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

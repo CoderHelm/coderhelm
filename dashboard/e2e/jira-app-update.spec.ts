@@ -10,12 +10,13 @@ const BEHIND = {
   version: "6.8.0",
   latest: "6.11.0",
   missing: ["mentions", "in-place edits", "extended issue fields", "threaded replies"],
-  manage_url: "https://your-team.atlassian.net/plugins/servlet/upm",
+  manage_url: "https://admin.atlassian.com/",
+  install_url: "https://developer.atlassian.com/console/install/00000000-0000-0000-0000-000000000002?signature=abc&product=jira",
   seen_at: "2026-11-14T10:00:00Z",
   message:
-    "Your Jira site runs an older Coderhelm app (version 6.8.0, latest 6.11.0). Missing: mentions, in-place edits, extended issue fields, threaded replies. A Jira admin needs to accept the update: Jira Settings, Apps, Manage apps, Coderhelm, Update.",
+    "Your Jira site runs an older Coderhelm app (version 6.8.0, latest 6.11.0). Missing: mentions, in-place edits, extended issue fields, threaded replies. An Atlassian site admin can open the app's installation link (https://developer.atlassian.com/console/install/00000000-0000-0000-0000-000000000002?signature=abc&product=jira), choose the site and Update, or accept it in Atlassian Administration (admin.atlassian.com): Apps, Sites, choose the site, Connected apps, Coderhelm, View app details, Update.",
   run_note:
-    "Comments on this ticket may be incomplete: its Jira site runs an older Coderhelm app (version 6.8.0, latest 6.11.0) without mentions, in-place edits, extended issue fields, threaded replies. A Jira admin can accept the update in Manage apps.",
+    "Comments on this ticket may be incomplete: its Jira site runs an older Coderhelm app (version 6.8.0, latest 6.11.0) without mentions, in-place edits, extended issue fields, threaded replies. An Atlassian site admin can accept the update in Atlassian Administration, Connected apps.",
 };
 
 const RUN = {
@@ -82,9 +83,12 @@ test("Integrations: a Jira site on an older app says its version, the latest, wh
   await expect(notice).toBeVisible();
   await expect(notice).toContainText("Your Jira site runs an older Coderhelm app (version 6.8.0, latest 6.11.0).");
   await expect(notice).toContainText("Missing: mentions, in-place edits, extended issue fields, threaded replies.");
-  await expect(notice).toContainText("A Jira admin needs to accept the update: Jira Settings, Apps, Manage apps, Coderhelm, Update.");
-  const link = notice.getByRole("link", { name: "Open Manage apps in Jira" });
-  await expect(link).toHaveAttribute("href", "https://your-team.atlassian.net/plugins/servlet/upm");
+  await expect(notice).toContainText("Atlassian Administration (admin.atlassian.com): Apps, Sites, choose the site, Connected apps, Coderhelm, View app details, Update.");
+  // Atlassian Administration and the one-click installation link: never Jira's Manage apps, which has no Update for it.
+  await expect(notice.getByRole("link", { name: "Open Connected apps in Atlassian Administration" })).toHaveAttribute("href", "https://admin.atlassian.com/");
+  const link = notice.getByRole("link", { name: "Update with the installation link" });
+  await expect(link).toHaveAttribute("href", /^https:\/\/developer\.atlassian\.com\/console\/install\//);
+  await expect(notice).not.toContainText("Manage apps, Coderhelm");
   await expect(link).toHaveAttribute("target", "_blank");
   // It sits with the Jira row, not elsewhere on the page.
   await expect(page.getByTestId("integration-jira").getByTestId("jira-app-update")).toBeVisible();
@@ -104,7 +108,7 @@ test("Run page: a ticket from a behind site gets one quiet line about its commen
   const line = page.getByTestId("run-jira-app-note");
   await expect(line).toHaveCount(1);
   await expect(line).toContainText("Comments on this ticket may be incomplete: its Jira site runs an older Coderhelm app (version 6.8.0, latest 6.11.0)");
-  await expect(line.getByRole("link", { name: "Open Manage apps" })).toHaveAttribute("href", BEHIND.manage_url);
+  await expect(line.getByRole("link", { name: "Update the app" })).toHaveAttribute("href", BEHIND.install_url);
   // Quiet: a plain line, not a warning box.
   await expect(line).toHaveClass(/text-zinc-400/);
 });

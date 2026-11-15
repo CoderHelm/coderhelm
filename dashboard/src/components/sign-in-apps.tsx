@@ -31,7 +31,7 @@ const GUIDE = "https://docs.coderhelm.com/self-host/knowledge-sources/";
 /** Each app's section in the knowledge sources guide. */
 const STEPS: Record<string, string> = {
   notion: `${GUIDE}#notion`,
-  confluence: `${GUIDE}#confluence-atlassian`,
+  confluence: `${GUIDE}#atlassian-the-confluence-sign-in`,
   google_drive: `${GUIDE}#google-drive`,
 };
 
