@@ -5,6 +5,13 @@ the team in plain words, one "## <date>: <what>" heading per release, and link t
 pull requests that shipped it. Leave out CI, pins and dependency bumps.
 -->
 
+## November 16, 2026 (evening): CoderHelm proves web changes and keeps quiet
+
+- **"What needs my answer?" covers everything waiting on you.** In any words, chat checks run questions, CoderHelm pull requests on your tickets, your Jira tickets and mentions, and GitHub reviews and failing checks, grouped by urgency with a link and what to do. ([#729](https://github.com/CoderHelm/coderhelm-platform/pull/729), [#436](https://github.com/CoderHelm/coderhelm/pull/436))
+- **Read-only commands run instead of being refused.** A read-only curl or wget goes through CoderHelm's safe page check, setup chains run as one build, git history reads use CoderHelm's own tools, and anything still refused names what to use instead. Missing programs are noted once instead of retried. ([#732](https://github.com/CoderHelm/coderhelm-platform/pull/732))
+- **One short status comment per pull request.** CoderHelm keeps a single status comment, edited in place, posts only when a person must act, writes it in a few plain lines, and hides its own older status comments as outdated. ([#736](https://github.com/CoderHelm/coderhelm-platform/pull/736))
+- **The run log shows every command.** Refused or failed steps show the full command and the reason as they happen. ([#439](https://github.com/CoderHelm/coderhelm/pull/439))
+
 ## November 16, 2026 (afternoon): Knowledge search tabs, deleting many chats, and cleaner dialogs
 
 - **Knowledge search tabs search right away.** Picking Code, Work, Logs or another base on the Knowledge page runs your search there at once and keeps what you typed; "Search Code" in a base's panel does the same. The last results stay on screen while new ones load. ([#433](https://github.com/CoderHelm/coderhelm/pull/433))
