@@ -1,14 +1,15 @@
-import { expect, test, type Page, type Route } from "@playwright/test";
+import { expect, test, type Locator, type Page, type Route } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 
-// The six built-in bases on the Knowledge page: listed first, above the
-// bases people made, each with what it holds, how fresh it is, who reads it
-// and whether the person looking may. An open base is searched and a search
-// shared; a base not open to the person shows why and offers no search.
-// Admins change who reads a base and whether readers may connect AI tools.
-// The shared link opens again as whoever looks. Every API call is answered
-// here; nothing reaches a real backend.
+// The six built-in bases on the Knowledge page: one overview above the bases
+// people made, each with a few numbers, how fresh it is and who reads it. One
+// search runs across the bases open to the person, filtered by base, the
+// results grouped by base with what was held back named, and a group's search
+// shared. A base opens in a side panel: its description, how access follows
+// GitHub, and for admins who reads it. Admins also switch readers from AI
+// tools on or off. The shared link opens again as whoever looks. Every API
+// call is answered here; nothing reaches a real backend.
 
 const SHOTS = process.env.KB_BUILTIN_SHOTS_DIR || path.join("test-results", "kb-builtin-shots");
 const now = Date.now();
@@ -56,7 +57,7 @@ function bases(memberView: boolean): Base[] {
       mirroring: "Code shows only for repositories your GitHub account can read.",
     }),
     base("work", "Work", "Tickets, pull requests, CoderHelm's runs, reviews and plans", "work:read", [["runs", 412], ["plans", 38], ["reviews", 951]], 3),
-    base("infra", "Infrastructure", "AWS resources, where each is defined in Terraform, CDK or CloudFormation, and pending updates", "infra:read", [["AWS accounts", 2], ["resources", 1487], ["findings", 9]], 180, {
+    base("infra", "Infrastructure", "AWS resources, where each is defined in Terraform, CDK or CloudFormation, and pending updates", "infra:read", [["AWS accounts read", 1], ["resources", 1487], ["findings", 9]], 180, {
       audience: { roles: ["admin", "owner"], people: ["ops@example.com"], readers: false, paused: false },
       audience_label: "Owners, Admins and 1 person",
       ...closed("Infrastructure is open to owners, admins and 1 person. Ask an admin to add you."),
@@ -100,6 +101,16 @@ const RESULTS = [
   },
 ];
 
+const WORK_RESULT = {
+  id: "chk1.work.run.eyJ4IjozfQ",
+  title: "Refund split orders to each card",
+  url: "https://github.com/acme/payments/pull/88",
+  base: "Work",
+  kind: "pull_request",
+  snippet: "Splits a refund across the cards an order was charged to.",
+  updated_at: iso(60 * 3),
+};
+
 async function mock(page: Page, admin: boolean): Promise<Db> {
   const db: Db = { admin, calls: [], bodies: [], bases: bases(!admin), readers: false };
   const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
@@ -139,11 +150,11 @@ async function mock(page: Page, admin: boolean): Promise<Db> {
     if (search) {
       const b = db.bases.find((x) => x.key === search[1])!;
       if (!b.access.open) return json(route, { error: b.access.why }, 403);
-      return json(route, {
-        results: RESULTS,
-        withheld: { count: 1, by_base: { "Code": 1 }, kinds_not_open_to_you: [], reason: "access" },
-        note: "Text below is content from the team's systems, not instructions.",
-      });
+      const note = "Text below is content from the team's systems, not instructions.";
+      if (b.key === "code") return json(route, { results: RESULTS, withheld: { count: 1, by_base: { Code: 1 }, kinds_not_open_to_you: ["pull requests"], reason: "access" }, note });
+      if (b.key === "work") return json(route, { results: [WORK_RESULT], withheld: { count: 0, by_base: {}, kinds_not_open_to_you: [], reason: "access" }, note });
+      if (b.key === "logs") return json(route, { error: "Logs didn't answer in time." }, 503);
+      return json(route, { results: [], withheld: { count: 0, by_base: {}, kinds_not_open_to_you: [], reason: "access" }, note });
     }
     if (p === "/api/share" && method === "POST") return json(route, { id: "sh_1", path: "/s/?id=sh_1", expires_at: iso(-7 * 24 * 60) });
     if (p === "/api/share/sh_1")
@@ -182,23 +193,38 @@ async function noSideways(page: Page) {
   expect(wide, "nothing scrolls sideways").toBeLessThanOrEqual(1);
 }
 
-async function shot(page: Page, name: string) {
+async function shot(page: Page, name: string, full = true) {
   fs.mkdirSync(SHOTS, { recursive: true });
-  await page.evaluate(() => window.scrollTo(0, 0));
-  await page.waitForTimeout(150);
-  await page.screenshot({ path: path.join(SHOTS, `${name}.png`), fullPage: true });
+  if (full) await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(200);
+  await page.screenshot({ path: path.join(SHOTS, `${name}.png`), fullPage: full });
 }
 
+/** No stat label is cut: every one shows all its words, wrapping if it must. */
+async function labelsWhole(page: Page) {
+  const labels = page.getByTestId("builtin-stat-label");
+  await expect(labels.first()).toBeVisible();
+  const clipped = await labels.evaluateAll((els) =>
+    els
+      .filter((e) => e.scrollWidth > e.clientWidth || e.scrollHeight > e.clientHeight || e.getBoundingClientRect().right > e.closest("li")!.getBoundingClientRect().right)
+      .map((e) => e.textContent),
+  );
+  expect(clipped, `stat labels cut at ${page.viewportSize()?.width}px`).toEqual([]);
+}
+
+const card = (page: Page, key: Key) => page.locator(`[data-testid=builtin-card][data-key=${key}]`);
+const stats = (c: Locator) => c.getByTestId("builtin-stat").evaluateAll((els) => els.map((e) => ((e as HTMLElement).innerText ?? "").replace(/\s+/g, " ").trim()));
+const searches = (db: Db) => db.calls.filter((c) => /\/search\?/.test(c));
+
 test.describe("built-in knowledge bases", () => {
-  test("the six bases come first, with counts, freshness and who reads them; search and share an open one", async ({ page }) => {
-    const db = await mock(page, true);
+  test("one overview: six bases first, numbers as stats, freshness, who reads them and only the states that matter", async ({ page }) => {
+    await mock(page, true);
     await page.goto("/knowledge/");
     const section = page.getByTestId("builtin-bases");
     await expect(section.getByRole("heading", { name: "Built in" })).toBeVisible();
     const cards = section.getByTestId("builtin-card");
     await expect(cards).toHaveCount(6);
-    const keys = await cards.evaluateAll((els) => els.map((e) => e.getAttribute("data-key")));
-    expect(keys).toEqual(["code", "work", "infra", "logs", "security", "team"]);
+    expect(await cards.evaluateAll((els) => els.map((e) => e.getAttribute("data-key")))).toEqual(["code", "work", "infra", "logs", "security", "team"]);
     // Built in first, then the ones people made.
     const order = await page.evaluate(() => {
       const b = document.querySelector("[data-testid=builtin-bases]")!;
@@ -207,38 +233,100 @@ test.describe("built-in knowledge bases", () => {
     });
     expect(order).toBeTruthy();
 
-    const code = cards.nth(0);
-    await expect(code.getByTestId("builtin-counts")).toHaveText("12 repositories, 18,340 files, 1,210 docs");
-    await expect(code.getByTestId("builtin-fresh")).toHaveText("Updated 14 min ago, read live");
-    await expect(code.getByTestId("builtin-access")).toHaveText("Open to you");
-    await expect(code).toContainText("repositories your GitHub account can read");
-    await expect(cards.nth(2).getByTestId("builtin-audience")).toHaveText("Owners, Admins and 1 person");
-    await expect(cards.nth(5).getByTestId("builtin-fresh")).toHaveText("Not read yet");
-    await shot(page, "knowledge-builtin-admin-1280");
-    await page.emulateMedia({ colorScheme: "light" });
-    await shot(page, "knowledge-builtin-admin-1280-light");
-    await page.emulateMedia({ colorScheme: "dark" });
+    // Numbers as stats, short and singular where there is one.
+    expect(await stats(card(page, "code"))).toEqual(["12 repositories", "18.3k files", "1,210 docs"]);
+    expect(await stats(card(page, "infra"))).toEqual(["1 AWS account read", "1,487 resources", "9 findings"]);
+    await expect(card(page, "code").getByTestId("builtin-fresh")).toHaveText("Live");
+    await expect(card(page, "logs").getByTestId("builtin-fresh")).toHaveText("Updated 45 min ago");
+    // Who reads it, as chips.
+    await expect(card(page, "code").getByTestId("builtin-audience-chips")).toContainText("All rolesAI readers");
+    await expect(card(page, "infra").getByTestId("builtin-audience-chips")).toContainText("Owners, Admins +1");
+    // A state only when it matters; no "Built in" on every card.
+    await expect(card(page, "team").getByTestId("builtin-state")).toHaveText("Not read yet");
+    await expect(card(page, "code").getByTestId("builtin-state")).toHaveCount(0);
+    await expect(cards.getByText("Built in", { exact: true })).toHaveCount(0);
+    await expect(section).not.toContainText("AWS accounts read");
 
-    // Search an open base, then share the search.
-    await code.getByRole("searchbox", { name: "Search Code" }).fill("refunds");
-    await code.getByRole("button", { name: "Search" }).click();
+    await noSideways(page);
+    await shot(page, "knowledge-builtin-admin-1280");
+    await shot(page, "knowledge-builtin-admin-1280-screen", false);
+    await labelsWhole(page);
+    await page.setViewportSize({ width: 768, height: 1024 });
+    await labelsWhole(page);
+    await page.setViewportSize({ width: 1280, height: 800 });
+    // The whole overview fits on one screen at 1280: the last card ends inside the window.
+    const box = await card(page, "team").boundingBox();
+    expect(box!.y + box!.height).toBeLessThanOrEqual(800);
+  });
+
+  test("one search across bases: grouped by base, held back named, filtered by base, and a group shared", async ({ page }) => {
+    const db = await mock(page, true);
+    await page.goto("/knowledge/");
+    await expect(page.getByTestId("builtin-card")).toHaveCount(6);
+    const search = page.getByRole("searchbox", { name: "Search the built-in bases" });
+    await search.fill("refunds");
+    await page.getByTestId("builtin-search-go").click();
+
+    // Every open base searched once, side by side.
+    await expect.poll(() => searches(db).length).toBe(6);
+    const grouped = page.getByTestId("builtin-grouped");
+    await expect(grouped.getByTestId("builtin-summary")).toHaveText("3 results for \u201crefunds\u201d in all bases open to you");
+    const groups = grouped.getByTestId("builtin-group");
+    expect(await groups.evaluateAll((els) => els.map((e) => e.getAttribute("data-key")))).toEqual(["code", "work"]);
+    const code = grouped.locator("[data-testid=builtin-group][data-key=code]");
     await expect(code.getByTestId("builtin-result")).toHaveCount(2);
-    await expect(code.getByTestId("builtin-withheld")).toContainText("1 more result isn't open to you");
-    expect(db.calls).toContain("GET /api/knowledge/builtin/code/search?q=refunds");
-    await code.getByRole("button", { name: "30 days" }).click();
-    await code.getByTestId("builtin-share-make").click();
-    await expect.poll(() => db.bodies.find((b) => b.call === "POST /api/share")).toMatchObject({ base: "code", query: "refunds", days: 30 });
-    await expect(code.getByRole("button", { name: "Copy the link" })).toBeVisible();
+    await expect(code.getByTestId("builtin-withheld")).toHaveText("1 more result isn't open to you, so it isn't shown (pull requests).");
+    await expect(grouped.getByTestId("builtin-search-notes")).toContainText("Nothing matched in Infrastructure, Security and Knowledge.");
+    await expect(grouped.getByTestId("builtin-search-notes")).toContainText("Logs couldn't be searched: Logs didn't answer in time.");
     await shot(page, "knowledge-builtin-search-1280");
 
-    // Admins: who reads a base, and readers from AI tools.
-    await page.getByTestId("readers-toggle").getByRole("checkbox").check();
-    await expect.poll(() => db.readers).toBe(true);
-    const infra = cards.nth(2);
-    await infra.getByTestId("builtin-edit").click();
-    const editor = infra.getByTestId("audience-editor");
-    await editor.getByLabel("Members").check();
-    await editor.getByLabel("Readers from AI tools").check();
+    // Share the Code group's search for 30 days.
+    await code.getByTestId("builtin-share-open").click();
+    const share = page.getByTestId("builtin-share");
+    await share.getByRole("button", { name: "30 days" }).click();
+    await share.getByTestId("builtin-share-make").click();
+    await expect.poll(() => db.bodies.find((b) => b.call === "POST /api/share")).toMatchObject({ base: "code", query: "refunds", days: 30 });
+    await expect(share.getByRole("button", { name: "Copy the link" })).toBeVisible();
+    await shot(page, "knowledge-builtin-share-1280", false);
+    await page.keyboard.press("Escape");
+
+    // Filter to Work: only Work is searched.
+    db.calls.length = 0;
+    await page.getByTestId("filter-work").click();
+    await expect(page.getByTestId("filter-work")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByTestId("filter-all")).toHaveAttribute("aria-pressed", "false");
+    await page.getByTestId("builtin-search-go").click();
+    await expect.poll(() => searches(db)).toEqual(["GET /api/knowledge/builtin/work/search?q=refunds"]);
+    await expect(grouped.getByTestId("builtin-summary")).toHaveText("1 result for \u201crefunds\u201d in Work");
+    await page.getByTestId("builtin-clear").click();
+    await expect(page.getByTestId("builtin-grouped")).toHaveCount(0);
+    await noSideways(page);
+  });
+
+  test("a base opens in a side panel; admins change who reads it there", async ({ page }) => {
+    const db = await mock(page, true);
+    await page.goto("/knowledge/");
+    await card(page, "code").getByTestId("builtin-open").click();
+    let panel = page.getByTestId("builtin-panel");
+    await expect(panel.getByRole("heading", { name: "Code" })).toBeVisible();
+    await expect(panel).toContainText("The team's repositories: files, code search, the code graph and history");
+    await expect(panel.getByTestId("builtin-mirroring")).toContainText("repositories your GitHub account can read");
+    await expect(panel.getByTestId("builtin-access")).toHaveText("Open to you");
+    await expect(panel.getByTestId("builtin-counts")).toContainText("18,340");
+    await expect(panel).toContainText("code:read");
+    // Search this base: the top search narrows to it.
+    await panel.getByTestId("builtin-panel-search").click();
+    await expect(page.getByTestId("builtin-panel")).toHaveCount(0);
+    await expect(page.getByTestId("filter-code")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("searchbox", { name: "Search the built-in bases" })).toBeFocused();
+
+    await card(page, "infra").getByTestId("builtin-open").click();
+    panel = page.getByTestId("builtin-panel");
+    const editor = panel.getByTestId("audience-editor");
+    await expect(editor.getByTestId("audience-save")).toBeDisabled();
+    await editor.getByTestId("role-members").click();
+    await editor.getByRole("switch", { name: "Readers from AI tools" }).click();
+    await shot(page, "knowledge-builtin-panel-admin-1280", false);
     await editor.getByTestId("audience-save").click();
     await expect.poll(() => db.bodies.find((b) => b.call === "PUT /api/knowledge/builtin/infra")).toMatchObject({
       roles: ["admin", "owner", "member"],
@@ -246,38 +334,70 @@ test.describe("built-in knowledge bases", () => {
       readers: true,
       paused: false,
     });
-    await expect(infra.getByTestId("audience-editor")).toHaveCount(0);
-    await expect(infra.getByTestId("builtin-audience")).toHaveText("3 roles");
-    await noSideways(page);
+    await expect(editor.getByTestId("audience-saved")).toBeVisible();
+    await expect(editor.getByTestId("builtin-audience")).toHaveText("3 roles");
+    await page.keyboard.press("Escape");
+    await expect(card(page, "infra").getByTestId("builtin-audience-chips")).toContainText("Owners, Admins, Members +1AI readers");
   });
 
-  test("a base not open to the person says so and offers no search", async ({ page }) => {
-    await mock(page, false);
+  test("admins switch readers from AI tools in one compact row", async ({ page }) => {
+    const db = await mock(page, true);
     await page.goto("/knowledge/");
-    const cards = page.getByTestId("builtin-card");
-    await expect(cards).toHaveCount(6);
-    const infra = page.locator("[data-testid=builtin-card][data-key=infra]");
-    await expect(infra.getByTestId("builtin-access")).toContainText("Not open to you");
-    await expect(infra.getByTestId("builtin-access")).toContainText("Ask an admin to add you");
-    await expect(infra.getByTestId("builtin-search")).toHaveCount(0);
-    const security = page.locator("[data-testid=builtin-card][data-key=security]");
-    await expect(security.getByTestId("builtin-search")).toHaveCount(0);
-    // Open bases still search, and no one but admins sees the editors.
-    await expect(page.locator("[data-testid=builtin-card][data-key=code]").getByTestId("builtin-search")).toHaveCount(1);
-    await expect(page.getByTestId("builtin-edit")).toHaveCount(0);
+    const row = page.getByTestId("readers-toggle");
+    const sw = row.getByRole("switch", { name: "AI tools as readers" });
+    await expect(sw).toHaveAttribute("aria-checked", "false");
+    await sw.click();
+    await expect.poll(() => db.readers).toBe(true);
+    await expect(sw).toHaveAttribute("aria-checked", "true");
+    await row.getByTestId("readers-more").click();
+    await expect(page.getByTestId("readers-more-panel")).toContainText("signs in with GitHub");
+  });
+
+  test("a member: closed bases say so, can't be searched, and nothing to manage", async ({ page }) => {
+    const db = await mock(page, false);
+    await page.goto("/knowledge/");
+    await expect(page.getByTestId("builtin-card")).toHaveCount(6);
+    await expect(card(page, "infra").getByTestId("builtin-state")).toHaveText("Not open to you");
+    await expect(card(page, "security").getByTestId("builtin-state")).toHaveText("Not open to you");
+    await expect(page.getByTestId("filter-infra")).toBeDisabled();
+    await expect(page.getByTestId("filter-security")).toBeDisabled();
     await expect(page.getByTestId("readers-toggle")).toHaveCount(0);
     await shot(page, "knowledge-builtin-member-1280");
+
+    await page.getByRole("searchbox", { name: "Search the built-in bases" }).fill("refunds");
+    await page.getByTestId("builtin-search-go").click();
+    await expect.poll(() => searches(db).length).toBe(4);
+    expect(searches(db).some((c) => /infra|security/.test(c))).toBe(false);
+    await expect(page.getByTestId("builtin-skipped")).toHaveText("Not searched: Infrastructure and Security aren't open to you.");
+
+    await card(page, "infra").getByTestId("builtin-open").click();
+    const panel = page.getByTestId("builtin-panel");
+    await expect(panel.getByTestId("builtin-access")).toHaveText("Not open to you");
+    await expect(panel.getByTestId("builtin-why")).toContainText("Ask an admin to add you");
+    await expect(panel.getByTestId("builtin-audience")).toHaveText("Owners, Admins and 1 person");
+    await expect(panel.getByTestId("audience-editor")).toHaveCount(0);
+    await expect(panel.getByTestId("builtin-panel-search")).toHaveCount(0);
+    await shot(page, "knowledge-builtin-panel-member-1280", false);
   });
 
-  test("at phone width the cards stack and nothing scrolls sideways", async ({ page }) => {
+  test("at phone width the overview stacks, search and panel fit, nothing scrolls sideways", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await mock(page, true);
     await page.goto("/knowledge/");
     await expect(page.getByTestId("builtin-card")).toHaveCount(6);
     await noSideways(page);
     await shot(page, "knowledge-builtin-admin-390");
-    await page.emulateMedia({ colorScheme: "light" });
-    await shot(page, "knowledge-builtin-admin-390-light");
+    await page.getByRole("searchbox", { name: "Search the built-in bases" }).fill("refunds");
+    await page.getByTestId("builtin-search-go").click();
+    await expect(page.getByTestId("builtin-group")).toHaveCount(2);
+    await noSideways(page);
+    await shot(page, "knowledge-builtin-search-390");
+    await card(page, "code").getByTestId("builtin-open").click();
+    const panel = page.getByTestId("builtin-panel");
+    await expect(panel).toBeVisible();
+    const box = await panel.boundingBox();
+    expect(box!.width).toBeLessThanOrEqual(390);
+    await shot(page, "knowledge-builtin-panel-390", false);
   });
 
   test("a shared search runs again as the viewer, or says it isn't open to them", async ({ page }) => {
