@@ -134,7 +134,7 @@ export function BuiltinBases() {
 
       <CrossSearch bases={list.bases} scope={scope} setScope={setScope} inputRef={searchRef} />
 
-      <ul className="mt-3 min-w-0 divide-y divide-zinc-800 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/50" aria-label="Built-in bases">
+      <ul className="mt-2 min-w-0 divide-y divide-zinc-800 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/50" aria-label="Built-in bases">
         {list.bases.map((b) => (
           <BaseCard
             key={b.key}
@@ -245,7 +245,7 @@ function BaseCard({ b, onOpen }: { b: BuiltinBase; onOpen: (el: HTMLElement) => 
         onClick={(e) => onOpen(e.currentTarget)}
         aria-haspopup="dialog"
         data-testid="builtin-open"
-        className={`group grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-3 px-4 py-3 text-left transition-colors [grid-template-areas:'base_base'_'stats_stats'_'who_status'] hover:bg-zinc-800/40 motion-reduce:transition-none lg:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_minmax(0,9rem)_minmax(0,8.5rem)_1rem] lg:items-center lg:gap-x-4 lg:py-2 lg:[grid-template-areas:'base_stats_who_status_chevron'] ${focusRing} focus-visible:outline-offset-[-2px]`}
+        className={`group grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-3 px-4 py-3 text-left transition-colors [grid-template-areas:'base_base'_'stats_stats'_'who_status'] hover:bg-zinc-800/40 motion-reduce:transition-none lg:grid-cols-[minmax(0,13rem)_minmax(0,1fr)_minmax(0,9rem)_minmax(0,8.5rem)_1rem] lg:items-center lg:gap-x-4 lg:py-1.5 lg:[grid-template-areas:'base_stats_who_status_chevron'] ${focusRing} focus-visible:outline-offset-[-2px]`}
       >
         <span className="flex min-w-0 items-center gap-3 [grid-area:base]">
           <BaseIcon k={b.key} />
@@ -255,14 +255,17 @@ function BaseCard({ b, onOpen }: { b: BuiltinBase; onOpen: (el: HTMLElement) => 
           </span>
         </span>
 
-        <span className="flex min-w-0 gap-4 [grid-area:stats]" data-testid="builtin-stats">
+        {/* Stats as "number word" on one line; a stat that doesn't fit moves to
+            a second line whole, never cut, and two lines stay within the
+            height of the name beside them, so the row doesn't grow. */}
+        <span className="flex min-w-0 flex-wrap gap-x-4 [grid-area:stats]" data-testid="builtin-stats">
           {stats.length === 0 ? (
             <span className="text-sm text-zinc-400">Nothing in it yet</span>
           ) : (
             stats.map((c) => (
-              <span key={c.label} className="min-w-min shrink" data-testid="builtin-stat" title={`${c.count.toLocaleString()} ${countLabel(c.label, c.count)}`}>
-                <span className="block text-base font-semibold tabular-nums leading-5 text-zinc-50">{shortCount(c.count)}</span>
-                <span className="block text-xs leading-4 text-zinc-400" data-testid="builtin-stat-label">{countLabel(c.label, c.count)}</span>
+              <span key={c.label} className="flex min-w-0 max-w-full items-baseline gap-1" data-testid="builtin-stat" title={`${c.count.toLocaleString()} ${countLabel(c.label, c.count)}`}>
+                <span className="shrink-0 text-sm font-semibold leading-4 tabular-nums text-zinc-50">{shortCount(c.count)}</span>
+                <span className="min-w-0 text-xs leading-4 text-zinc-400" data-testid="builtin-stat-label">{countLabel(c.label, c.count)}</span>
               </span>
             ))
           )}
@@ -346,7 +349,7 @@ function CrossSearch({
   const where = scope.length === 0 ? "all bases open to you" : chosen.map((b) => b.name).join(", ");
 
   return (
-    <div className="mt-4" data-testid="builtin-search">
+    <div className="mt-3" data-testid="builtin-search">
       <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
         <form
           role="search"
