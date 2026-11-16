@@ -5,6 +5,14 @@ the team in plain words, one "## <date>: <what>" heading per release, and link t
 pull requests that shipped it. Leave out CI, pins and dependency bumps.
 -->
 
+## November 16, 2026: plans that survive a cut answer, rebuilt descriptions, and a calmer update
+
+- **A cut plan never replaces a good one.** When a plan revision runs out of room, CoderHelm continues it or repairs the missing part instead of throwing the plan away, so a run no longer fails with an empty plan. ([#720](https://github.com/CoderHelm/coderhelm-platform/pull/720))
+- **Older pull request descriptions are rebuilt.** Open pull requests written by an earlier description writer, security fixes included, are rewritten fresh a few at a time, keeping their Closes and Fixes lines. ([#715](https://github.com/CoderHelm/coderhelm-platform/pull/715), [#720](https://github.com/CoderHelm/coderhelm-platform/pull/720))
+- **Updates wait out a busy AWS.** When AWS turns calls away before an update has changed anything, the update waits and tries again by itself instead of asking you to press Update again. ([#722](https://github.com/CoderHelm/coderhelm-platform/pull/722))
+- **The run page's Overview tab opens the Overview,** even on a run that is still planning. ([#429](https://github.com/CoderHelm/coderhelm/pull/429))
+- **The team's bases as one overview.** Knowledge shows the six built-in bases on one screen with their numbers, one search across them, and each base's details in a side panel. ([#430](https://github.com/CoderHelm/coderhelm/pull/430))
+
 ## November 15, 2026: Atlassian as one connection, infrastructure that follows AWS, and the team's bases
 
 - **Atlassian is one connection.** Jira, Confluence and Atlassian's own agent tools are one row under **Settings**, **Integrations**, with a status for each part. Sign-in follows what Atlassian's server publishes, and when Atlassian's sign-in page is failing, CoderHelm says so instead of sending you to an error page. Existing connections keep working with nothing to reconnect. See [Connect Atlassian](/getting-started/atlassian). ([#713](https://github.com/CoderHelm/coderhelm-platform/pull/713), [#427](https://github.com/CoderHelm/coderhelm/pull/427))
