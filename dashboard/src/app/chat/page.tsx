@@ -22,6 +22,8 @@ import {
   askBrain,
   brainApi,
   MAX_BULK_DELETE,
+  NEEDS_ME,
+  scopeNote,
   uploadProblem,
   uploadToSignedUrl,
   type BrainMessage,
@@ -128,6 +130,10 @@ function Chat() {
   // as a chip the asker can remove.
   const fromRun = /^[A-Za-z0-9_-]{1,64}$/.test(params.get("run") ?? "") ? params.get("run")! : "";
   const fromRunTitle = (params.get("title") ?? "").slice(0, 120);
+  // Run titles this page was opened with, kept after the address moves to
+  // the new chat, so the question still says which run it was about.
+  const runTitles = useRef<Record<string, string>>({});
+  if (fromRun && fromRunTitle) runTitles.current[fromRun] = fromRunTitle;
 
   // Asking is the brain_ask capability; managing knowledge is knowledge_manage.
   const { can, ready: capsReady } = useCan();
@@ -703,8 +709,13 @@ function Chat() {
   );
 
   const noData = !!sources && !!starters && starters.length === 0 && sources.knowledge.length === 0 && sources.repos.length === 0;
-  const mentionName = (m: Mention) =>
-    mentionOptions.find((o) => o.kind === m.kind && o.id === m.id)?.label ?? (m.kind === "run" ? "A run" : m.id.split("/").pop() ?? m.id);
+  // What a mention is called under its question: a run by its title when
+  // the page knows it, else counted ("About 2 runs"); a repository or base
+  // by its name.
+  const mentionName = (m: Mention): { kind: string; label?: string } =>
+    m.kind === "run"
+      ? { kind: "run", label: runTitles.current[m.id] }
+      : { kind: m.kind, label: mentionOptions.find((o) => o.kind === m.kind && o.id === m.id)?.label ?? m.id.split("/").pop() ?? m.id };
 
   // One list for saved turns and the live one, keyed by position: when the
   // answer ends and its saved copy arrives, the same blocks stay mounted
@@ -908,14 +919,19 @@ function starterKind(s: Starter): string {
   return "code";
 }
 
-function Question({ text, attachments, mentions, anchor }: { text: string; attachments: string[]; mentions: string[]; anchor?: string }) {
+function Question({ text, attachments, mentions, anchor }: { text: string; attachments: string[]; mentions: { kind: string; label?: string }[]; anchor?: string }) {
+  const scope = scopeNote(mentions);
   return (
     <div className="animate-chat-in flex flex-col items-end gap-1.5" data-testid="question" data-scroll-anchor={anchor}>
       <div className="max-w-[85%] min-w-0 rounded-2xl bg-zinc-800/80 px-4 py-2.5 text-sm leading-relaxed text-zinc-100">
         <p className="whitespace-pre-wrap wrap-anywhere">{text}</p>
         {attachments.length > 0 && <p className="mt-1 truncate text-xs text-zinc-400">Attached: {attachments.join(", ")}</p>}
       </div>
-      {mentions.length > 0 && <p className="max-w-[85%] truncate text-xs text-zinc-500">Only in {mentions.join(", ")}</p>}
+      {scope && (
+        <p className="max-w-[85%] truncate text-xs text-zinc-500" data-testid="question-scope">
+          {scope}
+        </p>
+      )}
     </div>
   );
 }
@@ -937,6 +953,14 @@ function startLabel(name: string): string {
       return "Searching knowledge";
     case "search_memories":
       return "Checking past work";
+    case NEEDS_ME:
+      return "Checking what's waiting on you";
+    case "api_get":
+      return "Reading the team's API";
+    case "db_query":
+      return "Querying a database";
+    case "logs_search":
+      return "Searching the logs";
     default:
       return name.startsWith("graph_") ? "Checking the code graph" : "Looking it up";
   }
