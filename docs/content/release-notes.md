@@ -5,6 +5,12 @@ the team in plain words, one "## <date>: <what>" heading per release, and link t
 pull requests that shipped it. Leave out CI, pins and dependency bumps.
 -->
 
+## November 16, 2026 (evening): set-up and reset emails reach people moved from hosted
+
+- **Every install admin can send set-up emails.** The email relay now lists all of an install's owners and admins, including people copied over from hosted CoderHelm, and keeps that list in step when roles change. Sending a set-up email again no longer fails with "Something went wrong on our side"; if a send is refused, the page says why and what to do. ([#727](https://github.com/CoderHelm/coderhelm-platform/pull/727))
+- **Unfinished sign-ups can start over.** Someone whose sign-up was never confirmed gets the set-up email from "Forgot password", and signing up again replaces the unconfirmed sign-up so the new password works. They land on their existing account. ([#727](https://github.com/CoderHelm/coderhelm-platform/pull/727))
+- **Verification and reset codes use the install's own email.** The codes go out in the install's template instead of the plain default text. ([#727](https://github.com/CoderHelm/coderhelm-platform/pull/727))
+
 ## November 16, 2026 (later): CoderHelm finishes its own review findings
 
 - **A finding answered with proof is reviewed again and closed.** When a fix round answers a review finding by running the checks on the latest commit instead of changing code, CoderHelm's reviewer looks at that same commit again with the round's evidence, and closes the finding when the proof holds. ([#726](https://github.com/CoderHelm/coderhelm-platform/pull/726))
