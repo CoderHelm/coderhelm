@@ -290,12 +290,11 @@ test.describe("built-in knowledge bases", () => {
     await shot(page, "knowledge-builtin-share-1280", false);
     await page.keyboard.press("Escape");
 
-    // Filter to Work: only Work is searched.
+    // Filter to Work: the words run again, in Work only.
     db.calls.length = 0;
     await page.getByTestId("filter-work").click();
     await expect(page.getByTestId("filter-work")).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByTestId("filter-all")).toHaveAttribute("aria-pressed", "false");
-    await page.getByTestId("builtin-search-go").click();
     await expect.poll(() => searches(db)).toEqual(["GET /api/knowledge/builtin/work/search?q=refunds"]);
     await expect(grouped.getByTestId("builtin-summary")).toHaveText("1 result for \u201crefunds\u201d in Work");
     await page.getByTestId("builtin-clear").click();
@@ -410,5 +409,173 @@ test.describe("built-in knowledge bases", () => {
     await expect(page.getByTestId("shared-closed")).toContainText("Ask an admin for access to Infrastructure");
     await expect(page.getByTestId("builtin-result")).toHaveCount(0);
     await shot(page, "shared-closed-1280");
+  });
+});
+
+// The base tabs beside the search box, and "Search Code" in a base's panel:
+// each picks the one base to search, keeps the words typed and runs them again
+// there, without taking focus from the box or blanking the results meanwhile.
+test.describe("built-in search: switching the base", () => {
+  const box = (page: Page) => page.getByRole("searchbox", { name: "Search the built-in bases" });
+  const summary = (page: Page) => page.getByTestId("builtin-summary");
+  const pressed = (page: Page) =>
+    page
+      .getByTestId("builtin-filters")
+      .getByRole("button")
+      .evaluateAll((els) => els.filter((e) => e.getAttribute("aria-pressed") === "true").map((e) => e.getAttribute("data-testid")));
+
+  async function searched(page: Page, db: Db) {
+    await page.goto("/knowledge/");
+    await expect(page.getByTestId("builtin-card")).toHaveCount(6);
+    await box(page).fill("refunds");
+    await box(page).press("Enter");
+    await expect(summary(page)).toHaveText("3 results for “refunds” in all bases open to you");
+    await expect.poll(() => searches(db).length).toBe(6);
+    db.calls.length = 0;
+  }
+
+  test("a tab is one base: the typed words run again there, and focus stays in the box", async ({ page }) => {
+    const db = await mock(page, true);
+    await searched(page, db);
+    await box(page).focus();
+
+    await page.getByTestId("filter-logs").click();
+    expect(await pressed(page)).toEqual(["filter-logs"]);
+    await expect(box(page)).toHaveAttribute("placeholder", "Search Logs");
+    await expect(box(page)).toHaveValue("refunds");
+    await expect(box(page)).toBeFocused();
+    await expect.poll(() => searches(db)).toEqual(["GET /api/knowledge/builtin/logs/search?q=refunds"]);
+    await expect(page.getByTestId("builtin-search-notes")).toContainText("Logs couldn't be searched: Logs didn't answer in time.");
+    await expect(summary(page)).toHaveText("0 results for “refunds” in Logs");
+
+    // Another tab replaces it rather than adding to it.
+    db.calls.length = 0;
+    await page.getByTestId("filter-code").click();
+    expect(await pressed(page)).toEqual(["filter-code"]);
+    await expect.poll(() => searches(db)).toEqual(["GET /api/knowledge/builtin/code/search?q=refunds"]);
+    await expect(summary(page)).toHaveText("2 results for “refunds” in Code");
+    await expect(box(page)).toBeFocused();
+
+    // All searches every open base again.
+    db.calls.length = 0;
+    await page.getByTestId("filter-all").click();
+    expect(await pressed(page)).toEqual(["filter-all"]);
+    await expect.poll(() => searches(db).length).toBe(6);
+    await expect(summary(page)).toHaveText("3 results for “refunds” in all bases open to you");
+    await noSideways(page);
+  });
+
+  test("Search Code in the panel switches the search to Code", async ({ page }) => {
+    const db = await mock(page, true);
+    await searched(page, db);
+    await card(page, "code").getByTestId("builtin-open").click();
+    const panel = page.getByTestId("builtin-panel");
+    await panel.getByRole("button", { name: "Search Code" }).click();
+    await expect(panel).toHaveCount(0);
+    expect(await pressed(page)).toEqual(["filter-code"]);
+    await expect.poll(() => searches(db)).toEqual(["GET /api/knowledge/builtin/code/search?q=refunds"]);
+    await expect(summary(page)).toHaveText("2 results for “refunds” in Code");
+    await expect(box(page)).toHaveValue("refunds");
+    await expect(box(page)).toBeFocused();
+    // Still there a moment later: nothing hands focus back to the card.
+    await page.waitForTimeout(300);
+    await expect(box(page)).toBeFocused();
+  });
+
+  test("with nothing typed a tab only narrows; the next search runs there", async ({ page }) => {
+    const db = await mock(page, true);
+    await page.goto("/knowledge/");
+    await expect(page.getByTestId("builtin-card")).toHaveCount(6);
+    await page.getByTestId("filter-work").click();
+    await expect(box(page)).toHaveAttribute("placeholder", "Search Work");
+    await page.waitForTimeout(300);
+    expect(searches(db)).toEqual([]);
+    await expect(page.getByTestId("builtin-grouped")).toHaveCount(0);
+    await box(page).fill("refunds");
+    await box(page).press("Enter");
+    await expect.poll(() => searches(db)).toEqual(["GET /api/knowledge/builtin/work/search?q=refunds"]);
+    await expect(summary(page)).toHaveText("1 result for “refunds” in Work");
+  });
+
+  test("keyboard: Tab from the box reaches the tabs, Space picks one, Escape closes the panel", async ({ page }) => {
+    const db = await mock(page, true);
+    await searched(page, db);
+    await box(page).focus();
+    // Box, its Search button, then the tabs in order.
+    await page.keyboard.press("Tab");
+    await expect(page.getByTestId("builtin-search-go")).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(page.getByTestId("filter-all")).toBeFocused();
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Tab");
+    await expect(page.getByTestId("filter-work")).toBeFocused();
+    await page.keyboard.press("Space");
+    expect(await pressed(page)).toEqual(["filter-work"]);
+    // A keyboard pick leaves focus on the tab, so the next Tab carries on.
+    await expect(page.getByTestId("filter-work")).toBeFocused();
+    await expect.poll(() => searches(db)).toEqual(["GET /api/knowledge/builtin/work/search?q=refunds"]);
+    await expect(summary(page)).toHaveText("1 result for “refunds” in Work");
+    // Back along Code, All and the Search button to the box.
+    for (let i = 0; i < 4; i++) await page.keyboard.press("Shift+Tab");
+    await expect(box(page)).toBeFocused();
+
+    await card(page, "logs").getByTestId("builtin-open").click();
+    await expect(page.getByTestId("builtin-panel")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("builtin-panel")).toHaveCount(0);
+    expect(await pressed(page)).toEqual(["filter-work"]);
+  });
+
+  test("a new base's answer replaces the old one without blanking it first", async ({ page }) => {
+    const db = await mock(page, true);
+    await searched(page, db);
+    // Hold the next answer so the moment between can be looked at.
+    let release!: () => void;
+    const held = new Promise<void>((r) => (release = r));
+    await page.route(/\/api\/knowledge\/builtin\/work\/search/, async (route) => {
+      await held;
+      await route.fallback();
+    });
+    await page.getByTestId("filter-work").click();
+    const grouped = page.getByTestId("builtin-grouped");
+    await expect(grouped).toHaveAttribute("aria-busy", "true");
+    await expect(grouped.getByTestId("builtin-group")).toHaveCount(2);
+    await expect(page.getByTestId("builtin-search-go")).toHaveText("Searching…");
+    release();
+    await expect(summary(page)).toHaveText("1 result for “refunds” in Work");
+    await expect(grouped).toHaveAttribute("aria-busy", "false");
+    await expect(grouped.getByTestId("builtin-group")).toHaveCount(1);
+  });
+
+  test("a quick second tab wins over a slow first one", async ({ page }) => {
+    const db = await mock(page, true);
+    await searched(page, db);
+    let release!: () => void;
+    const held = new Promise<void>((r) => (release = r));
+    await page.route(/\/api\/knowledge\/builtin\/code\/search/, async (route) => {
+      await held;
+      await route.fallback();
+    });
+    await page.getByTestId("filter-code").click();
+    await page.getByTestId("filter-work").click();
+    await expect(summary(page)).toHaveText("1 result for “refunds” in Work");
+    release();
+    await page.waitForTimeout(300);
+    await expect(summary(page)).toHaveText("1 result for “refunds” in Work");
+  });
+
+  test("at phone width the tabs wrap inside the screen and a pick moves nothing sideways", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const db = await mock(page, true);
+    await searched(page, db);
+    const tabs = page.getByTestId("builtin-filters").getByRole("button");
+    const inside = await tabs.evaluateAll((els) => els.every((e) => e.getBoundingClientRect().right <= window.innerWidth && e.getBoundingClientRect().left >= 0));
+    expect(inside).toBe(true);
+    const before = await box(page).boundingBox();
+    await page.getByTestId("filter-infra").click();
+    await expect(summary(page)).toContainText("in Infrastructure");
+    const after = await box(page).boundingBox();
+    expect(after).toEqual(before);
+    await noSideways(page);
   });
 });
