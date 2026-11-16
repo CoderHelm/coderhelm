@@ -594,7 +594,10 @@ function RunDetailInner() {
   const planning = run.status === "running" && (run.current_pass ?? "").startsWith("plan");
   const tab: RunTab = asked === "plan" && !hasPlan && !planPending ? "overview" : !tabParam && !oldLogLink && planning && hasPlan ? "plan" : asked;
   const shownTabs = RUN_TABS.filter((t) => t !== "plan" || hasPlan || tab === "plan");
-  const tabHref = (t: RunTab) => `/runs/detail?id=${encodeURIComponent(runId)}${t === "overview" ? "" : `&tab=${t}`}`;
+  // Every tab names itself, Overview included: a run still planning opens on
+  // its plan when no tab is named, so an unnamed Overview link would land on
+  // the Plan tab again.
+  const tabHref = (t: RunTab) => `/runs/detail?id=${encodeURIComponent(runId)}&tab=${t}`;
   const sourceWord = run.ticket_source === "jira" ? "Jira ticket" : run.ticket_source === "alert" ? "Alert" : "Issue";
   // "your-team/web#1234" in "your-team/web" says the repo twice: show "Issue #1234".
   const ticketShort = run.ticket_id && run.repo && run.ticket_id.startsWith(`${run.repo}#`) ? `#${run.ticket_id.slice(run.repo.length + 1)}` : run.ticket_id;
