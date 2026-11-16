@@ -21,6 +21,7 @@ import { KNOWLEDGE_HREF } from "@/lib/routes";
 import {
   askBrain,
   brainApi,
+  MAX_BULK_DELETE,
   uploadProblem,
   uploadToSignedUrl,
   type BrainMessage,
@@ -466,6 +467,53 @@ function Chat() {
     }
   };
 
+  /** Deletes several chats after asking once; resolves to the ids that weren't deleted, or null when declined. */
+  const removeMany = async (ids: string[]): Promise<string[] | null> => {
+    const n = ids.length;
+    const ok = await confirm({
+      title: n === 1 ? "Delete 1 chat?" : `Delete ${n} chats?`,
+      message: `${n === 1 ? "Its questions and answers are" : "Their questions and answers are"} removed for everyone ${n === 1 ? "it was" : "they were"} shared with. This can't be undone.`,
+      confirmLabel: n === 1 ? "Delete" : `Delete ${n} chats`,
+      destructive: true,
+    });
+    if (!ok) return null;
+    const deleted: string[] = [];
+    const failed: string[] = [];
+    let reason = "";
+    for (let i = 0; i < n; i += MAX_BULK_DELETE) {
+      const part = ids.slice(i, i + MAX_BULK_DELETE);
+      try {
+        const r = await brainApi.deleteThreads(part);
+        const byId = new Map(r.results.map((x) => [x.id, x]));
+        for (const id of part) {
+          const res = byId.get(id);
+          if (res?.ok) deleted.push(id);
+          else {
+            failed.push(id);
+            reason ||= res?.error ?? "";
+          }
+        }
+      } catch (e) {
+        failed.push(...part);
+        reason ||= e instanceof Error ? e.message : "";
+      }
+    }
+    if (deleted.length) {
+      const gone = new Set(deleted.map((id) => id.toLowerCase()));
+      setThreads((all) => (all ?? []).filter((x) => !gone.has(x.id.toLowerCase())));
+      for (const id of deleted) writeDraft(id, "");
+      // The open chat went with them: a new chat in its place.
+      if (threadId && gone.has(threadId.toLowerCase())) chatUrl("", "replace");
+    }
+    const done = deleted.length === 1 ? "1 chat deleted" : `${deleted.length} chats deleted`;
+    if (!failed.length) toast(done);
+    else {
+      const left = failed.length === 1 ? "1 chat couldn't be deleted and is still selected" : `${failed.length} chats couldn't be deleted and are still selected`;
+      toast(`${deleted.length ? `${done}. ` : ""}${left}.${reason ? ` ${reason}` : " Try again."}`, "error");
+    }
+    return failed;
+  };
+
   const rename = async (t: BrainThread, title: string) => {
     try {
       const r = await brainApi.updateThread(t.id, { title });
@@ -550,6 +598,7 @@ function Chat() {
         setSheetOpen(false);
         remove(t);
       }}
+      onDeleteMany={removeMany}
       onCollapse={opts.inSheet ? undefined : () => toggleRail(false)}
       shortcut={opts.inSheet ? undefined : shortcut}
     />

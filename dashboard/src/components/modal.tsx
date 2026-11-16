@@ -127,8 +127,13 @@ export function Modal({
     measure();
     return () => ro.disconnect();
   }, [sheet, bodyEl]);
+  // A dialog with nothing in its body (a yes/no question: the title, the
+  // description and the buttons) draws no body at all: no empty padded band
+  // between two rules. The title row then drops its rule (below), so at most
+  // one rule sits above the buttons, and the footer keeps its place at the
+  // bottom of a full-screen dialog on a phone (`mt-auto`).
   const body = (
-    <div ref={setBodyEl} data-modal-body className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
+    <div ref={setBodyEl} data-modal-body className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4 empty:hidden">
       {children}
     </div>
   );
@@ -138,7 +143,7 @@ export function Modal({
     <div
       ref={setSlot}
       data-modal-footer
-      className={`shrink-0 bg-zinc-900 px-5 empty:hidden ${sheet ? `border-t pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pb-5 ${overflows ? "border-zinc-800" : "border-transparent"}` : "border-t border-zinc-800 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-3"}`}
+      className={`mt-auto shrink-0 bg-zinc-900 px-5 empty:hidden ${sheet ? `border-t pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pb-5 ${overflows ? "border-zinc-800" : "border-transparent"}` : "border-t border-zinc-800 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-3"}`}
     >
       {footer}
     </div>
@@ -179,7 +184,10 @@ export function Modal({
               : `sm:inset-x-4 sm:bottom-auto sm:top-[8dvh] sm:mx-auto sm:h-auto sm:max-h-[84dvh] sm:rounded-xl sm:border sm:border-zinc-800 ${wide === "xl" ? "sm:max-w-2xl lg:max-w-4xl" : wide === "md" ? "sm:max-w-lg" : wide ? "sm:max-w-2xl" : "sm:max-w-md"}`
           }`}
         >
-          <div className={`flex shrink-0 items-start justify-between gap-3 px-5 ${sheet ? "pb-1 pt-5" : "border-b border-zinc-800 pb-3 pt-[max(1rem,env(safe-area-inset-top))] sm:pt-4"}`}>
+          <div
+            data-modal-head
+            className={`flex shrink-0 items-start justify-between gap-3 px-5 ${sheet ? "pb-1 pt-5 [&:has(+[data-modal-body]:empty)]:pb-3" : "border-b border-zinc-800 pb-3 pt-[max(1rem,env(safe-area-inset-top))] sm:pt-4 [&:has(+[data-modal-body]:empty)]:border-b-0 [&:has(+[data-modal-body]:empty)]:pb-4"}`}
+          >
             <div className="min-w-0">
               <Dialog.Title className="text-base font-semibold text-zinc-100">{title}</Dialog.Title>
               {description && <Dialog.Description className="mt-1 text-sm text-zinc-400">{description}</Dialog.Description>}

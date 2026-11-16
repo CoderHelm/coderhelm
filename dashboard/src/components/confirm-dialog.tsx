@@ -45,9 +45,12 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
     <ConfirmContext.Provider value={{ confirm }}>
       {children}
       {/* The shared dialog: focus starts on Cancel (the safe choice), Tab stays
-          inside, Escape cancels, focus goes back where it was. */}
+          inside, Escape cancels, focus goes back where it was. A question has
+          no body: the title and the message, then the buttons. On a phone it
+          rises from the bottom as tall as it is, not a whole empty screen. */}
       <Modal
         open={open}
+        sheet
         onOpenChange={(v) => !v && close(false)}
         role="alertdialog"
         title={opts.title}
