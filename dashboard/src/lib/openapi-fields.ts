@@ -65,7 +65,7 @@ export interface OpenApiFields {
   RotateBody: "overlap_hours";
   RotatedSecret: "previous_secret_expires_at" | "secret";
   RoundIncomplete: "at" | "can_resume" | "files" | "kind" | "number" | "pushed" | "reason" | "summary" | "wip_branch";
-  Run: "answers" | "answers_url" | "applied_standards" | "branch" | "branches" | "cache_read_tokens" | "cache_write_tokens" | "checks" | "close_reason" | "closed_at" | "closed_by" | "closed_from" | "codegen_env_missing" | "continued_run_id" | "cost_usd" | "covered_by" | "created_at" | "current_pass" | "draft_hold" | "duration_s" | "error" | "files_modified" | "fix_location" | "github_wait" | "lesson" | "mcp_servers" | "merge_standing" | "outside_change_report" | "pass_history" | "policy_approval" | "policy_note" | "pr_number" | "pr_numbers" | "pr_review" | "pr_review_comments" | "pr_url" | "pr_urls" | "progress_notes" | "prs" | "questions" | "questions_url" | "repo" | "round_incomplete" | "run_id" | "sign_in_prompts" | "status" | "stop_kind" | "ticket_id" | "ticket_source" | "title" | "tokens_in" | "tokens_out" | "tooling_failure" | "trigger" | "updated_at" | "waiting_on";
+  Run: "answers" | "answers_url" | "applied_standards" | "branch" | "branches" | "cache_read_tokens" | "cache_write_tokens" | "checks" | "close_reason" | "closed_at" | "closed_by" | "closed_from" | "codegen_env_missing" | "continued_run_id" | "cost_usd" | "covered_by" | "created_at" | "current_pass" | "draft_hold" | "duration_s" | "error" | "files_modified" | "fix_location" | "github_wait" | "lesson" | "mcp_servers" | "merge_standing" | "outside_change_report" | "pass_history" | "policy_approval" | "policy_note" | "pr_number" | "pr_numbers" | "pr_review" | "pr_review_comments" | "pr_url" | "pr_urls" | "progress_notes" | "preview" | "prs" | "questions" | "questions_url" | "repo" | "round_incomplete" | "run_id" | "sign_in_prompts" | "status" | "stop_kind" | "ticket_id" | "ticket_source" | "title" | "tokens_in" | "tokens_out" | "tooling_failure" | "trigger" | "updated_at" | "waiting_line" | "waiting_on";
   RunActionResult: "status";
   RunAnswer: "answer" | "answered_at" | "author" | "question" | "question_id";
   RunCheck: "completed_at" | "conclusion" | "name" | "required" | "started_at" | "state" | "url";
@@ -76,6 +76,9 @@ export interface OpenApiFields {
   RunDraftHold: "kind" | "pr_number" | "reasons" | "since" | "summary";
   RunDraftHoldReason: "todo" | "what";
   RunMergeStanding: "code" | "link" | "needs_person" | "next" | "text";
+  RunPreview: "checks" | "e2e_covered" | "e2e_required" | "labels_added" | "shots" | "stage" | "url" | "why";
+  RunPreviewCheck: "name" | "outcome" | "url";
+  RunPreviewShot: "page" | "src" | "width";
   RunNote: "message" | "timestamp";
   RunPass: "pass" | "started_at";
   RunPrReview: "at" | "review_sk" | "reviewed_sha" | "session_id" | "verdict";

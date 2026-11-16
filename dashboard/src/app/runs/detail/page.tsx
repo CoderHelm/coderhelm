@@ -20,6 +20,8 @@ import { usePaletteActions, type PageAction } from "@/components/command-palette
 import type { CloseRunRequest } from "@/lib/api";
 import { TeamAgentAsks } from "./team-asks";
 import { RunOutputs } from "./run-outputs";
+import { RunPreviewPanel } from "./run-preview";
+import { waitingLine } from "@/lib/waiting-line";
 import { RunAnswered, RunQuestions } from "./run-questions";
 import { AsksHistory, WaitingOnYou, useRunApprovals } from "./agent-asks";
 import { WorkUsedLine } from "@/components/work-used";
@@ -631,6 +633,12 @@ function RunDetailInner() {
   );
   // A finished run's card says what is true now: never a fix round that isn't running.
   const standing = run.merge_standing ? (done ? finishedStanding(run.merge_standing) : run.merge_standing) : null;
+  // One plain line at the top: what the pull request waits on now, and whether it is ready for review.
+  // The gateway writes it; an older gateway's run gets the same sentence from its standing and draft hold.
+  const topLine =
+    hasPr && (done || run.status === "needs_input")
+      ? waitingLine({ waiting_line: run.waiting_line, merge_standing: standing, draft_hold: hold, preview: run.preview, checks: run.checks, pr_number: prNumber })
+      : "";
   const helpLink = (
     <HelpLink item={{ kind: "run", id: runId, label: run.title || undefined, repo: run.repo || undefined }}>Get help with this run</HelpLink>
   );
@@ -1167,6 +1175,12 @@ function RunDetailInner() {
         </p>
       )}
 
+      {topLine && (
+        <p className="mt-4 text-sm font-medium text-zinc-100 [overflow-wrap:anywhere]" data-testid="run-waiting-line">
+          {topLine}
+        </p>
+      )}
+
       <div className="mt-6">{outcome}</div>
 
       <Tabs
@@ -1273,6 +1287,7 @@ function RunDetailInner() {
               </dl>
             </div>
           </div>
+          <RunPreviewPanel preview={run.preview} />
           <RunOutputs runId={runId} status={run.status} focus={searchParams.get("output")} />
         </div>
       )}
