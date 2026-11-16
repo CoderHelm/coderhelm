@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useEffect, useId, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode, type RefObject } from "react";
 import { Callout } from "@/components/callout";
 import { CopyButton } from "@/components/copy-button";
 import { Drawer } from "@/components/drawer";
@@ -84,7 +84,8 @@ export function BuiltinBases() {
   const [list, setList] = useState<BuiltinList | null>(null);
   const [failed, setFailed] = useState(false);
   const [openKey, setOpenKey] = useState<BuiltinKey | null>(null);
-  const [scope, setScope] = useState<BuiltinKey[]>([]);
+  // The one base the search is narrowed to; null searches every open base.
+  const [scope, setScope] = useState<BuiltinKey | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
 
@@ -155,10 +156,11 @@ export function BuiltinBases() {
         onClose={() => setOpenKey(null)}
         onChange={replace}
         onSearch={(k) => {
-          setScope([k]);
+          // The panel hands focus back to the search box, not the card, and
+          // the search box runs what is typed again in this base.
+          openerRef.current = searchRef.current;
+          setScope(k);
           setOpenKey(null);
-          // After the panel hands focus back to the card.
-          setTimeout(() => searchRef.current?.focus(), 50);
         }}
       />
     </section>
@@ -314,41 +316,60 @@ function CrossSearch({
   inputRef,
 }: {
   bases: BuiltinBase[];
-  scope: BuiltinKey[];
-  setScope: (s: BuiltinKey[]) => void;
+  scope: BuiltinKey | null;
+  setScope: (s: BuiltinKey | null) => void;
   inputRef: RefObject<HTMLInputElement | null>;
 }) {
   const id = useId();
   const [q, setQ] = useState("");
-  const [asked, setAsked] = useState("");
-  const [groups, setGroups] = useState<Group[] | null>(null);
-  const [skipped, setSkipped] = useState<BuiltinBase[]>([]);
+  // The answer on screen: the words, where they were searched, what came back.
+  const [shown, setShown] = useState<{ query: string; where: string; groups: Group[]; skipped: BuiltinBase[] } | null>(null);
   const [busy, setBusy] = useState(false);
   const ask = useRef(0);
   const open = bases.filter((b) => b.access.open && !b.audience.paused);
-  const chosen = scope.length ? open.filter((b) => scope.includes(b.key)) : open;
+  const chosen = scope ? open.filter((b) => b.key === scope) : open;
 
-  const run = async () => {
-    const query = q.trim();
+  const run = async (query: string) => {
     if (!query || chosen.length === 0) return;
     const n = ++ask.current;
+    const where = scope ? chosen[0].name : "all bases open to you";
+    // Named so nobody reads "nothing matched" as "nothing there".
+    const skipped = scope ? [] : bases.filter((b) => !open.includes(b));
+    // The last answer stays on screen, marked busy, until this one is in.
     setBusy(true);
     const settled = await Promise.allSettled(chosen.map((b) => builtinBases.search(b.key, query)));
     if (n !== ask.current) return;
-    setGroups(
-      chosen.map((b, i) => {
-        const s = settled[i];
-        return s.status === "fulfilled" ? { key: b.key, name: b.name, found: s.value } : { key: b.key, name: b.name, error: s.reason instanceof Error ? s.reason.message : "The search failed." };
-      }),
-    );
-    // Named so nobody reads "nothing matched" as "nothing there".
-    setSkipped(scope.length ? [] : bases.filter((b) => !open.includes(b)));
-    setAsked(query);
+    const groups = chosen.map((b, i): Group => {
+      const s = settled[i];
+      return s.status === "fulfilled" ? { key: b.key, name: b.name, found: s.value } : { key: b.key, name: b.name, error: s.reason instanceof Error ? s.reason.message : "The search failed." };
+    });
+    setShown({ query, where, groups, skipped });
     setBusy(false);
   };
 
-  const toggle = (k: BuiltinKey) => setScope(scope.includes(k) ? scope.filter((x) => x !== k) : [...scope, k]);
-  const where = scope.length === 0 ? "all bases open to you" : chosen.map((b) => b.name).join(", ");
+  // A new base (a tab, or "Search Code" in a panel) runs the words again
+  // there: what is typed, or else the search on screen.
+  const runLatest = useRef(run);
+  runLatest.current = run;
+  const shownQuery = useRef("");
+  shownQuery.current = shown?.query ?? "";
+  const typed = useRef("");
+  typed.current = q.trim();
+  const firstScope = useRef(true);
+  useEffect(() => {
+    if (firstScope.current) {
+      firstScope.current = false;
+      return;
+    }
+    runLatest.current(typed.current || shownQuery.current);
+  }, [scope]);
+
+  const pick = (k: BuiltinKey | null, e: ReactMouseEvent<HTMLButtonElement>) => {
+    if (k !== scope) setScope(k);
+    // A click keeps typing in the box; a key press (Space, Enter: detail 0)
+    // leaves focus on the tab so Tab carries on along them.
+    if (e.detail > 0) inputRef.current?.focus();
+  };
 
   return (
     <div className="mt-3" data-testid="builtin-search">
@@ -358,7 +379,7 @@ function CrossSearch({
           className="relative min-w-0 flex-1 basis-72"
           onSubmit={(e) => {
             e.preventDefault();
-            run();
+            run(q.trim());
           }}
         >
           <label htmlFor={id} className="sr-only">
@@ -372,7 +393,7 @@ function CrossSearch({
             id={id}
             type="search"
             className={`${inputClass} pl-9 pr-24`}
-            placeholder={scope.length === 1 ? `Search ${chosen[0]?.name ?? ""}` : "Search every base"}
+            placeholder={scope && chosen[0] ? `Search ${chosen[0].name}` : "Search every base"}
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
@@ -387,13 +408,13 @@ function CrossSearch({
         </form>
 
         <div className="flex min-w-0 flex-wrap items-center gap-1.5" role="group" aria-label="Bases to search" data-testid="builtin-filters">
-          <FilterChip pressed={scope.length === 0} onClick={() => setScope([])} testId="filter-all">
+          <FilterChip pressed={scope === null} onClick={(e) => pick(null, e)} testId="filter-all">
             All
           </FilterChip>
           {bases.map((b) => {
             const closed = !open.includes(b);
             return (
-              <FilterChip key={b.key} pressed={scope.includes(b.key)} disabled={closed} onClick={() => toggle(b.key)} testId={`filter-${b.key}`} title={closed ? (b.audience.paused ? `${b.name} is paused` : `${b.name} isn't open to you`) : undefined}>
+              <FilterChip key={b.key} pressed={scope === b.key} disabled={closed} onClick={(e) => pick(b.key, e)} testId={`filter-${b.key}`} title={closed ? (b.audience.paused ? `${b.name} is paused` : `${b.name} isn't open to you`) : undefined}>
                 {closed && (
                   <span aria-hidden="true" className="[&_svg]:h-3 [&_svg]:w-3">
                     <LockIcon />
@@ -406,16 +427,16 @@ function CrossSearch({
         </div>
       </div>
 
-      {groups && (
+      {shown && (
         <GroupedResults
-          query={asked}
-          where={where}
-          groups={groups}
-          skipped={skipped}
+          query={shown.query}
+          where={shown.where}
+          groups={shown.groups}
+          skipped={shown.skipped}
+          busy={busy}
           onClear={() => {
             ask.current++;
-            setGroups(null);
-            setAsked("");
+            setShown(null);
             setBusy(false);
           }}
         />
@@ -424,13 +445,29 @@ function CrossSearch({
   );
 }
 
-function FilterChip({ pressed, disabled, onClick, children, testId, title }: { pressed: boolean; disabled?: boolean; onClick: () => void; children: ReactNode; testId?: string; title?: string }) {
+function FilterChip({
+  pressed,
+  disabled,
+  onClick,
+  children,
+  testId,
+  title,
+}: {
+  pressed: boolean;
+  disabled?: boolean;
+  onClick: (e: ReactMouseEvent<HTMLButtonElement>) => void;
+  children: ReactNode;
+  testId?: string;
+  title?: string;
+}) {
   return (
     <button
       type="button"
       aria-pressed={pressed}
       disabled={disabled}
       title={title}
+      // A click doesn't take focus from the search box on its way.
+      onMouseDown={(e) => e.preventDefault()}
       onClick={onClick}
       data-testid={testId}
       className={`inline-flex min-h-8 items-center gap-1 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-medium transition-colors motion-reduce:transition-none disabled:cursor-not-allowed disabled:opacity-60 ${
@@ -442,13 +479,17 @@ function FilterChip({ pressed, disabled, onClick, children, testId, title }: { p
   );
 }
 
-function GroupedResults({ query, where, groups, skipped, onClear }: { query: string; where: string; groups: Group[]; skipped: BuiltinBase[]; onClear: () => void }) {
+function GroupedResults({ query, where, groups, skipped, busy, onClear }: { query: string; where: string; groups: Group[]; skipped: BuiltinBase[]; busy: boolean; onClear: () => void }) {
   const found = groups.filter((g) => g.found && g.found.results.length > 0);
   const empty = groups.filter((g) => g.found && g.found.results.length === 0 && !(g.found.withheld?.count > 0));
   const failed = groups.filter((g) => g.error);
   const total = found.reduce((n, g) => n + (g.found?.results.length ?? 0), 0);
   return (
-    <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900/40" data-testid="builtin-grouped">
+    <div
+      className={`mt-4 rounded-xl border border-zinc-800 bg-zinc-900/40 transition-opacity motion-reduce:transition-none ${busy ? "opacity-60" : ""}`}
+      aria-busy={busy}
+      data-testid="builtin-grouped"
+    >
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 border-b border-zinc-800 px-4 py-2.5">
         <p className="min-w-0 text-sm text-zinc-300" data-testid="builtin-summary">
           {plural(total, "result")} for <span className="font-medium text-zinc-100 [overflow-wrap:anywhere]">&ldquo;{query}&rdquo;</span> in {where}
