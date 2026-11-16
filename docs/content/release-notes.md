@@ -5,6 +5,12 @@ the team in plain words, one "## <date>: <what>" heading per release, and link t
 pull requests that shipped it. Leave out CI, pins and dependency bumps.
 -->
 
+## November 16, 2026 (later): CoderHelm finishes its own review findings
+
+- **A finding answered with proof is reviewed again and closed.** When a fix round answers a review finding by running the checks on the latest commit instead of changing code, CoderHelm's reviewer looks at that same commit again with the round's evidence, and closes the finding when the proof holds. ([#726](https://github.com/CoderHelm/coderhelm-platform/pull/726))
+- **Running out of time is never a reason to stop.** A check a step had no time to start is owed to the next step and runs first there; it no longer counts against the finding or hands the pull request to a person. ([#726](https://github.com/CoderHelm/coderhelm-platform/pull/726))
+- **Pull requests end ready for review.** Anything truly left over after every approach is listed as CoderHelm's note on the pull request, which is marked ready instead of held as a draft. Pull requests already held this way recover on their own. ([#726](https://github.com/CoderHelm/coderhelm-platform/pull/726))
+
 ## November 16, 2026: plans that survive a cut answer, rebuilt descriptions, and a calmer update
 
 - **A cut plan never replaces a good one.** When a plan revision runs out of room, CoderHelm continues it or repairs the missing part instead of throwing the plan away, so a run no longer fails with an empty plan. ([#720](https://github.com/CoderHelm/coderhelm-platform/pull/720))
