@@ -199,6 +199,16 @@ export interface Mention {
   id: string;
 }
 
+/** How many chats one bulk delete takes (the server holds the same limit). */
+export const MAX_BULK_DELETE = 100;
+
+/** One chat's result in a bulk delete: deleted, or why not. */
+export interface BulkDeleteResult {
+  id: string;
+  ok: boolean;
+  error?: string;
+}
+
 export interface BrainThread {
   id: string;
   title: string;
@@ -271,6 +281,8 @@ export const brainApi = {
   updateThread: (id: string, patch: { title?: string; shared?: boolean; pinned?: boolean }) =>
     request<{ thread: BrainThread }>(`/api/brain/threads/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(patch) }),
   deleteThread: (id: string) => request<{ ok: boolean }>(`/api/brain/threads/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  /** Deletes up to {@link MAX_BULK_DELETE} of your own chats at once; each id gets its own result. */
+  deleteThreads: (ids: string[]) => request<{ results: BulkDeleteResult[] }>("/api/brain/threads/delete", json({ ids })),
   sources: () => request<BrainSources>("/api/brain/sources"),
   starters: () => request<{ starters: Starter[] }>("/api/brain/starters"),
   rate: (threadId: string, seq: number, rating: Rating | null) =>

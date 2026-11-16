@@ -5,6 +5,25 @@ the team in plain words, one "## <date>: <what>" heading per release, and link t
 pull requests that shipped it. Leave out CI, pins and dependency bumps.
 -->
 
+## November 16, 2026 (afternoon): Knowledge search tabs, deleting many chats, and cleaner dialogs
+
+- **Knowledge search tabs search right away.** Picking Code, Work, Logs or another base on the Knowledge page runs your search there at once and keeps what you typed; "Search Code" in a base's panel does the same. The last results stay on screen while new ones load. ([#433](https://github.com/CoderHelm/coderhelm/pull/433))
+- **Delete several chats at once.** Choose Select in the chat list (or Shift-click a chat), tick the chats, and delete them together after one confirmation. Only your own chats can be selected. ([#434](https://github.com/CoderHelm/coderhelm/pull/434), [#728](https://github.com/CoderHelm/coderhelm-platform/pull/728))
+- **Confirm dialogs without the empty band.** Yes or no questions no longer show an empty section between two lines, and on a phone they open as a short panel at the bottom. ([#434](https://github.com/CoderHelm/coderhelm/pull/434))
+- **Everyone moved from hosted can get in.** A GitHub sign-in lands on the person's existing account instead of a second one made from their GitHub name, and people invited before the move get their invite from the install through "Forgot password" or "Send set-up emails to all". Refused sign-ins are logged by cause. ([#730](https://github.com/CoderHelm/coderhelm-platform/pull/730))
+
+## November 16, 2026 (evening): set-up and reset emails reach people moved from hosted
+
+- **Every install admin can send set-up emails.** The email relay now lists all of an install's owners and admins, including people copied over from hosted CoderHelm, and keeps that list in step when roles change. Sending a set-up email again no longer fails with "Something went wrong on our side"; if a send is refused, the page says why and what to do. ([#727](https://github.com/CoderHelm/coderhelm-platform/pull/727))
+- **Unfinished sign-ups can start over.** Someone whose sign-up was never confirmed gets the set-up email from "Forgot password", and signing up again replaces the unconfirmed sign-up so the new password works. They land on their existing account. ([#727](https://github.com/CoderHelm/coderhelm-platform/pull/727))
+- **Verification and reset codes use the install's own email.** The codes go out in the install's template instead of the plain default text. ([#727](https://github.com/CoderHelm/coderhelm-platform/pull/727))
+
+## November 16, 2026 (later): CoderHelm finishes its own review findings
+
+- **A finding answered with proof is reviewed again and closed.** When a fix round answers a review finding by running the checks on the latest commit instead of changing code, CoderHelm's reviewer looks at that same commit again with the round's evidence, and closes the finding when the proof holds. ([#726](https://github.com/CoderHelm/coderhelm-platform/pull/726))
+- **Running out of time is never a reason to stop.** A check a step had no time to start is owed to the next step and runs first there; it no longer counts against the finding or hands the pull request to a person. ([#726](https://github.com/CoderHelm/coderhelm-platform/pull/726))
+- **Pull requests end ready for review.** Anything truly left over after every approach is listed as CoderHelm's note on the pull request, which is marked ready instead of held as a draft. Pull requests already held this way recover on their own. ([#726](https://github.com/CoderHelm/coderhelm-platform/pull/726))
+
 ## November 16, 2026: plans that survive a cut answer, rebuilt descriptions, and a calmer update
 
 - **A cut plan never replaces a good one.** When a plan revision runs out of room, CoderHelm continues it or repairs the missing part instead of throwing the plan away, so a run no longer fails with an empty plan. ([#720](https://github.com/CoderHelm/coderhelm-platform/pull/720))
