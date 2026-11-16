@@ -387,6 +387,11 @@ function describe(tool: string, input: Record<string, unknown>): { verb: string;
       return { verb: "Ran", target: "the checks", isPath: false, files: [] };
     case "run_codegen":
       return { verb: "Ran", target: "the code generator", isPath: false, files: [] };
+    case "bash": {
+      // The command itself, however long: a refused or failed one is read by what it tried.
+      const command = str(input.command ?? input.cmd).trim();
+      return { verb: "Ran", target: command || "a shell command (none was sent)", isPath: false, files: [] };
+    }
     case "check_url": {
       const urls = Array.isArray(input.urls) ? (input.urls as unknown[]).map(str) : str(input.url) ? [str(input.url)] : [];
       const find = Array.isArray(input.find) ? (input.find as unknown[]).map(str).filter(Boolean) : [];
@@ -442,11 +447,13 @@ function makeStep(opts: {
   call: unknown;
   live?: boolean;
   liveSummary?: string;
+  /** What a live event says the agent got back (a refusal's reason), before the log is saved. */
+  liveText?: string | null;
 }): LogStep {
   const { tool, input } = opts;
   const d = describe(tool, input);
   const decoded = decodeResult(opts.result);
-  const text = decoded.text;
+  const text = decoded.text ?? (opts.liveText || null);
   const outcome = opts.outcome ?? opts.result?.outcome ?? null;
   const isError = opts.isError ?? !!opts.result?.is_error;
   const status: StepStatus = outcome ? outcome.status : text === null && !opts.live ? (isError ? "error" : "unknown") : statusFromText(tool, text ?? "", isError);
@@ -816,6 +823,7 @@ function livePasses(events: AgentLogLiveEvent[], logged: Set<string>, hasLogs: b
         startedAt: e.started_at ?? (e.timestamp ? new Date(Date.parse(e.timestamp) - (e.duration_ms || 0)).toISOString() : undefined),
         call: e,
         live: true,
+        liveText: e.message,
       }),
     );
     const items = fold(steps.map((step) => ({ kind: "step" as const, step })), id);
