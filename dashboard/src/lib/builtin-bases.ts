@@ -121,11 +121,39 @@ export const builtinBases = {
   unshare: (id: string) => request<{ ok: boolean }>(`/api/share/${e(id)}`, { method: "DELETE" }),
 };
 
+/**
+ * A count's label for one thing. The gateway sends plural labels ("AWS
+ * accounts read", "repositories"); for a count of 1 the noun, the last word
+ * that ends in s and isn't all capitals, becomes singular: "1 AWS account read".
+ */
+export function countLabel(label: string, count: number): string {
+  if (count !== 1) return label;
+  const words = label.split(" ");
+  for (let i = words.length - 1; i >= 0; i--) {
+    const w = words[i];
+    if (w.length < 3 || !/s$/.test(w) || /ss$/.test(w) || w === w.toUpperCase()) continue;
+    words[i] = /ies$/.test(w) ? `${w.slice(0, -3)}y` : /(ch|sh|x)es$/.test(w) ? w.slice(0, -2) : w.slice(0, -1);
+    return words.join(" ");
+  }
+  return label;
+}
+
 /** "412 files, 3 repositories", the largest first as the gateway sends them. */
 export function countsLine(counts: BuiltinBase["counts"]): string {
   const shown = counts.filter((c) => c.count > 0);
   if (shown.length === 0) return "Nothing in it yet";
-  return shown.map((c) => `${c.count.toLocaleString()} ${c.label}`).join(", ");
+  return shown.map((c) => `${c.count.toLocaleString()} ${countLabel(c.label, c.count)}`).join(", ");
+}
+
+/** A count short enough for a stat: 940, 18.3k, 1.3M. */
+export function shortCount(n: number): string {
+  if (n < 10_000) return n.toLocaleString();
+  return new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(n).toLowerCase().replace("m", "M").replace("b", "B");
+}
+
+/** "1 result", "2 results". */
+export function plural(n: number, one: string, many = `${one}s`): string {
+  return `${n.toLocaleString()} ${n === 1 ? one : many}`;
 }
 
 /** People typed in a box: one address per line or comma, trimmed, no repeats. */
