@@ -245,7 +245,7 @@ function BaseCard({ b, onOpen }: { b: BuiltinBase; onOpen: (el: HTMLElement) => 
         onClick={(e) => onOpen(e.currentTarget)}
         aria-haspopup="dialog"
         data-testid="builtin-open"
-        className={`group grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-3 px-4 py-3 text-left transition-colors [grid-template-areas:'base_base'_'stats_stats'_'who_status'] hover:bg-zinc-800/40 motion-reduce:transition-none lg:grid-cols-[minmax(0,13rem)_minmax(0,1fr)_minmax(0,9rem)_minmax(0,8.5rem)_1rem] lg:items-center lg:gap-x-4 lg:py-1.5 lg:[grid-template-areas:'base_stats_who_status_chevron'] ${focusRing} focus-visible:outline-offset-[-2px]`}
+        className={`group grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-3 px-4 py-3 text-left transition-colors [grid-template-areas:'base_base'_'stats_stats'_'who_status'] hover:bg-zinc-800/40 motion-reduce:transition-none xl:grid-cols-[minmax(0,13rem)_minmax(0,1fr)_minmax(0,9rem)_minmax(0,8.5rem)_1rem] xl:items-center xl:gap-x-4 xl:py-1.5 xl:[grid-template-areas:'base_stats_who_status_chevron'] ${focusRing} focus-visible:outline-offset-[-2px]`}
       >
         <span className="flex min-w-0 items-center gap-3 [grid-area:base]">
           <BaseIcon k={b.key} />
@@ -265,7 +265,9 @@ function BaseCard({ b, onOpen }: { b: BuiltinBase; onOpen: (el: HTMLElement) => 
             stats.map((c) => (
               <span key={c.label} className="flex min-w-0 max-w-full items-baseline gap-1" data-testid="builtin-stat" title={`${c.count.toLocaleString()} ${countLabel(c.label, c.count)}`}>
                 <span className="shrink-0 text-sm font-semibold leading-4 tabular-nums text-zinc-50">{shortCount(c.count)}</span>
-                <span className="min-w-0 text-xs leading-4 text-zinc-400" data-testid="builtin-stat-label">{countLabel(c.label, c.count)}</span>
+                {/* Never narrower than its longest word, so it wraps between words; a
+                    label longer than two lines is clamped, the stat's title has it whole. */}
+                <span className="line-clamp-2 text-xs leading-4 text-zinc-400" data-testid="builtin-stat-label">{countLabel(c.label, c.count)}</span>
               </span>
             ))
           )}
@@ -283,8 +285,8 @@ function BaseCard({ b, onOpen }: { b: BuiltinBase; onOpen: (el: HTMLElement) => 
           )}
         </span>
 
-        <span className="flex min-w-0 items-center justify-end self-center [grid-area:status] lg:justify-start">{status}</span>
-        <span aria-hidden="true" className="hidden text-zinc-500 transition-colors [grid-area:chevron] group-hover:text-zinc-200 lg:block">
+        <span className="flex min-w-0 items-center justify-end self-center [grid-area:status] xl:justify-start">{status}</span>
+        <span aria-hidden="true" className="hidden text-zinc-500 transition-colors [grid-area:chevron] group-hover:text-zinc-200 xl:block">
           <ChevronRightIcon />
         </span>
       </button>
