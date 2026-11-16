@@ -76,6 +76,8 @@ interface Backend {
   uploads: number;
   /** The saved answer's text. */
   answerText: string;
+  /** The saved answer's steps, when not the default three. */
+  answerUsed?: unknown[];
 }
 
 const ev = (type: string, data: unknown) => `event: ${type}\ndata: ${JSON.stringify(data)}\n\n`;
@@ -167,7 +169,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
           citations: CITED,
           grounded: true,
           attachments: [],
-          used: [
+          used: db.answerUsed ?? [
             { kind: "knowledge", name: "search_knowledge", label: "Searched knowledge for “parental leave”", summary: "1 passage" },
             { kind: "code", name: "github__read_file", repo: "web", label: "Read src/policies/leave.ts in web", summary: "Lines 1-3 of 3" },
             { kind: "code", name: "github__read_file", repo: "web", label: "Read src/server.ts in web", summary: "Lines 1-17 of 44" },
@@ -658,6 +660,8 @@ test.describe("chat: the chat list", () => {
     await askIt(page, "Why is this waiting?");
     await expect.poll(() => db.asks.length).toBe(1);
     expect(db.asks[0].mentions).toEqual([{ kind: "run", id: "01RUNACME" }]);
+    // Under the question it reads as what it's about, not a place it's "only in".
+    await expect(page.getByTestId("question").last().getByTestId("question-scope")).toHaveText("About “Add a Heading component”");
     // Removable before asking.
     await page.goto("/chat?run=01RUNACME&title=Add%20a%20Heading%20component");
     await page.getByRole("button", { name: /Stop pointing at Run: Add a Heading component/ }).click();
@@ -667,7 +671,31 @@ test.describe("chat: the chat list", () => {
     await expect(page.getByTestId("mention-chip")).toHaveCount(0);
   });
 
-  test("“What needs my answer?” sends the waiting runs with it", async ({ page }) => {
+  test("“What needs my answer?” asks about everything waiting, with no scope line and a step that says what it checked", async ({ page }) => {
+    const db = await mockApi(page, {
+      starters: [
+        { question: "What needs my answer?", why: "Runs, tickets and pull requests waiting on you", sources: { ...NONE, work: true }, mentions: [] },
+        ...STARTERS.slice(0, 3),
+      ] as typeof STARTERS,
+      answerText: "6 things need you: 2 now, 3 today, 1 when you can [S1].",
+      answerUsed: [
+        { kind: "work", name: "work_needs_me", label: "Checked what's waiting on you", summary: "6 items" },
+        { kind: "data_sources", name: "api_get", label: "Read /v1/orders/42 from Orders API", summary: "1 result" },
+      ],
+    });
+    await page.goto("/chat");
+    await page.getByTestId("starter").filter({ hasText: "What needs my answer?" }).click();
+    await expect.poll(() => db.asks.length).toBe(1);
+    expect(db.asks[0].mentions).toEqual([]);
+    const answer = page.getByTestId("answer").last();
+    await expect(answer.getByTestId("activity-summary")).toHaveText("Checked what's waiting on you, read /v1/orders/42 from Orders API");
+    await expect(answer).not.toContainText("api get");
+    await answer.getByTestId("activity-toggle").click();
+    await expect(answer.getByTestId("step-group").first()).toContainText("Waiting on you");
+    await expect(page.getByTestId("question").last().getByTestId("question-scope")).toHaveCount(0);
+  });
+
+  test("a question an older starter sent with waiting runs says it's about them, never “Only in A run”", async ({ page }) => {
     const db = await mockApi(page, {
       starters: [
         { question: "What needs my answer?", why: "2 runs are waiting on an answer", sources: NONE, mentions: [{ kind: "run", id: "01R1" }, { kind: "run", id: "01R2" }] },
@@ -677,7 +705,9 @@ test.describe("chat: the chat list", () => {
     await page.goto("/chat");
     await page.getByTestId("starter").filter({ hasText: "What needs my answer?" }).click();
     await expect.poll(() => db.asks.length).toBe(1);
-    expect(db.asks[0].mentions).toEqual([{ kind: "run", id: "01R1" }, { kind: "run", id: "01R2" }]);
+    const scope = page.getByTestId("question").last().getByTestId("question-scope");
+    await expect(scope).toHaveText("About 2 runs");
+    await expect(page.getByTestId("question").last()).not.toContainText("Only in");
   });
 
   test("⌘J opens Chat from any page", async ({ page }) => {

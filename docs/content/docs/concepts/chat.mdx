@@ -22,6 +22,16 @@ Chat works like a teammate who opens the code: it looks a repository over (its R
 
 Besides code and knowledge, Chat looks up your team's work directly: Jira tickets by key or words, pull requests and CoderHelm's branches, runs (what is running now, why one stopped, what it waits on), security and infrastructure findings, quarantined tests, reviews, alerts, log findings, plans, and AWS resources from the daily read of your connected accounts. It reads through the team's [built-in bases](/concepts/knowledge#the-teams-built-in-bases), so a base that isn't open to you is left out. When a source it needed couldn't be read, the answer says so. Your [AI tools](/mcp) use the same lookups.
 
+### What needs you
+
+Ask **What needs my answer?** (it's the first suggested question), or say it your way: "what's on my plate", "anything waiting on me", "my reviews". Chat checks everything waiting on you in one step:
+
+- **CoderHelm:** questions runs stopped on, with the answers they found; runs waiting on a change outside their repository; CoderHelm's open pull requests on your tickets; and, for admins, tool calls waiting for a yes.
+- **Jira:** open tickets assigned to you, and tickets where someone mentioned you after your last comment. Tickets nobody touched in 60 days are left out unless they're urgent.
+- **GitHub:** pull requests asking for your review, your pull requests with changes asked for, failing checks or ready to merge, and comments that mention you that you haven't answered, in your team's repositories.
+
+The answer starts with a count, then lists the items by how soon they need you, each on one line with a link and what to do. When a source can't be read (Jira isn't connected, or your sign-in isn't linked to GitHub), the answer says so. Chat finds you by your sign-in email, your GitHub login and the Jira account CoderHelm has seen with your email; it reads your team only.
+
 <Diagram id="chat-answers">
 
 1. You ask a question, and can attach files.

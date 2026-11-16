@@ -440,10 +440,11 @@ export function activitySummary(steps: { name?: string; label: string; repo?: st
   if (count(isSearch)) parts.push("searched the code");
   if (count((n) => n === "search_knowledge")) parts.push("searched knowledge");
   if (count((n) => n === "search_memories")) parts.push("checked past work");
+  if (count((n) => n === NEEDS_ME)) parts.push("checked what's waiting on you");
   // The team's records, by what was looked up: "looked up tickets, pull requests and runs".
   const work = [...new Set(done.map((s) => WORK_NOUN[s.name ?? ""]).filter(Boolean))];
   if (work.length) parts.push(`looked up ${andList(work)}`);
-  const known = (n: string) => isRead(n) || isOverview(n) || isSearch(n) || n === "search_knowledge" || n === "search_memories" || n === "github__list_repos" || n in WORK_NOUN;
+  const known = (n: string) => isRead(n) || isOverview(n) || isSearch(n) || n === "search_knowledge" || n === "search_memories" || n === "github__list_repos" || n === NEEDS_ME || n in WORK_NOUN;
   const other = done.filter((s) => !known(s.name ?? "") && !s.label.startsWith("Looked further"));
   if (other.length === 1) parts.push(other[0].label.charAt(0).toLowerCase() + other[0].label.slice(1));
   else if (other.length > 1) parts.push(`${other.length} other lookups`);
@@ -451,6 +452,9 @@ export function activitySummary(steps: { name?: string; label: string; repo?: st
   const text = parts.join(", ");
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
+
+/** The lookup that gathers everything waiting on the asker (runs, approvals, Jira, GitHub). */
+export const NEEDS_ME = "work_needs_me";
 
 /** What each work lookup reads, in the summary's words. */
 const WORK_NOUN: Record<string, string> = {
@@ -472,6 +476,7 @@ export function stepSource(name?: string): { key: string; label: string } {
   if (n.startsWith("github__") || n.startsWith("graph_")) return { key: "code", label: "Code" };
   if (n === "search_knowledge") return { key: "knowledge", label: "Knowledge" };
   if (n === "search_memories") return { key: "memories", label: "Past work" };
+  if (n === NEEDS_ME) return { key: n, label: "Waiting on you" };
   if (WORK_NOUN[n]) {
     const w = WORK_NOUN[n];
     return { key: n, label: w.charAt(0).toUpperCase() + w.slice(1) };
@@ -501,6 +506,25 @@ export function unavailableSources(steps: { name?: string; status?: string }[]):
 export function unavailableNote(steps: { name?: string; status?: string }[]): string {
   const gone = unavailableSources(steps);
   return gone.length ? `${andList(gone)} couldn't be read` : "";
+}
+
+/**
+ * The line under a question that says what it was pointed at. Repositories
+ * and knowledge bases narrow what Chat reads ("Only in api"); a run only goes
+ * with the question as context ("About “Add a Heading”", "About 2 runs"), so
+ * it never reads as a place.
+ */
+export function scopeNote(mentions: { kind: string; label?: string }[]): string {
+  const narrow = mentions.filter((m) => m.kind !== "run" && m.label).map((m) => m.label!);
+  const runs = mentions.filter((m) => m.kind === "run");
+  const named = runs.map((m) => m.label).filter((l): l is string => !!l);
+  const parts: string[] = [];
+  if (narrow.length) parts.push(`Only in ${narrow.join(", ")}`);
+  if (runs.length) {
+    if (named.length === runs.length) parts.push(`About ${named.map((l) => `“${l}”`).join(", ")}`);
+    else parts.push(runs.length === 1 ? "About a run" : `About ${runs.length} runs`);
+  }
+  return parts.join(" · ");
 }
 
 /** An answer's text without its `[S1]` markers, for copying. */
