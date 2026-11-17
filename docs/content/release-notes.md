@@ -5,6 +5,11 @@ the team in plain words, one "## <date>: <what>" heading per release, and link t
 pull requests that shipped it. Leave out CI, pins and dependency bumps.
 -->
 
+## November 17, 2026: red checks reproduced first, and a reviewer that reads only the change
+
+- **A red check is reproduced before it is blamed or reverted.** When an end-to-end test fails, CoderHelm runs it against staging and the preview and records both. It reverts its own work only when that record shows the change caused the failure, and when the test fails on staging too it fixes the test on the branch. The fixer reads the failure's test name, error and screenshot, and the description drops "CI is failing" and revert lines once they stop being true. ([#754](https://github.com/CoderHelm/coderhelm-platform/pull/754))
+- **The reviewer reads only the pull request's own change.** After main is merged in, files the merge brought are no longer reviewed or called unrelated. A passing end-to-end run whose report shows a page's test ids counts as a probe, and when one is missing the reviewer probes the page itself instead of blocking. Failing checks are compared test by test with main before anything is called pre-existing, and a review that asks for a test sends it to the coder as work, with how to test scripts and CI. ([#758](https://github.com/CoderHelm/coderhelm-platform/pull/758))
+
 ## November 17, 2026: tests built from the live page, and WAF alarms that read their evidence
 
 - **Tests against outside pages are built from the live page.** Before CoderHelm writes or keeps a selector for a vendor page, it probes that page and records each test id's state and what clicking it brings up, and the PR quotes the probe. A test branch that no recorded run has taken is labelled unverified until the page can take it and it has run. Changes that only reformat a file are put back. ([#755](https://github.com/CoderHelm/coderhelm-platform/pull/755))
