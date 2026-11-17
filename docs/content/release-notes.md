@@ -5,6 +5,12 @@ the team in plain words, one "## <date>: <what>" heading per release, and link t
 pull requests that shipped it. Leave out CI, pins and dependency bumps.
 -->
 
+## November 17, 2026: checked pushes, scope held, and tidy reviews
+
+- **A fix is pushed only after its own checks pass.** Before every push CoderHelm runs the type check, lint and tests of the package that owns each changed file, the whole unit suite when shared code changes. A red result is not pushed; a check that can't run is marked unverified in the commit. Commit messages are checked against their diff, a revert takes its tests with it, and after two fixes for the same failing test CoderHelm stops and names the test and its error instead of rolling the branch back. ([#760](https://github.com/CoderHelm/coderhelm-platform/pull/760))
+- **Scope is decided once and held.** Every plan says what is out of scope and why; the run records it before any code, and code or tests brought back against it are fixed in the next round unless a criterion or a person's answer moves it. Open product questions become decided defaults, and the description is rebuilt from the head on every push: no stale history, no claims the diff contradicts, and a length that fits the change. ([#762](https://github.com/CoderHelm/coderhelm-platform/pull/762))
+- **Reviews and threads stay tidy.** After a push, merge or close, CoderHelm's older reviews shrink to one line, its threads whose finding no longer holds (checks now pass, the code is gone) are resolved and hidden, and new reviews show only the verdict and what holds the merge, with the rest folded. A person's review or thread is never touched. ([#761](https://github.com/CoderHelm/coderhelm-platform/pull/761))
+
 ## November 17, 2026: red checks reproduced first, and a reviewer that reads only the change
 
 - **A red check is reproduced before it is blamed or reverted.** When an end-to-end test fails, CoderHelm runs it against staging and the preview and records both. It reverts its own work only when that record shows the change caused the failure, and when the test fails on staging too it fixes the test on the branch. The fixer reads the failure's test name, error and screenshot, and the description drops "CI is failing" and revert lines once they stop being true. ([#754](https://github.com/CoderHelm/coderhelm-platform/pull/754))
