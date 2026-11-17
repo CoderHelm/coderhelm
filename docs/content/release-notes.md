@@ -5,6 +5,11 @@ the team in plain words, one "## <date>: <what>" heading per release, and link t
 pull requests that shipped it. Leave out CI, pins and dependency bumps.
 -->
 
+## November 17, 2026: tests built from the live page, and WAF alarms that read their evidence
+
+- **Tests against outside pages are built from the live page.** Before CoderHelm writes or keeps a selector for a vendor page, it probes that page and records each test id's state and what clicking it brings up, and the PR quotes the probe. A test branch that no recorded run has taken is labelled unverified until the page can take it and it has run. Changes that only reformat a file are put back. ([#755](https://github.com/CoderHelm/coderhelm-platform/pull/755))
+- **WAF alarms read their own evidence.** The read-only AWS role gains a scoped WAF policy, and an alarm run reads the requests its rule matched, including WAF logs kept in S3 through one bounded Athena query, before it plans the fix. When the role is missing those reads, the install shows one setup item with a one-line update, and the run carries on instead of asking a question. ([#757](https://github.com/CoderHelm/coderhelm-platform/pull/757))
+
 ## November 17, 2026: short replies, review rounds that agree, and red checks reproduced first
 
 - **Short, plain replies on pull requests and tickets.** CoderHelm answers the newest comment in one line, with no quote, no "replying to" header, no repeated request, at most one mention, and never a link to the thread it is posted on. A branch update reads like `Merged main in (15401ad).` Every comment goes through the same check before it is posted. ([#752](https://github.com/CoderHelm/coderhelm-platform/pull/752))
