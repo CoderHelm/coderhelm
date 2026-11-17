@@ -5,6 +5,11 @@ the team in plain words, one "## <date>: <what>" heading per release, and link t
 pull requests that shipped it. Leave out CI, pins and dependency bumps.
 -->
 
+## November 16, 2026 (night): previews, honest descriptions and no hand-offs
+
+- **Held pull requests are looked at again right after an update.** A hold decided by older code is re-decided on the next sweep, a sweep skipped for the GitHub request allowance runs again when it refills, and held drafts are checked first. ([#733](https://github.com/CoderHelm/coderhelm-platform/pull/733))
+- **End-to-end results are read, not handed to a person.** CoderHelm reads results from checks, workflow runs, the pull request comment or the published report, and a missing GitHub permission is shown once for the install instead of on each pull request. ([#735](https://github.com/CoderHelm/coderhelm-platform/pull/735))
+
 ## November 16, 2026 (evening): CoderHelm proves web changes and keeps quiet
 
 - **"What needs my answer?" covers everything waiting on you.** In any words, chat checks run questions, CoderHelm pull requests on your tickets, your Jira tickets and mentions, and GitHub reviews and failing checks, grouped by urgency with a link and what to do. ([#729](https://github.com/CoderHelm/coderhelm-platform/pull/729), [#436](https://github.com/CoderHelm/coderhelm/pull/436))
