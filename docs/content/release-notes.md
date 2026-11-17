@@ -5,6 +5,12 @@ the team in plain words, one "## <date>: <what>" heading per release, and link t
 pull requests that shipped it. Leave out CI, pins and dependency bumps.
 -->
 
+## November 16, 2026 (after midnight): ticket answers, short descriptions and what a run waits on
+
+- **Short, true pull request descriptions.** Descriptions follow Problem, Changes, Risk and Verification, drop items the latest checks have settled, and CoderHelm's commits are squashed into a few logical ones with the real ticket key. A person's commits are never rewritten. ([#737](https://github.com/CoderHelm/coderhelm-platform/pull/737))
+- **Answers on the ticket decide the work.** Every answer and instruction on a ticket, from any run, is applied before planning and building, and an answered item is never listed as pending. Linked tickets' acceptance criteria are part of the plan and are checked before a pull request is ready. ([#744](https://github.com/CoderHelm/coderhelm-platform/pull/744))
+- **The run page says what it is waiting on.** A line at the top names what a run waits on, and a preview block shows the preview link, its checks and screenshots. ([#438](https://github.com/CoderHelm/coderhelm/pull/438))
+
 ## November 16, 2026 (late night): previews, kept work, clean reviews and deploys followed
 
 - **Web changes are proven on a preview.** CoderHelm reads the repository's workflows, starts the preview, runs the end-to-end tests for the changed area, captures the changed pages at desktop and phone width, and requires an end-to-end test for a visible change. Pull requests and run pages say in one line what they are waiting on. ([#734](https://github.com/CoderHelm/coderhelm-platform/pull/734))
