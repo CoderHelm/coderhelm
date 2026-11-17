@@ -5,6 +5,11 @@ the team in plain words, one "## <date>: <what>" heading per release, and link t
 pull requests that shipped it. Leave out CI, pins and dependency bumps.
 -->
 
+## November 17, 2026: short replies, review rounds that agree, and red checks reproduced first
+
+- **Short, plain replies on pull requests and tickets.** CoderHelm answers the newest comment in one line, with no quote, no "replying to" header, no repeated request, at most one mention, and never a link to the thread it is posted on. A branch update reads like `Merged main in (15401ad).` Every comment goes through the same check before it is posted. ([#752](https://github.com/CoderHelm/coderhelm-platform/pull/752))
+- **Review rounds and planned work agree.** Work a review took out is not built again unless an acceptance criterion asks for it, and then the reply says which criterion. A fix round that answered its gaps with lookups or checks is judged on what it found, and the test environment comes from the CI job that tests the files being changed. ([#753](https://github.com/CoderHelm/coderhelm-platform/pull/753))
+
 ## November 17, 2026: the coder makes the smallest change
 
 - **The coder makes the smallest change the ticket asks for.** Before planning, it searches the repository for the ticket's own names and reads what it extends. The plan must say what it reuses, what must not change, what to measure first and how it proves the work. A plan or diff is sent back when it adds a structure next to an existing one, deletes or replaces stored data the ticket never asked to touch, adds reporting nobody asked for, or changes a test to match an outside page when the product should change. The reviewer flags the same things. ([#742](https://github.com/CoderHelm/coderhelm-platform/pull/742))
