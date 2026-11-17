@@ -2308,6 +2308,37 @@ export interface RunMergeStanding {
   link?: string | null;
 }
 
+/** One preview or end-to-end check's result on the pull request's head. */
+export interface RunPreviewCheck {
+  name: string;
+  outcome: "passed" | "failed" | "running" | "skipped" | (string & {});
+  url: string;
+}
+
+/** One page of the preview, captured at one width. */
+export interface RunPreviewShot {
+  /** The page's path (`/join`). */
+  page: string;
+  width: "desktop" | "phone" | (string & {});
+  /** The image's address. */
+  src: string;
+}
+
+/** Where the preview of a web change stands on the pull request's head. */
+export interface RunPreview {
+  stage: "not_needed" | "triggered" | "deploying" | "ready" | "checked" | "failed" | "blocked" | (string & {});
+  url: string;
+  /** Labels Coderhelm added to start the preview. */
+  labels_added: string[];
+  checks: RunPreviewCheck[];
+  shots: RunPreviewShot[];
+  /** One line: why there is no preview, what blocks it, or why no page was captured. */
+  why: string;
+  /** The change needs a new or updated end-to-end spec, and has one. */
+  e2e_required: boolean;
+  e2e_covered: boolean;
+}
+
 /** One reason a pull request stays a draft. */
 export interface RunDraftHoldReason {
   /** What holds it. */
@@ -2406,6 +2437,10 @@ export interface RunDetail extends Run {
   draft_hold?: RunDraftHold | null;
   /** Where the run's pull request stands on its way to merge, and whether a person has to act; null until the worker has looked at the pull request (missing on older backends). */
   merge_standing?: RunMergeStanding | null;
+  /** One plain line: what the run's pull request waits on now, and whether it is ready for review (missing on older backends). */
+  waiting_line?: string | null;
+  /** Where the preview of a web change stands: its deploy, its end-to-end checks and the pages captured (missing on older backends). */
+  preview?: RunPreview | null;
   /** While the run waits for GitHub (its hourly limit, or GitHub not answering): when it goes on, in plain words. */
   github_wait?: string | null;
   /** The comment with those questions on the ticket or issue. */

@@ -6,7 +6,7 @@
 // Nothing here runs; it is checked by the compiler only.
 
 import type { OpenApiFields } from "./openapi-fields";
-import type { ActivityGroup, ActivityItem, AnswerRunResult, OverviewFile, Plan, Review, ReviewOverview, ReviewSession, Run, RunAnswer, RunCheck, RunChecks, RunPrReview, RunDetail, RunDraftHold, RunDraftHoldReason, RunMergeStanding, RunQuestion, RunTrigger, SessionStep, Task, api } from "./api";
+import type { ActivityGroup, ActivityItem, AnswerRunResult, OverviewFile, Plan, Review, ReviewOverview, ReviewSession, Run, RunAnswer, RunCheck, RunChecks, RunPrReview, RunDetail, RunDraftHold, RunDraftHoldReason, RunMergeStanding, RunPreview, RunPreviewCheck, RunPreviewShot, RunQuestion, RunTrigger, SessionStep, Task, api } from "./api";
 
 type Answer<K extends keyof typeof api> = Awaited<ReturnType<(typeof api)[K]>>;
 
@@ -36,6 +36,10 @@ export type RunDraftHoldContract = None<Undocumented<RunDraftHold, "RunDraftHold
 export type RunDraftHoldReasonContract = None<Undocumented<RunDraftHoldReason, "RunDraftHoldReason">>;
 // Where a finished run's pull request stands on its way to merge, and whether a person has to act.
 export type RunMergeStandingContract = None<Undocumented<RunMergeStanding, "RunMergeStanding">>;
+// Where the preview of a web change stands: its deploy, its end-to-end checks and the pages captured.
+export type RunPreviewContract = None<Undocumented<RunPreview, "RunPreview">>;
+export type RunPreviewCheckContract = None<Undocumented<RunPreviewCheck, "RunPreviewCheck">>;
+export type RunPreviewShotContract = None<Undocumented<RunPreviewShot, "RunPreviewShot">>;
 
 // Plans and their tasks (the plan pages and the runs they start).
 export type PlansPageContract = None<Undocumented<Answer<"listPlans">, "PlansPage">>;

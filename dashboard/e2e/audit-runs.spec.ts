@@ -563,6 +563,101 @@ test("a standing's link is followed only to the dashboard or GitHub, and a null 
   await expect(page.getByTestId("merge-standing")).toHaveCount(0);
 });
 
+const GREEN_CHECKS = {
+  sha: "4e1a2b0c9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a",
+  items: [
+    { name: "build", state: "passed", conclusion: "success", required: true, started_at: iso(9), completed_at: iso(7), url: "https://github.com/your-team/web/actions/runs/1" },
+    { name: "E2E on preview", state: "passed", conclusion: "success", required: false, started_at: iso(6), completed_at: iso(3), url: "https://github.com/your-team/web/actions/runs/5" },
+  ],
+  counts: { passed: 2, failed: 0, running: 0, queued: 0, skipped: 0 },
+};
+
+const PIXEL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+
+const PREVIEW = {
+  stage: "checked",
+  url: "https://pr-101.preview-web.example.com",
+  labels_added: ["E2E:schedule"],
+  checks: [
+    { name: "Deploy Preview Web App", outcome: "passed", url: "https://github.com/your-team/web/actions/runs/4" },
+    { name: "E2E on preview", outcome: "passed", url: "https://github.com/your-team/web/actions/runs/5" },
+  ],
+  shots: [
+    { page: "/classes", width: "desktop", src: "https://github.com/your-team/web/blob/abc1234/shots/classes-desktop.png?raw=true" },
+    { page: "/classes", width: "phone", src: "https://github.com/your-team/web/blob/abc1234/shots/classes-phone.png?raw=true" },
+  ],
+  why: "",
+  e2e_required: true,
+  e2e_covered: true,
+};
+
+async function stubShots(page: Page) {
+  // The shots live on GitHub; the page shows them as they are (a stand-in image here).
+  await page.route(/github\.com\/your-team\/web\/blob\/.*\.png/, (route) =>
+    route.fulfill({ status: 200, contentType: "image/png", body: Buffer.from(PIXEL.split(",")[1], "base64") }),
+  );
+}
+
+test("the top line says what the pull request waits on: a person's approval reads in plain words", async ({ page }) => {
+  const errors = watchConsole(page);
+  // An older gateway: no line from the server, so the page builds it from the standing.
+  await mockApi(page, { run: baseRun({ merge_standing: STANDING.needs_person_approval, checks: GREEN_CHECKS, preview: null }) });
+  await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
+  await expect(page.getByTestId("run-waiting-line")).toHaveText(
+    "Waiting on: an approving review from a person on #101 (this repo requires one before Coderhelm merges). Ready for review: checks passed.",
+  );
+  // It sits above the outcome card, which keeps its own detail.
+  const line = await page.getByTestId("run-waiting-line").boundingBox();
+  const card = await page.getByTestId("run-outcome").boundingBox();
+  expect(line && card && line.y < card.y).toBeTruthy();
+  await expect(page.getByTestId("merge-standing")).toHaveText(STANDING.needs_person_approval.text);
+  expect(errors).toEqual([]);
+});
+
+test("the server's line is shown as written, and a preview shows its checks and both widths", async ({ page }) => {
+  const errors = watchConsole(page);
+  const line =
+    "Waiting on: an approving review from a person on #101 (this repo requires one before Coderhelm merges). Ready for review: checks passed, preview checked.";
+  await mockApi(page, { run: baseRun({ merge_standing: STANDING.needs_person_approval, checks: GREEN_CHECKS, preview: PREVIEW, waiting_line: line }) });
+  await stubShots(page);
+  await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
+  await expect(page.getByTestId("run-waiting-line")).toHaveText(line);
+  const panel = page.getByTestId("run-preview");
+  await expect(panel).toHaveAttribute("data-stage", "checked");
+  await expect(page.getByTestId("run-preview-stage")).toContainText("Preview checked: deployed, end-to-end passed, pages captured");
+  await expect(page.getByTestId("run-preview-url")).toHaveAttribute("href", PREVIEW.url);
+  await expect(page.getByTestId("run-preview-labels")).toContainText("E2E:schedule");
+  await expect(page.getByTestId("run-preview-check")).toHaveCount(2);
+  await expect(panel.getByRole("link", { name: "E2E on preview" })).toHaveAttribute("href", "https://github.com/your-team/web/actions/runs/5");
+  await expect(page.getByTestId("run-preview-shot")).toHaveCount(2);
+  await expect(page.locator('[data-testid="run-preview-shot"][data-width="desktop"]')).toHaveAttribute("alt", "/classes at desktop width");
+  await expect(page.locator('[data-testid="run-preview-shot"][data-width="phone"]')).toHaveAttribute("alt", "/classes at phone width");
+  await shot(page, "run-preview-checked");
+  expect(errors).toEqual([]);
+});
+
+test("a preview still deploying keeps the line from saying ready, and a check not run yet is no result", async ({ page }) => {
+  await mockApi(page, {
+    run: baseRun({
+      merge_standing: STANDING.needs_person_approval,
+      checks: GREEN_CHECKS,
+      preview: { ...PREVIEW, stage: "deploying", shots: [], checks: [{ name: "E2E on preview", outcome: "skipped", url: "" }] },
+    }),
+  });
+  await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
+  await expect(page.getByTestId("run-waiting-line")).toHaveText("Waiting on: an approving review from a person on #101 (this repo requires one before Coderhelm merges).");
+  await expect(page.getByTestId("run-preview-check")).toContainText("not run yet");
+  await expect(page.getByTestId("run-preview-shot")).toHaveCount(0);
+});
+
+test("a run with no preview and no standing has no top line and no preview block", async ({ page }) => {
+  await mockApi(page, { run: baseRun({ merge_standing: null, preview: { ...PREVIEW, stage: "not_needed" } }) });
+  await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
+  await expect(page.getByTestId("run-outcome")).toBeVisible();
+  await expect(page.getByTestId("run-waiting-line")).toHaveCount(0);
+  await expect(page.getByTestId("run-preview")).toHaveCount(0);
+});
+
 const CHECKS = {
   sha: "4e1a2b0c9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a",
   items: [
