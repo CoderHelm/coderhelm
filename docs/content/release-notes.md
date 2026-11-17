@@ -5,6 +5,11 @@ the team in plain words, one "## <date>: <what>" heading per release, and link t
 pull requests that shipped it. Leave out CI, pins and dependency bumps.
 -->
 
+## November 17, 2026: the coder makes the smallest change
+
+- **The coder makes the smallest change the ticket asks for.** Before planning, it searches the repository for the ticket's own names and reads what it extends. The plan must say what it reuses, what must not change, what to measure first and how it proves the work. A plan or diff is sent back when it adds a structure next to an existing one, deletes or replaces stored data the ticket never asked to touch, adds reporting nobody asked for, or changes a test to match an outside page when the product should change. The reviewer flags the same things. ([#742](https://github.com/CoderHelm/coderhelm-platform/pull/742))
+- **Tests install once per run.** The test environment is installed on the first build and restored for every later build and the proof step, so fix rounds start faster. ([#742](https://github.com/CoderHelm/coderhelm-platform/pull/742))
+
 ## November 16, 2026 (after midnight): ticket answers, short descriptions and what a run waits on
 
 - **Short, true pull request descriptions.** Descriptions follow Problem, Changes, Risk and Verification, drop items the latest checks have settled, and CoderHelm's commits are squashed into a few logical ones with the real ticket key. A person's commits are never rewritten. ([#737](https://github.com/CoderHelm/coderhelm-platform/pull/737))
