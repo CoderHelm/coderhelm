@@ -182,11 +182,21 @@ function Fields({ value }: { value: Record<string, unknown> }) {
   );
 }
 
-/** What a step without a stored result says: its outcome in words, and when the full message arrives. */
+/** What a step without a stored result says: its outcome in words (live events carry the message itself). */
 function missingResult(step: LogStep): string {
   const why = step.summary ? `${step.summary.charAt(0).toUpperCase()}${step.summary.slice(1)}.` : "";
-  if (step.live) return `${why} The full message is shown once this part of the run is saved.`.trim();
+  if (step.live && !why) return "The full message is shown once this part of the run is saved.";
   return why || "The tool returned nothing.";
+}
+
+/** The command a shell step ran or tried, in full. */
+function ShellCommand({ step }: { step: LogStep }) {
+  const command = String(step.input.command ?? step.input.cmd ?? "").trim();
+  if (step.tool !== "bash") return null;
+  if (!command) return <p className="text-xs text-zinc-400">No command was sent with this call.</p>;
+  return (
+    <pre data-testid="log-step-command" className="whitespace-pre-wrap rounded bg-zinc-900 px-2 py-1 font-mono text-xs text-zinc-200 [overflow-wrap:anywhere]">{command}</pre>
+  );
 }
 
 function PlainDetail({ step }: { step: LogStep }) {
@@ -195,6 +205,7 @@ function PlainDetail({ step }: { step: LogStep }) {
   if (isProblem(step) && step.tool !== "run_checks") {
     return (
       <div className="space-y-2">
+        <ShellCommand step={step} />
         <p className="whitespace-pre-wrap text-sm text-zinc-300 [overflow-wrap:anywhere]">{text || missingResult(step)}</p>
         {step.tool === "edit_file" && <EditDiff step={step} />}
       </div>

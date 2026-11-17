@@ -2,7 +2,7 @@
 // docs/api/openapi.json. Do not edit; run `npm run openapi:fields` instead.
 
 /** The platform commit this was generated from. */
-export const OPENAPI_REF = "5a0004f0eaab2c1dc1dfc663f969bc0d7a4a1b64";
+export const OPENAPI_REF = "b60be33c1bad33dcbbd883c3442096a6cf4e937c";
 
 /** The fields each public API schema has. */
 export interface OpenApiFields {
@@ -65,7 +65,7 @@ export interface OpenApiFields {
   RotateBody: "overlap_hours";
   RotatedSecret: "previous_secret_expires_at" | "secret";
   RoundIncomplete: "at" | "can_resume" | "files" | "kind" | "number" | "pushed" | "reason" | "summary" | "wip_branch";
-  Run: "answers" | "answers_url" | "applied_standards" | "branch" | "branches" | "cache_read_tokens" | "cache_write_tokens" | "checks" | "close_reason" | "closed_at" | "closed_by" | "closed_from" | "codegen_env_missing" | "continued_run_id" | "cost_usd" | "covered_by" | "created_at" | "current_pass" | "draft_hold" | "duration_s" | "error" | "files_modified" | "fix_location" | "github_wait" | "lesson" | "mcp_servers" | "merge_standing" | "outside_change_report" | "pass_history" | "policy_approval" | "policy_note" | "pr_number" | "pr_numbers" | "pr_review" | "pr_review_comments" | "pr_url" | "pr_urls" | "progress_notes" | "preview" | "prs" | "questions" | "questions_url" | "repo" | "round_incomplete" | "run_id" | "sign_in_prompts" | "status" | "stop_kind" | "ticket_id" | "ticket_source" | "title" | "tokens_in" | "tokens_out" | "tooling_failure" | "trigger" | "updated_at" | "waiting_line" | "waiting_on";
+  Run: "answers" | "answers_url" | "applied_standards" | "branch" | "branches" | "cache_read_tokens" | "cache_write_tokens" | "checks" | "close_reason" | "closed_at" | "closed_by" | "closed_from" | "codegen_env_missing" | "continued_run_id" | "cost_usd" | "covered_by" | "created_at" | "current_pass" | "draft_hold" | "duration_s" | "error" | "files_modified" | "fix_location" | "github_wait" | "lesson" | "mcp_servers" | "merge_standing" | "outside_change_report" | "pass_history" | "policy_approval" | "policy_note" | "pr_number" | "pr_numbers" | "pr_review" | "pr_review_comments" | "pr_url" | "pr_urls" | "preview" | "progress_notes" | "prs" | "questions" | "questions_url" | "repo" | "round_incomplete" | "run_id" | "sign_in_prompts" | "status" | "stop_kind" | "ticket_id" | "ticket_source" | "title" | "tokens_in" | "tokens_out" | "tooling_failure" | "trigger" | "updated_at" | "waiting_line" | "waiting_on";
   RunActionResult: "status";
   RunAnswer: "answer" | "answered_at" | "author" | "question" | "question_id";
   RunCheck: "completed_at" | "conclusion" | "name" | "required" | "started_at" | "state" | "url";
@@ -76,12 +76,12 @@ export interface OpenApiFields {
   RunDraftHold: "kind" | "pr_number" | "reasons" | "since" | "summary";
   RunDraftHoldReason: "todo" | "what";
   RunMergeStanding: "code" | "link" | "needs_person" | "next" | "text";
-  RunPreview: "checks" | "e2e_covered" | "e2e_required" | "labels_added" | "shots" | "stage" | "url" | "why";
-  RunPreviewCheck: "name" | "outcome" | "url";
-  RunPreviewShot: "page" | "src" | "width";
   RunNote: "message" | "timestamp";
   RunPass: "pass" | "started_at";
   RunPrReview: "at" | "review_sk" | "reviewed_sha" | "session_id" | "verdict";
+  RunPreview: "checks" | "e2e_covered" | "e2e_required" | "labels_added" | "shots" | "stage" | "url" | "why";
+  RunPreviewCheck: "name" | "outcome" | "url";
+  RunPreviewShot: "page" | "src" | "width";
   RunQuestion: "decision" | "evidence" | "id" | "question" | "suggestions" | "why";
   RunSummary: "cost_usd" | "created_at" | "current_pass" | "duration_s" | "pr_number" | "pr_url" | "repo" | "run_id" | "status" | "ticket_id" | "ticket_source" | "title" | "tokens_in" | "tokens_out" | "trigger";
   RunSupersededPr: "closed" | "closed_by" | "number" | "repo" | "title" | "url";
@@ -96,9 +96,10 @@ export interface OpenApiFields {
   Totals: "deliveries" | "failed" | "handled" | "ignored" | "p50_ms" | "p95_ms" | "p99_ms" | "retried" | "retried_ok" | "retries" | "success_rate";
   TriggerKind: never;
   UpdateEndpointBody: "description" | "enabled" | "events" | "url";
-  Usage: "cache_hit_rate" | "cache_read_tokens" | "cache_write_tokens" | "counted_tokens" | "features" | "limit_counts_cache" | "limits" | "limits_legacy" | "max_tokens" | "month" | "new_tokens" | "tokens_in" | "tokens_out" | "total_runs" | "total_tokens";
+  Usage: "cache_hit_rate" | "cache_read_tokens" | "cache_write_tokens" | "counted_tokens" | "features" | "limit_counts_cache" | "limits" | "limits_legacy" | "max_tokens" | "models" | "month" | "new_tokens" | "tokens_in" | "tokens_out" | "total_runs" | "total_tokens";
   UsageFeature: "cache_read_tokens" | "cache_write_tokens" | "feature" | "tokens_in" | "tokens_out" | "total_tokens";
   UsageLimit: "kind" | "max" | "used";
+  UsageModel: "cache_hit_rate" | "cache_read_tokens" | "cache_write_tokens" | "calls" | "model" | "tokens_in" | "tokens_out" | "total_tokens";
   WebhookDelivery: "attempts" | "created_at" | "event" | "event_id" | "headers" | "id" | "next_retry_at" | "outcome" | "payload_preview" | "reason" | "reason_fix" | "reason_message" | "status";
   WebhookEndpoint: "created_at" | "created_by" | "description" | "disabled_reason" | "enabled" | "events" | "failing_since" | "id" | "last_failure_at" | "last_success_at" | "previous_secret_expires_at" | "secret_hint" | "updated_at" | "url";
 }

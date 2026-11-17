@@ -279,6 +279,17 @@ export function liveTail(): AgentLogLiveEvent[] {
   ];
 }
 
+/** A coding step still running: a refused shell command too long for one line, one sent with no command, and a refused page fetch. */
+export const LONG_COMMAND =
+  "cd e2e && pnpm install --ignore-workspace --silent && pnpm exec playwright install chromium && node -e 'const page = 1'";
+export function refusedShellTail(): AgentLogLiveEvent[] {
+  return [
+    { tool: "bash", input_summary: `command: ${LONG_COMMAND}`, duration_ms: 7, is_error: false, timestamp: at(5000), pass: "implement", tool_use_id: "toolu_live_sh1", started_at: at(4999), outcome: { status: "refused", summary: "not run: Background commands don't run here" }, message: "Background commands don't run here: send each command on its own call." },
+    { tool: "bash", input_summary: "{}", duration_ms: 0, is_error: true, timestamp: at(5010), pass: "implement", tool_use_id: "toolu_live_sh2", started_at: at(5010), outcome: { status: "refused", summary: "the agent policy did not allow it" }, message: "This command needs a person's approval." },
+    { tool: "bash", input_summary: "command: curl -X POST https://www.example.com/api", duration_ms: 4, is_error: false, timestamp: at(5020), pass: "implement", tool_use_id: "toolu_live_sh3", started_at: at(5020), outcome: { status: "refused", summary: "not run: This `curl` sends a POST request, which can change data, so it doesn't run here" } },
+  ];
+}
+
 /** An old log (format 1): a bare entry array per pass, JSON-encoded results, no times, turns restarting in a second call. */
 export function formatOneLog() {
   const enc = (s: string) => JSON.stringify(s);

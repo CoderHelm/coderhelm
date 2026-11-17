@@ -2694,6 +2694,8 @@ export interface AgentLogLiveEvent {
   tool_use_id?: string | null;
   started_at?: string | null;
   outcome?: AgentLogOutcome | null;
+  /** A refused or failed call's message, sent while the step runs (null on calls that went through and on older events). */
+  message?: string | null;
 }
 
 export interface AgentLog {

@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { buildLog, decodeResult, filterPass, parseInputSummary, splitIntent, type LogStep } from "../src/lib/agent-log";
 import { runTimeline } from "../src/lib/run-timeline";
-import { at, formatOneLog, formatTwoLog, liveTail, RUN_ID } from "./agent-log-data";
+import { at, formatOneLog, formatTwoLog, liveTail, LONG_COMMAND, refusedShellTail, RUN_ID } from "./agent-log-data";
 import { LOG_TRACES, logRun, mockRunApi } from "./agent-log-mock";
 
 // The run page's agent log: the pure model (lib/agent-log.ts) on old and new
@@ -142,6 +142,22 @@ test.describe("buildLog", () => {
     expect(old.passes[0].steps[0].target).toBe('"ScheduleTable"');
   });
 
+  test("a refused shell command always names its command, and a live refusal carries its reason", () => {
+    const log = formatTwoLog();
+    const m = buildLog({ ...log, live_events: [...log.live_events, ...refusedShellTail()] });
+    const [long, empty, post] = ["toolu_live_sh1", "toolu_live_sh2", "toolu_live_sh3"].map((id) => step(m, id));
+    // However long the command, the step names it.
+    expect(`${long.verb} ${long.target}`).toBe(`Ran ${LONG_COMMAND}`);
+    expect(long.status).toBe("refused");
+    // The reason is there while the step runs, not only once it is saved.
+    expect(long.result).toBe("Background commands don't run here: send each command on its own call.");
+    // A call with no command says so.
+    expect(empty.target).toBe("a shell command (none was sent)");
+    // An event without a message still says why, from its outcome.
+    expect(post.target).toBe("curl -X POST https://www.example.com/api");
+    expect(post.summary).toContain("sends a POST request");
+  });
+
   test("small readers", () => {
     expect(decodeResult({ type: "tool_result", content: '"a\\nb"', content_encoding: "json" }).text).toBe("a\nb");
     expect(decodeResult({ type: "tool_result", content: "plain error", content_encoding: "text" }).text).toBe("plain error");
@@ -271,6 +287,22 @@ test("filters, search and the view are kept in the URL; a step link opens that s
   await page.getByRole("button", { name: "Timeline" }).click();
   await expect(page).toHaveURL(/log_time=1/);
   await shot(page, "agent-log-timeline", [1280]);
+});
+
+test("a refused command shows its command and its reason while the step runs", async ({ page }) => {
+  const errors = watchConsole(page);
+  const log = formatTwoLog();
+  await mockRunApi(page, { log: { ...log, live_events: [...log.live_events, ...refusedShellTail()] } });
+  await openLog(page);
+  const refused = page.locator('[data-testid="log-step"][data-status="refused"][data-tool="bash"]').first();
+  await expect(refused).toContainText("Not allowed: Ran cd e2e && pnpm install");
+  const detail = refused.getByTestId("log-step-detail");
+  if (!(await detail.count())) await refused.getByRole("button").first().click();
+  await expect(refused.getByTestId("log-step-command")).toHaveText(LONG_COMMAND);
+  await expect(refused.getByTestId("log-step-detail")).toContainText("Background commands don't run here: send each command on its own call.");
+  await expect(page.getByTestId("agent-log-panel")).not.toContainText("The full message is shown once");
+  expect(errors).toEqual([]);
+  await shot(page, "agent-log-refused-command");
 });
 
 test("the old log (format 1) still reads, with its problems and times", async ({ page }) => {
