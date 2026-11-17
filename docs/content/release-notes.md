@@ -5,6 +5,15 @@ the team in plain words, one "## <date>: <what>" heading per release, and link t
 pull requests that shipped it. Leave out CI, pins and dependency bumps.
 -->
 
+## November 16, 2026 (late night): previews, kept work, clean reviews and deploys followed
+
+- **Web changes are proven on a preview.** CoderHelm reads the repository's workflows, starts the preview, runs the end-to-end tests for the changed area, captures the changed pages at desktop and phone width, and requires an end-to-end test for a visible change. Pull requests and run pages say in one line what they are waiting on. ([#734](https://github.com/CoderHelm/coderhelm-platform/pull/734))
+- **CoderHelm's own limits never hand work to a person.** A security update with red CI keeps every green bump, notes the failing ones and marks the pull request ready; a long wait is retried instead of becoming a person's to-do; holds name a person only for an approval, a credential, access or a data-destroying change. Related packages move together. ([#739](https://github.com/CoderHelm/coderhelm-platform/pull/739))
+- **A person's work on a pull request is kept.** CoderHelm never commits a change that undoes lines a person wrote; it keeps their version and asks in one note. Reverts touch only CoderHelm's own files, edits stay inside the plan, fix rounds edit the branch instead of restoring and rebuilding, and edit-then-undo commits are folded away. ([#743](https://github.com/CoderHelm/coderhelm-platform/pull/743))
+- **One current review per pull request.** When CoderHelm reviews again, its earlier reviews shrink to one line, their comments are hidden as outdated, settled threads are resolved, and an old request for changes is dismissed. A person's review or unanswered reply is never touched. ([#746](https://github.com/CoderHelm/coderhelm-platform/pull/746))
+- **Every merge is followed to its deploy.** Whoever merges a CoderHelm pull request, CoderHelm watches the staging deploy the change actually triggers, then prepares production by the repository's own path (for example its release tag), and says the result in one line. ([#748](https://github.com/CoderHelm/coderhelm-platform/pull/748))
+- **Clearer alert cards and WAF evidence.** An alarm no rule names says so and links to add a rule; fix runs for firewall alarms start with a summary of the matching requests. ([#741](https://github.com/CoderHelm/coderhelm-platform/pull/741))
+
 ## November 16, 2026 (night): previews, honest descriptions and no hand-offs
 
 - **Held pull requests are looked at again right after an update.** A hold decided by older code is re-decided on the next sweep, a sweep skipped for the GitHub request allowance runs again when it refills, and held drafts are checked first. ([#733](https://github.com/CoderHelm/coderhelm-platform/pull/733))
