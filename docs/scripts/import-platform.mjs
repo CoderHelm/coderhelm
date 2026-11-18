@@ -320,6 +320,39 @@ export function releaseNotes(text) {
   return text.replace(/^\s*<!--[\s\S]*?-->\s*/, '').trim();
 }
 
+const RELEASE_HEADING = /^## ([A-Z][a-z]+ \d{1,2}, \d{4})(?: \([^)]*\))?(?:: (.*))?$/;
+
+/**
+ * The release notes grouped by day: one `## <date>` heading per day, newest
+ * first, with each release that day as a `### <what>` heading under it, in the
+ * order the file lists them. A day's releases may sit anywhere in the file;
+ * they are gathered under the day's one heading. Lines before the first
+ * release heading are kept on top.
+ */
+export function groupByDate(notes) {
+  const head = [];
+  const days = new Map();
+  let cur = null;
+  for (const line of notes.split('\n')) {
+    const m = line.match(RELEASE_HEADING);
+    if (m) {
+      if (!days.has(m[1])) days.set(m[1], []);
+      cur = days.get(m[1]);
+      if (m[2]) cur.push(`### ${m[2].charAt(0).toUpperCase()}${m[2].slice(1)}`);
+      continue;
+    }
+    (cur ?? head).push(line.startsWith('### ') && cur ? `#${line}` : line);
+  }
+  const when = (d) => Date.parse(`${d} 00:00:00 UTC`) || 0;
+  const out = [];
+  const top = head.join('\n').trim();
+  if (top) out.push(top, '');
+  for (const day of [...days.keys()].sort((a, b) => when(b) - when(a))) {
+    out.push(`## ${day}`, '', days.get(day).join('\n').replace(/\n{3,}/g, '\n\n').trim(), '');
+  }
+  return out.join('\n').trim();
+}
+
 /** Stable self-host releases (no beta builds), newest first. */
 export function stableTags(tags) {
   return tags.filter((t) => /^v\d+\.\d+\.\d+$/.test(t.name));
@@ -386,7 +419,7 @@ function writeChangelog(platform) {
     '',
   ];
   const notes = fs.existsSync(RELEASE_NOTES) ? releaseNotes(fs.readFileSync(RELEASE_NOTES, 'utf8')) : '';
-  if (notes) out.push(plainArrows(notes), '', '## Every merged pull request', '');
+  if (notes) out.push(plainArrows(groupByDate(notes)), '', '## Every merged pull request', '');
   for (const key of [...months.keys()].sort().reverse()) {
     const m = months.get(key);
     const h = notes ? '###' : '##';

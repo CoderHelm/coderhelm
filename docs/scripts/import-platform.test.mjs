@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { INSTALL_GUIDE_LINK, UNINSTALL_GUIDE_LINK, importedName, convertGuide, guideOrder, releaseNotes, selfHostLead, sitePages, sortByOrder, stableTags } from './import-platform.mjs';
+import { INSTALL_GUIDE_LINK, UNINSTALL_GUIDE_LINK, importedName, convertGuide, guideOrder, groupByDate, releaseNotes, selfHostLead, sitePages, sortByOrder, stableTags } from './import-platform.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -60,6 +60,53 @@ test('release notes lose their leading comment and keep every release heading', 
   assert.ok(!notes.includes('<!--'), 'no HTML comment reaches the MDX page');
   assert.match(notes, /^## /, 'the notes start with a release heading');
   assert.ok(!/[<>{}]/.test(notes.replace(/`[^`]*`/g, '')), 'no raw MDX syntax outside code');
+});
+
+test('release notes are grouped by day, one heading a day, newest first', () => {
+  const notes = [
+    '## November 17, 2026: tests that run',
+    '',
+    '- one',
+    '',
+    '## November 16, 2026 (evening): quiet runs',
+    '',
+    '- two',
+    '',
+    '## November 17, 2026: smaller changes',
+    '',
+    '- three',
+    '',
+    '## November 16, 2026 (after midnight): ticket answers',
+    '',
+    '- four',
+  ].join('\n');
+  assert.equal(groupByDate(notes), [
+    '## November 17, 2026',
+    '',
+    '### Tests that run',
+    '',
+    '- one',
+    '',
+    '### Smaller changes',
+    '',
+    '- three',
+    '',
+    '## November 16, 2026',
+    '',
+    '### Quiet runs',
+    '',
+    '- two',
+    '',
+    '### Ticket answers',
+    '',
+    '- four',
+  ].join('\n'));
+  // The real file: every day appears exactly once.
+  const file = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'content/release-notes.md');
+  const days = groupByDate(releaseNotes(fs.readFileSync(file, 'utf8'))).split('\n').filter((l) => l.startsWith('## '));
+  assert.ok(days.length > 0);
+  assert.equal(new Set(days).size, days.length, 'each day has one heading');
+  for (const d of days) assert.match(d, /^## [A-Z][a-z]+ \d{1,2}, \d{4}$/, `day heading: ${d}`);
 });
 
 test('only stable self-host releases are listed, never the beta builds', () => {
