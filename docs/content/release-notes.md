@@ -5,6 +5,13 @@ the team in plain words, one "## <date>: <what>" heading per release, and link t
 pull requests that shipped it. Leave out CI, pins and dependency bumps.
 -->
 
+## November 17, 2026: criteria proven both ways, a reviewer that converges, reproduce first
+
+- **Each ticket criterion is proven both ways.** The plan maps every acceptance criterion to an end-to-end test of the page it names, and before the pull request is called done each test is run on staging (it must fail) and on the preview (it must pass); a test that passes on both goes back to the coder. Near-identical helpers added in one change are caught. ([#766](https://github.com/CoderHelm/coderhelm-platform/pull/766))
+- **A reviewer that converges.** Each finding gets one verdict; everything is raised in the first review; a blocking finding must name its file, line, the existing code and the change wanted; a finding doesn't move to the next file, ask for the opposite of an earlier request, or block after CoderHelm's own fix rounds deferred it; a person's answer is never called out of scope. Once the criteria are proven and CI is green, the review approves with notes, and the posted review follows every new commit. ([#765](https://github.com/CoderHelm/coderhelm-platform/pull/765))
+- **Reproduce before planning.** A bug plan quotes the ticket's real names, the command run on the base and its output, and the line where the code goes wrong, and fixes the mechanism that line belongs to. A change much wider than the records the ticket names is flagged, tests must fail on the base before they count, questions are answered by a lookup first, and a person's answer moves work into scope. ([#768](https://github.com/CoderHelm/coderhelm-platform/pull/768))
+- **New AWS reads reach every team.** The read-only role is one template with named read groups shipped with each release; when a team's role is older than the release or lacks a read a feature needs, Settings shows one item with a one-click CloudFormation update, and runs carry on instead of asking. ([#764](https://github.com/CoderHelm/coderhelm-platform/pull/764))
+
 ## November 17, 2026: checked pushes, scope held, and tidy reviews
 
 - **A fix is pushed only after its own checks pass.** Before every push CoderHelm runs the type check, lint and tests of the package that owns each changed file, the whole unit suite when shared code changes. A red result is not pushed; a check that can't run is marked unverified in the commit. Commit messages are checked against their diff, a revert takes its tests with it, and after two fixes for the same failing test CoderHelm stops and names the test and its error instead of rolling the branch back. ([#760](https://github.com/CoderHelm/coderhelm-platform/pull/760))
