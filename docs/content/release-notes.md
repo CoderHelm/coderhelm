@@ -6,7 +6,7 @@ pull requests that shipped it. Leave out CI, pins and dependency bumps. The page
 groups releases by day: one heading per day, each release a subheading under it.
 -->
 
-## November 17, 2026: previews found wherever your host publishes them
+## November 18, 2026: previews found wherever your host publishes them
 
 - **Previews are found wherever they are published.** CoderHelm reads the head commit's deployments, deploy statuses, preview checks and bot comments, then the description and your address template. Only what belongs to the head commit counts first, and the changed app's preview is picked in a monorepo. It waits at most an hour for a preview that is still building, and reports a failed one with where it read it. ([#772](https://github.com/CoderHelm/coderhelm-platform/pull/772))
 - **Protected previews.** **Settings**, **Repositories**, **Preview access** holds the preview's address when nothing publishes it, and one sealed secret: a header, a query parameter or a password. CoderHelm sends that secret only to the preview's own host. Details: [Pull request previews](/concepts/previews). ([#772](https://github.com/CoderHelm/coderhelm-platform/pull/772))
