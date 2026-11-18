@@ -2,7 +2,8 @@
 Release notes for the top of /changelog/, newest first. scripts/import-platform.mjs
 puts them above the generated list of merged pull requests. Write what changed for
 the team in plain words, one "## <date>: <what>" heading per release, and link the
-pull requests that shipped it. Leave out CI, pins and dependency bumps.
+pull requests that shipped it. Leave out CI, pins and dependency bumps. The page
+groups releases by day: one heading per day, each release a subheading under it.
 -->
 
 ## November 17, 2026: tests that actually run, and plan dependents released by their own ticket
