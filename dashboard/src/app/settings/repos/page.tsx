@@ -10,6 +10,7 @@ import { api, type Repo } from "@/lib/api";
 import { githubAppUrl } from "@/lib/runtime-config";
 import { RoleGuard } from "@/components/role-guard";
 import { StagingCmsDialog } from "@/components/staging-cms-dialog";
+import { PreviewAccessDialog } from "@/components/preview-access-dialog";
 import { useToast } from "@/components/toast";
 import { Page, PageHeader } from "@/components/page";
 import { buttonClass, secondaryButton } from "@/components/ui";
@@ -78,6 +79,8 @@ function ReposPage() {
   const [savingRole, setSavingRole] = useState<string | null>(null);
   // The repository whose staging CMS connection is open, if any.
   const [stagingRepo, setStagingRepo] = useState<string | null>(null);
+  // The repository whose preview access is open, if any.
+  const [previewRepo, setPreviewRepo] = useState<string | null>(null);
   // Turning repos on or off, syncing and routing roles need `repos`.
   const { ready, can } = useCan();
   const canManage = can("repos");
@@ -312,6 +315,17 @@ function ReposPage() {
                           Staging content
                         </button>
                       )}
+                      {repo.enabled && canManage && (
+                        <button
+                          type="button"
+                          onClick={() => setPreviewRepo(repo.name)}
+                          className={buttonClass("secondary", "sm")}
+                          aria-label={`Preview access for ${repo.name}`}
+                          title="The preview's address when nothing publishes it, and the secret a protected preview takes"
+                        >
+                          Preview access
+                        </button>
+                      )}
                     </>
                   }
                 />
@@ -321,6 +335,13 @@ function ReposPage() {
         )}
         <LoadMore hasMore={!loading && filtered.length > shownCount} loading={false} onClick={() => setShownCount((n) => n + PAGE_SIZE)} />
       </div>
+      {previewRepo && (
+        <PreviewAccessDialog
+          repo={previewRepo}
+          open={!!previewRepo}
+          onOpenChange={(v) => !v && setPreviewRepo(null)}
+        />
+      )}
       {stagingRepo && (
         <StagingCmsDialog
           repo={stagingRepo}
