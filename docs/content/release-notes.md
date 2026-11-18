@@ -5,6 +5,11 @@ the team in plain words, one "## <date>: <what>" heading per release, and link t
 pull requests that shipped it. Leave out CI, pins and dependency bumps.
 -->
 
+## November 17, 2026: previews found wherever your host publishes them
+
+- **Previews are found wherever they are published.** CoderHelm reads the head commit's deployments, deploy statuses, preview checks and bot comments, then the description and your address template. Only what belongs to the head commit counts first, and the changed app's preview is picked in a monorepo. It waits at most an hour for a preview that is still building, and reports a failed one with where it read it. ([#772](https://github.com/CoderHelm/coderhelm-platform/pull/772))
+- **Protected previews.** **Settings**, **Repositories**, **Preview access** holds the preview's address when nothing publishes it, and one sealed secret: a header, a query parameter or a password. CoderHelm sends that secret only to the preview's own host. Details: [Pull request previews](/concepts/previews). ([#772](https://github.com/CoderHelm/coderhelm-platform/pull/772))
+
 ## November 17, 2026: tests that actually run, and plan dependents released by their own ticket
 
 - **Tests actually run.** Workspace packages install from the workspace root with CI's own job, cached install and pinned versions, and a failed install says why. Test runs that don't fit in a step get a fresh step of their own instead of being skipped, more CI test commands are read, and the run page and pull request say how many tests ran with and without the change. ([#769](https://github.com/CoderHelm/coderhelm-platform/pull/769))

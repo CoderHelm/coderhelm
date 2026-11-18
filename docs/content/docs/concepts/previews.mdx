@@ -1,0 +1,69 @@
+---
+title: Pull request previews
+description: How CoderHelm finds each pull request's preview, waits for it, gets through a protected one, and checks the changed pages on it.
+---
+
+When a pull request changes something a person sees in the browser, CoderHelm checks it on the pull request's own preview before calling it ready: it waits for the preview of the exact commit at the head of the pull request, opens the changed pages at desktop and phone width, and puts the screenshots in the description. Most teams set nothing for this. CoderHelm reads the preview from wherever your host or your CI already publishes it.
+
+## Where CoderHelm finds the preview
+
+CoderHelm reads every place a preview's address is usually published, and only trusts what belongs to the head commit:
+
+| Where | What counts |
+|---|---|
+| **Deployments on the commit** | A deployment of the head commit to a preview, pull request or other non-production environment. Its newest status says whether it is building, up, failed or taken down, and its environment address is the preview. Hosting integrations write these, and so does a CI job that sets `environment: { name, url }`. Production and shared environments never count, unless the deployment says it is temporary. |
+| **Deploy statuses** | A commit status on the head commit whose name or description says it is a deploy or a preview, with the preview as its link. CI build statuses and links to a host's dashboard or build log are ignored. |
+| **Preview checks** | A check run on the head commit whose name or output says it deploys a preview (or that your workflows run as the preview deploy), with the address in its output. |
+| **Bot comments** | A bot's comment on the pull request, usually edited on every push. It counts when it names the head commit, or names no commit and was edited after the head commit was made. A comment that names an older commit is an older deploy and is ignored. A table with one row per app is read row by row. |
+| **The description** | A link labelled as the preview in the pull request description. It is used only when nothing on the head commit carries an address, because such a link often keeps the same address across pushes. |
+| **Your address template** | The preview address you set in **Settings**, **Repositories**, **Preview access** (see below). It is also used only when nothing on the head commit carries an address. |
+
+When several of these answer, the most direct one wins, in the order of the table. A preview of an older commit is never used for a newer one.
+
+### Several previews on one pull request
+
+In a monorepo each app often gets its own preview. CoderHelm picks the one named after the app the change touches (for example, a change under `apps/web/` picks the preview named for `web`), and never another app's preview. A preview named after an API or backend service is used only when nothing else fits, because it has no pages to capture.
+
+## Waiting for the preview
+
+- **Still building.** While the head commit's preview is queued or building, CoderHelm waits and looks again every two minutes, even when nothing else on the pull request changes.
+- **Nothing published yet.** If nothing at all has appeared for the head commit, CoderHelm waits six minutes, because most hosts start a preview within a minute or two of a push. After that, it says that nothing publishes a preview for this commit.
+- **Limit.** It waits at most 60 minutes for one commit. After that it says what it was waiting on, and a new push starts the wait again.
+- **Failed or taken down.** A preview that failed or was taken down is reported with where that was read. CoderHelm does not wait on it.
+- **Warming up.** A page that answers 404, 502, 503 or 504 right after the preview comes up is tried again, up to three times.
+
+## Protected previews
+
+If your previews ask for a sign-in, give CoderHelm a way through in **Settings**, **Repositories**, **Preview access**. Pick the kind your host uses:
+
+| Kind | What you enter | How it is used |
+|---|---|---|
+| **A header** | One or two header names with their values: a protection bypass token, or a sign-in service's client id and client secret | Sent with every request to the preview's own host, and never to any other host the page loads from |
+| **A query parameter** | `name=value` (join several with `&`), such as a bypass token that sets a cookie | Added to each page's address |
+| **A user name and password** | The preview's basic sign-in | Sent only when the preview's own host asks for it |
+
+The secret is sealed when you save it and never shown again. Only the sandbox that opens the preview's pages receives it, and it is never written to a log, a screenshot record or the pull request. To replace it, enter a new one. To switch to another kind, enter that kind's secret.
+
+If a page answers 401 or 403, or sends the browser to a sign-in page on another host, the pull request says so and points to this setting. If a secret is saved, it says the preview refused the saved access.
+
+A preview reachable only from an allowed list of network addresses can't be opened from CoderHelm's sandbox unless that list allows it. Use a bypass header or token instead if your host offers one.
+
+## The preview address template
+
+Set this only when nothing on the commit publishes the preview's address. The template starts with `https://` and names the pull request with these placeholders:
+
+| Placeholder | Filled in with |
+|---|---|
+| `{pr}` | The pull request number |
+| `{branch}` | The branch name as it is, with its slashes (for previews served under a path) |
+| `{branch_slug}` | The branch name as hosts put it in a host name: lowercase, every other character a `-`, no `-` at either end |
+| `{sha}`, `{short_sha}` | The head commit, in full or as its first seven characters |
+| `{owner}`, `{repo}` | The repository's owner and name, as slugs |
+
+Examples: `https://pr-{pr}.preview.your-domain.example` or `https://{branch_slug}.web.your-domain.example`. A fixed address such as a staging site is refused, because it is shared and not the pull request's own. A host name part longer than 63 characters is cut to 63, as DNS requires. If your host shortens long branch names some other way, rely on its deployments or comments instead, because they carry the exact address.
+
+A test address that names `{pr}` in the Tests settings ([Failing and flaky tests](/concepts/test-fixes)) is used as the template when Preview access sets none.
+
+## What the GitHub App needs
+
+Reading deployments needs **Deployments: read**, and reading deploy statuses needs **Commit statuses: read**. Without them, CoderHelm still reads the preview from checks, comments, the description and your template.

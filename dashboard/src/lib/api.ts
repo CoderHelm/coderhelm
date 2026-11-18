@@ -515,6 +515,15 @@ export const api = {
     }),
   deleteStagingCms: (repo: string) =>
     request<StagingCms>(`/api/repos/${repo}/staging-cms`, { method: "DELETE" }),
+  /** The repository's preview address template and protection (never its secret). */
+  getPreviewAccess: (repo: string) => request<PreviewAccess>(`/api/repos/${repo}/preview-access`),
+  savePreviewAccess: (repo: string, body: PreviewAccessInput) =>
+    request<PreviewAccess>(`/api/repos/${repo}/preview-access`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  deletePreviewAccess: (repo: string) =>
+    request<PreviewAccess>(`/api/repos/${repo}/preview-access`, { method: "DELETE" }),
 
   // Stats
   getStats: () => request<{ month: Stats; all_time: Stats }>("/api/stats"),
@@ -2742,6 +2751,27 @@ export interface StagingCms {
   production_dataset?: string;
   /** Whether a token is saved; the token itself is never returned. */
   token_set?: boolean;
+}
+
+/** How a repository's preview is protected. */
+export type PreviewAccessKind = "none" | "header" | "query" | "basic";
+
+/** A repository's preview access, as the gateway shows it. */
+export interface PreviewAccess {
+  configured: boolean;
+  repo: string;
+  kind?: PreviewAccessKind;
+  /** The preview's address template, "" when the preview publishes its own. */
+  address?: string;
+  /** Whether a secret is saved; the secret itself is never returned. */
+  secret_set?: boolean;
+}
+
+export interface PreviewAccessInput {
+  kind: PreviewAccessKind;
+  address: string;
+  /** Left out to keep the saved secret (same kind only). */
+  secret?: string;
 }
 
 export interface StagingCmsInput {
