@@ -15,6 +15,9 @@ const LOOKS: Record<string, RunLook> = {
   needs_input: { label: "Needs your answer", tone: "waiting", group: "waiting" },
   // The code works as designed; the fix is a change in another system's data or settings.
   needs_outside_change: { label: "Needs a change outside the code", tone: "attention", group: "waiting" },
+  // Waiting for the team's AWS role to allow a read the run needs; it starts
+  // again by itself as soon as the role allows it.
+  awaiting_setup: { label: "Waiting for AWS access", tone: "waiting", group: "waiting" },
   // An open pull request (anyone's) already does the work; the run linked it and built no second fix.
   covered_by_pr: { label: "Covered by an open PR", tone: "muted", group: "done" },
   completed: { label: "Done", tone: "success", group: "done" },
@@ -33,7 +36,7 @@ const LOOKS: Record<string, RunLook> = {
 /** The status codes behind each toggle on the runs list (sent to the server as `status=`). */
 export const RUN_GROUP_STATUSES: Record<"active" | "waiting" | "done" | "failed" | "closed", string> = {
   active: "pending,queued,running",
-  waiting: "awaiting_ci,needs_input,needs_outside_change",
+  waiting: "awaiting_ci,needs_input,needs_outside_change,awaiting_setup",
   done: "completed,success,merged,covered_by_pr",
   failed: "failed,cancelled",
   closed: "closed",

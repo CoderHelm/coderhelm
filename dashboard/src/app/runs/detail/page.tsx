@@ -1060,6 +1060,8 @@ function RunDetailInner() {
                   content: <RunAnswered run={run} />,
                   actions: undefined,
                 }
+              : run.status === "awaiting_setup"
+                ? { tone: "waiting", title: "Waiting for AWS access", body: "The team's AWS role can't read what this run needs yet. Settings shows the one update to apply; once it's applied, this run starts again by itself and finishes.", actions: undefined }
               : run.status === "needs_outside_change"
                 ? { tone: "attention", title: "The fix is a change outside the code", body: "The code works as designed. What to change, and where, is below.", actions: undefined }
                 : run.status === "cancelled"

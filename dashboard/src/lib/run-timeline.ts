@@ -117,6 +117,8 @@ function endStep(i: TimelineInput): Omit<TimelineStep, "key" | "notes"> | null {
       return { pass: "end", title: i.pr_number ? `Pull request #${i.pr_number} merged` : "Pull request merged", state: "done", started_at: at };
     case "needs_outside_change":
       return { pass: "end", title: "Reported the change to make outside the code", state: "done", started_at: at };
+    case "awaiting_setup":
+      return { pass: "end", title: "Waiting for the AWS role to allow a read; starts again by itself", state: "waiting", started_at: at };
     case "covered_by_pr":
       return { pass: "end", title: "Linked the open pull request that already does it", state: "done", started_at: at };
     case "cancelled":

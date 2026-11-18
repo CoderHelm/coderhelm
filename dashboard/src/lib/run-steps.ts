@@ -51,7 +51,7 @@ export function runSteps({ currentPass, status, passHistory, hasPr }: RunStepsIn
     return { doneIdx: ranPrPass ? PR : PASSES.length, activeIdx: -1 };
   }
   // A run whose fix is outside the code finished its plan and stopped there on purpose.
-  if (status === "needs_outside_change") {
+  if (status === "needs_outside_change" || status === "awaiting_setup") {
     return { doneIdx: Math.max(reached, PASSES.indexOf("plan")) + 1, activeIdx: -1 };
   }
   if (working && current >= 0) {
