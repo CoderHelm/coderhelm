@@ -5,6 +5,11 @@ the team in plain words, one "## <date>: <what>" heading per release, and link t
 pull requests that shipped it. Leave out CI, pins and dependency bumps.
 -->
 
+## November 17, 2026: tests that actually run, and plan dependents released by their own ticket
+
+- **Tests actually run.** Workspace packages install from the workspace root with CI's own job, cached install and pinned versions, and a failed install says why. Test runs that don't fit in a step get a fresh step of their own instead of being skipped, more CI test commands are read, and the run page and pull request say how many tests ran with and without the change. ([#769](https://github.com/CoderHelm/coderhelm-platform/pull/769))
+- **A merged plan task releases its own dependents.** The task is found through its ticket's plan link, or by the ticket recorded on its own task row, so a Jira task releases its dependents and an issue number in another repository can never release the wrong ones. ([#719](https://github.com/CoderHelm/coderhelm-platform/pull/719))
+
 ## November 17, 2026: criteria proven both ways, a reviewer that converges, reproduce first
 
 - **Each ticket criterion is proven both ways.** The plan maps every acceptance criterion to an end-to-end test of the page it names, and before the pull request is called done each test is run on staging (it must fail) and on the preview (it must pass); a test that passes on both goes back to the coder. Near-identical helpers added in one change are caught. ([#766](https://github.com/CoderHelm/coderhelm-platform/pull/766))
