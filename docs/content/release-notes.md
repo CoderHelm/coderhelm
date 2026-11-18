@@ -6,6 +6,14 @@ pull requests that shipped it. Leave out CI, pins and dependency bumps. The page
 groups releases by day: one heading per day, each release a subheading under it.
 -->
 
+## November 18, 2026: a code map per repository, criteria traced to proof, and reads as your own role
+
+- **A code map per repository, kept current.** CoderHelm keeps a summary of each repository: architecture, stack, how to build and test, conventions and how its parts depend on each other, each part stamped with the commit it describes. Only the parts a change touches are rebuilt, and the planner and coder start from it instead of exploring the repository again. ([#780](https://github.com/CoderHelm/coderhelm-platform/pull/780))
+- **Every criterion traced to its code, tests and proof.** The pull request description shows each acceptance criterion with the code changed for it, the tests that cover it and the proof result, rebuilt on every push. A criterion with no code, test or proof starts a fix round like any other open item. ([#780](https://github.com/CoderHelm/coderhelm-platform/pull/780))
+- **Checklists for risky changes.** A plan that touches infrastructure, CI, permissions, data, performance or monitoring answers a short checklist for that area (rollout and rollback, environments, permissions, cost, limits, monitoring, migration safety, compatibility), each answer with its source. ([#780](https://github.com/CoderHelm/coderhelm-platform/pull/780))
+- **An approval after a merge from the base keeps its review.** When a pull request's own change is unchanged and CoderHelm approves it again, the approval carries the earlier review in full, and tidying older reviews never hides the review an approval rests on. ([#781](https://github.com/CoderHelm/coderhelm-platform/pull/781))
+- **Reads of your AWS account always use your read-only role.** On an install in the same account it reads, CoderHelm now reads logs, metrics and firewall data as CoderHelmLogReader too, so a run and its access check can't disagree, and a run never waits twice for the same access. ([#782](https://github.com/CoderHelm/coderhelm-platform/pull/782))
+
 ## November 18, 2026: one run per ticket, runs that finish, and tickets proven on the preview
 
 - **One ticket, one run.** Every trigger, from Jira, a GitHub issue, a plan task or an alert, claims the ticket before anything starts, and an issue CoderHelm opens for a ticket points back to it. A second trigger for a ticket already being worked starts nothing, so one ticket gets one pull request. ([#778](https://github.com/CoderHelm/coderhelm-platform/pull/778))
