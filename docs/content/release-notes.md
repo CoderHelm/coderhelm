@@ -6,6 +6,11 @@ pull requests that shipped it. Leave out CI, pins and dependency bumps. The page
 groups releases by day: one heading per day, each release a subheading under it.
 -->
 
+## November 18, 2026: runtime vulnerabilities, and alarm runs that read the firewall themselves
+
+- **Vulnerabilities in the language runtime, not only its libraries.** CoderHelm reads which Java (and Node, Python and Go) a team runs from Dockerfile images, version files, build settings, CI setup steps and Lambda declarations, and which Java packages are installed on its servers. Java versions are matched against the runtime's own advisories, so a JDK bug like CVE-2026-114938 becomes a finding: a pull request to the fixed version when one is published, otherwise a rebuild or the advisory's mitigation flag. When a bug needs a particular CPU, each server's instance type says whether it is exposed. ([#775](https://github.com/CoderHelm/coderhelm-platform/pull/775))
+- **Alarm runs read the firewall data themselves.** Runs read any CloudWatch metric the AWS role allows, WAF included, and read a WAF rule's sampled requests and log files directly, without Athena. A run whose only blocker is a read the role doesn't allow yet waits, shows one setup item, and starts again by itself once the role allows it, instead of handing the work to a person. ([#776](https://github.com/CoderHelm/coderhelm-platform/pull/776), [#454](https://github.com/CoderHelm/coderhelm/pull/454))
+
 ## November 18, 2026: previews found wherever your host publishes them
 
 - **Previews are found wherever they are published.** CoderHelm reads the head commit's deployments, deploy statuses, preview checks and bot comments, then the description and your address template. Only what belongs to the head commit counts first, and the changed app's preview is picked in a monorepo. It waits at most an hour for a preview that is still building, and reports a failed one with where it read it. ([#772](https://github.com/CoderHelm/coderhelm-platform/pull/772))
