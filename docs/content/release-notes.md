@@ -6,6 +6,13 @@ pull requests that shipped it. Leave out CI, pins and dependency bumps. The page
 groups releases by day: one heading per day, each release a subheading under it.
 -->
 
+## November 18, 2026: one run per ticket, runs that finish, and tickets proven on the preview
+
+- **One ticket, one run.** Every trigger, from Jira, a GitHub issue, a plan task or an alert, claims the ticket before anything starts, and an issue CoderHelm opens for a ticket points back to it. A second trigger for a ticket already being worked starts nothing, so one ticket gets one pull request. ([#778](https://github.com/CoderHelm/coderhelm-platform/pull/778))
+- **Runs finish instead of handing work back.** The fixed limit on continuations is gone: each continuation names what it still has to close, and the run goes on while it closes something. When progress stops, the pull request ships with what is left listed, and a red check afterwards still starts a fix round. ([#778](https://github.com/CoderHelm/coderhelm-platform/pull/778))
+- **The ticket is proven on the preview.** A criterion about what the server sends, such as content without JavaScript, is checked against the preview's own HTML and the base's before the pull request is ready. A test that can't run because its install failed is reported as not run, never as failing, and a test that fails or proves nothing holds the draft. ([#778](https://github.com/CoderHelm/coderhelm-platform/pull/778))
+- **Sharper plans.** Plan checks list each gap once, never put what the ticket asks for out of scope, and treat a broken value with a working one beside it in our own pipeline as a code fix, not a change for someone else. ([#778](https://github.com/CoderHelm/coderhelm-platform/pull/778))
+
 ## November 18, 2026: runtime vulnerabilities, and alarm runs that read the firewall themselves
 
 - **Vulnerabilities in the language runtime, not only its libraries.** CoderHelm reads which Java (and Node, Python and Go) a team runs from Dockerfile images, version files, build settings, CI setup steps and Lambda declarations, and which Java packages are installed on its servers. Java versions are matched against the runtime's own advisories, so a JDK bug like CVE-2026-114938 becomes a finding: a pull request to the fixed version when one is published, otherwise a rebuild or the advisory's mitigation flag. When a bug needs a particular CPU, each server's instance type says whether it is exposed. ([#775](https://github.com/CoderHelm/coderhelm-platform/pull/775))
