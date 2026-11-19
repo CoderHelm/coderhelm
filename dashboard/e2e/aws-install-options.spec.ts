@@ -175,60 +175,29 @@ async function shot(page: Page, name: string) {
   await page.setViewportSize({ width: 1280, height: 800 });
 }
 
-test("a permission the next release adds: Update now to add it, then it arrives with the update installing now", async ({ page }) => {
-  const db = await backend(page, { missing: ["logs:StopQuery"], latest: "v1.5.0" });
-  await page.goto("/settings/integrations/aws/");
-  const panel = page.getByTestId(`aws-perms-${INSTALL}`);
-  await expect(panel.getByRole("heading", { name: "1 permission arrives with the next update" })).toBeVisible();
-  await expect(panel.locator("section")).toHaveAttribute("data-case", "install");
-  // Needed now is only the missing permission; the optional reads are apart and collapsed.
-  const needed = panel.getByTestId(`aws-needed-${INSTALL}`);
-  await expect(needed).toContainText("logs:StopQuery");
-  await expect(needed).not.toContainText("Amazon Inspector");
-  const optional = panel.getByTestId(`aws-optional-${INSTALL}`);
-  await expect(optional).toContainText("Optional, off: 2 reads");
-  await expect(optional.getByTestId("aws-optional-inspector")).toBeHidden();
-  // Never "go to another page and figure it out": the update is right here.
-  await expect(panel.getByRole("link", { name: /Open Version and updates/ })).toHaveCount(0);
-  await expect(panel.getByTestId("install-needed-update")).toContainText("v1.5.0 adds it");
-  await shot(page, "aws-install-update-available");
-
-  await panel.getByRole("button", { name: "Update now to add it" }).click();
-  const press = db.calls.find((c) => c.path === "/api/system/update");
-  expect(press?.body).toEqual({ accept_permissions: true });
-  await expect(panel.getByRole("heading", { name: "1 permission arrives with the update installing now" })).toBeVisible();
-  await expect(panel.getByTestId("install-needed-running")).toContainText("Arrives with the update to v1.5.0 installing now");
-  await shot(page, "aws-install-update-running");
-});
-
-test("this version already grants it: the card says exactly why and offers the fix", async ({ page }) => {
-  await backend(page, {
-    missing: ["logs:StopQuery"],
-    problem: { code: "install_boundary", message: "This install's permission limit doesn't allow 1 of these read-only permissions yet.", fix: "An AWS admin applies the install's access update once (Settings, System, Version, Permissions: one link to the AWS console). No version update can change the limit." },
-    access: { state: "pending", link: "https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/quickcreate?stackName=coderhelm-prod-access" },
-  });
-  await page.goto("/settings/integrations/aws/");
-  const panel = page.getByTestId(`aws-perms-${INSTALL}`);
-  await expect(panel.getByRole("heading", { name: "1 permission is blocked by this install's permission limit" })).toBeVisible();
-  const why = panel.getByTestId("install-needed-boundary");
-  await expect(why).toContainText("v1.4.0 grants it, but this install's permission limit doesn't allow 1");
-  await expect(why.getByRole("link", { name: /Open the access update in AWS/ })).toHaveAttribute("href", /stackName=coderhelm-prod-access/);
-  await expect(panel.getByRole("button", { name: "Update now to add it" })).toHaveCount(0);
-  await shot(page, "aws-install-current-boundary");
-});
-
-test("no newer version and nothing blocks it: what IAM says is missing, on which role, never a claim about the stack", async ({ page }) => {
-  await backend(page, { missing: ["logs:StopQuery"] });
-  await page.goto("/settings/integrations/aws/");
-  const panel = page.getByTestId(`aws-perms-${INSTALL}`);
-  await expect(panel.getByRole("heading", { name: "1 permission missing from this install's read role" })).toBeVisible();
-  const why = panel.getByTestId("install-needed-current");
-  await expect(why).toContainText("IAM's policy simulator says coderhelm-prod-ServiceRole-0a1b2c3d isn't allowed logs:StopQuery");
-  await expect(why).toContainText("no newer version is out yet");
-  // Nothing it didn't read: no "your stack grants it", no drift.
-  await expect(why).not.toContainText(/grants it, yet|drift|changed in AWS/);
-  await expect(why.getByRole("button", { name: "Check again" })).toBeVisible();
-  await shot(page, "aws-install-missing-no-update");
+test("the install's own account: it updates with the release, and there is nothing to do", async ({ page }) => {
+  // Whatever is out (a newer version, none) and whatever the check says: never an action.
+  for (const latest of ["v1.5.0", null]) {
+    await backend(page, { missing: ["logs:StopQuery"], latest });
+    await page.goto("/settings/integrations/aws/");
+    const panel = page.getByTestId(`aws-perms-${INSTALL}`);
+    await expect(panel.getByRole("heading", { name: "Updates with the release" })).toBeVisible();
+    await expect(panel.locator("section").first()).toHaveAttribute("data-case", "install");
+    await expect(panel.getByTestId(`aws-install-reads-${INSTALL}`)).toContainText("Each version update brings it to");
+    await expect(panel.getByTestId(`aws-install-reads-${INSTALL}`)).toContainText("so there is nothing to do");
+    // What arrives is listed; the optional reads stay apart and collapsed.
+    const needed = panel.getByTestId(`aws-needed-${INSTALL}`);
+    await expect(needed).toContainText("logs:StopQuery");
+    await expect(needed).not.toContainText("Amazon Inspector");
+    await expect(panel.getByTestId(`aws-optional-${INSTALL}`)).toContainText("Optional, off: 2 reads");
+    // Nothing to press and nowhere to go: no update stack, no update button, no warning.
+    const card = panel.locator("section").first();
+    await expect(card.getByRole("button")).toHaveCount(0);
+    await expect(card.getByRole("link")).toHaveCount(0);
+    await expect(panel.getByRole("link", { name: /Update in AWS/ })).toHaveCount(0);
+    await expect(panel.getByRole("heading", { name: /Update needed/ })).toHaveCount(0);
+    await shot(page, latest ? "aws-install-updates-with-release" : "aws-install-updates-with-release-no-newer");
+  }
 });
 
 test("an optional read switches on the install's own stack: review of exactly what it adds, confirm, progress, result", async ({ page }) => {

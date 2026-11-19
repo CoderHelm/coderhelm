@@ -7,7 +7,7 @@ import { Callout } from "./callout";
 import { CheckIcon, ExternalLinkIcon, WarningIcon, AlertCircleIcon } from "./icons";
 import { buttonClass, primaryButton, secondaryButton } from "./ui";
 import { Code } from "./settings/code";
-import { InstallNeededNow, OptionalReads, installHeader, useInstallStatus } from "./aws-install-options";
+import { OptionalReads, useInstallStatus } from "./aws-install-options";
 
 // Whether each connected AWS account's read-only role has every permission
 // this release uses, checked live (IAM's policy simulator on the role, or one
@@ -115,8 +115,8 @@ export function stateLabel(s: AccountPermissions): string {
   if (!v) return s.checking ? "Checking permissions" : s.error ? "Couldn't check permissions" : "Not checked yet";
   if (v.status === "up_to_date") return "Permissions up to date";
   if (v.status === "error") return "Can't check: Coderhelm can't take on the role";
-  // The install's own account: nothing to do in AWS, its next update brings them.
-  if (v.install_account) return `${v.missing_count} permission${v.missing_count === 1 ? "" : "s"} ${v.missing_count === 1 ? "arrives" : "arrive"} with the next update`;
+  // The install's own account: the release brings them to its reader by itself.
+  if (v.install_account) return "Updates with the release";
   return `Update needed: ${v.missing_count} new read-only permission${v.missing_count === 1 ? "" : "s"}`;
 }
 
@@ -269,13 +269,47 @@ export function PermissionsPanel({ account, perms, canEdit }: { account: string;
 
   const neededGroups = v.abilities.filter((a) => !a.optional && a.missing.length > 0);
   const waiting = !!s.pressedAt && !v.problem;
-  const title = install ? installHeader(v.missing_count, status, v.problem?.code) : stateLabel(s);
+
+  // The install's own account: each version update brings this release's
+  // reads to its CoderHelmLogReader (the access stack's reader update), so
+  // there is nothing to do here: no update stack, no button, no warning.
+  if (install) {
+    const n = v.missing_count;
+    return (
+      <div className="flex flex-col gap-3" data-testid={`aws-perms-${account}`}>
+        <section aria-labelledby={`aws-perms-title-${account}`} className="rounded-lg border border-zinc-800 bg-zinc-900/40" data-case="install">
+          <div className="flex flex-col gap-3 px-4 py-3">
+            <div className="min-w-0">
+              <h3 id={`aws-perms-title-${account}`} className="text-sm font-medium text-zinc-100">
+                Updates with the release
+              </h3>
+              <p className="mt-1 text-sm text-zinc-400" data-testid={`aws-install-reads-${account}`}>
+                This install&apos;s own account. This release reads a little more from it: {n} read-only permission{n === 1 ? "" : "s"}. Each version
+                update brings {n === 1 ? "it" : "them"} to <Code>{v.role || "CoderHelmLogReader"}</Code> here by itself, so there is nothing to do. Until
+                then, Coderhelm skips what needs {n === 1 ? "it" : "them"} and keeps working with the rest.
+              </p>
+            </div>
+            <p className="flex flex-wrap gap-1.5" data-testid={`aws-needed-${account}`}>
+              {v.missing.map((m) => (
+                <Code key={m.action} className="!text-xs">
+                  {m.action}
+                </Code>
+              ))}
+            </p>
+          </div>
+        </section>
+        {optional}
+      </div>
+    );
+  }
+
+  const title = stateLabel(s);
   return (
     <div className="flex flex-col gap-3" data-testid={`aws-perms-${account}`}>
       <section
         aria-labelledby={`aws-perms-title-${account}`}
         className="overflow-hidden rounded-lg border border-amber-500/30 bg-amber-500/[0.04]"
-        data-case={install ? "install" : "account"}
+        data-case="account"
       >
         <div className="flex flex-col gap-4 p-4 sm:p-5">
           <div className="flex items-start gap-3">
@@ -287,9 +321,7 @@ export function PermissionsPanel({ account, perms, canEdit }: { account: string;
                 {title}
               </h3>
               <p className="mt-1 text-sm text-zinc-300">
-                {install
-                  ? "This install's own account. This release reads a little more from it; everything stays read-only, and nothing is needed in AWS."
-                  : `This release reads a little more from account ${v.account}. Everything stays read-only: Coderhelm can list, describe and query, never change anything.`}{" "}
+                {`This release reads a little more from account ${v.account}. Everything stays read-only: Coderhelm can list, describe and query, never change anything.`}{" "}
                 Until the role has it, Coderhelm skips what needs it and keeps working with the rest.
               </p>
             </div>
@@ -314,23 +346,7 @@ export function PermissionsPanel({ account, perms, canEdit }: { account: string;
             </ul>
           </div>
 
-          {install ? (
-            <div className="sm:pl-8">
-              {canEdit ? (
-                <InstallNeededNow
-                  s={status}
-                  problem={v.problem}
-                  onCheck={() => perms.check(account, true)}
-                  checking={s.checking}
-                  role={v.role}
-                  missing={v.missing.map((m) => m.action)}
-                />
-              ) : (
-                <p className="text-sm text-zinc-400">An admin adds it from this card with the install&apos;s next version update.</p>
-              )}
-            </div>
-          ) : (
-            <>
+          <>
               {v.problem && (
                 <div className="sm:pl-8">
                   <Callout variant="error" title={v.problem.message}>
@@ -377,8 +393,7 @@ export function PermissionsPanel({ account, perms, canEdit }: { account: string;
                 </div>
               )}
               {!canEdit && <p className="text-sm text-zinc-400 sm:pl-8">An admin can update the role in one click from this page.</p>}
-            </>
-          )}
+          </>
         </div>
       </section>
       {optional}

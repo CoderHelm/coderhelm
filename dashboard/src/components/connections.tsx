@@ -422,15 +422,10 @@ export function AwsAbilitiesPanel({
       {a.install_account && (missing.length > 0 || a.permissions?.status === "update_needed") && (
         <Callout
           variant="neutral"
-          title={`${a.permissions?.missing_count || missing.length || 1} read-only permission${(a.permissions?.missing_count || missing.length || 1) === 1 ? " arrives" : "s arrive"} with the next update`}
+          title={`Updates with the release: ${a.permissions?.missing_count || missing.length || 1} read-only permission${(a.permissions?.missing_count || missing.length || 1) === 1 ? " arrives" : "s arrive"} with the next update`}
           live={false}
         >
-          <p>Nothing is needed in AWS. The AWS page updates Coderhelm in one press, and the install&apos;s own role has them once it finishes.</p>
-          <p className="mt-2">
-            <Link href={`/settings/integrations/aws#aws-account-${a.account}`} className={linkButton}>
-              Update from the AWS page
-            </Link>
-          </p>
+          <p>Nothing to do. Each version update brings this release&apos;s read-only permissions to this account&apos;s read role by itself.</p>
         </Callout>
       )}
       {!a.install_account && (missing.length > 0 || a.permissions?.status === "update_needed") && a.update_url && (
