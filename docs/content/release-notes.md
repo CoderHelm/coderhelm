@@ -6,6 +6,13 @@ pull requests that shipped it. Leave out CI, pins and dependency bumps. The page
 groups releases by day: one heading per day, each release a subheading under it.
 -->
 
+## November 19, 2026: ticket lookups for moved teams, merged work never rebuilt
+
+- **Ticket lookups in chat for teams that run their own CoderHelm.** When a team moved from CoderHelm's cloud to its own install, the Jira app could no longer send CoderHelm its new links, so chat couldn't look up tickets. Those registrations are now accepted through the team's install link, checked against the site's secret, and the install copies the new links by itself. When the Jira app refuses a request, CoderHelm now records its reason. ([#788](https://github.com/CoderHelm/coderhelm-platform/pull/788))
+- **A deploy label's workflow is part of the preview.** A pull request no longer leaves draft while the workflow its deploy label starts is still running. The description quotes how that workflow ended, a backend-only change still has a time limit on its wait, and the merge gate never adds a deploy label again on a commit the preview already ran. ([#705](https://github.com/CoderHelm/coderhelm-platform/pull/705))
+- **No second run on a ticket whose pull request already merged.** Before a run builds anything, CoderHelm checks the ticket's merged pull requests the same way it checks open ones: work that is already merged is not rebuilt, and work that is partly merged builds only the rest. An answer on the ticket keeps that check. ([#706](https://github.com/CoderHelm/coderhelm-platform/pull/706))
+- **Before and After from the end-to-end screenshots.** CoderHelm's pull requests show a Before and After pair from the screenshots their end-to-end run already took, read from the test reports CoderHelm already parses. ([#707](https://github.com/CoderHelm/coderhelm-platform/pull/707))
+
 ## November 18, 2026: chat knows Jira is connected
 
 - **Chat knows Jira is connected, and missing Jira links repair themselves.** Chat, the Integrations page and runs now share one check for whether Jira is connected, so chat never says Jira isn't connected when it is. When the Jira app gains a link in an update, or a site is missing one, CoderHelm asks the app to send its links again and existing installs copy them on their own, with nobody re-saving settings. Until a link is back, chat names exactly what is missing and answers from the tickets CoderHelm's runs already know. ([#786](https://github.com/CoderHelm/coderhelm-platform/pull/786))
