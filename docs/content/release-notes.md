@@ -6,6 +6,10 @@ pull requests that shipped it. Leave out CI, pins and dependency bumps. The page
 groups releases by day: one heading per day, each release a subheading under it.
 -->
 
+## November 18, 2026: chat knows Jira is connected
+
+- **Chat knows Jira is connected, and missing Jira links repair themselves.** Chat, the Integrations page and runs now share one check for whether Jira is connected, so chat never says Jira isn't connected when it is. When the Jira app gains a link in an update, or a site is missing one, CoderHelm asks the app to send its links again and existing installs copy them on their own, with nobody re-saving settings. Until a link is back, chat names exactly what is missing and answers from the tickets CoderHelm's runs already know. ([#786](https://github.com/CoderHelm/coderhelm-platform/pull/786))
+
 ## November 18, 2026: approved pull requests merge, conflicts and all
 
 - **Approved pull requests merge, conflicts and all.** When a pull request CoderHelm is set to merge falls behind or conflicts with its base, CoderHelm merges the base in itself, checks the pull request's own change is unchanged, reviews the new commit and carries on. An approval GitHub still counts is counted, the merge is checked again every 15 minutes while it waits, and a wait always says what is missing: whose approval, dismissed by which commit, and how many the branch needs. ([#783](https://github.com/CoderHelm/coderhelm-platform/pull/783))
