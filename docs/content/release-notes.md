@@ -6,6 +6,10 @@ pull requests that shipped it. Leave out CI, pins and dependency bumps. The page
 groups releases by day: one heading per day, each release a subheading under it.
 -->
 
+## November 18, 2026: approved pull requests merge, conflicts and all
+
+- **Approved pull requests merge, conflicts and all.** When a pull request CoderHelm is set to merge falls behind or conflicts with its base, CoderHelm merges the base in itself, checks the pull request's own change is unchanged, reviews the new commit and carries on. An approval GitHub still counts is counted, the merge is checked again every 15 minutes while it waits, and a wait always says what is missing: whose approval, dismissed by which commit, and how many the branch needs. ([#783](https://github.com/CoderHelm/coderhelm-platform/pull/783))
+
 ## November 18, 2026: a code map per repository, criteria traced to proof, and reads as your own role
 
 - **A code map per repository, kept current.** CoderHelm keeps a summary of each repository: architecture, stack, how to build and test, conventions and how its parts depend on each other, each part stamped with the commit it describes. Only the parts a change touches are rebuilt, and the planner and coder start from it instead of exploring the repository again. ([#780](https://github.com/CoderHelm/coderhelm-platform/pull/780))
