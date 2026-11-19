@@ -6,6 +6,11 @@ pull requests that shipped it. Leave out CI, pins and dependency bumps. The page
 groups releases by day: one heading per day, each release a subheading under it.
 -->
 
+## November 19, 2026: sign in with Microsoft and Okta
+
+- **Sign in with Microsoft.** Work, school and personal Microsoft accounts can sign in, on CoderHelm's cloud and on self-hosted installs that add their own Entra app registration. CoderHelm checks Microsoft's signature, the account's own tenant, the nonce and the expiry, and takes the email only when Microsoft vouches for it: a personal account's email, or a work email at a domain the organization verified. The button shows only where it is set up. ([#793](https://github.com/CoderHelm/coderhelm-platform/pull/793), [dashboard #463](https://github.com/CoderHelm/coderhelm/pull/463))
+- **Sign in with your team's Okta.** In **Settings, Sign-in rules**, an admin enters the Okta domain, client ID and secret (kept encrypted), copies CoderHelm's sign-in redirect address into Okta, and runs **Test sign-in** before turning it on. People then choose **Continue with Okta** and enter their work email. On CoderHelm's cloud a team's Okta signs in only that team's own members and invitees, and the session stays on that team; on a self-hosted install it follows the organization's join rules. Two-factor sign-in is asked for after Microsoft and Okta, as after Google and GitHub. ([#793](https://github.com/CoderHelm/coderhelm-platform/pull/793), [dashboard #463](https://github.com/CoderHelm/coderhelm/pull/463))
+
 ## November 19, 2026: read-only permissions arrive with the release
 
 - **New read-only permissions arrive with the release, with no alert.** On an install's own AWS account, each release update now adds that release's read-only permissions to the CoderHelmLogReader role by itself, with the AWS switches as the install has them, so nobody has to update anything and the AWS page says it updates with the release. Other AWS accounts show the update quietly on the AWS page with its one-click link; CoderHelm no longer sends a notification about read-only permissions. Existing installs update their access stack once to get this. ([#789](https://github.com/CoderHelm/coderhelm-platform/pull/789), [dashboard #461](https://github.com/CoderHelm/coderhelm/pull/461))

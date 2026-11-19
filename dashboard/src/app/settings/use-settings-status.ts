@@ -98,7 +98,8 @@ const LOADERS: Record<SettingsStatusKey, (me: Me) => Promise<ItemStatus | null>>
   },
   security: async (me) => {
     if (me.auth_provider && me.auth_provider !== "email") {
-      return { text: `Signs in with ${me.auth_provider === "github" ? "GitHub" : "Google"}`, tone: "neutral" };
+      const names: Record<string, string> = { github: "GitHub", google: "Google", microsoft: "Microsoft", okta: "Okta" };
+      return { text: `Signs in with ${names[me.auth_provider] ?? "Google"}`, tone: "neutral" };
     }
     if (!me.auth_provider && me.github_login) return { text: "Signs in with GitHub", tone: "neutral" };
     return me.mfa_enabled ? { text: "Two step sign in on", tone: "success" } : { text: "Two step sign in off", tone: "warning" };

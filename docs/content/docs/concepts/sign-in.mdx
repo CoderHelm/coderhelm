@@ -1,16 +1,29 @@
 ---
 title: Sign-in and two-factor
-description: How people sign in to CoderHelm, the one second factor each person has, and how a team's admins require two-factor sign-in.
+description: How people sign in to CoderHelm (password, Google, GitHub, Microsoft, a team's Okta), the one second factor each person has, and how a team's admins require two-factor sign-in.
 ---
 
-People sign in to CoderHelm with an email and password, with Google, or with GitHub. All three lead to the same person (by email), on every team they are on. This page is about the hosted CoderHelm at app.coderhelm.com; a self-hosted install has its own [sign-in page](/self-host/sign-in/).
+People sign in to CoderHelm with an email and password, with Google, with GitHub, or with Microsoft (work, school and personal accounts). All of them lead to the same person (by email), on every team they are on. A team can also turn on sign-in with its own Okta, for its own members ([below](#okta-for-a-team)). This page is about the hosted CoderHelm at app.coderhelm.com; a self-hosted install has its own [sign-in page](/self-host/sign-in/).
+
+Microsoft vouches for an email only when it is verified: a personal account's email, or a work account's email at a domain its organization has verified with Microsoft. Without one, sign-in stops and says so. CoderHelm never uses the account's display name (`preferred_username`) as its email.
+
+## Okta for a team
+
+A team's admins and owners can let people sign in with the team's own Okta: **Settings, Sign-in rules, Okta sign-in**.
+
+1. In Okta, create an app integration: **OIDC - OpenID Connect**, **Web Application**, grant type Authorization Code. Its **Sign-in redirect URI** is `https://api.coderhelm.com/auth/okta/callback` (the section shows it with a **Copy** button). Assign the people or groups who use CoderHelm.
+2. In CoderHelm, enter your Okta domain (such as `acme.okta.com`) or issuer, the app's **Client ID** and **Client secret**, and your work email domains. The secret is encrypted with AWS KMS and never shown again.
+3. Choose **Test sign-in**: your Okta asks you to sign in, and CoderHelm makes every check a real sign-in makes. Nothing changes for anyone else.
+4. When the test passed, choose **Save and turn on**.
+
+Then **Continue with Okta** on the sign-in page asks for a work email and goes to your Okta for people already on your team or invited to it. A team's Okta signs people in to that team only: it never makes a new team, the session can't switch to the person's other teams, and the person's own second factor is still asked for. Someone your Okta signs in who isn't on the team sees that they need an invite. Turning Okta sign-in on, off or removing it goes in the log under **Settings, Roles**.
 
 ## Your second factor
 
 Anyone can turn on two-factor sign-in for themselves in **Settings, Security**. Each person has **one** second factor, and CoderHelm asks for it however they sign in, whether or not a team requires it:
 
 - **People who sign in with a password** use the password account's own codes: the sign-in asks for a code from your authenticator app (any TOTP app: 1Password, Google Authenticator, Authy and so on) after your password.
-- **People who sign in with Google or GitHub** don't pass through that step, so CoderHelm asks for its own authenticator-app code right after Google or GitHub. The secret is encrypted with AWS KMS.
+- **People who sign in with Google, GitHub, Microsoft or Okta** don't pass through that step, so CoderHelm asks for its own authenticator-app code right after them. The secret is encrypted with AWS KMS.
 - **A code set up after Google or GitHub** is asked for after a password sign-in too.
 - **A code on the password account** can only be checked at the password sign-in: signing in with Google or GitHub sends you back to sign in with your email and password.
 - **Neither kind can be set up while you have one.** To change it, turn the current one off first: the app code takes a current code to turn off, and the password account's code can be turned off only from a session that signed in with it.

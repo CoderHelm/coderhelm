@@ -1,10 +1,10 @@
-// What the sign-in screen says when Google or GitHub sign-in did not finish.
-// The API's callback sends the person back here with
-// `?signin_error=<code>&provider=<google|github>` (services/gateway
+// What the sign-in screen says when Google, GitHub, Microsoft or Okta sign-in
+// did not finish. The API's callback sends the person back here with
+// `?signin_error=<code>&provider=<google|github|microsoft|okta>` (services/gateway
 // oauth_signin.rs); the URL carries only that short code, and this turns it
 // into one plain sentence.
 
-export type SignInProvider = "google" | "github";
+export type SignInProvider = "google" | "github" | "microsoft" | "okta";
 
 export interface SignInProblem {
   code: string;
@@ -15,14 +15,18 @@ export interface SignInProblem {
   canRetry: boolean;
 }
 
-const NAMES: Record<SignInProvider, string> = { google: "Google", github: "GitHub" };
+const NAMES: Record<SignInProvider, string> = { google: "Google", github: "GitHub", microsoft: "Microsoft", okta: "Okta" };
+
+function providerOf(p: string | null): SignInProvider | null {
+  return p === "google" || p === "github" || p === "microsoft" || p === "okta" ? p : null;
+}
 
 export function signInProblem(search: string): SignInProblem | null {
   const params = new URLSearchParams(search);
   const code = params.get("signin_error");
   if (!code) return null;
   const p = params.get("provider");
-  const provider: SignInProvider | null = p === "google" || p === "github" ? p : null;
+  const provider = providerOf(p);
   const name = provider ? NAMES[provider] : "The sign-in provider";
   switch (code) {
     case "in_app_browser":
@@ -48,6 +52,30 @@ export function signInProblem(search: string): SignInProblem | null {
         code,
         provider,
         sentence: `${provider ? NAMES[provider] : "That"} sign-in isn't set up on this Coderhelm. Sign in with your email and password.`,
+        canRetry: false,
+      };
+    case "no_verified_email":
+      return {
+        code,
+        provider,
+        sentence:
+          provider === "microsoft"
+            ? "Microsoft didn't share a verified email address for this account, so Coderhelm can't tell who you are. Ask your IT team to check the Coderhelm app's email claims, or sign in another way."
+            : `${name} didn't share a verified email address for this account. Ask your IT team, or sign in another way.`,
+        canRetry: false,
+      };
+    case "okta_not_found":
+      return {
+        code,
+        provider,
+        sentence: "There's no Okta sign-in for that email here. Check the address, or sign in another way. An admin turns Okta on in Settings, Sign-in rules.",
+        canRetry: false,
+      };
+    case "not_on_team":
+      return {
+        code,
+        provider,
+        sentence: "Okta signed you in, but you aren't on the team that uses this Okta. Ask one of its admins to invite you with that email.",
         canRetry: false,
       };
     case "server":

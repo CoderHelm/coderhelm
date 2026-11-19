@@ -25,6 +25,9 @@ const TWO_STEP = "Two step sign in";
 const PROVIDERS: Record<string, { name: string; settings: string }> = {
   github: { name: "GitHub", settings: "https://github.com/settings/security" },
   google: { name: "Google", settings: "https://myaccount.google.com/security" },
+  microsoft: { name: "Microsoft", settings: "https://mysignins.microsoft.com/security-info" },
+  // Each organization's own Okta: no one address to link to.
+  okta: { name: "Okta", settings: "" },
 };
 
 export default function SecurityPage() {
@@ -81,7 +84,7 @@ export default function SecurityPage() {
 
   useEffect(loadMe, [loadMe]);
 
-  const isOAuth = authProvider === "github" || authProvider === "google";
+  const isOAuth = authProvider !== null && authProvider in PROVIDERS;
   // It stays on while a team they're on (self-hosted: the organization) requires it.
   const mustKeep = !!(mine?.must_keep ?? mine?.required);
   // The code is this Coderhelm's own (set up after Google or GitHub, or

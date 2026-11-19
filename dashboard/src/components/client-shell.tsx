@@ -34,6 +34,7 @@ import { apiBase, githubAppUrl, runtimeConfig, siteUrl } from "@/lib/runtime-con
 import { SetupBanner } from "@/components/setup-banner";
 import { UpdateReady } from "@/components/update-ready";
 import { CopyButton } from "./copy-button";
+import { MicrosoftMark, OktaMark } from "./brand-icons";
 import { openInChromeHref, signInProblem, type SignInProblem } from "@/lib/sign-in-errors";
 import { consentReturnTo, rememberConsentReturn, takeConsentReturn } from "@/lib/connected-apps";
 import { TwoFactorSetup } from "./two-factor-setup";
@@ -919,7 +920,8 @@ function SignInProblemNotice({ problem }: { problem: SignInProblem }) {
       <p className="wrap-anywhere">{problem.sentence}</p>
       <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
         {problem.canRetry && problem.provider && (
-          <a href={`${apiBase()}/auth/${problem.provider}`} className={`font-medium text-zinc-100 underline underline-offset-4 rounded ${focusRing}`}>
+          // Okta starts from the work email (a form), the others from a link.
+          <a href={problem.provider === "okta" ? "/?okta=1" : `${apiBase()}/auth/${problem.provider}`} className={`font-medium text-zinc-100 underline underline-offset-4 rounded ${focusRing}`}>
             Try again
           </a>
         )}
@@ -1043,7 +1045,7 @@ function TwoFactorGate({ status, email, onDone }: { status: MyTwoFactor; email: 
 
 // ── Auth Screen (login / signup / verify / forgot password) ────────
 
-type AuthView = "login" | "signup" | "verify" | "forgot" | "reset" | "mfa" | "second_step";
+type AuthView = "login" | "signup" | "verify" | "forgot" | "reset" | "mfa" | "second_step" | "okta";
 
 /** What a self-hosted install says to someone it won't let in. */
 const NOT_INVITED =
@@ -1120,7 +1122,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
   const selfHosted = isSelfHosted();
   // Only the ways in that work here (the API says which).
   const methods = useSignInMethods();
-  const providers = methods.google || methods.github;
+  const providers = methods.google || methods.github || methods.microsoft || methods.okta;
   // Signed out on an app's consent page: GitHub sign-in comes straight back
   // here, and someone without an account may join as a reader.
   const [consentBack, setConsentBack] = useState<string | null>(null);
@@ -1139,6 +1141,11 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
     const failed = signInProblem(window.location.search);
     if (failed) {
       setProblem(failed);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+    // "Try again" after Okta: back to the work email form.
+    if (params.get("okta") === "1") {
+      setView("okta");
       window.history.replaceState({}, "", window.location.pathname);
     }
     // Google or GitHub sign-in waiting for the authenticator-app code.
@@ -1413,6 +1420,27 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
                   Continue with GitHub
                 </a>
                 )}
+                {/* Microsoft: work, school and personal accounts, with the deployment's own app registration. */}
+                {methods.microsoft && (
+                <a
+                  href={`${apiBase()}/auth/microsoft`}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-zinc-800 border border-zinc-700 px-4 py-2.5 text-sm font-medium text-zinc-100 hover:bg-zinc-700 transition-colors"
+                >
+                  <MicrosoftMark />
+                  Continue with Microsoft
+                </a>
+                )}
+                {/* Okta: each organization's own; the work email finds which. */}
+                {methods.okta && (
+                <button
+                  type="button"
+                  onClick={() => { setView("okta"); setError(""); setMessage(""); }}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-zinc-800 border border-zinc-700 px-4 py-2.5 text-sm font-medium text-zinc-100 hover:bg-zinc-700 transition-colors cursor-pointer"
+                >
+                  <OktaMark />
+                  Continue with Okta
+                </button>
+                )}
               </div>
               )}
 
@@ -1531,6 +1559,31 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
           )}
 
           {/* ── Forgot password ── */}
+          {/* ── Okta: the work email picks the organization's Okta ── */}
+          {view === "okta" && (
+            <div className="w-full space-y-4" data-testid="okta-sign-in">
+              <div className="flex items-center justify-center gap-2">
+                <OktaMark className="h-5 w-5" />
+                <h2 className="text-base font-medium text-zinc-100">Sign in with Okta</h2>
+              </div>
+              <p className="text-sm text-zinc-400 text-center">
+                Enter your work email. We&apos;ll send you to your organization&apos;s Okta to sign in.
+              </p>
+              {/* A real form post: the email goes in the body, never in a URL. */}
+              <form method="post" action={`${apiBase()}/auth/okta`} className="space-y-3">
+                <input type="email" name="email" id="okta-email" required autoComplete="email" aria-label="Work email" placeholder="Work email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); }}
+                  className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600" />
+                <button type="submit" disabled={!email}
+                  className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-40 transition-colors cursor-pointer disabled:cursor-not-allowed">
+                  Continue to Okta
+                </button>
+              </form>
+              <button onClick={() => { setView("login"); setError(""); setMessage(""); }} className="text-xs text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer">
+                Back to sign in
+              </button>
+            </div>
+          )}
+
           {view === "forgot" && (
             <div className="w-full space-y-4">
               <p className="text-sm text-zinc-400 text-center">
