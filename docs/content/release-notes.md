@@ -6,6 +6,11 @@ pull requests that shipped it. Leave out CI, pins and dependency bumps. The page
 groups releases by day: one heading per day, each release a subheading under it.
 -->
 
+## November 19, 2026: read-only permissions arrive with the release
+
+- **New read-only permissions arrive with the release, with no alert.** On an install's own AWS account, each release update now adds that release's read-only permissions to the CoderHelmLogReader role by itself, with the AWS switches as the install has them, so nobody has to update anything and the AWS page says it updates with the release. Other AWS accounts show the update quietly on the AWS page with its one-click link; CoderHelm no longer sends a notification about read-only permissions. Existing installs update their access stack once to get this. ([#789](https://github.com/CoderHelm/coderhelm-platform/pull/789), [dashboard #461](https://github.com/CoderHelm/coderhelm/pull/461))
+- **A ticket that keeps failing stops restarting by itself.** After 3 failed runs in a row, a ticket event that leaves the ticket unchanged starts no further run. A content change, Retry, a command, or a person adding the trigger label or assigning CoderHelm on GitHub or Jira still starts one. ([#773](https://github.com/CoderHelm/coderhelm-platform/pull/773))
+
 ## November 19, 2026: ticket lookups for moved teams, merged work never rebuilt
 
 - **Ticket lookups in chat for teams that run their own CoderHelm.** When a team moved from CoderHelm's cloud to its own install, the Jira app could no longer send CoderHelm its new links, so chat couldn't look up tickets. Those registrations are now accepted through the team's install link, checked against the site's secret, and the install copies the new links by itself. When the Jira app refuses a request, CoderHelm now records its reason. ([#788](https://github.com/CoderHelm/coderhelm-platform/pull/788))
