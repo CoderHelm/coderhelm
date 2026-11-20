@@ -42,6 +42,8 @@ interface State {
   saves: Record<string, unknown>[];
   toggles: Record<string, unknown>[];
   verifies: number;
+  link: { available: boolean; issuer: string | null; linked: boolean; linked_at: string | null; from_okta: boolean };
+  linkStarts: number;
   /** Refuse the next POST /api/sign-in/okta/test with this error. */
   refuseTest?: string;
 }
@@ -80,6 +82,8 @@ async function mock(page: Page, over: Partial<State> = {}): Promise<State> {
     saves: [],
     toggles: [],
     verifies: 0,
+    link: { available: true, issuer: "https://acme.okta.com", linked: false, linked_at: null, from_okta: false },
+    linkStarts: 0,
     ...over,
   };
   const json = (route: Route, body: unknown, status = 200) =>
@@ -122,6 +126,18 @@ async function mock(page: Page, over: Partial<State> = {}): Promise<State> {
       const draft = setup({ issuer: b.issuer, client_id: b.client_id, domains: b.domains });
       state.okta = { ...state.okta, draft };
       return json(route, { test_url: "http://localhost:3111/auth/okta/test?ticket=t1", draft });
+    }
+    if (p === "/api/users/okta/link" && req.method() === "GET") return json(route, state.link);
+    if (p === "/api/users/okta/link" && req.method() === "POST") {
+      state.linkStarts += 1;
+      return json(route, { url: "http://localhost:3111/auth/okta/link?ticket=l1" });
+    }
+    if (p === "/api/users/okta/link" && req.method() === "DELETE") {
+      state.link = { ...state.link, linked: false };
+      return json(route, { linked: false });
+    }
+    if (p === "/auth/okta/link") {
+      return route.fulfill({ status: 200, contentType: "text/html", body: "<title>okta link</title><h1>Okta link sign-in</h1>" });
     }
     if (p === "/api/sign-in/okta/domains/verify") {
       state.verifies += 1;
@@ -221,6 +237,12 @@ const SENTENCES: [string, string, string, boolean][] = [
     false,
   ],
   [
+    "okta_not_linked",
+    "okta",
+    "Okta signed you in, but no Coderhelm account has linked that Okta account yet. Sign in another way first, then choose Link Okta in Settings, Security.",
+    false,
+  ],
+  [
     "okta_team_only",
     "github",
     "You signed in with your team's Okta, which works for that team only, so it can't link another sign-in. Sign in with your password, Google, GitHub or Microsoft to do this.",
@@ -317,7 +339,10 @@ test.describe("Settings, Sign-in rules: Okta", () => {
       await expect(section.getByLabel("Client secret")).toHaveValue("");
       await expect(section.getByText("Saved, and never shown again. Leave empty to keep it while the Okta domain and Client ID stay the same.")).toBeVisible();
       await section.getByRole("button", { name: "Save and turn on" }).click();
-      await expect.poll(() => state.saves).toEqual([{ enabled: true }]);
+      // The save names the draft the owner looked at.
+      await expect.poll(() => state.saves).toEqual([
+        { enabled: true, issuer: "https://acme.okta.com", client_id: "0oa1example", updated_at: "2026-11-19T12:00:00Z" },
+      ]);
       await expect(section.getByTestId("okta-live")).toContainText("On: https://acme.okta.com for example.org");
       await noSidewaysScroll(page);
 
@@ -343,5 +368,48 @@ test.describe("Settings, Sign-in rules: Okta", () => {
     await expect(section.getByTestId("okta-error")).toContainText("couldn't read the sign-in settings");
     // An empty secret box sends no secret: the saved one is kept.
     expect(state.tests.at(-1)).not.toHaveProperty("client_secret");
+  });
+});
+
+test.describe("Settings, Security: Link Okta", () => {
+  for (const width of [1440, 390]) {
+    test(`at ${width}px: link from a session started another way, then unlink`, async ({ page }) => {
+      await page.setViewportSize({ width, height: width < 600 ? 844 : 900 });
+      const state = await mock(page, { signedIn: true });
+      await page.goto("/settings/security");
+      const section = page.getByTestId("okta-link");
+      await expect(section).toContainText("Not linked to acme.okta.com");
+      await section.getByRole("button", { name: "Link Okta" }).click();
+      await expect(page.getByRole("heading", { name: "Okta link sign-in" })).toBeVisible();
+      expect(state.linkStarts).toBe(1);
+
+      state.link = { ...state.link, linked: true, linked_at: "2026-11-20T10:00:00Z" };
+      await page.goto("/settings/security?okta_link=linked#okta");
+      await expect(section).toContainText("Linked to acme.okta.com");
+      await expect(section.getByRole("status")).toHaveText("Okta is linked. You can sign in with Okta now.");
+      await noSidewaysScroll(page);
+      await section.getByRole("button", { name: "Unlink Okta" }).click();
+      await page.getByRole("button", { name: "Unlink", exact: true }).click();
+      await expect(section).toContainText("Not linked");
+    });
+  }
+
+  test("from an Okta session there is no Link button, and a failed link says why", async ({ page }) => {
+    await mock(page, {
+      signedIn: true,
+      link: { available: true, issuer: "https://acme.okta.com", linked: false, linked_at: null, from_okta: true },
+    });
+    await page.goto("/settings/security?okta_link=failed&reason=taken#okta");
+    const section = page.getByTestId("okta-link");
+    await expect(section.getByTestId("okta-link-failed")).toHaveText("That Okta account is already linked to another member of this team.");
+    await expect(section.getByRole("button", { name: "Link Okta" })).toHaveCount(0);
+    await expect(section).toContainText("To link or unlink Okta, sign in with your password, Google, GitHub or Microsoft.");
+  });
+
+  test("no Okta on this team: no section", async ({ page }) => {
+    await mock(page, { signedIn: true, link: { available: false, issuer: null, linked: false, linked_at: null, from_okta: false } });
+    await page.goto("/settings/security");
+    await expect(page.getByRole("heading", { name: "Security" }).first()).toBeVisible();
+    await expect(page.getByTestId("okta-link")).toHaveCount(0);
   });
 });

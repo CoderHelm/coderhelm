@@ -128,7 +128,8 @@ export function OktaSection({ selfHosted }: { selfHosted: boolean }) {
   const save = async () => {
     setBusy(true);
     try {
-      const d = await api.oktaSave(true);
+      if (!draft) return;
+      const d = await api.oktaSave(true, { issuer: draft.issuer, client_id: draft.client_id, updated_at: draft.updated_at });
       setData(d);
       fill(d);
       setResult(null);
@@ -198,6 +199,25 @@ export function OktaSection({ selfHosted }: { selfHosted: boolean }) {
     }
   };
 
+  const release = async (domain: string) => {
+    const ok = await confirm({
+      title: `Release ${domain}?`,
+      message: "Okta sign-in stops for emails at this domain until it's verified again.",
+      confirmLabel: "Release",
+      destructive: true,
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      setData(await api.oktaReleaseDomain(domain));
+      toast(`${domain} released`);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Couldn't release it. Try again.", "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const discard = async () => {
     setBusy(true);
     try {
@@ -213,8 +233,8 @@ export function OktaSection({ selfHosted }: { selfHosted: boolean }) {
   };
 
   const description = selfHosted
-    ? "Let people sign in with your Okta. They still need an invite or an allowed email domain, and two-factor sign-in still applies."
-    : "Let people on this team sign in with your Okta. It signs in only people who are already members of this team, at email domains you prove in DNS, and two-factor sign-in still applies.";
+    ? "Let people sign in with your Okta. Each member links their own Okta account in Settings, Security first, and two-factor sign-in still applies. Only the owner can save it or turn it on."
+    : "Let people on this team sign in with your Okta. Each member links their own Okta account in Settings, Security first, emails must be at domains you prove in DNS, and two-factor sign-in still applies. Only the owner can save it or turn it on.";
 
   return (
     <SettingsSection id="okta" title="Okta sign-in" description={description}>
@@ -279,6 +299,11 @@ export function OktaSection({ selfHosted }: { selfHosted: boolean }) {
                         <span className="text-zinc-400">
                           {d.verified_at ? `Verified ${when(d.verified_at)}` : d.other_team ? "Verified by another team" : "Not verified"}
                         </span>
+                        {d.verified_at && (
+                          <button type="button" onClick={() => release(d.domain)} disabled={busy} className={buttonClass("ghost", "sm")}>
+                            Release
+                          </button>
+                        )}
                       </p>
                       {!d.verified_at && !d.other_team && (
                         <dl className="mt-2 grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1">

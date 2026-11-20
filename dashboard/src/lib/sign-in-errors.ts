@@ -78,6 +78,13 @@ export function signInProblem(search: string): SignInProblem | null {
         sentence: "Okta signed you in, but you aren't a member of the team that uses this Okta. Okta works only for people already on the team: accept your invite with your password, Google, GitHub or Microsoft first.",
         canRetry: false,
       };
+    case "okta_not_linked":
+      return {
+        code,
+        provider,
+        sentence: "Okta signed you in, but no Coderhelm account has linked that Okta account yet. Sign in another way first, then choose Link Okta in Settings, Security.",
+        canRetry: false,
+      };
     case "okta_team_only":
       return {
         code,

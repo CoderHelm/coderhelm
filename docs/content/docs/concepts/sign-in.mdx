@@ -5,7 +5,7 @@ description: How people sign in to CoderHelm (password, Google, GitHub, Microsof
 
 People sign in to CoderHelm with an email and password, with Google, with GitHub, or with Microsoft (work, school and personal accounts). All of them lead to the same person (by email), on every team they are on. A team can also turn on sign-in with its own Okta, for its own members ([below](#okta-for-a-team)). This page is about the hosted CoderHelm at app.coderhelm.com; a self-hosted install has its own [sign-in page](/self-host/sign-in/).
 
-Microsoft vouches for an email only when its token says the email's domain is verified (`xms_edov`). Without that, sign-in stops and says so. CoderHelm never uses the account's display name (`preferred_username`) as its email.
+Microsoft vouches for an email only when its token says the email's domain is verified (`xms_edov`), for work, school and personal accounts alike. Without that, sign-in stops and says so: sign in another way. CoderHelm never uses the account's display name (`preferred_username`) as its email.
 
 ## Okta for a team
 
@@ -17,7 +17,7 @@ A team's admins and owners can let people sign in with the team's own Okta: **Se
 4. Prove each email domain: add the TXT record the section shows (`_coderhelm-okta.<domain>`, value `coderhelm-okta=...`) in your DNS, then choose **Verify domains**. A domain can be proven by one team only, and Okta sign-in turns on only when every domain is verified.
 5. When the test passed and the domains are verified, choose **Save and turn on**.
 
-Then **Continue with Okta** on the sign-in page asks for a work email and goes to the Okta of the team that proved that email's domain. It signs in only people who are already members of your team (they joined with their invite and a password, Google, GitHub or Microsoft): Okta never accepts an invite and never makes an account or a team. An Okta session works for your team only: it can't switch to the person's other teams, change their password or second factor, link a GitHub account, or act as a CoderHelm admin. The person's own second factor is still asked for. Turning Okta sign-in on, off or removing it goes in the log under **Settings, Roles**.
+Then each member links their own Okta account: **Settings, Security, Link Okta**, from a session they started another way (password, Google, GitHub or Microsoft). **Continue with Okta** on the sign-in page asks for a work email and goes to the Okta of the team that proved that email's domain, and signs in only the member who linked exactly that Okta account. It never matches anyone by email, never accepts an invite and never makes an account or a team. Changing your Okta domain or removing Okta drops everyone's links. CoderHelm reads each domain's TXT record again when Okta is turned on and once a day at sign-in; a record that is gone releases the domain, and **Release** beside a domain does it by hand. An Okta session works for your team only: it can't switch to the person's other teams, change their password or second factor, link a GitHub account, or act as a CoderHelm admin. Someone on no other team can still set up a second factor from it. The person's own second factor is still asked for. Turning Okta sign-in on, off or removing it goes in the log under **Settings, Roles**.
 
 ## Your second factor
 

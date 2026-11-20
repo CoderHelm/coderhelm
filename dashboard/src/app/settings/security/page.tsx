@@ -13,6 +13,7 @@ import { Problem } from "@/components/problem";
 import { ExternalLinkIcon } from "@/components/icons";
 import { buttonClass, dangerButton, ghostButton, primaryButton } from "@/components/ui";
 import { Code, Field, SettingsSection } from "@/components/settings";
+import { OktaLinkSection } from "./okta-link";
 import { TwoFactorSetup } from "@/components/two-factor-setup";
 import { ReplaceAuthenticator } from "@/components/replace-authenticator";
 import { isSelfHosted } from "@/lib/runtime-config";
@@ -297,6 +298,7 @@ export default function SecurityPage() {
               )}
             </div>
           </SettingsSection>
+          <OktaLinkSection />
           {mine && (
             <div className="mt-8">
               <SettingsSection
@@ -413,6 +415,7 @@ export default function SecurityPage() {
             </button>
           </form>
         </SettingsSection>
+        <OktaLinkSection />
 
         <SettingsSection
           id="two-step"

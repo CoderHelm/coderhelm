@@ -262,6 +262,16 @@ export const settingsData: Handler = ({ method, path, url }) => {
       your_session_has_2fa: true,
     };
   }
+  // Your own Okta link: a long issuer.
+  if (p === "/api/users/okta/link") {
+    return {
+      available: true,
+      issuer: "https://payments-reconciliation-engineering-platform.okta.com/oauth2/aus1a2b3c4d5e6f7g8h9i0",
+      linked: false,
+      linked_at: null,
+      from_okta: false,
+    };
+  }
   // Okta sign-in: a long issuer, client id, domains and callback, live and a tested draft.
   if (p === "/api/sign-in/okta") {
     const issuer = "https://payments-reconciliation-engineering-platform.okta.com/oauth2/aus1a2b3c4d5e6f7g8h9i0";

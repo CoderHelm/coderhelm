@@ -212,6 +212,17 @@ export interface OktaSettings {
   domains?: OktaDomainProof[];
 }
 
+/** A member's own Okta link (`GET /api/users/okta/link`). */
+export interface OktaLinkStatus {
+  /** This team (self-hosted: the organization) has Okta sign-in on. */
+  available: boolean;
+  issuer: string | null;
+  linked: boolean;
+  linked_at: string | null;
+  /** This session was signed in with Okta: linking needs another way in. */
+  from_okta: boolean;
+}
+
 /** Hosted: the TXT record that proves a team owns an email domain, and whether it was seen. */
 export interface OktaDomainProof {
   domain: string;
@@ -999,10 +1010,16 @@ export const api = {
   oktaTest: (body: { issuer: string; client_id: string; client_secret?: string; domains: string[] }) =>
     request<{ test_url: string; draft: OktaSetup }>("/api/sign-in/okta/test", { method: "POST", body: JSON.stringify(body) }),
   /** The tested draft becomes the live setup. */
-  oktaSave: (enabled: boolean) =>
-    request<OktaSettings>("/api/sign-in/okta/save", { method: "POST", body: JSON.stringify({ enabled }) }),
+  /** Owner only. Names the draft being saved, so a draft changed since it was shown is refused. */
+  oktaSave: (enabled: boolean, draft: { issuer: string; client_id: string; updated_at: string | null }) =>
+    request<OktaSettings>("/api/sign-in/okta/save", { method: "POST", body: JSON.stringify({ enabled, ...draft }) }),
   /** Hosted: reads each domain's TXT record and records the ones that show this team's value. */
   oktaVerifyDomains: () => request<OktaSettings>("/api/sign-in/okta/domains/verify", { method: "POST" }),
+  oktaReleaseDomain: (domain: string) =>
+    request<OktaSettings>(`/api/sign-in/okta/domains/${encodeURIComponent(domain)}`, { method: "DELETE" }),
+  oktaLinkStatus: () => request<OktaLinkStatus>("/api/users/okta/link"),
+  oktaLinkStart: () => request<{ url: string }>("/api/users/okta/link", { method: "POST" }),
+  oktaUnlink: () => request<{ linked: boolean }>("/api/users/okta/link", { method: "DELETE" }),
   oktaToggle: (enabled: boolean) =>
     request<OktaSettings>("/api/sign-in/okta", { method: "PUT", body: JSON.stringify({ enabled }) }),
   oktaRemove: () => request<OktaSettings>("/api/sign-in/okta", { method: "DELETE" }),
