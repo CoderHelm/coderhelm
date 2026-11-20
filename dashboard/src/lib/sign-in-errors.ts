@@ -75,7 +75,14 @@ export function signInProblem(search: string): SignInProblem | null {
       return {
         code,
         provider,
-        sentence: "Okta signed you in, but you aren't on the team that uses this Okta. Ask one of its admins to invite you with that email.",
+        sentence: "Okta signed you in, but you aren't a member of the team that uses this Okta. Okta works only for people already on the team: accept your invite with your password, Google, GitHub or Microsoft first.",
+        canRetry: false,
+      };
+    case "okta_team_only":
+      return {
+        code,
+        provider,
+        sentence: "You signed in with your team's Okta, which works for that team only, so it can't link another sign-in. Sign in with your password, Google, GitHub or Microsoft to do this.",
         canRetry: false,
       };
     case "server":

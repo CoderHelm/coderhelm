@@ -30,6 +30,7 @@ type Okta = {
   live: Record<string, unknown> | null;
   draft: Record<string, unknown> | null;
   self_hosted: boolean;
+  domains?: { domain: string; txt_name: string; txt_value: string; verified_at: string | null; other_team: boolean }[];
 };
 
 interface State {
@@ -40,6 +41,7 @@ interface State {
   tests: Record<string, unknown>[];
   saves: Record<string, unknown>[];
   toggles: Record<string, unknown>[];
+  verifies: number;
   /** Refuse the next POST /api/sign-in/okta/test with this error. */
   refuseTest?: string;
 }
@@ -77,6 +79,7 @@ async function mock(page: Page, over: Partial<State> = {}): Promise<State> {
     tests: [],
     saves: [],
     toggles: [],
+    verifies: 0,
     ...over,
   };
   const json = (route: Route, body: unknown, status = 200) =>
@@ -119,6 +122,14 @@ async function mock(page: Page, over: Partial<State> = {}): Promise<State> {
       const draft = setup({ issuer: b.issuer, client_id: b.client_id, domains: b.domains });
       state.okta = { ...state.okta, draft };
       return json(route, { test_url: "http://localhost:3111/auth/okta/test?ticket=t1", draft });
+    }
+    if (p === "/api/sign-in/okta/domains/verify") {
+      state.verifies += 1;
+      state.okta = {
+        ...state.okta,
+        domains: (state.okta.domains ?? []).map((d) => ({ ...d, verified_at: "2026-11-19T12:06:00Z" })),
+      };
+      return json(route, state.okta);
     }
     if (p === "/api/sign-in/okta/save") {
       state.saves.push(body());
@@ -203,7 +214,18 @@ const SENTENCES: [string, string, string, boolean][] = [
   ],
   ["no_verified_email", "okta", "Okta didn't share a verified email address for this account. Ask your IT team, or sign in another way.", false],
   ["okta_not_found", "okta", "There's no Okta sign-in for that email here. Check the address, or sign in another way. An admin turns Okta on in Settings, Sign-in rules.", false],
-  ["not_on_team", "okta", "Okta signed you in, but you aren't on the team that uses this Okta. Ask one of its admins to invite you with that email.", false],
+  [
+    "not_on_team",
+    "okta",
+    "Okta signed you in, but you aren't a member of the team that uses this Okta. Okta works only for people already on the team: accept your invite with your password, Google, GitHub or Microsoft first.",
+    false,
+  ],
+  [
+    "okta_team_only",
+    "github",
+    "You signed in with your team's Okta, which works for that team only, so it can't link another sign-in. Sign in with your password, Google, GitHub or Microsoft to do this.",
+    false,
+  ],
   ["not_set_up", "microsoft", "Microsoft sign-in isn't set up on this Coderhelm. Sign in with your email and password.", false],
   ["cancelled", "microsoft", "Sign-in with Microsoft was cancelled before it finished.", true],
   ["provider", "okta", "Okta didn't confirm your sign-in.", true],
@@ -275,13 +297,25 @@ test.describe("Settings, Sign-in rules: Okta", () => {
         { issuer: "acme.okta.com", client_id: "0oa1example", client_secret: "s3cret-value", domains: ["example.org", "example.net"] },
       ]);
 
-      // Okta sends the admin back here with the outcome.
-      state.okta = { ...state.okta, draft: setup({ tested_at: "2026-11-19T12:05:00Z", tested_email: "owner@example.org" }) };
+      // Okta sends the admin back here with the outcome, and each domain shows its TXT record.
+      state.okta = {
+        ...state.okta,
+        draft: setup({ tested_at: "2026-11-19T12:05:00Z", tested_email: "owner@example.org" }),
+        domains: [{ domain: "example.org", txt_name: "_coderhelm-okta.example.org", txt_value: "coderhelm-okta=0123456789abcdef0123456789abcdef", verified_at: null, other_team: false }],
+      };
       await page.goto("/settings/sign-in?okta_test=passed#okta");
+      const domain = section.getByTestId("okta-domain");
+      await expect(domain).toContainText("Not verified");
+      await expect(domain).toContainText("_coderhelm-okta.example.org");
+      await expect(domain).toContainText("coderhelm-okta=0123456789abcdef0123456789abcdef");
+      await section.getByRole("button", { name: "Verify domains" }).click();
+      await expect.poll(() => state.verifies).toBe(1);
+      await expect(domain).toContainText("Verified");
+      await expect(domain).not.toContainText("_coderhelm-okta.example.org");
       await expect(section.getByTestId("okta-test-passed")).toHaveText("Test sign-in passed as owner@example.org. Save to turn Okta sign-in on.");
       // The secret is never shown again; an empty box keeps it.
       await expect(section.getByLabel("Client secret")).toHaveValue("");
-      await expect(section.getByText("Saved, and never shown again. Leave empty to keep it.")).toBeVisible();
+      await expect(section.getByText("Saved, and never shown again. Leave empty to keep it while the Okta domain and Client ID stay the same.")).toBeVisible();
       await section.getByRole("button", { name: "Save and turn on" }).click();
       await expect.poll(() => state.saves).toEqual([{ enabled: true }]);
       await expect(section.getByTestId("okta-live")).toContainText("On: https://acme.okta.com for example.org");

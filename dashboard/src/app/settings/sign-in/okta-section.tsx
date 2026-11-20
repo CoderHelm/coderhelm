@@ -35,6 +35,8 @@ export function oktaTestFailure(reason: string | null): string {
       return "Okta didn't share a verified email address. Give the app the email scope, and check the person's email is verified in Okta.";
     case "domain":
       return "The test signed in someone whose email domain isn't in the list. Add the domain, or test with an account at one of them.";
+    case "not_yours":
+      return "That test link belongs to another admin's session. Run Test sign-in again from this page.";
     case "no_draft":
     case "changed":
       return "These settings changed during the test. Run Test sign-in again.";
@@ -182,6 +184,20 @@ export function OktaSection({ selfHosted }: { selfHosted: boolean }) {
     }
   };
 
+  const verify = async () => {
+    setBusy(true);
+    try {
+      const d = await api.oktaVerifyDomains();
+      setData(d);
+      const left = (d.domains ?? []).filter((x) => !x.verified_at).map((x) => x.domain);
+      toast(left.length ? `Not verified yet: ${left.join(", ")}. DNS can take a while to publish.` : "Every domain is verified", left.length ? "error" : undefined);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Couldn't check the domains. Try again.", "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const discard = async () => {
     setBusy(true);
     try {
@@ -198,7 +214,7 @@ export function OktaSection({ selfHosted }: { selfHosted: boolean }) {
 
   const description = selfHosted
     ? "Let people sign in with your Okta. They still need an invite or an allowed email domain, and two-factor sign-in still applies."
-    : "Let people on this team sign in with your Okta. It signs in only people already on this team or invited to it, and two-factor sign-in still applies.";
+    : "Let people on this team sign in with your Okta. It signs in only people who are already members of this team, at email domains you prove in DNS, and two-factor sign-in still applies.";
 
   return (
     <SettingsSection id="okta" title="Okta sign-in" description={description}>
@@ -248,6 +264,45 @@ export function OktaSection({ selfHosted }: { selfHosted: boolean }) {
               </div>
             </div>
 
+            {!selfHosted && (data.domains ?? []).length > 0 && (
+              <div className="space-y-2" data-testid="okta-domains">
+                <p className="text-sm font-medium text-zinc-200">Prove each email domain</p>
+                <p className="text-sm text-zinc-400">
+                  Add each TXT record in your domain&apos;s DNS, then choose Verify domains. Okta sign-in turns on only when every domain is verified.
+                </p>
+                <ul className="space-y-2">
+                  {(data.domains ?? []).map((d) => (
+                    <li key={d.domain} className="min-w-0 rounded-md border border-zinc-800 px-3 py-2 text-sm" data-testid="okta-domain">
+                      <p className="flex min-w-0 items-center gap-2">
+                        <StatusDot tone={d.verified_at ? "success" : d.other_team ? "attention" : "muted"} />
+                        <span className="text-zinc-100 [overflow-wrap:anywhere]">{d.domain}</span>
+                        <span className="text-zinc-400">
+                          {d.verified_at ? `Verified ${when(d.verified_at)}` : d.other_team ? "Verified by another team" : "Not verified"}
+                        </span>
+                      </p>
+                      {!d.verified_at && !d.other_team && (
+                        <dl className="mt-2 grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1">
+                          <dt className="text-zinc-400">Name</dt>
+                          <dd className="flex min-w-0 flex-wrap items-center gap-2">
+                            <Code>{d.txt_name}</Code>
+                            <CopyButton text={d.txt_name} label="Copy" />
+                          </dd>
+                          <dt className="text-zinc-400">Value</dt>
+                          <dd className="flex min-w-0 flex-wrap items-center gap-2">
+                            <Code>{d.txt_value}</Code>
+                            <CopyButton text={d.txt_value} label="Copy" />
+                          </dd>
+                        </dl>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+                <button type="button" onClick={verify} disabled={busy} className={`${buttonClass("secondary")} ${fullWidthOnPhone}`}>
+                  Verify domains
+                </button>
+              </div>
+            )}
+
             {result?.passed && draft?.tested_at && (
               <div role="status" className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300" data-testid="okta-test-passed">
                 <p className="[overflow-wrap:anywhere]">
@@ -286,7 +341,7 @@ export function OktaSection({ selfHosted }: { selfHosted: boolean }) {
                 id="okta-client-secret"
                 label="Client secret"
                 type="password"
-                help={hasSecret ? "Saved, and never shown again. Leave empty to keep it." : "Kept encrypted. Never shown again."}
+                help={hasSecret ? "Saved, and never shown again. Leave empty to keep it while the Okta domain and Client ID stay the same." : "Kept encrypted. Never shown again."}
                 value={secret}
                 onChange={(e) => setSecret(e.target.value)}
                 autoComplete="new-password"

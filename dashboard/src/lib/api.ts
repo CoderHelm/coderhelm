@@ -208,6 +208,18 @@ export interface OktaSettings {
   live: OktaSetup | null;
   draft: OktaSetup | null;
   self_hosted: boolean;
+  /** Hosted: each email domain's DNS TXT proof. */
+  domains?: OktaDomainProof[];
+}
+
+/** Hosted: the TXT record that proves a team owns an email domain, and whether it was seen. */
+export interface OktaDomainProof {
+  domain: string;
+  txt_name: string;
+  txt_value: string;
+  verified_at: string | null;
+  /** Another team already proved this domain. */
+  other_team: boolean;
 }
 
 /** The sign-in methods that work on this deployment (`GET /auth/methods`, public). */
@@ -989,6 +1001,8 @@ export const api = {
   /** The tested draft becomes the live setup. */
   oktaSave: (enabled: boolean) =>
     request<OktaSettings>("/api/sign-in/okta/save", { method: "POST", body: JSON.stringify({ enabled }) }),
+  /** Hosted: reads each domain's TXT record and records the ones that show this team's value. */
+  oktaVerifyDomains: () => request<OktaSettings>("/api/sign-in/okta/domains/verify", { method: "POST" }),
   oktaToggle: (enabled: boolean) =>
     request<OktaSettings>("/api/sign-in/okta", { method: "PUT", body: JSON.stringify({ enabled }) }),
   oktaRemove: () => request<OktaSettings>("/api/sign-in/okta", { method: "DELETE" }),
