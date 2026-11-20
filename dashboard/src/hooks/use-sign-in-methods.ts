@@ -10,14 +10,16 @@ import { isSelfHosted } from "@/lib/runtime-config";
 // self-hosted install has GitHub with an OAuth client of its own, or, on
 // Coderhelm's GitHub App (hybrid), once it is registered with Coderhelm: the
 // same /auth/github then goes through Coderhelm's app and the install still
-// decides who signs in.
+// decides who signs in. Microsoft shows with the deployment's own Entra app
+// registration, Okta once a team (hosted) or the organization (self-hosted)
+// has turned on an Okta sign-in that passed its test.
 //
 // Until the API answers, and when it can't (an older gateway), the hosted
 // service keeps Google and GitHub and a self-hosted install shows email and
-// password only.
+// password only; neither shows Microsoft or Okta until the API says so.
 
 export function fallbackSignInMethods(selfHosted: boolean): SignInMethods {
-  return { password: true, google: !selfHosted, github: !selfHosted };
+  return { password: true, google: !selfHosted, github: !selfHosted, microsoft: false, okta: false };
 }
 
 export function useSignInMethods(): SignInMethods {
@@ -32,6 +34,8 @@ export function useSignInMethods(): SignInMethods {
           password: m.password !== false,
           google: m.google === true,
           github: m.github === true,
+          microsoft: m.microsoft === true,
+          okta: m.okta === true,
           ...(m.senders ? { senders: m.senders } : {}),
         });
       })

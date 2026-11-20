@@ -14,6 +14,7 @@ import { Field, SettingsSection, Switch } from "@/components/settings";
 import { api, errorStatus, type SignInSettings } from "@/lib/api";
 import { isSelfHosted } from "@/lib/runtime-config";
 import { buttonClass, fullWidthOnPhone, linkButton, smallSecondaryButton } from "@/components/ui";
+import { OktaSection } from "./okta-section";
 
 export default function SignInSettingsGuarded() {
   return (
@@ -53,8 +54,8 @@ function SignInSettingsPage() {
         title="Sign-in rules"
         lead={
           selfHosted
-            ? "This install is for one organization. Admins add people, and you choose whether everyone must use two-factor sign-in."
-            : "Choose whether everyone on this team must use two-factor sign-in, and see who has it set up."
+            ? "This install is for one organization. Admins add people, choose whether everyone must use two-factor sign-in, and can turn on Okta sign-in."
+            : "Choose whether everyone on this team must use two-factor sign-in, see who has it set up, and turn on Okta sign-in."
         }
       />
     </div>
@@ -129,7 +130,7 @@ function SignInSettingsPage() {
     } else {
       const ok = await confirm({
         title: "Stop requiring two-factor sign-in?",
-        message: "People who set it up keep it. Others can sign in with only a password, Google or GitHub.",
+        message: "People who set it up keep it. Others can sign in with only a password, Google, GitHub, Microsoft or Okta.",
         confirmLabel: "Stop requiring it",
         destructive: true,
       });
@@ -206,7 +207,7 @@ function SignInSettingsPage() {
         <SettingsSection
           id="two-factor"
           title="Two-factor sign-in"
-          description="Everyone signs in with a code from an authenticator app too: after their password, and after Google or GitHub."
+          description="Everyone signs in with a code from an authenticator app too: after their password, and after Google, GitHub, Microsoft or Okta."
         >
           <div className="space-y-3 px-4 py-4">
             <div className="flex min-w-0 items-start justify-between gap-4">
@@ -248,6 +249,8 @@ function SignInSettingsPage() {
             )}
           </div>
         </SettingsSection>
+
+        {data.is_org !== false && <OktaSection selfHosted={selfHosted} />}
 
         <SettingsSection
           id="who-has-it"

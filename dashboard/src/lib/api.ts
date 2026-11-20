@@ -186,11 +186,62 @@ export interface SignInSettings {
   your_session_has_2fa?: boolean;
 }
 
+/** A team's (self-hosted: the organization's) Okta sign-in, live or draft. Never its secret. */
+export interface OktaSetup {
+  issuer: string;
+  client_id: string;
+  has_secret: boolean;
+  domains: string[];
+  enabled: boolean;
+  /** When a Test sign-in of exactly these values passed, and as whom. */
+  tested_at: string | null;
+  tested_email: string | null;
+  updated_at: string | null;
+  updated_by: string | null;
+}
+
+/** `GET /api/sign-in/okta`: the setup, its unsaved draft, and the address to copy into Okta. */
+export interface OktaSettings {
+  callback_url: string;
+  sign_in_redirect_uri: string;
+  sign_out_redirect_uri: string;
+  live: OktaSetup | null;
+  draft: OktaSetup | null;
+  self_hosted: boolean;
+  /** Hosted: each email domain's DNS TXT proof. */
+  domains?: OktaDomainProof[];
+}
+
+/** A member's own Okta link (`GET /api/users/okta/link`). */
+export interface OktaLinkStatus {
+  /** This team (self-hosted: the organization) has Okta sign-in on. */
+  available: boolean;
+  issuer: string | null;
+  linked: boolean;
+  linked_at: string | null;
+  /** This session was signed in with Okta: linking needs another way in. */
+  from_okta: boolean;
+}
+
+/** Hosted: the TXT record that proves a team owns an email domain, and whether it was seen. */
+export interface OktaDomainProof {
+  domain: string;
+  txt_name: string;
+  txt_value: string;
+  verified_at: string | null;
+  /** Another team already proved this domain. */
+  other_team: boolean;
+}
+
 /** The sign-in methods that work on this deployment (`GET /auth/methods`, public). */
 export interface SignInMethods {
   password: boolean;
   google: boolean;
   github: boolean;
+  /** Sign in with Microsoft: the deployment has its own Entra app registration. */
+  microsoft?: boolean;
+  /** Sign in with Okta: a team (hosted) or the organization (self-hosted) turned it on. */
+  okta?: boolean;
   /**
    * Self-hosted: where the sign-in page's emails come from, so a person can ask IT to allow
    * them. `setup` is the install's own sender (the set-up email), `reset_codes` Amazon
@@ -954,6 +1005,25 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(body),
     }),
+  oktaSettings: () => request<OktaSettings>("/api/sign-in/okta"),
+  /** Saves the values as a draft and answers the Test sign-in link (nothing changes for anyone signing in). */
+  oktaTest: (body: { issuer: string; client_id: string; client_secret?: string; domains: string[] }) =>
+    request<{ test_url: string; draft: OktaSetup }>("/api/sign-in/okta/test", { method: "POST", body: JSON.stringify(body) }),
+  /** The tested draft becomes the live setup. */
+  /** Owner only. Names the draft being saved, so a draft changed since it was shown is refused. */
+  oktaSave: (enabled: boolean, draft: { issuer: string; client_id: string; updated_at: string | null }) =>
+    request<OktaSettings>("/api/sign-in/okta/save", { method: "POST", body: JSON.stringify({ enabled, ...draft }) }),
+  /** Hosted: reads each domain's TXT record and records the ones that show this team's value. */
+  oktaVerifyDomains: () => request<OktaSettings>("/api/sign-in/okta/domains/verify", { method: "POST" }),
+  oktaReleaseDomain: (domain: string) =>
+    request<OktaSettings>(`/api/sign-in/okta/domains/${encodeURIComponent(domain)}`, { method: "DELETE" }),
+  oktaLinkStatus: () => request<OktaLinkStatus>("/api/users/okta/link"),
+  oktaLinkStart: () => request<{ url: string }>("/api/users/okta/link", { method: "POST" }),
+  oktaUnlink: () => request<{ linked: boolean }>("/api/users/okta/link", { method: "DELETE" }),
+  oktaToggle: (enabled: boolean) =>
+    request<OktaSettings>("/api/sign-in/okta", { method: "PUT", body: JSON.stringify({ enabled }) }),
+  oktaRemove: () => request<OktaSettings>("/api/sign-in/okta", { method: "DELETE" }),
+  oktaDiscardDraft: () => request<OktaSettings>("/api/sign-in/okta/draft", { method: "DELETE" }),
   resetTwoFactor: (userId: string, verifiedHow: string) =>
     request<{ status: string }>(`/api/users/${encodeURIComponent(userId)}/2fa/reset`, {
       method: "POST",

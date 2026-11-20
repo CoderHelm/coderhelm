@@ -238,7 +238,7 @@ export const settingsData: Handler = ({ method, path, url }) => {
       headers: { "webhook-id": "evt_01JBEVNT8M1N4P7Q0R3S6T9V2WWIDEWIDEWIDE", "webhook-signature": "[redacted]", "user-agent": LONG_URL },
     }] };
   }
-  if (p === "/auth/methods") return { password: true, google: false, github: true, senders: { setup: `coderhelm.${EMAIL}`, reset_codes: "no-reply@verificationemail.com" } };
+  if (p === "/auth/methods") return { password: true, google: false, github: true, microsoft: true, okta: true, senders: { setup: `coderhelm.${EMAIL}`, reset_codes: "no-reply@verificationemail.com" } };
   if (p === "/api/users") return { users: USERS };
   // Your own two-factor sign-in (both deployments): kept on by a team's rule.
   if (p === "/api/users/2fa") {
@@ -260,6 +260,49 @@ export const settingsData: Handler = ({ method, path, url }) => {
       ],
       api_keys: [{ id: "k1", name: "Nightly-release-notes-and-deploy-pipeline-k1", created_by: EMAIL }],
       your_session_has_2fa: true,
+    };
+  }
+  // Your own Okta link: a long issuer.
+  if (p === "/api/users/okta/link") {
+    return {
+      available: true,
+      issuer: "https://payments-reconciliation-engineering-platform.okta.com/oauth2/aus1a2b3c4d5e6f7g8h9i0",
+      linked: false,
+      linked_at: null,
+      from_okta: false,
+    };
+  }
+  // Okta sign-in: a long issuer, client id, domains and callback, live and a tested draft.
+  if (p === "/api/sign-in/okta") {
+    const issuer = "https://payments-reconciliation-engineering-platform.okta.com/oauth2/aus1a2b3c4d5e6f7g8h9i0";
+    const setup = (over: Record<string, unknown> = {}) => ({
+      issuer,
+      client_id: "0oa1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9",
+      has_secret: true,
+      domains: ["payments-reconciliation.engineering-platform.example.com", "example.com"],
+      enabled: true,
+      tested_at: iso(30),
+      tested_email: EMAIL,
+      updated_at: iso(30),
+      updated_by: EMAIL,
+      ...over,
+    });
+    const callback = "https://coderhelm-api.payments-reconciliation.engineering-platform.example.com/auth/okta/callback";
+    const proof = (domain: string, verified: boolean) => ({
+      domain,
+      txt_name: `_coderhelm-okta.${domain}`,
+      txt_value: "coderhelm-okta=4f1c2a9e8b7d6c5f4e3d2c1b0a9f8e7d",
+      verified_at: verified ? iso(20) : null,
+      other_team: false,
+    });
+    return {
+      callback_url: callback,
+      sign_in_redirect_uri: callback,
+      sign_out_redirect_uri: LONG_URL,
+      live: setup(),
+      draft: setup({ enabled: false }),
+      self_hosted: false,
+      domains: [proof("payments-reconciliation.engineering-platform.example.com", false), proof("example.com", true)],
     };
   }
   // API keys: a long name, a long maker, and every scope.
