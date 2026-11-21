@@ -5274,8 +5274,12 @@ export interface Learning {
   bandit: LearningBandit[];
 }
 
-/** `quiet`: the loop should have learned from this window's work and did not. */
-export type LearningLoopState = "ok" | "quiet" | "idle";
+/**
+ * `quiet`: the loop should have learned from this window's work and did not.
+ * `retrying`: it got its signal and Coderhelm is still learning from it by itself
+ * (GitHub held its requests for a while); nothing for a person to do.
+ */
+export type LearningLoopState = "ok" | "quiet" | "retrying" | "idle";
 
 /** One learning loop on the health check. */
 export interface LearningLoop {
@@ -5291,6 +5295,8 @@ export interface LearningLoop {
   /** What should have fed it over the window, when that is countable. */
   expected: number | null;
   detail: string;
+  /** What a person should check when the loop is quiet and the gateway knows why; absent otherwise. */
+  check?: string;
 }
 
 /** GET /api/learning/health: per learning loop, its last signal and its count over the window. */
@@ -5301,6 +5307,8 @@ export interface LearningHealth {
   state: "ok" | "red" | (string & {});
   /** Keys of the quiet loops. */
   quiet: string[];
+  /** Keys of the loops retrying by themselves (not red). */
+  retrying?: string[];
   loops: LearningLoop[];
 }
 
