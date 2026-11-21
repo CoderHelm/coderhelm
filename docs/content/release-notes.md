@@ -6,6 +6,10 @@ pull requests that shipped it. Leave out CI, pins and dependency bumps. The page
 groups releases by day: one heading per day, each release a subheading under it.
 -->
 
+## November 21, 2026: require Okta sign-in
+
+- **Require Okta sign-in.** In **Settings, Sign-in rules**, the owner can make the team's Okta (on a self-hosted install, the organization's) the only way in. It turns on only when Okta is on, every email domain is verified, and the owner's own session signed in with that Okta, so a broken setup can't lock the team out. While it is on, password, Google, GitHub and Microsoft sign-in, switching into the team and connecting apps from other sessions are refused with a message that names the team, and sessions that didn't start with Okta end at once; your other teams are not affected. The page lists who hasn't linked Okta yet and warns with that list. New members accept their invite with Okta when Okta's verified email matches the invite. If Okta breaks, the owner can still sign in with their password and two-factor code; each such sign-in is logged and listed on the page. API keys and CI tokens keep working. ([coderhelm-platform pull requests](https://github.com/CoderHelm/coderhelm-platform/pulls?q=is%3Apr+require+okta), [dashboard #465](https://github.com/CoderHelm/coderhelm/pull/465))
+
 ## November 19, 2026: sign in with Microsoft and Okta
 
 - **Sign in with Microsoft.** Work, school and personal Microsoft accounts can sign in, on CoderHelm's cloud and on self-hosted installs that add their own Entra app registration. CoderHelm checks Microsoft's signature, the account's own tenant, the nonce and the expiry, and takes the email only when Microsoft says its domain is verified. The button shows only where it is set up. ([#793](https://github.com/CoderHelm/coderhelm-platform/pull/793), [dashboard #463](https://github.com/CoderHelm/coderhelm/pull/463))

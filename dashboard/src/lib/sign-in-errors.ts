@@ -2,7 +2,7 @@
 // did not finish. The API's callback sends the person back here with
 // `?signin_error=<code>&provider=<google|github|microsoft|okta>` (services/gateway
 // oauth_signin.rs); the URL carries only that short code, and this turns it
-// into one plain sentence.
+// into one plain sentence. `okta_required` also carries `&team=<name>`.
 
 export type SignInProvider = "google" | "github" | "microsoft" | "okta";
 
@@ -13,6 +13,8 @@ export interface SignInProblem {
   sentence: string;
   /** Trying again in this browser can work. False when the browser itself is the problem. */
   canRetry: boolean;
+  /** `okta_required`: the team's name, when the server gave one. */
+  team?: string;
 }
 
 const NAMES: Record<SignInProvider, string> = { google: "Google", github: "GitHub", microsoft: "Microsoft", okta: "Okta" };
@@ -90,6 +92,24 @@ export function signInProblem(search: string): SignInProblem | null {
         code,
         provider,
         sentence: "You signed in with your team's Okta, which works for that team only, so it can't link another sign-in. Sign in with your password, Google, GitHub or Microsoft to do this.",
+        canRetry: false,
+      };
+    case "okta_required": {
+      // The team (self-hosted: the organization) takes only its own Okta.
+      const team = (params.get("team") || "").trim();
+      return {
+        code,
+        provider,
+        team,
+        sentence: `${team ? `${team} requires` : "Your team requires"} Okta sign-in. Sign in with Okta using your work email.`,
+        canRetry: false,
+      };
+    }
+    case "okta_ask_admin":
+      return {
+        code,
+        provider,
+        sentence: "Your team requires Okta sign-in and your account isn't linked to Okta yet. Ask an admin.",
         canRetry: false,
       };
     case "server":

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { RoleGuard } from "@/components/role-guard";
 import { Page, PageHeader } from "@/components/page";
 import { Problem } from "@/components/problem";
@@ -11,8 +11,8 @@ import { StatusDot } from "@/components/list";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Field, SettingsSection, Switch } from "@/components/settings";
-import { api, errorStatus, type SignInSettings } from "@/lib/api";
-import { isSelfHosted } from "@/lib/runtime-config";
+import { api, ApiError, errorStatus, type SignInSettings, type UnlinkedMember } from "@/lib/api";
+import { apiBase, isSelfHosted } from "@/lib/runtime-config";
 import { buttonClass, fullWidthOnPhone, linkButton, smallSecondaryButton } from "@/components/ui";
 import { OktaSection } from "./okta-section";
 
@@ -156,6 +156,70 @@ function SignInSettingsPage() {
 
   const canTurnOn = !!data.your_session_has_2fa;
 
+  const requireOkta = !!data.require_okta;
+  const unlinked = data.unlinked ?? [];
+  const checks = data.okta;
+  const canRequireOkta = !!data.can_require_okta;
+  const breakGlass = data.break_glass ?? [];
+  const selfEmail = people.find((p) => p.is_self)?.email ?? "";
+  const names = (list: UnlinkedMember[]) => list.map((m) => m.name || m.email || "A member").join(", ");
+
+  const sendRequireOkta = async (on: boolean, acknowledge: boolean) => {
+    const r = await api.updateSignInSettings(on ? { require_okta: true, acknowledge_unlinked: acknowledge } : { require_okta: false });
+    setData({ ...data, require_okta: r.require_okta, require_okta_since: r.require_okta_since ?? null });
+    toast(on ? "Okta sign-in is required. Other sessions on this team ended." : "Okta sign-in is no longer required");
+  };
+
+  const setOktaRequired = async (on: boolean) => {
+    if (on) {
+      const ok = await confirm({
+        title: `Require Okta sign-in for ${everyone}?`,
+        message:
+          unlinked.length > 0
+            ? `${unlinked.length} ${unlinked.length === 1 ? "person hasn't" : "people haven't"} linked Okta yet and won't be able to sign in: ${names(unlinked)}. Every session on this team that didn't start with Okta ends now. API keys and CI tokens keep working.`
+            : "Every session on this team that didn't start with Okta ends now. Password, Google, GitHub and Microsoft sign-in stop working here. API keys and CI tokens keep working.",
+        confirmLabel: "Require Okta",
+        destructive: unlinked.length > 0,
+      });
+      if (!ok) return;
+    } else {
+      const ok = await confirm({
+        title: "Stop requiring Okta sign-in?",
+        message: "People can sign in with their password, Google, GitHub or Microsoft again.",
+        confirmLabel: "Stop requiring it",
+        destructive: true,
+      });
+      if (!ok) return;
+    }
+    setSaving(true);
+    try {
+      await sendRequireOkta(on, unlinked.length > 0);
+    } catch (e) {
+      // Someone else's link changed since this page loaded: confirm with the new list.
+      if (on && e instanceof ApiError && e.code === "unlinked_members") {
+        const list = Array.isArray(e.body?.unlinked) ? (e.body.unlinked as UnlinkedMember[]) : [];
+        const again = await confirm({
+          title: "Some people haven't linked Okta",
+          message: `${names(list)} can't sign in while Okta sign-in is required. Require it anyway?`,
+          confirmLabel: "Require Okta",
+          destructive: true,
+        });
+        if (again) {
+          try {
+            await sendRequireOkta(true, true);
+          } catch (e2) {
+            toast(e2 instanceof Error ? e2.message : "Couldn't save. Try again.", "error");
+          }
+        }
+      } else {
+        toast(e instanceof Error ? e.message : "Couldn't save. Try again.", "error");
+      }
+      load();
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <Page>
       {header}
@@ -250,6 +314,118 @@ function SignInSettingsPage() {
           </div>
         </SettingsSection>
 
+        {data.is_org !== false && (
+          <SettingsSection
+            id="require-okta"
+            title="Require Okta sign-in"
+            description={`While it's on, ${everyone} signs in only with ${selfHosted ? "the organization's" : "this team's"} Okta. Password, Google, GitHub and Microsoft sign-in stop working${selfHosted ? "" : " for this team"}, and sessions that started another way end at once.`}
+          >
+            <div className="space-y-4 px-4 py-4">
+              <div className="flex min-w-0 items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <p id="require-okta-label" className="text-sm font-medium text-zinc-100">
+                    {selfHosted ? "Require Okta sign-in" : "Require Okta sign-in for this team"}
+                  </p>
+                  <p id="require-okta-help" className="mt-0.5 text-sm text-zinc-400" data-testid="require-okta-state">
+                    {requireOkta
+                      ? `Required${data.require_okta_since ? ` since ${new Date(data.require_okta_since).toLocaleDateString()}` : ""}. Only the owner can turn it off.`
+                      : "Off: people sign in any way this Coderhelm offers."}
+                  </p>
+                </div>
+                <Switch
+                  checked={requireOkta}
+                  onChange={setOktaRequired}
+                  labelledBy="require-okta-label"
+                  describedBy="require-okta-help"
+                  disabled={saving || !checks?.is_owner || (!requireOkta && !canRequireOkta)}
+                  testId="require-okta"
+                />
+              </div>
+              {!requireOkta && checks && !canRequireOkta && (
+                <div className="space-y-1.5 text-sm" data-testid="require-okta-needs">
+                  <p className="text-zinc-300">To turn it on:</p>
+                  <ul className="space-y-1">
+                    <Need ok={checks.is_owner} testId="need-owner">
+                      Only the owner can turn it on or off.
+                    </Need>
+                    <Need ok={checks.set_up && checks.enabled} testId="need-okta-on">
+                      {checks.set_up ? "Turn Okta sign-in on below." : "Set up Okta sign-in below and turn it on."}
+                    </Need>
+                    {!selfHosted && (
+                      <Need ok={checks.domains_verified} testId="need-domains">
+                        Verify every email domain of the Okta setup in DNS.
+                      </Need>
+                    )}
+                    <Need ok={checks.session_is_okta} testId="need-okta-session">
+                      <span>
+                        Sign in with {selfHosted ? "the organization's" : "this team's"} Okta yourself first, so you know it works for you and nobody is locked out.
+                      </span>
+                      {!checks.session_is_okta && checks.set_up && checks.enabled && selfEmail && (
+                        <form method="post" action={`${apiBase()}/auth/okta`} className="mt-1">
+                          <input type="hidden" name="email" value={selfEmail} />
+                          <button type="submit" className={linkButton} data-testid="sign-in-with-okta">
+                            Sign in with Okta
+                          </button>
+                        </form>
+                      )}
+                    </Need>
+                  </ul>
+                </div>
+              )}
+              {checks?.set_up && (
+                <div data-testid="okta-unlinked">
+                  <h3 className="text-sm font-medium text-zinc-200">Not linked to Okta yet</h3>
+                  {unlinked.length === 0 ? (
+                    <p className="mt-1 text-sm text-zinc-400">Everyone on the team has linked Okta.</p>
+                  ) : (
+                    <>
+                      <p className="mt-1 text-sm text-zinc-400">
+                        {requireOkta
+                          ? "They can't sign in until they're linked. Ask them to tell an admin; an admin can remove them and invite them again, and they accept the invite with Okta."
+                          : "They link Okta in Settings, Security. Once Okta sign-in is required, they can't sign in until they're linked."}
+                      </p>
+                      <ul className="mt-2 space-y-1 text-sm text-zinc-200" data-testid="unlinked-list">
+                        {unlinked.map((m) => (
+                          <li key={m.user_id} className="flex min-w-0 items-center gap-2">
+                            <StatusDot tone={requireOkta ? "attention" : "muted"} />
+                            <span className="[overflow-wrap:anywhere]">
+                              {m.name || m.email}
+                              {m.name && m.email && <span className="text-zinc-400"> {m.email}</span>}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
+                </div>
+              )}
+              {(requireOkta || breakGlass.length > 0) && (
+                <div data-testid="break-glass-log">
+                  <h3 className="text-sm font-medium text-zinc-200">Owner sign-ins without Okta</h3>
+                  <p className="mt-1 text-sm text-zinc-400">
+                    If Okta stops working, the owner can still sign in with their password and two-factor code. Nobody else can. Each of those sign-ins is listed here and in the log.
+                  </p>
+                  {breakGlass.length === 0 ? (
+                    <p className="mt-2 text-sm text-zinc-400">None.</p>
+                  ) : (
+                    <ul className="mt-2 space-y-1 text-sm text-zinc-200" data-testid="break-glass-list">
+                      {breakGlass.map((b) => (
+                        <li key={`${b.at}-${b.email}`} className="[overflow-wrap:anywhere]">
+                          {b.who || b.email}
+                          <span className="text-zinc-400">, {new Date(b.at).toLocaleString()}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+              <p className="text-sm text-zinc-400" data-testid="require-okta-keys">
+                API keys and CI tokens aren&apos;t sessions: they never sign in, so they keep working while Okta sign-in is required.
+              </p>
+            </div>
+          </SettingsSection>
+        )}
+
         {data.is_org !== false && <OktaSection selfHosted={selfHosted} />}
 
         <SettingsSection
@@ -331,6 +507,21 @@ function SignInSettingsPage() {
         />
       )}
     </Page>
+  );
+}
+
+/** One thing turning Require Okta sign-in on needs, and whether it holds now. */
+function Need({ ok, testId, children }: { ok: boolean; testId: string; children: ReactNode }) {
+  return (
+    <li className="flex min-w-0 items-start gap-2" data-testid={testId} data-ok={ok ? "yes" : "no"}>
+      <span className="mt-1.5">
+        <StatusDot tone={ok ? "success" : "attention"} />
+      </span>
+      <span className={`min-w-0 ${ok ? "text-zinc-400" : "text-zinc-200"}`}>
+        <span className="sr-only">{ok ? "Done: " : "Needed: "}</span>
+        {children}
+      </span>
+    </li>
   );
 }
 
