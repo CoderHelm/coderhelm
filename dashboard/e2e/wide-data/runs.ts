@@ -3,6 +3,11 @@ import { PLAN_ID, RUN_ID } from "./ids";
 import {
   ARN, BRANCH, EMAIL, FILE, FILE_2, LOG_GROUP, LONG_URL, MARKDOWN, ORG, PR_URL, REPO, REPO_2, SENTENCE, SHA, TICKET, TITLE, TOKEN, iso,
 } from "./long";
+import fs from "node:fs";
+import nodePath from "node:path";
+
+/** The App map's made-up harbor map (written by the platform's Floorplan driver test). */
+const APP_MAP = JSON.parse(fs.readFileSync(nodePath.join(__dirname, "..", "app-map-harbor.json"), "utf8"));
 
 // Runs, plans, templates, releases, analytics, the code graph,
 // infrastructure, memory, system health and the platform admin's pages.
@@ -486,6 +491,10 @@ export const runsData: Handler = ({ method, path, url }) => {
     const stats = (n: number) => ({ total_runs: n, completed: n, failed: n, in_progress: n, total_cost_usd: n * 1000, total_tokens_in: n * 1e6, total_tokens_out: n * 1e6, merge_rate: 0.5, estimated_calls: n, recovered_calls: n });
     return { month: stats(1234567), all_time: stats(98765432) };
   }
+
+  // App map: the made-up harbor map, with a long step name.
+  if (path === "/api/app-map") return { status: { state: "ready", updating: true, step: "Describing files and endpoints in every repository the team turned on", note: "", floorplan: "floorplan--v0.11.0" }, graph: APP_MAP };
+  if (path === "/api/app-map/ask") return { answer: "1. The slip page sends the booking.", grounded: true, steps: ["The slip page sends the booking."], graph: null };
 
   // Code graph
   if (path === "/api/graph/repos") return { repos: GRAPH_REPOS };
