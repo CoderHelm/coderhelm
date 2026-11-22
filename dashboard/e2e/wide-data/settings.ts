@@ -260,7 +260,44 @@ export const settingsData: Handler = ({ method, path, url }) => {
       ],
       api_keys: [{ id: "k1", name: "Nightly-release-notes-and-deploy-pipeline-k1", created_by: EMAIL }],
       your_session_has_2fa: true,
+      team_id: "TEAM#01jbcdefghijklmnopqrstuvwx",
+      require_sso: "microsoft",
+      require_sso_since: iso(60 * 24),
+      sso_options: [
+        {
+          provider: "okta", name: "Okta", set_up: true, enabled: true, domains_verified: true, session_from_provider: false, is_owner: true, ready: false,
+          unlinked: [], recovery: "If Okta is down or misconfigured, nobody can sign in until it's fixed. There is no way around it inside Coderhelm: to turn the rule off, someone with this install's AWS credentials runs scripts/sso-recovery.py from the Coderhelm platform repository, which writes the audit log and emails every owner.",
+        },
+        {
+          provider: "microsoft", name: "Microsoft Entra", set_up: true, enabled: true, domains_verified: true, session_from_provider: true, is_owner: true, ready: true,
+          unlinked: [{ user_id: "u3", email: EMAIL, name: "Alexandria Montgomery-Fitzwilliam the Third", role: "member" }],
+          recovery: "If Microsoft Entra is down or misconfigured, nobody can sign in until it's fixed. There is no way around it inside Coderhelm: to turn the rule off, someone with this install's AWS credentials runs scripts/sso-recovery.py from the Coderhelm platform repository, which writes the audit log and emails every owner.",
+        },
+      ],
+      claim_links: [{ user_id: "u3", email: EMAIL, role: "member", provider: "microsoft", expires_at: iso(-60 * 24 * 3), used: false, used_at: null, issued_by: EMAIL, issued_at: iso(10) }],
     };
+  }
+  // The organization's own Microsoft Entra tenant: a long redirect and domains.
+  if (p === "/api/sign-in/microsoft") {
+    return {
+      available: true,
+      redirect_uri: "https://coderhelm-api.payments-reconciliation.engineering-platform.example.com/auth/microsoft/callback",
+      setup: {
+        tenant_id: "11111111-2222-3333-4444-555555555555",
+        domains: ["payments-reconciliation.engineering-platform.example.com", "example.com"],
+        enabled: true,
+        tested_at: iso(30),
+        tested_email: EMAIL,
+        updated_at: iso(40),
+        updated_by: EMAIL,
+      },
+      self_hosted: true,
+      domains: [],
+    };
+  }
+  // Your own link to the tenant.
+  if (p === "/api/users/microsoft/link") {
+    return { available: true, tenant_id: "11111111-2222-3333-4444-555555555555", linked: false, linked_at: null };
   }
   // Your own Okta link: a long issuer.
   if (p === "/api/users/okta/link") {

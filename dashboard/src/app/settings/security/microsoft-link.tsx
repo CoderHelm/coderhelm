@@ -102,7 +102,7 @@ export function MicrosoftLinkSection() {
           <StatusDot tone={status.linked ? "success" : "muted"} />
           <span className="text-zinc-200">{status.linked ? "Linked to your team's tenant" : "Not linked to your team's tenant"}</span>
         </p>
-        {result?.linked && <p role="status" className="text-sm text-emerald-300">Microsoft is linked. You can sign in through your team's tenant now.</p>}
+        {result?.linked && <p role="status" className="text-sm text-emerald-300">Microsoft is linked. You can sign in through your team&apos;s tenant now.</p>}
         {result && !result.linked && (
           <p role="alert" className="text-sm text-red-300" data-testid="microsoft-link-failed">
             {microsoftLinkFailure(result.reason)}
