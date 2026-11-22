@@ -1,9 +1,9 @@
 ---
 title: Plans
-description: Describe a bigger change in your own words; CoderHelm reads your code and drafts a plan of tickets you can edit before anything runs.
+description: Describe a bigger change in your own words; CoderHelm drafts a plan of tasks, and each task's state follows its runs and pull requests until it merges.
 ---
 
-A **plan** turns a change too big for one ticket into an ordered list of tasks. Each task becomes a GitHub issue or a Jira ticket, and each one becomes a run.
+A **plan** turns a change too big for one ticket into an ordered list of tasks. Each task you approve becomes a GitHub issue or a Jira ticket, and that ticket's runs and pull requests are the task's work. A plan is done when every task has merged or been dropped, never when its tickets are filed.
 
 ## Make a plan
 
@@ -15,11 +15,64 @@ A **plan** turns a change too big for one ticket into an ordered list of tasks. 
 
 You can also start from a **template**: save a plan you like as a template, then reuse it from **Templates**.
 
-## Approve and run
+## Approve and start
 
-Open the plan. It has an overview, the tasks, the runs and pull requests made from it, a spec, and a list of what the chat looked at.
+A draft plan shows what starting it takes before anything runs: the number of runs and a cost range, read from your team's recent runs.
 
-- **Approve all and start** creates every ticket and starts the runs in order.
-- Or approve tasks one by one. Approving the last one starts the plan.
+- **Approve and start** approves every draft task and starts them, in order. A task that runs after another starts when that task's pull request merges.
+- Or approve tasks one at a time from their rows. Each one starts right away, and the plan stays open for the rest: the drafts left keep their **Approve** and **Drop** buttons, and the plan lists them under **Needs you** until you approve or drop them.
 
-Nothing is created in GitHub or Jira, and no code changes, until you approve.
+Every way of starting work checks your team's run budget first. Nothing is created in GitHub or Jira, and no code changes, until you approve.
+
+## What the plan page shows
+
+In order:
+
+1. **The goal and one status line**: the plan's state, a count line such as "2 of 5 merged, 1 needs you, 1 in review", what its runs have cost, and the one thing to do next.
+2. **Needs you**, only when something does. Each row is the exact ask with its button: answer the run's question, review or approve pull request #53, look at checks CoderHelm could not fix, retry or drop a task that failed (with its reason), approve the drafts that are left. A row goes away once it is handled.
+3. **What done means**: the plan's success criteria, each with the tasks that cover it and what the work shows for it, read from the criteria trace of the task's run (proven, no test, fails, not run yet). Without a list of its own, a plan's criteria are its tasks' "Done when" lines.
+4. **Tasks**: each with its state, its pull requests as chips, its attempts and what they cost. Finished tasks are faded. A plan with more than eight tasks is grouped by state, with what needs you first and merged work folded; the page remembers which groups and task you had open.
+5. **Spec**: the plan's description and written spec, open while the plan is a draft and folded below the work once it runs.
+
+## Task states
+
+| State | What it means |
+| --- | --- |
+| Draft | Not approved yet. |
+| Queued | Approved and waiting: on the task it runs after, on its ticket being filed, or on its run to start. |
+| Working | Its run is working. |
+| Needs you | Its run asks a person for something: an answer, a review, an approval, a merge, or checks it could not fix. |
+| Failed | Its run failed with no pull request left open, was cancelled, or its pull request closed without merging. The reason is shown. |
+| In review | A pull request is open and the next step is CoderHelm's or the checks', not yours. |
+| Merged | A pull request of the task merged. |
+| Dropped | You dropped the task, or closed its run on purpose. |
+
+Filing the ticket is a fact on the task, not a state. Every attempt counts: a task that took several runs lists each one, with its cost.
+
+A plan is **Drafting** until a task is approved, then **Running**. It **Needs you** when a task does, when a task failed, or when drafts are left once the rest finished. It is **Done** when every task merged or was dropped, and **Stalled** when work is open and nothing has moved for 3 days.
+
+## Pull request chips
+
+Each pull request shows its number, coloured by where it stands, with its size once GitHub reports it:
+
+- **Green**: checks pass and nothing waits on a review: ready to merge.
+- **Yellow**: checks are running, or it waits on a review or an approval.
+- **Red**: checks fail, or a review asked for changes.
+- **Purple**: merged.
+- **Grey**: closed without merging.
+
+## Changes after approval
+
+A task added, changed or dropped after the plan was approved is marked, with who made the change: a person, or CoderHelm. A pull request that changes files outside the paths its task names, or whose run moved an out-of-scope item into scope, is marked **Out of scope**.
+
+## Retry and Start now
+
+**Retry** on a failed task asks first and says what a run costs. When the task's ticket was filed, its run is retried; when the ticket could not be filed, it is filed again. **Start now** runs a waiting task before the task it waits on has merged, also after a confirmation with the cost.
+
+## Steering a task while it works
+
+The plan page has no message box yet. To steer a task while it works, comment on its pull request, or answer on its run page when it asks you something. CoderHelm picks the comment up from the pull request.
+
+## Plans made before this
+
+Plans written before task states followed the work are read again the first time the plans list or the plan opens: each task is linked to its ticket's runs and pull requests, and its state is worked out from them. Nothing else about the plan changes.
