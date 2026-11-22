@@ -14,6 +14,7 @@ import { ExternalLinkIcon } from "@/components/icons";
 import { buttonClass, dangerButton, ghostButton, primaryButton } from "@/components/ui";
 import { Code, Field, SettingsSection } from "@/components/settings";
 import { OktaLinkSection } from "./okta-link";
+import { MicrosoftLinkSection } from "./microsoft-link";
 import { TwoFactorSetup } from "@/components/two-factor-setup";
 import { ReplaceAuthenticator } from "@/components/replace-authenticator";
 import { isSelfHosted } from "@/lib/runtime-config";
@@ -299,6 +300,7 @@ export default function SecurityPage() {
             </div>
           </SettingsSection>
           <OktaLinkSection />
+          <MicrosoftLinkSection />
           {mine && (
             <div className="mt-8">
               <SettingsSection
@@ -416,6 +418,7 @@ export default function SecurityPage() {
           </form>
         </SettingsSection>
         <OktaLinkSection />
+        <MicrosoftLinkSection />
 
         <SettingsSection
           id="two-step"
