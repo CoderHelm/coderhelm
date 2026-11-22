@@ -6,6 +6,12 @@ pull requests that shipped it. Leave out CI, pins and dependency bumps. The page
 groups releases by day: one heading per day, each release a subheading under it.
 -->
 
+## November 21, 2026: plans tell the truth about the work
+
+- **A task's state follows its runs and pull requests.** Filing a task's ticket no longer marks it done, and a plan is done only when every task merged or was dropped. Each task is Draft, Queued, Working, Needs you, Failed (with its reason), In review, Merged or Dropped, and lists every attempt with its cost. Runs started from a plan task now name their plan and task, and plans made before this are linked to their runs and read again the first time they open. ([platform #800](https://github.com/CoderHelm/coderhelm-platform/pull/800), [dashboard #467](https://github.com/CoderHelm/coderhelm/pull/467))
+- **Approving one task never ends the plan.** The plan runs with its approved tasks and stays open: the drafts left keep their buttons and are listed under Needs you. Approve and start shows the expected runs and cost range first, Retry and Start now ask with the cost, and every way of starting work checks the run budget. ([platform #800](https://github.com/CoderHelm/coderhelm-platform/pull/800), [dashboard #467](https://github.com/CoderHelm/coderhelm/pull/467))
+- **The plan page in the order you need it.** The goal and a count line come first, then a Needs you strip with each exact ask and its button, the success criteria with their evidence, and the tasks with their pull requests as chips coloured by checks and review, attempts, cost and marks for changes after approval. The spec folds below once the plan runs. The plans list shows each plan's progress by state, what needs you and its cost, and Active counts the plans that are really running. ([dashboard #467](https://github.com/CoderHelm/coderhelm/pull/467))
+
 ## November 19, 2026: sign in with Microsoft and Okta
 
 - **Sign in with Microsoft.** Work, school and personal Microsoft accounts can sign in, on CoderHelm's cloud and on self-hosted installs that add their own Entra app registration. CoderHelm checks Microsoft's signature, the account's own tenant, the nonce and the expiry, and takes the email only when Microsoft says its domain is verified. The button shows only where it is set up. ([#793](https://github.com/CoderHelm/coderhelm-platform/pull/793), [dashboard #463](https://github.com/CoderHelm/coderhelm/pull/463))

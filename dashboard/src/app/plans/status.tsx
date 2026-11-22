@@ -1,73 +1,174 @@
-import { TONES, type StatusLook } from "@/components/list/status";
+import { TONES, type StatusLook, type Tone } from "@/components/list/status";
+import type { Plan, PrChip as PrChipData, Task, TaskCounts, TaskState } from "@/lib/api";
+import { focusRing } from "@/components/ui";
 
-// Plain-word status pills for plans and their tasks. The API sends status
-// words like "rejected" or "waiting"; people see what they mean.
+// Where a plan and its tasks stand, in plain words and the shared list tones.
+// The states come from the API, derived from the runs and pull requests
+// (never from a ticket being filed): a plan is Done only when every task
+// merged or was dropped.
 
 const PILL = "inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium whitespace-nowrap";
 
-// Plans use the shared list tones (components/list/status), so "Running" is
-// the same colour here as on Runs.
 const PLAN: Record<string, StatusLook> = {
-  draft: { label: "Draft", tone: "neutral" },
-  executing: { label: "Running", tone: "live", live: true },
-  waiting: { label: "Waiting on a merge", tone: "waiting" },
+  drafting: { label: "Drafting", tone: "neutral" },
+  running: { label: "Running", tone: "live", live: true },
+  needs_you: { label: "Needs you", tone: "attention" },
   done: { label: "Done", tone: "success" },
+  stalled: { label: "Stalled", tone: "waiting" },
 };
 
-/** How a plan's status looks in a list; unknown statuses read as plain words. */
-export function planStatusLook(status: string): StatusLook {
-  return PLAN[status] ?? { label: words(status), tone: "neutral" };
+/** A plan's state; older answers without one read from the older word. */
+export function planState(plan: Pick<Plan, "state" | "status">): string {
+  if (plan.state) return plan.state;
+  if (plan.status === "draft") return "drafting";
+  // An older "done" was written when tickets were filed, not when work merged.
+  return "running";
 }
 
-export const TASK: Record<string, { label: string; style: string; dot: string; border: string }> = {
-  draft: { label: "Draft", style: "bg-zinc-800 text-zinc-400 border-zinc-700", dot: "bg-zinc-700", border: "border-l-zinc-700" },
-  approved: { label: "Approved", style: "bg-green-500/10 text-green-400 border-green-500/20", dot: "bg-green-500/60", border: "border-l-green-500/50" },
-  rejected: { label: "Skipped", style: "bg-zinc-800 text-zinc-500 border-zinc-700", dot: "bg-zinc-600", border: "border-l-zinc-600" },
-  queued: { label: "Queued", style: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20", dot: "bg-yellow-500/60", border: "border-l-yellow-500/50" },
-  running: { label: "Running", style: "bg-blue-500/10 text-blue-400 border-blue-500/20", dot: "bg-blue-500", border: "border-l-blue-500" },
-  waiting: { label: "Waiting", style: "bg-orange-500/10 text-orange-400 border-orange-500/20", dot: "bg-orange-500/60", border: "border-l-orange-500/50" },
-  failed: { label: "Failed", style: "bg-red-500/10 text-red-400 border-red-500/20", dot: "bg-red-500/70", border: "border-l-red-500/60" },
-  issue_created: { label: "Issue opened", style: "bg-blue-500/10 text-blue-300 border-blue-500/20", dot: "bg-blue-400/60", border: "border-l-blue-400/50" },
-  done: { label: "Done", style: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20", dot: "bg-emerald-500", border: "border-l-emerald-500" },
+/** How a plan's state looks in a list or a header. */
+export function planStatusLook(state: string): StatusLook {
+  return PLAN[state] ?? PLAN[planState({ status: state })] ?? { label: words(state), tone: "neutral" };
+}
+
+export function PlanStatusPill({ state }: { state: string }) {
+  const s = planStatusLook(state);
+  return <span className={`${PILL} ${TONES[s.tone].chip}`}>{s.label}</span>;
+}
+
+/** Task states in the order people act on them (the groups and filters). */
+export const TASK_ORDER: TaskState[] = ["needs_you", "failed", "in_review", "working", "queued", "draft", "merged", "dropped"];
+
+const TASK_LOOK: Record<TaskState, StatusLook> = {
+  draft: { label: "Draft", tone: "neutral" },
+  queued: { label: "Queued", tone: "queued", live: true },
+  working: { label: "Working", tone: "live", live: true },
+  needs_you: { label: "Needs you", tone: "attention" },
+  failed: { label: "Failed", tone: "danger" },
+  in_review: { label: "In review", tone: "waiting" },
+  merged: { label: "Merged", tone: "merged" },
+  dropped: { label: "Dropped", tone: "muted" },
 };
 
-/** Task statuses in the order the filter chips show them. */
-export const TASK_ORDER = ["draft", "approved", "rejected", "queued", "running", "waiting", "failed", "issue_created", "done"];
+/** A task's state; older answers without one read from the row's own word. */
+export function taskState(task: Pick<Task, "state" | "status">): TaskState {
+  if (task.state && task.state in TASK_LOOK) return task.state as TaskState;
+  switch (task.status) {
+    case "draft":
+      return "draft";
+    case "rejected":
+      return "dropped";
+    case "failed":
+      return "failed";
+    case "running":
+      return "working";
+    default:
+      return "queued";
+  }
+}
+
+export function taskStatusLook(state: string): StatusLook {
+  return TASK_LOOK[state as TaskState] ?? { label: words(state), tone: "neutral" };
+}
+
+/** Finished: nothing more happens on it, so its row is faded. */
+export function taskFinished(state: string): boolean {
+  return state === "merged" || state === "dropped";
+}
 
 function words(status: string): string {
   const s = (status || "unknown").replace(/_/g, " ");
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-export function taskInfo(status: string) {
-  return TASK[status] ?? { ...TASK.draft, label: words(status) };
+/** "$12.40", "$0.30", or "under $0.01". */
+export function money(v: number | null | undefined): string {
+  const n = v ?? 0;
+  if (n > 0 && n < 0.01) return "under $0.01";
+  return `$${n.toFixed(2)}`;
 }
 
-export function PlanStatusPill({ status }: { status: string }) {
-  const s = planStatusLook(status);
-  return <span className={`${PILL} ${TONES[s.tone].chip}`}>{s.label}</span>;
+/** "$3 to $9" from an estimate's low and high. */
+export function moneyRange(low: number, high: number): string {
+  const r = (n: number) => `$${n.toFixed(2)}`;
+  return Math.abs(high - low) < 0.005 ? r(low) : `${r(low)} to ${r(high)}`;
 }
 
-export function TaskStatusPill({ status }: { status: string }) {
-  const s = taskInfo(status);
-  return <span className={`${PILL} ${s.style}`}>{s.label}</span>;
-}
-
-// A task's status as the shared list tones, for the checklist mark and the
-// status word on a task row.
-const TASK_TONE: Record<string, StatusLook> = {
-  draft: { label: "Draft", tone: "neutral" },
-  approved: { label: "Approved", tone: "queued", live: false },
-  rejected: { label: "Skipped", tone: "muted" },
-  queued: { label: "Queued", tone: "queued" },
-  running: { label: "Running", tone: "live", live: true },
-  waiting: { label: "Waiting on a merge", tone: "waiting" },
-  failed: { label: "Failed", tone: "danger" },
-  issue_created: { label: "Issue opened", tone: "attention" },
-  done: { label: "Done", tone: "success" },
+// The colour of a pull request chip: green ready to merge, yellow waiting on
+// checks or a review, red failing, purple merged, grey closed or draft.
+const CHIP_TONE: Record<string, Tone> = {
+  ready: "success",
+  waiting: "waiting",
+  failing: "danger",
+  merged: "merged",
+  closed: "muted",
 };
 
-/** How a task's status reads on its row; unknown statuses read as plain words. */
-export function taskStatusLook(status: string): StatusLook {
-  return TASK_TONE[status] ?? { label: words(status), tone: "neutral" };
+/** What the chip's colour means, in words, for its hover text and screen readers. */
+export function chipWords(pr: PrChipData): string {
+  if (pr.state === "merged") return "merged";
+  if (pr.state === "closed") return "closed without merging";
+  const parts: string[] = [];
+  if (pr.state === "draft") parts.push("draft");
+  parts.push(
+    pr.checks === "passed"
+      ? "checks pass"
+      : pr.checks === "failed"
+        ? "checks fail"
+        : pr.checks === "running"
+          ? "checks running"
+          : "checks not reported",
+  );
+  if (pr.review === "approved") parts.push("approved");
+  else if (pr.review === "changes_requested") parts.push("changes requested");
+  else if (pr.review === "waiting") parts.push("waiting on a review");
+  if (pr.tone === "ready") parts.push("ready to merge");
+  return parts.join(", ");
+}
+
+/** A pull request number coloured by where it stands, with its size. */
+export function PrChip({ pr }: { pr: PrChipData }) {
+  const tone = TONES[CHIP_TONE[pr.tone] ?? "neutral"];
+  const what = chipWords(pr);
+  const size = pr.additions != null && pr.deletions != null ? ` +${pr.additions} -${pr.deletions}` : "";
+  return (
+    <a
+      href={pr.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={`Pull request #${pr.number}: ${what}`}
+      aria-label={`Pull request #${pr.number}, ${what}${size ? `, ${pr.additions} lines added and ${pr.deletions} removed` : ""} (opens in a new tab)`}
+      data-testid="pr-chip"
+      data-tone={pr.tone}
+      className={`${PILL} gap-1 tabular-nums hover:brightness-125 ${tone.chip} ${focusRing}`}
+    >
+      <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${tone.dot}`} />#{pr.number}
+      {size && <span className="font-normal opacity-80">{size}</span>}
+    </a>
+  );
+}
+
+const BAR_ORDER: TaskState[] = ["merged", "in_review", "working", "queued", "needs_you", "failed", "draft", "dropped"];
+
+/** The tasks by state as one thin bar: merged first, then the work still open. */
+export function StateBar({ counts, className = "" }: { counts: TaskCounts | null | undefined; className?: string }) {
+  if (!counts) return null;
+  const total = BAR_ORDER.reduce((n, s) => n + (counts[s] ?? 0), 0);
+  if (total === 0) return null;
+  const said = BAR_ORDER.filter((s) => (counts[s] ?? 0) > 0)
+    .map((s) => `${counts[s]} ${taskStatusLook(s).label.toLowerCase()}`)
+    .join(", ");
+  return (
+    <div
+      role="img"
+      aria-label={`Tasks: ${said}`}
+      data-testid="state-bar"
+      className={`flex h-1.5 w-full max-w-md overflow-hidden rounded-full bg-zinc-800 ${className}`}
+    >
+      {BAR_ORDER.map((s) => {
+        const n = counts[s] ?? 0;
+        if (!n) return null;
+        return <span key={s} className={`h-full ${TONES[taskStatusLook(s).tone].dot}`} style={{ width: `${(n / total) * 100}%` }} />;
+      })}
+    </div>
+  );
 }

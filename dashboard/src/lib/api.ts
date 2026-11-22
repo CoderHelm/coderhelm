@@ -819,7 +819,7 @@ export const api = {
       body: JSON.stringify(body),
     }),
   getPlan: (planId: string) =>
-    request<Plan & { tasks: Task[] }>(`/api/plans/${planId}`),
+    request<FullPlan>(`/api/plans/${planId}`),
   updatePlan: (
     planId: string,
     body: Partial<{
@@ -3024,13 +3024,97 @@ export interface TeamInfo {
   current: boolean;
 }
 
+/** Where a plan stands, from its tasks' work. */
+export type PlanState = "drafting" | "running" | "needs_you" | "done" | "stalled";
+/** Where a task stands, from its runs and pull requests. */
+export type TaskState = "draft" | "queued" | "working" | "needs_you" | "failed" | "in_review" | "merged" | "dropped";
+
+/** How many tasks are in each state. */
+export type TaskCounts = Record<TaskState, number>;
+
+/** A pull request as a chip, coloured by its checks and review. */
+export interface PrChip {
+  number: number;
+  url: string;
+  repo: string;
+  state: "open" | "draft" | "merged" | "closed" | string;
+  checks: "passed" | "failed" | "running" | "unknown" | string;
+  review: "approved" | "changes_requested" | "waiting" | "none" | string;
+  tone: "ready" | "waiting" | "failing" | "merged" | "closed" | string;
+  additions?: number;
+  deletions?: number;
+  run_id: string;
+}
+
+/** Something a person has to do for the plan to go on: the exact ask. */
+export interface NeedsItem {
+  task_id: string;
+  kind: "answer" | "review" | "approval" | "checks" | "merge" | "failed" | "closed_pr" | "approve_rest" | string;
+  ask: string;
+  detail?: string;
+  url?: string;
+  run_id?: string;
+  action: "answer" | "open_pr" | "open_link" | "retry" | "approve" | string;
+}
+
+/** A change to the plan after it was approved, or work outside a task's scope. */
+export interface PlanDrift {
+  kind: "added" | "changed" | "dropped" | "scope" | string;
+  detail: string;
+  by?: "agent" | "person" | string;
+  by_name?: string;
+  at?: string;
+}
+
+/** One attempt at a task. */
+export interface TaskRun {
+  run_id: string;
+  status: string;
+  created_at: string;
+  cost_usd: number;
+}
+
+/** A success criterion with what the work shows for it. */
+export interface PlanCriterion {
+  id: string;
+  text: string;
+  tasks: string[];
+  met: boolean;
+  evidence: { task_id: string; run_id: string; state: string; words: string; by?: string; tests?: string[] }[];
+}
+
+/** What starting tasks, or retrying one, is expected to take. */
+export interface PlanEstimate {
+  tasks: number;
+  runs_low: number;
+  runs_high: number;
+  cost_low: number;
+  cost_high: number;
+  per_run_low: number;
+  per_run_high: number;
+  /** Finished runs the numbers come from; 0 = no history yet. */
+  sample: number;
+}
+
 export interface Plan {
   plan_id: string;
   title: string;
   description: string;
   repo: string;
   destination?: "github" | "jira" | string;
+  /** The older word (draft, executing, done); read `state`. */
   status: "draft" | "executing" | "waiting" | "done" | string;
+  state?: PlanState | string | null;
+  /** "2 of 5 merged, 1 needs you, 1 in review". */
+  summary?: string | null;
+  counts?: TaskCounts | null;
+  needs_count?: number;
+  cost_usd?: number | null;
+  attempts?: number | null;
+  criteria_met?: number | null;
+  criteria_count?: number | null;
+  last_activity_at?: string | null;
+  success_criteria?: string[] | null;
   task_count: number;
   tokens_in?: number;
   tokens_out?: number;
@@ -3076,7 +3160,29 @@ export interface Task {
   rejected_at?: string;
   rejected_by?: string;
   created_at: string;
+  state?: TaskState | string | null;
+  /** What it is doing, waits on, or what blocks it. */
+  state_detail?: string | null;
+  /** Why it failed. */
+  state_reason?: string | null;
+  attempts?: number | null;
+  cost_usd?: number | null;
+  runs?: TaskRun[] | null;
+  prs?: PrChip[] | null;
+  needs?: NeedsItem | null;
+  drift?: PlanDrift[] | null;
+  covers?: string[] | null;
+  ticket_filed?: boolean | null;
+  last_activity_at?: string | null;
 }
+
+/** A plan with its tasks, criteria, what waits on people and the start estimate. */
+export type FullPlan = Plan & {
+  tasks: Task[];
+  criteria?: PlanCriterion[];
+  needs?: NeedsItem[];
+  estimate?: PlanEstimate | null;
+};
 
 export interface TaskTemplate {
   title: string;

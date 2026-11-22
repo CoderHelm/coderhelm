@@ -23,11 +23,17 @@ function task(id: string, title: string, status: string, order: number, extra: R
   };
 }
 
+const counts = (c: Partial<Record<string, number>>) => ({ draft: 0, queued: 0, working: 0, needs_you: 0, failed: 0, in_review: 0, merged: 0, dropped: 0, ...c });
+
 const PLANS = [
-  plan("PLANA", "Add a class schedule page", "draft"),
-  plan("PLANB", "Retry the sync job", "executing"),
-  plan("PLANC", "Move billing to the new API", "waiting"),
-  plan("PLAND", "Clean up old flags", "done"),
+  plan("PLANA", "Add a class schedule page", "draft", { state: "drafting", summary: "3 tasks to review, 1 dropped", counts: counts({ draft: 3, dropped: 1 }) }),
+  plan("PLANB", "Retry the sync job", "executing", {
+    state: "running", summary: "1 of 3 merged, 1 in review, 1 working", counts: counts({ merged: 1, in_review: 1, working: 1 }), cost_usd: 14.2, attempts: 4, last_activity_at: NOW,
+  }),
+  plan("PLANC", "Move billing to the new API", "executing", {
+    state: "needs_you", summary: "2 of 5 merged, 1 needs you, 1 failed, 1 in review", needs_count: 2, counts: counts({ merged: 2, needs_you: 1, failed: 1, in_review: 1 }), cost_usd: 61.9, attempts: 11,
+  }),
+  plan("PLAND", "Clean up old flags", "done", { state: "done", summary: "2 of 2 merged", counts: counts({ merged: 2 }), cost_usd: 5.1, attempts: 2 }),
 ];
 
 const TEMPLATES = [
@@ -59,21 +65,77 @@ interface Backend {
   openspecMissing: boolean;
   /** Bodies of every write, "METHOD /path" → body, in order. */
   writes: { call: string; body: unknown }[];
+  /** The detail answer's criteria, needs and estimate. */
+  criteria: unknown[];
+  needs: unknown[];
+  estimate: unknown;
 }
 
 function freshTasks() {
   return [
-    task("T1", "Add the schedule table", "draft", 0),
-    task("T2", "Show the schedule on the page", "rejected", 1),
-    task("T3", "Wire the schedule API", "failed", 2),
-    task("T4", "Write the tests", "approved", 3, { depends_on: "T1" }),
+    task("T1", "Add the schedule table", "draft", 0, { state: "draft" }),
+    task("T2", "Show the schedule on the page", "rejected", 1, { state: "dropped", state_detail: "Dropped by a-person" }),
+    task("T3", "Wire the schedule API", "draft", 2, { state: "draft" }),
+    task("T4", "Write the tests", "draft", 3, { state: "draft", depends_on: "T1" }),
   ];
 }
+
+const ESTIMATE = { tasks: 3, runs_low: 3, runs_high: 4, cost_low: 6.3, cost_high: 19.8, per_run_low: 2.1, per_run_high: 4.95, sample: 40 };
+
+const pr = (n: number, tone: string, extra: Record<string, unknown> = {}) => ({
+  number: n, url: `https://github.com/your-team/web/pull/${n}`, repo: "your-team/web", state: "open", checks: "passed", review: "none", tone, run_id: `RUN${n}`, ...extra,
+});
+
+/** A plan at work: one merged, one in review, one needing a person, one failed, one still a draft. */
+function runningTasks() {
+  return [
+    task("T1", "Add the schedule table", "filed", 0, {
+      state: "merged", state_detail: "Pull request #41 merged", attempts: 1, cost_usd: 3.4, ticket_filed: true, covers: ["C1"],
+      runs: [{ run_id: "RUN41", status: "merged", created_at: NOW, cost_usd: 3.4 }], prs: [pr(41, "merged", { state: "merged", additions: 120, deletions: 8 })],
+      issue_url: "https://github.com/your-team/web/issues/40", issue_number: 40,
+    }),
+    task("T2", "Show the schedule on the page", "filed", 1, {
+      state: "in_review", state_detail: "Checks are still running on `9f1c2ab`.", attempts: 1, cost_usd: 4.1, ticket_filed: true, covers: ["C2"],
+      runs: [{ run_id: "RUN52", status: "completed", created_at: NOW, cost_usd: 4.1 }],
+      prs: [pr(52, "waiting", { checks: "running", additions: 64, deletions: 3 })],
+    }),
+    task("T3", "Wire the schedule API", "filed", 2, {
+      state: "needs_you", state_detail: "Approve pull request #53", attempts: 2, cost_usd: 9.8, ticket_filed: true,
+      runs: [{ run_id: "RUN50", status: "retried", created_at: NOW, cost_usd: 5.0 }, { run_id: "RUN53", status: "completed", created_at: NOW, cost_usd: 4.8 }],
+      prs: [pr(53, "waiting", { review: "waiting", additions: 210, deletions: 41 }), pr(50, "closed", { state: "closed" })],
+      drift: [{ kind: "scope", detail: "The pull request changes files outside the task's planned scope: src/billing/charge.ts", by: "agent" }],
+    }),
+    task("T4", "Write the tests", "filed", 3, {
+      state: "failed", state_detail: "Run timed out (exceeded execution time limit).", state_reason: "Run timed out (exceeded execution time limit).",
+      attempts: 1, cost_usd: 2.2, ticket_filed: true, runs: [{ run_id: "RUN60", status: "failed", created_at: NOW, cost_usd: 2.2 }], prs: [],
+    }),
+    task("T5", "Add the print view", "draft", 4, { state: "draft", created_at: NOW, drift: [{ kind: "added", detail: "Added after the plan was approved", by: "person" }] }),
+  ];
+}
+
+const RUNNING_NEEDS = [
+  { task_id: "T3", kind: "approval", ask: "Approve pull request #53", detail: "This repo's auto-merge setting requires an approving review from a person before Coderhelm merges.", url: "https://github.com/your-team/web/pull/53", run_id: "RUN53", action: "open_pr" },
+  { task_id: "T4", kind: "failed", ask: "Task \"Write the tests\" failed", detail: "Run timed out (exceeded execution time limit).", run_id: "RUN60", action: "retry" },
+  { task_id: "", kind: "approve_rest", ask: "Approve or drop the 1 task still in draft", action: "approve" },
+];
+
+const RUNNING_CRITERIA = [
+  { id: "C1", text: "The schedule table stores classes by day", tasks: ["T1"], met: true, evidence: [{ task_id: "T1", run_id: "RUN41", state: "proven", words: "proven", by: "tests with and without the change", tests: ["schedule.test.ts"] }] },
+  { id: "C2", text: "The page shows today's classes by default", tasks: ["T2"], met: false, evidence: [{ task_id: "T2", run_id: "RUN52", state: "not_run", words: "not run yet" }] },
+  { id: "C3", text: "The page says when a class is full", tasks: [], met: false, evidence: [] },
+];
+
+const RUNNING_PLAN = {
+  status: "executing", state: "needs_you", summary: "1 of 5 merged, 1 needs you, 1 failed, 1 in review, 1 in draft",
+  counts: counts({ merged: 1, needs_you: 1, failed: 1, in_review: 1, draft: 1 }), needs_count: 3, cost_usd: 19.5, attempts: 5,
+  criteria_met: 1, criteria_count: 3, executed_at: NOW, executed_by: "a-person", last_activity_at: NOW,
+};
 
 async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend> {
   const db: Backend = {
     calls: [], plansEmpty: false, plansFail: false, templatesEmpty: false, planStatus: 200, slowPlan: false,
-    tasks: freshTasks(), chatBody: null, chatPosts: 0, created: null, usedQueries: [], planExtra: {}, openspecMissing: false, writes: [], ...init,
+    tasks: freshTasks(), chatBody: null, chatPosts: 0, created: null, usedQueries: [], planExtra: {}, openspecMissing: false, writes: [],
+    criteria: [], needs: [], estimate: ESTIMATE, ...init,
   };
   const json = (route: Route, body: unknown, status = 200) =>
     route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
@@ -175,7 +237,10 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     if (one && m === "GET") {
       if (db.planStatus !== 200) return route.fulfill({ status: db.planStatus, body: "" });
       if (db.slowPlan) await new Promise((r) => setTimeout(r, 1500));
-      return json(route, { ...plan(one[1], "Add a class schedule page", "draft", { chat_id: "chat-1", ...db.planExtra }), task_count: db.tasks.length, tasks: db.tasks });
+      return json(route, {
+        ...plan(one[1], "Add a class schedule page", "draft", { chat_id: "chat-1", state: "drafting", summary: "3 tasks to review, 1 dropped", ...db.planExtra }),
+        task_count: db.tasks.length, tasks: db.tasks, criteria: db.criteria, needs: db.needs, estimate: db.estimate,
+      });
     }
     const taskOne = p.match(/^\/api\/plans\/\w+\/tasks\/(\w+)$/);
     if (taskOne && (m === "PUT" || m === "DELETE")) return route.fulfill({ status: 200, body: "" });
@@ -187,8 +252,23 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     }
     const approve = p.match(/^\/api\/plans\/\w+\/tasks\/(\w+)\/approve$/);
     if (approve) {
-      db.tasks = db.tasks.map((t) => (t.task_id === approve[1] ? { ...t, status: "approved" } : t));
-      return route.fulfill({ status: 200, body: "" });
+      // The plan runs and stays open: the approved task is queued, the rest are still drafts.
+      db.tasks = db.tasks.map((t) => (t.task_id === approve[1] ? { ...t, status: "queued", state: "queued", state_detail: "Waiting to file its ticket" } : t));
+      const drafts = db.tasks.filter((t) => (t as { state?: string }).state === "draft").length;
+      db.planExtra = { ...db.planExtra, status: "executing", state: "running", summary: `0 of ${db.tasks.length} merged, 1 queued, ${drafts} in draft` };
+      db.needs = drafts ? [{ task_id: "", kind: "approve_rest", ask: `Approve or drop the ${drafts} tasks still in draft`, action: "approve" }] : [];
+      return json(route, { dispatched: true, task_id: approve[1] });
+    }
+    if (/^\/api\/plans\/\w+\/approve-and-execute$/.test(p) && m === "POST") {
+      const n = db.tasks.filter((t) => (t as { state?: string }).state === "draft").length;
+      db.tasks = db.tasks.map((t) => ((t as { state?: string }).state === "draft" ? { ...t, status: "queued", state: "queued" } : t));
+      db.needs = [];
+      db.planExtra = { ...db.planExtra, status: "executing", state: "running" };
+      return json(route, { status: "executing", tasks_queued: n });
+    }
+    if (/^\/api\/runs\/\w+\/retry$/.test(p) && m === "POST") {
+      db.writes.push({ call: `${m} ${p}`, body: null });
+      return json(route, { status: "queued" });
     }
     if (/^\/api\/plans\/\w+\/openspec$/.test(p)) {
       if (db.openspecMissing) return route.fulfill({ status: 404, body: "" });
@@ -227,53 +307,70 @@ async function shot(page: Page, name: string) {
   await page.setViewportSize({ width: 1280, height: 800 });
 }
 
-test("plans list shows plain status words and keeps New plan while a plan runs", async ({ page }) => {
+test("plans list shows each plan's progress by state, what needs you, and the cost", async ({ page }) => {
   const errors = watchConsole(page);
   await mockApi(page);
   await page.goto("/plans/");
   await expect(page.getByRole("heading", { name: "Plans", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Add a class schedule page" })).toBeVisible();
-  await expect(page.getByRole("list", { name: "Plans" }).getByText("Running", { exact: true })).toBeVisible();
-  // A plan is running: it is pinned to the top of the list, and New plan stays.
+  const list = page.getByRole("list", { name: "Plans" });
+  await expect(list.getByText("Running", { exact: true })).toBeVisible();
+  // A running plan sits above a draft one; New plan stays.
   await expect(page.getByRole("link", { name: "New plan" })).toBeVisible();
-  await expect(page.getByTestId("plan-row").first()).toHaveAttribute("data-status", "executing");
+  const first = page.getByTestId("plan-row").first();
+  await expect(first).toHaveAttribute("data-status", "running");
+  await expect(first).toContainText("1 of 3 merged, 1 in review, 1 working");
+  await expect(first).toContainText("$14.20");
+  await expect(first.getByTestId("state-bar")).toHaveAttribute("aria-label", "Tasks: 1 merged, 1 in review, 1 working");
+  // No description clutter on a row.
+  await expect(list).not.toContainText("Why: retry the sync job");
   await shot(page, "plans-list");
   expect(errors).toEqual([]);
 });
 
-test("Load more sends the cursor encoded, so the next page arrives", async ({ page }) => {
+test("Load more sends the cursor encoded; a plan that needs you says how many things", async ({ page }) => {
   const errors = watchConsole(page);
   const db = await mockApi(page);
   await page.goto("/plans/");
   await page.getByRole("button", { name: "Load more" }).click();
   await expect(page.getByRole("link", { name: "Clean up old flags" })).toBeVisible();
-  await expect(page.getByRole("list", { name: "Plans" }).getByText("Waiting on a merge")).toBeVisible();
   expect(db.calls).toContain("GET /api/plans?cursor=PLAN%23PLANB");
   await expect(page.getByRole("button", { name: "Load more" })).toHaveCount(0);
+  // Needs you is pinned first, with its count.
+  const first = page.getByTestId("plan-row").first();
+  await expect(first).toHaveAttribute("data-status", "needs_you");
+  await expect(first.getByTestId("needs-count")).toHaveText("2 need you");
+  await expect(page.getByRole("list", { name: "Plans" }).getByText("Waiting on a merge")).toHaveCount(0);
+  await shot(page, "plans-list-all");
   expect(errors).toEqual([]);
 });
 
-test("plans toolbar: status toggles with counts and a search, kept in the address", async ({ page }) => {
+test("plans toolbar: Active counts running plans, Needs you and Done are their own, kept in the address", async ({ page }) => {
   const errors = watchConsole(page);
   await mockApi(page);
   await page.goto("/plans/");
   const list = page.getByRole("list", { name: "Plans" });
-  await expect(list.getByRole("listitem")).toHaveCount(2);
+  await page.getByRole("button", { name: "Load more" }).click();
+  await expect(list.getByRole("listitem")).toHaveCount(4);
   const toggles = page.getByRole("group", { name: "Show plans" });
-  await expect(toggles.getByRole("button", { name: /^All\s*2$/ })).toHaveAttribute("aria-pressed", "true");
+  await expect(toggles.getByRole("button", { name: /^All\s*4$/ })).toHaveAttribute("aria-pressed", "true");
+  await expect(toggles.getByRole("button", { name: /^Active\s*1$/ })).toBeVisible();
+  await expect(toggles.getByRole("button", { name: /^Needs you\s*1$/ })).toBeVisible();
+  await expect(toggles.getByRole("button", { name: /^Done\s*1$/ })).toBeVisible();
   await toggles.getByRole("button", { name: /^Active/ }).click();
   await expect(page).toHaveURL(/status=active/);
   await expect(list.getByRole("listitem")).toHaveCount(1);
   await expect(list.getByRole("link", { name: "Retry the sync job" })).toBeVisible();
-  await page.goBack();
-  await expect(list.getByRole("listitem")).toHaveCount(2);
+  await toggles.getByRole("button", { name: /^Done/ }).click();
+  await expect(list.getByRole("link", { name: "Clean up old flags" })).toBeVisible();
+  await toggles.getByRole("button", { name: /^All/ }).click();
   await page.getByRole("searchbox", { name: "Search plans" }).fill("class schedule");
   await expect(page).toHaveURL(/q=class/);
   await expect(list.getByRole("listitem")).toHaveCount(1);
   await page.getByRole("searchbox", { name: "Search plans" }).fill("nothing like this");
   await expect(page.getByText(/No plans match/)).toBeVisible();
   await page.getByRole("button", { name: "Clear filters" }).first().click();
-  await expect(list.getByRole("listitem")).toHaveCount(2);
+  await expect(list.getByRole("listitem")).toHaveCount(4);
   expect(errors).toEqual([]);
 });
 
@@ -298,91 +395,78 @@ test("plans list error offers a retry that works", async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-test("plan detail reads as a document: one summary line, one action, the plan, the rest folded", async ({ page }) => {
+test("a draft plan: one status line, the estimate before starting, criteria, tasks, the spec folded below", async ({ page }) => {
   const errors = watchConsole(page);
-  await mockApi(page);
+  await mockApi(page, { criteria: RUNNING_CRITERIA.map((c) => ({ ...c, met: false, evidence: [] })) });
   await page.goto("/plans/detail/?id=PLANA");
   await expect(page.getByRole("heading", { level: 1, name: "Add a class schedule page" })).toBeVisible();
-  // One line says where the plan stands.
   const summary = page.getByRole("list", { name: "About this plan" });
-  await expect(summary).toContainText("Draft");
+  await expect(summary).toContainText("Drafting");
+  await expect(summary).toContainText("3 tasks to review, 1 dropped");
   await expect(summary).toContainText("your-team/web");
-  await expect(summary).toContainText("4 tasks, 1 to review");
   await expect(summary).toContainText("Sends to GitHub issues");
-  // One primary action in the top bar; the rarely used ones sit in More.
+  // What starting costs, before the button is pressed.
+  await expect(page.getByTestId("plan-estimate")).toHaveText(
+    "Approving all 3 tasks starts 3 to 4 runs, about $6.30 to $19.80 from your team's last 40 runs.",
+  );
   const header = page.getByTestId("page-actions");
-  await expect(header.getByRole("button", { name: "Approve all and start" })).toBeVisible();
-  await expect(header.getByRole("button", { name: "Save as template" })).toHaveCount(0);
-  await expect(header.getByRole("button", { name: "Delete" })).toHaveCount(0);
+  await expect(header.getByRole("button", { name: "Approve and start" })).toBeVisible();
   await header.getByRole("button", { name: "More" }).click();
   await expect(page.getByRole("menuitem")).toHaveText(["Save as template", "Download the spec", "Delete plan"]);
   await page.keyboard.press("Escape");
-  // The document and its section list.
+  // In order: what done means, the tasks, the spec, details.
   const nav = page.getByRole("navigation", { name: "On this page" });
-  await expect(nav.getByRole("link")).toHaveText(["Overview", "Tasks4", "Spec", "Details"]);
-  await expect(page.getByRole("heading", { level: 2, name: "Overview" })).toBeVisible();
+  await expect(nav.getByRole("link")).toHaveText(["What done means3", "Tasks4", "Spec", "Details"]);
+  await expect(page.getByTestId("criteria-count")).toContainText("3 criteria, 0 proven");
+  await expect(page.getByTestId("criterion")).toHaveCount(3);
+  // The spec sits below the tasks, open while the plan is a draft.
   await expect(page.getByText("Why: add a class schedule page")).toBeVisible();
   await expect(page.getByRole("heading", { level: 3, name: "Proposal" })).toBeVisible();
-  await expect(page.getByText("Members ask for the class schedule on the web.")).toBeVisible();
-  // The design and requirements are folded behind "Technical plan".
-  await expect(page.getByRole("button", { name: "Copy design.md" })).toBeHidden();
-  await page.getByText("Technical plan").click();
-  await expect(page.getByRole("button", { name: "Copy design.md" })).toBeVisible();
-  // Tasks are a checklist: a mark, a number, a title, a status word.
   const tasks = page.getByRole("list", { name: "Tasks" });
   await expect(tasks.getByTestId("task")).toHaveCount(4);
-  await expect(tasks.getByRole("img", { name: "Failed" })).toBeVisible();
-  await expect(tasks.getByRole("img", { name: "Skipped" })).toBeVisible();
-  await expect(tasks.getByTestId("task").nth(2).getByRole("button", { name: "Retry" })).toBeVisible();
+  await expect(tasks.getByRole("img", { name: "Dropped" })).toBeVisible();
   await expect(tasks.getByTestId("task").nth(3)).toContainText("after 1");
-  // No filters for a short plan; details are folded.
-  await expect(page.getByRole("searchbox", { name: "Search tasks" })).toHaveCount(0);
-  await expect(page.getByRole("group", { name: "Destination" })).toBeHidden();
-  await expect(page.getByText("Do add the schedule table")).toHaveCount(0);
+  await expect(tasks.getByTestId("task").nth(0).getByRole("button", { name: "Approve", exact: true })).toBeVisible();
+  await expect(page.getByTestId("needs-strip")).toHaveCount(0);
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await shot(page, "plans-detail");
   expect(errors).toEqual([]);
 });
 
-test("a long plan gets task search and status filters, including failed", async ({ page }) => {
+test("Approve and start says what it starts and costs, then starts", async ({ page }) => {
   const errors = watchConsole(page);
-  const many = [
-    ...freshTasks(),
-    task("T5", "Add the empty state", "draft", 4),
-    task("T6", "Add the loading state", "draft", 5),
-    task("T7", "Link the page from the menu", "draft", 6),
-  ];
-  await mockApi(page, { tasks: many });
+  const db = await mockApi(page);
   await page.goto("/plans/detail/?id=PLANA");
-  const tasks = page.getByRole("list", { name: "Tasks" });
-  await expect(tasks.getByTestId("task")).toHaveCount(7);
-  const failed = page.getByRole("group", { name: "Show tasks" }).getByRole("button", { name: "Failed (1)" });
-  await failed.click();
-  await expect(failed).toHaveAttribute("aria-pressed", "true");
-  await expect(tasks.getByTestId("task")).toHaveCount(1);
-  await expect(tasks).toContainText("Wire the schedule API");
-  await failed.click();
-  await page.getByRole("searchbox", { name: "Search tasks" }).fill("loading");
-  await expect(tasks.getByTestId("task")).toHaveCount(1);
-  await page.getByRole("searchbox", { name: "Search tasks" }).fill("nothing like it");
-  await expect(page.getByText("No tasks match.")).toBeVisible();
+  await page.getByTestId("page-actions").getByRole("button", { name: "Approve and start" }).click();
+  const dialog = page.getByRole("alertdialog", { name: "Approve and start 3 tasks?" });
+  await expect(dialog).toContainText("3 to 4 runs, about $6.30 to $19.80");
+  await dialog.getByRole("button", { name: "Approve and start" }).click();
+  await expect.poll(() => db.writes.map((w) => w.call)).toContain("POST /api/plans/PLANA/approve-and-execute");
   expect(errors).toEqual([]);
 });
 
-test("approving a task updates in place instead of blanking the page", async ({ page }) => {
+test("approving one task starts it and leaves the other drafts approvable", async ({ page }) => {
   const errors = watchConsole(page);
   const db = await mockApi(page);
   await page.goto("/plans/detail/?id=PLANA");
   const heading = page.getByRole("heading", { level: 1, name: "Add a class schedule page" });
   await expect(heading).toBeVisible();
+  await page.getByRole("list", { name: "Tasks" }).getByTestId("task").first().getByRole("button", { name: "Approve", exact: true }).click();
+  const dialog = page.getByRole("alertdialog", { name: "Approve and start this task?" });
+  await expect(dialog).toContainText("Runs like it cost about $2.10 to $4.95. The plan stays open for its other tasks.");
   db.slowPlan = true;
-  await page.getByRole("button", { name: "Approve", exact: true }).click();
+  await dialog.getByRole("button", { name: "Approve and start" }).click();
   // While the reload is in flight, the plan stays on screen.
   await page.waitForTimeout(400);
   await expect(heading).toBeVisible();
-  await expect(page.getByRole("list", { name: "Tasks" })).toContainText("Wire the schedule API");
-  await expect(page.getByRole("list", { name: "Tasks" }).getByRole("img", { name: "Approved" })).toHaveCount(2);
   expect(db.writes).toContainEqual({ call: "POST /api/plans/PLANA/tasks/T1/approve", body: null });
+  const tasks = page.getByRole("list", { name: "Tasks" });
+  await expect(tasks.getByRole("img", { name: "Queued" })).toHaveCount(1);
+  // The plan runs and stays open: the two drafts still have their buttons,
+  // and the strip asks for them by name.
+  await expect(page.getByRole("list", { name: "About this plan" })).toContainText("Running");
+  await expect(tasks.getByRole("button", { name: "Approve and start" })).toHaveCount(2);
+  await expect(page.getByTestId("needs-item")).toHaveText(/Approve or drop the 2 tasks still in draft/);
   expect(errors).toEqual([]);
 });
 
@@ -392,7 +476,7 @@ test("a task opens to what it says; edit sends only what changed, add sends the 
   await page.goto("/plans/detail/?id=PLANA");
   await page.getByRole("button", { name: "Show details of Add the schedule table" }).click();
   await expect(page.getByText("Do add the schedule table")).toBeVisible();
-  await expect(page.getByText("Done when")).toBeVisible();
+  await expect(page.getByText("Done when", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Remove task Add the schedule table" })).toBeVisible();
   await shot(page, "plans-detail-task-open");
   await page.getByRole("button", { name: "Edit", exact: true }).click();
@@ -429,27 +513,138 @@ test("the destination sits in Details; the summary line opens it", async ({ page
   expect(errors).toEqual([]);
 });
 
-test("a finished plan leads with its PR and lists its runs and PRs as rows", async ({ page }) => {
+test("the Needs you strip names each exact ask with its button", async ({ page }) => {
+  const errors = watchConsole(page);
+  const db = await mockApi(page, { planExtra: RUNNING_PLAN, tasks: runningTasks(), needs: RUNNING_NEEDS, criteria: RUNNING_CRITERIA });
+  await page.goto("/plans/detail/?id=PLANA");
+  const summary = page.getByRole("list", { name: "About this plan" });
+  await expect(summary).toContainText("Needs you");
+  await expect(summary).toContainText("1 of 5 merged, 1 needs you, 1 failed, 1 in review, 1 in draft");
+  await expect(summary).toContainText("$19.50 over 5 runs");
+  // The top action goes to what needs you.
+  await expect(page.getByTestId("page-actions").getByRole("link", { name: "3 need you" })).toHaveAttribute("href", "#needs");
+  const strip = page.getByTestId("needs-strip");
+  const items = strip.getByTestId("needs-item");
+  await expect(items).toHaveCount(3);
+  await expect(items.nth(0)).toContainText("3.Approve pull request #53");
+  await expect(items.nth(0)).toContainText("requires an approving review from a person");
+  await expect(items.nth(0).getByRole("link", { name: /Approve #53/ })).toHaveAttribute("href", "https://github.com/your-team/web/pull/53");
+  await expect(items.nth(0).getByRole("link", { name: "Open run" })).toHaveAttribute("href", /RUN53/);
+  // A failed task says why, and Retry confirms with what a run costs.
+  await expect(items.nth(1)).toContainText("Run timed out (exceeded execution time limit).");
+  await items.nth(1).getByRole("button", { name: "Retry" }).click();
+  const dialog = page.getByRole("alertdialog", { name: 'Retry "Write the tests"?' });
+  await expect(dialog).toContainText("It starts a new run. Runs like it cost about $2.10 to $4.95.");
+  await dialog.getByRole("button", { name: "Retry" }).click();
+  // Its ticket was filed: the run is retried, no second ticket.
+  await expect.poll(() => db.writes.map((w) => w.call)).toContain("POST /api/runs/RUN60/retry");
+  expect(db.writes.map((w) => w.call)).not.toContain("POST /api/plans/PLANA/tasks/T4/force-run");
+  await expect(items.nth(2)).toContainText("Approve or drop the 1 task still in draft");
+  await expect(items.nth(2).getByRole("button", { name: "Approve the rest" })).toBeVisible();
+  // Handled: the strip goes.
+  db.needs = [];
+  await page.reload();
+  await expect(page.getByRole("heading", { level: 1, name: "Add a class schedule page" })).toBeVisible();
+  await expect(page.getByTestId("needs-strip")).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test("each task shows its pull requests as chips coloured by checks and review, with attempts, cost and drift", async ({ page }) => {
+  const errors = watchConsole(page);
+  await mockApi(page, { planExtra: RUNNING_PLAN, tasks: runningTasks(), needs: RUNNING_NEEDS, criteria: RUNNING_CRITERIA });
+  await page.goto("/plans/detail/?id=PLANA");
+  const rows = page.getByRole("list", { name: "Tasks" }).getByTestId("task");
+  await expect(rows).toHaveCount(5);
+  const chip = (row: number, n: number) => rows.nth(row).getByTestId("pr-chip").filter({ hasText: `#${n}` });
+  await expect(chip(0, 41)).toHaveAttribute("data-tone", "merged");
+  await expect(chip(0, 41)).toHaveAccessibleName(/Pull request #41, merged, 120 lines added and 8 removed/);
+  await expect(chip(1, 52)).toHaveAttribute("data-tone", "waiting");
+  await expect(chip(1, 52)).toHaveAccessibleName(/checks running/);
+  await expect(chip(2, 53)).toHaveAttribute("data-tone", "waiting");
+  await expect(chip(2, 53)).toHaveAccessibleName(/checks pass, waiting on a review/);
+  await expect(chip(2, 50)).toHaveAttribute("data-tone", "closed");
+  await expect(rows.nth(2)).toContainText("2 attempts");
+  await expect(rows.nth(2)).toContainText("$9.80");
+  await expect(rows.nth(2).getByTestId("drift-mark")).toHaveText("Out of scope");
+  await expect(rows.nth(4).getByTestId("drift-mark")).toHaveText("Added");
+  // A merged task is faded and marked merged; a failed one says why and offers Retry and Drop.
+  await expect(rows.nth(0).getByRole("img", { name: "Merged" })).toBeVisible();
+  await expect(rows.nth(3)).toContainText("Run timed out");
+  await expect(rows.nth(3).getByRole("button", { name: "Retry" })).toBeVisible();
+  await expect(rows.nth(3).getByRole("button", { name: "Drop" })).toBeVisible();
+  // The draft added after approval can still be approved.
+  await expect(rows.nth(4).getByRole("button", { name: "Approve and start" })).toBeVisible();
+  // Opening a task lists every attempt.
+  await page.getByRole("button", { name: "Show details of Wire the schedule API" }).click();
+  await expect(page.getByRole("link", { name: "Attempt 2" })).toHaveAttribute("href", /RUN53/);
+  await expect(page.getByRole("link", { name: "Attempt 1" })).toHaveAttribute("href", /RUN50/);
+  await expect(page.getByText("Changed since approval")).toBeVisible();
+  // Once the plan runs, the spec is folded below the work.
+  await expect(page.getByText("Why: add a class schedule page")).toBeHidden();
+  await page.getByTestId("plan-spec").locator("summary").first().click();
+  await expect(page.getByText("Why: add a class schedule page")).toBeVisible();
+  // Criteria with their evidence.
+  await expect(page.getByTestId("criteria-count")).toContainText("3 criteria, 1 proven");
+  await expect(page.getByTestId("criteria-count")).toBeVisible();
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await shot(page, "plans-detail-running");
+  expect(errors).toEqual([]);
+});
+
+test("a long plan is grouped by state, finished work folded, and what is open is remembered", async ({ page }) => {
+  const errors = watchConsole(page);
+  const many = [
+    ...runningTasks(),
+    ...[6, 7, 8, 9].map((i) =>
+      task(`T${i}`, `Merged step ${i}`, "filed", i, { state: "merged", state_detail: `Pull request #${i + 70} merged`, prs: [pr(i + 70, "merged", { state: "merged" })] }),
+    ),
+  ];
+  await mockApi(page, { planExtra: RUNNING_PLAN, tasks: many, needs: RUNNING_NEEDS });
+  await page.goto("/plans/detail/?id=PLANA");
+  await expect(page.getByTestId("task-group-needs_you")).toBeVisible();
+  // Needs you first, merged last and folded.
+  const groups = page.locator("[data-testid^=task-group-]");
+  await expect(groups.first()).toHaveAttribute("data-testid", "task-group-needs_you");
+  await expect(groups.last()).toHaveAttribute("data-testid", "task-group-merged");
+  const merged = page.getByTestId("task-group-merged");
+  await expect(merged.getByTestId("task")).toHaveCount(0);
+  await merged.getByRole("button", { expanded: false }).click();
+  await expect(merged.getByTestId("task")).toHaveCount(5);
+  await page.getByRole("button", { name: "Show details of Write the tests" }).click();
+  await expect(page.getByTestId("task-reason")).toContainText("Run timed out");
+  // Reloaded, the same group is open and the same task too.
+  await page.reload();
+  await expect(page.getByTestId("task-group-merged").getByTestId("task")).toHaveCount(5);
+  await expect(page.getByTestId("task-reason")).toContainText("Run timed out");
+  await page.getByRole("searchbox", { name: "Search tasks" }).fill("print");
+  await expect(page.locator("[data-testid=task]")).toHaveCount(1);
+  expect(errors).toEqual([]);
+});
+
+test("a plan reads Done only when every task merged or was dropped", async ({ page }) => {
   const errors = watchConsole(page);
   await mockApi(page, {
-    planExtra: { status: "done", destination: "jira", executed_at: NOW, executed_by: "a-person" },
+    planExtra: { status: "done", state: "done", summary: "1 of 2 merged, 1 dropped", counts: counts({ merged: 1, dropped: 1 }), cost_usd: 3.4, attempts: 1, destination: "jira", executed_at: NOW, executed_by: "a-person" },
     tasks: [
-      task("T1", "Add the schedule table", "done", 0, { run_id: "RUN1", pr_url: "https://github.com/your-team/web/pull/41", jira_ticket_key: "WEB-12", jira_ticket_url: "https://your-team.atlassian.net/browse/WEB-12" }),
-      task("T2", "Show the schedule on the page", "rejected", 1),
+      task("T1", "Add the schedule table", "filed", 0, {
+        state: "merged", state_detail: "Pull request #41 merged", ticket_filed: true, prs: [pr(41, "merged", { state: "merged" })],
+        runs: [{ run_id: "RUN41", status: "merged", created_at: NOW, cost_usd: 3.4 }], jira_ticket_key: "WEB-12", jira_ticket_url: "https://your-team.atlassian.net/browse/WEB-12",
+      }),
+      task("T2", "Show the schedule on the page", "rejected", 1, { state: "dropped" }),
     ],
+    estimate: null,
   });
   await page.goto("/plans/detail/?id=PLANA");
-  const header = page.getByTestId("page-actions");
-  await expect(header.getByRole("link", { name: /Open PR/ })).toHaveAttribute("href", "https://github.com/your-team/web/pull/41");
-  await expect(page.getByRole("list", { name: "About this plan" })).toContainText("1 of 2 done");
-  await expect(page.getByRole("progressbar", { name: "Tasks done" })).toHaveAttribute("aria-valuenow", "1");
-  const work = page.getByRole("list", { name: "Runs and PRs" });
-  await expect(work.getByRole("link", { name: "Add the schedule table" })).toHaveAttribute("href", /\/runs\/detail\/?\?id=RUN1/);
-  await expect(work.getByRole("link", { name: "PR #41" })).toBeVisible();
-  await expect(page.getByRole("list", { name: "Tasks" }).getByRole("link", { name: "WEB-12" })).toBeVisible();
-  // A started plan has nothing to approve.
-  await expect(page.getByRole("button", { name: "Approve all and start" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Approve", exact: true })).toHaveCount(0);
+  const summary = page.getByRole("list", { name: "About this plan" });
+  await expect(summary).toContainText("Done");
+  await expect(summary).toContainText("1 of 2 merged, 1 dropped");
+  await expect(page.getByTestId("state-bar")).toHaveAttribute("aria-label", "Tasks: 1 merged, 1 dropped");
+  // Nothing left to approve or act on.
+  await expect(page.getByRole("button", { name: "Approve and start" })).toHaveCount(0);
+  await expect(page.getByTestId("needs-strip")).toHaveCount(0);
+  await expect(page.getByRole("list", { name: "Tasks" }).getByTestId("pr-chip")).toHaveAttribute("data-tone", "merged");
+  await page.getByRole("button", { name: "Show details of Add the schedule table" }).click();
+  await expect(page.getByRole("link", { name: "WEB-12" })).toBeVisible();
   await shot(page, "plans-detail-done");
   expect(errors).toEqual([]);
 });
@@ -470,7 +665,7 @@ test("on a phone the plan's main action is in view, not in a menu", async ({ pag
   await page.setViewportSize({ width: 390, height: 844 });
   await mockApi(page);
   await page.goto("/plans/detail/?id=PLANA");
-  const approve = page.getByRole("button", { name: "Approve all and start" });
+  const approve = page.getByTestId("page-actions").getByRole("button", { name: "Approve and start" });
   await expect(approve).toBeVisible();
   const box = await approve.boundingBox();
   expect(box && box.x >= 0 && box.x + box.width <= 390).toBe(true);

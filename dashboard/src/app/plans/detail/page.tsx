@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState, useCallback, type ReactNode } from "reac
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { WorkUsedLine } from "@/components/work-used";
-import { api, type Plan, type Task, type Repo, type Openspec, errorStatus } from "@/lib/api";
+import { api, type FullPlan, type Task, type Repo, type Openspec, type PlanEstimate, errorStatus } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Skeleton } from "@/components/skeleton";
@@ -12,19 +12,23 @@ import { Markdown } from "@/components/markdown";
 import { Callout } from "@/components/callout";
 import { Page, PageHeader } from "@/components/page";
 import { SectionNav, type NavSection } from "@/components/section-nav";
-import { ExternalLinkIcon } from "@/components/icons";
-import { List, ListRow, StatusText, Time, TONES } from "@/components/list";
+import { ChevronRightIcon, ExternalLinkIcon } from "@/components/icons";
+import { StatusText, Time, TONES } from "@/components/list";
 import { focusRing, linkButton, primaryButton, secondaryButton } from "@/components/ui";
-import { planStatusLook, taskStatusLook } from "../status";
+import { money, moneyRange, planState, planStatusLook, StateBar, taskState } from "../status";
 import { TaskChecklist, type NewTask, type TaskActions } from "./tasks";
+import { NeedsStrip } from "./needs";
+import { CriteriaList } from "./criteria";
 import { SpecDocument, downloadOpenspec } from "./spec";
 import { PlanDetails, destinationWords } from "./details";
 import { SaveTemplateDialog } from "./template-dialog";
 
-// A plan reads as a document: its title and one summary line, the one thing
-// to do next, then the plan itself (what and why, the tasks as a checklist,
-// the written spec) with a section list beside it on wide screens. Runs and
-// PRs it opened are list rows; everything rarely needed sits in Details.
+// A plan page in the order a person needs it: the goal and one status line
+// with the main action; what needs them, each the exact ask; what done means
+// with the evidence so far; the tasks, each with its state, pull requests,
+// attempts and cost; then the written spec, folded. Every state comes from
+// the runs and pull requests, so the page never says Done before the work
+// merged.
 
 export default function PlanDetailPage() {
   return (
@@ -57,7 +61,18 @@ function SkeletonBody() {
   );
 }
 
-type FullPlan = Plan & { tasks: Task[] };
+/** "about 3 to 4 runs, $6 to $14, from your last 40 runs", or what is known. */
+function estimateWords(e: PlanEstimate | null | undefined, tasks: number): string {
+  const runs = !e || e.runs_low === e.runs_high ? `${tasks} run${tasks === 1 ? "" : "s"}` : `${e.runs_low} to ${e.runs_high} runs`;
+  if (!e || e.sample === 0) return `${runs}; there is no run history yet to estimate the cost from`;
+  return `${runs}, about ${moneyRange(e.cost_low, e.cost_high)} from your team's last ${e.sample} runs`;
+}
+
+/** One run's cost, for Retry and Start now. */
+function perRunWords(e: PlanEstimate | null | undefined): string {
+  if (!e || e.sample === 0) return "It starts a new run.";
+  return `It starts a new run. Runs like it cost about ${moneyRange(e.per_run_low, e.per_run_high)}.`;
+}
 
 function PlanDetail() {
   const searchParams = useSearchParams();
@@ -77,6 +92,8 @@ function PlanDetail() {
   const [writingSpec, setWritingSpec] = useState(false);
   const [templateOpen, setTemplateOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  // The spec is read while the plan is a draft, then folds below the work.
+  const [specOpen, setSpecOpen] = useState<boolean | null>(null);
   const { toast } = useToast();
   const { confirm } = useConfirm();
 
@@ -119,16 +136,15 @@ function PlanDetail() {
     };
   }, [planId, loaded]);
 
-  // Auto-poll when tasks are queued or running
+  // Keep reading while work is open: each read derives the states again.
+  const open = !!plan && ["running", "needs_you", "stalled"].includes(planState(plan));
   useEffect(() => {
-    if (!plan) return;
-    const hasActive = plan.tasks.some((t) => t.status === "queued" || t.status === "running" || t.status === "waiting");
-    if (!hasActive && plan.status !== "executing" && plan.status !== "waiting") return;
+    if (!open) return;
     const interval = setInterval(() => {
       api.getPlan(planId).then(setPlan).catch(() => {});
-    }, 5000);
+    }, 10_000);
     return () => clearInterval(interval);
-  }, [plan, planId]);
+  }, [open, planId]);
 
   /** Runs one task action with its busy mark, a toast, and a reload. */
   const taskAction = async (key: string, run: () => Promise<unknown>, ok: string, fail: string | ((e: unknown) => string)) => {
@@ -146,25 +162,42 @@ function PlanDetail() {
     }
   };
 
+  const estimate = plan?.estimate;
+  const started = !!plan && planState(plan) !== "drafting";
+
   const actions: TaskActions = {
     busy,
-    approve: (id) =>
-      void taskAction(`${id}:approve`, () => api.approveTask(planId, id), "Approved. Coderhelm will start it next.", (e) =>
+    approve: async (id) => {
+      // Approving a task starts its run now: say what that costs first.
+      const ok = await confirm({
+        title: "Approve and start this task?",
+        message: `${perRunWords(estimate)} The plan stays open for its other tasks.`,
+        confirmLabel: "Approve and start",
+      });
+      if (!ok) return;
+      void taskAction(`${id}:approve`, () => api.approveTask(planId, id), "Approved. Its run starts now.", (e) =>
         e instanceof Error ? e.message : "Couldn't approve the task. Try again.",
-      ),
-    reject: (id) => void taskAction(`${id}:reject`, () => api.rejectTask(planId, id), "Task skipped", "Couldn't skip the task. Try again."),
+      );
+    },
+    drop: (id) => void taskAction(`${id}:drop`, () => api.rejectTask(planId, id), "Task dropped", "Couldn't drop the task. Try again."),
     remove: (id) => void taskAction(`${id}:delete`, () => api.deleteTask(planId, id), "Task removed", "Couldn't remove the task. Try again."),
-    retry: (id) => void taskAction(`${id}:retry`, () => api.forceRunTask(planId, id), "Trying the task again", "Couldn't retry the task. Try again."),
+    retry: async (task: Task) => {
+      const ok = await confirm({ title: `Retry "${task.title}"?`, message: perRunWords(estimate), confirmLabel: "Retry" });
+      if (!ok) return;
+      const last = task.runs?.[task.runs.length - 1]?.run_id ?? task.run_id;
+      // A task whose ticket was filed retries its run; one that never filed
+      // its ticket files it again.
+      const run = last && task.ticket_filed ? () => api.retryRun(last) : () => api.forceRunTask(planId, task.task_id);
+      void taskAction(`${task.task_id}:retry`, run, "Trying the task again", "Couldn't retry the task. Try again.");
+    },
     forceRun: async (id) => {
-      setBusy(id);
-      // Optimistic: move to queued immediately
-      setPlan((prev) => (prev ? { ...prev, tasks: prev.tasks.map((t) => (t.task_id === id ? { ...t, status: "queued" } : t)) } : prev));
-      try {
-        await api.forceRunTask(planId, id);
-      } catch {
-        refresh();
-      }
-      setBusy(null);
+      const ok = await confirm({
+        title: "Start this task now?",
+        message: `It runs before the task it waits on has merged. ${perRunWords(estimate)}`,
+        confirmLabel: "Start now",
+      });
+      if (!ok) return;
+      void taskAction(`${id}:force`, () => api.forceRunTask(planId, id), "Starting the task", "Couldn't start the task. Try again.");
     },
     setDependency: async (id, val) => {
       // Optimistic update to avoid page flash
@@ -203,6 +236,13 @@ function PlanDetail() {
   };
 
   const handleExecute = async () => {
+    const drafts = plan?.tasks.filter((x) => taskState(x) === "draft").length ?? 0;
+    const ok = await confirm({
+      title: `Approve and start ${drafts} task${drafts === 1 ? "" : "s"}?`,
+      message: `This starts ${estimateWords(estimate, drafts)}. Each task's state follows its run and pull request until it merges.`,
+      confirmLabel: "Approve and start",
+    });
+    if (!ok) return;
     setExecuting(true);
     try {
       const result = await api.approveAllAndExecute(planId);
@@ -289,17 +329,18 @@ function PlanDetail() {
   }
 
   const tasks = plan.tasks;
-  const isDraft = plan.status === "draft";
-  const draftCount = tasks.filter((t) => t.status === "draft").length;
-  const doneCount = tasks.filter((t) => t.status === "done").length;
-  const worked = tasks.filter((t) => t.run_id || t.pr_url);
-  const prs = tasks.filter((t) => t.pr_url);
+  const state = planState(plan);
+  const isDraft = state === "drafting";
+  const draftCount = tasks.filter((t) => taskState(t) === "draft").length;
+  const needs = plan.needs ?? [];
+  const criteria = plan.criteria ?? [];
+  const readyPrs = tasks.flatMap((t) => (t.prs ?? []).filter((p) => p.tone === "ready"));
   const repoNames = [...new Set([plan.repo, ...tasks.map((t) => t.repo)].filter((r): r is string => !!r))];
 
   const sections: NavSection[] = [
-    ...(plan.description ? [{ id: "overview", label: "Overview" }] : []),
+    ...(needs.length > 0 ? [{ id: "needs", label: "Needs you", count: needs.length }] : []),
+    { id: "criteria", label: "What done means", count: criteria.length || undefined },
     { id: "tasks", label: "Tasks", count: tasks.length },
-    ...(worked.length > 0 ? [{ id: "work", label: "Runs and PRs", count: worked.length }] : []),
     { id: "spec", label: "Spec" },
     { id: "details", label: "Details" },
   ];
@@ -309,23 +350,23 @@ function PlanDetail() {
   if (isDraft && draftCount > 0) {
     primary = (
       <button type="button" onClick={handleExecute} disabled={executing} className={`${primaryButton} font-semibold`}>
-        {executing ? "Starting…" : "Approve all and start"}
+        {executing ? "Starting…" : "Approve and start"}
       </button>
     );
-  } else if (prs.length === 1) {
+  } else if (needs.length > 0) {
     primary = (
-      <a href={prs[0].pr_url} target="_blank" rel="noopener noreferrer" className={`${primaryButton} gap-1.5`}>
-        Open PR
+      <a href="#needs" className={`${primaryButton} font-semibold`}>
+        {needs.length} need{needs.length === 1 ? "s" : ""} you
+      </a>
+    );
+  } else if (readyPrs.length > 0) {
+    primary = (
+      <a href={readyPrs[0].url} target="_blank" rel="noopener noreferrer" className={`${primaryButton} gap-1.5`}>
+        Merge PR #{readyPrs[0].number}
         <span aria-hidden="true" className="inline-flex">
           <ExternalLinkIcon />
         </span>
         <span className="sr-only"> (opens in a new tab)</span>
-      </a>
-    );
-  } else if (prs.length > 1) {
-    primary = (
-      <a href="#work" className={secondaryButton}>
-        See {prs.length} PRs
       </a>
     );
   }
@@ -342,20 +383,17 @@ function PlanDetail() {
         <PageHeader detail title={plan.title || "Untitled plan"} actions={primary} more={more} />
         <ul className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-400" aria-label="About this plan" data-testid="plan-summary">
           <li>
-            <StatusText look={planStatusLook(plan.status)} />
+            <StatusText look={planStatusLook(state)} />
           </li>
-          {repoNames.length > 0 && (
-            <li title={repoNames.join(", ")}>
-              {repoNames.length === 1 ? repoNames[0] : `${repoNames.length} repos`}
+          <li data-testid="plan-count-line">{plan.summary || `${tasks.length} task${tasks.length === 1 ? "" : "s"}`}</li>
+          {(plan.cost_usd ?? 0) > 0 && (
+            <li className="tabular-nums" title="What its runs cost so far, every attempt counted">
+              {money(plan.cost_usd)} over {plan.attempts ?? 0} run{plan.attempts === 1 ? "" : "s"}
             </li>
           )}
-          <li>
-            {tasks.length === 0
-              ? "No tasks"
-              : isDraft
-                ? `${tasks.length} task${tasks.length === 1 ? "" : "s"}${draftCount > 0 && draftCount < tasks.length ? `, ${draftCount} to review` : ""}`
-                : `${doneCount} of ${tasks.length} done`}
-          </li>
+          {repoNames.length > 0 && (
+            <li title={repoNames.join(", ")}>{repoNames.length === 1 ? repoNames[0] : `${repoNames.length} repos`}</li>
+          )}
           <li>
             {isDraft ? (
               <button type="button" onClick={openDetails} className={`rounded underline decoration-zinc-700 underline-offset-2 hover:text-zinc-300 ${focusRing}`}>
@@ -365,77 +403,88 @@ function PlanDetail() {
               destinationWords(plan.destination)
             )}
           </li>
-          {plan.created_at && (
+          {plan.last_activity_at ? (
+            <li>
+              Last activity <Time iso={plan.last_activity_at} />
+            </li>
+          ) : plan.created_at ? (
             <li>
               Created <Time iso={plan.created_at} />
             </li>
-          )}
+          ) : null}
         </ul>
-        {!isDraft && tasks.length > 0 && (
-          <div
-            className="mt-3 h-1 max-w-md overflow-hidden rounded-full bg-zinc-800"
-            role="progressbar"
-            aria-label="Tasks done"
-            aria-valuemin={0}
-            aria-valuemax={tasks.length}
-            aria-valuenow={doneCount}
-          >
-            <div className="h-full rounded-full bg-emerald-400 transition-all motion-reduce:transition-none" style={{ width: `${(doneCount / tasks.length) * 100}%` }} />
-          </div>
+        {!isDraft && <StateBar counts={plan.counts} className="mt-3" />}
+        {isDraft && draftCount > 0 && (
+          <p className="mt-3 max-w-prose text-xs text-zinc-300" data-testid="plan-estimate">
+            Approving all {draftCount} task{draftCount === 1 ? "" : "s"} starts {estimateWords(estimate, draftCount)}.
+          </p>
+        )}
+        {state === "stalled" && (
+          <p className={`mt-3 text-xs ${TONES.waiting.text}`}>Nothing has moved on this plan for 3 days. Its open tasks are below.</p>
         )}
       </header>
 
       <div className="mt-8 min-w-0 lg:grid lg:grid-cols-[10rem_minmax(0,1fr)] lg:gap-10">
         <SectionNav sections={sections} />
         <article className="min-w-0 max-w-3xl space-y-10">
-          {plan.description && (
-            <DocSection id="overview" title="Overview">
-              <div className="text-sm [&_p]:text-zinc-300">
-                <Markdown>{plan.description}</Markdown>
-              </div>
-            </DocSection>
-          )}
+          <NeedsStrip
+            items={needs}
+            tasks={tasks}
+            actions={{
+              busy,
+              retry: actions.retry,
+              drop: actions.drop,
+              approveRest: () => void handleExecute(),
+            }}
+          />
+
+          <DocSection id="criteria" title="What done means">
+            <CriteriaList criteria={criteria} tasks={tasks} folded={!isDraft} />
+          </DocSection>
 
           <DocSection
             id="tasks"
             title="Tasks"
             note={
               isDraft && draftCount > 0
-                ? "Approve tasks one at a time, or approve them all and start. Approving the last one starts the plan."
-                : undefined
+                ? "Approve them all and start, or approve one at a time: the plan stays open for the rest either way."
+                : state === "running" || state === "stalled"
+                  ? "To steer a task while it works, comment on its pull request or answer on its run page."
+                  : undefined
             }
           >
-            <TaskChecklist tasks={tasks} planRepo={plan.repo} draft={isDraft} repos={repos} actions={actions} />
+            <TaskChecklist planId={planId} tasks={tasks} planRepo={plan.repo} started={started} repos={repos} actions={actions} />
           </DocSection>
 
-          {worked.length > 0 && (
-            <DocSection id="work" title="Runs and PRs">
-              <List label="Runs and PRs">
-                {worked.map((t) => (
-                  <ListRow
-                    key={t.task_id}
-                    status={taskStatusLook(t.status)}
-                    title={t.title}
-                    href={t.run_id ? `/runs/detail?id=${t.run_id}` : undefined}
-                    externalHref={!t.run_id ? t.pr_url : undefined}
-                    meta={[
-                      taskStatusLook(t.status).label,
-                      t.repo || plan.repo,
-                      t.run_id && t.pr_url && (
-                        <a key="pr" href={t.pr_url} target="_blank" rel="noopener noreferrer" className={`rounded text-zinc-400 hover:text-zinc-200 hover:underline ${focusRing}`}>
-                          {prLabel(t.pr_url)}
-                        </a>
-                      ),
-                    ]}
-                  />
-                ))}
-              </List>
-            </DocSection>
-          )}
-
-          <DocSection id="spec" title="Spec">
-            <SpecDocument openspec={openspec} writing={writingSpec} onWrite={writeSpec} />
-          </DocSection>
+          <section id="spec" aria-labelledby="spec-heading" className="min-w-0 scroll-mt-8">
+            <details
+              className="group"
+              data-testid="plan-spec"
+              open={specOpen ?? isDraft}
+              onToggle={(e) => {
+                const o = (e.currentTarget as HTMLDetailsElement).open;
+                if (o !== (specOpen ?? isDraft)) setSpecOpen(o);
+              }}
+            >
+              <summary className={`flex cursor-pointer list-none items-center gap-2 border-b border-zinc-800 pb-2 [&::-webkit-details-marker]:hidden ${focusRing}`}>
+                <span aria-hidden="true" className="inline-flex text-zinc-400 transition-transform group-open:rotate-90 motion-reduce:transition-none">
+                  <ChevronRightIcon />
+                </span>
+                <h2 id="spec-heading" className="text-base font-semibold text-zinc-100">
+                  Spec
+                </h2>
+                <span className="text-xs text-zinc-400">what and why, as written</span>
+              </summary>
+              <div className="mt-4 space-y-6">
+                {plan.description && (
+                  <div className="text-sm [&_p]:text-zinc-300" data-testid="plan-overview">
+                    <Markdown>{plan.description}</Markdown>
+                  </div>
+                )}
+                <SpecDocument openspec={openspec} writing={writingSpec} onWrite={writeSpec} />
+              </div>
+            </details>
+          </section>
 
           <section id="details" aria-label="Details" className="min-w-0 scroll-mt-8 space-y-3">
             <PlanDetails
@@ -465,12 +514,6 @@ function PlanDetail() {
       <SaveTemplateDialog planId={planId} plan={plan} open={templateOpen} onOpenChange={setTemplateOpen} />
     </Page>
   );
-}
-
-/** "https://github.com/o/r/pull/12" → "PR #12". */
-function prLabel(url: string): string {
-  const n = url.match(/\/pull\/(\d+)/)?.[1];
-  return n ? `PR #${n}` : "PR";
 }
 
 /** One part of the plan document: a readable heading and its body. */

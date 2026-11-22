@@ -303,7 +303,7 @@ const home: Page = {
             },
             {
               title: "Plans you approve",
-              text: "Describe the work in the dashboard. CoderHelm streams a plan, and each task you approve becomes an issue and a run, in order.",
+              text: "Describe the work in the dashboard. CoderHelm streams a plan, each task you approve becomes an issue and a run, and the plan shows what needs you until every task merged.",
               href: "/pull-requests/#plans",
               mini: "plans",
             },
@@ -589,7 +589,7 @@ const pullRequests: Page = {
       blocks: [
         {
           type: "p",
-          text: "In the dashboard, describe what you want to build. CoderHelm streams a plan as it reasons, searching your code and the MCP servers you connected for the details. Approve it and each task becomes a GitHub issue and a run, in order.",
+          text: "In the dashboard, describe what you want to build. CoderHelm streams a plan as it reasons, searching your code and the MCP servers you connected for the details. Approve it and each task becomes a GitHub issue and a run, in order. Each task's state follows its runs and pull requests, the plan lists what needs you, and it is done only when every task merged.",
         },
       ],
     },
