@@ -7,7 +7,7 @@ The **app map** shows how your team's app fits together across every repository 
 
 Open **Insights, App map** to see it. The first visit starts the first build, which takes a few minutes; the page says what it is doing and fills in by itself.
 
-Map viewer and extractor from the open-source [Floorplan](https://github.com/haydenschmitty/floorplan) project, MIT. CoderHelm runs a pinned Floorplan release and adds its own Recent work, Health and Ask.
+Map viewer and extractor from the open-source [Floorplan](https://github.com/haydenschmitty/floorplan) project, MIT. CoderHelm runs a pinned Floorplan release and adds its own Recent work and Health, and Chat answers questions from it.
 
 ## What is on it
 
@@ -28,9 +28,14 @@ Two switches above the map add what CoderHelm knows, in the map's own Recent wor
 - **Recent work** marks the files CoderHelm's runs of the last two weeks changed, each run with its ticket, why (from the run's plan) and its pull request.
 - **Health** adds CoderHelm's open security findings, infrastructure findings, log findings and alerts on the files and parts they concern, each linking to its finding in CoderHelm. Floorplan's own checks stay too, marked **Floorplan check**; one that names the same file and line as a CoderHelm finding is shown once.
 
-## Ask the map
+## Ask about the map
 
-Type a question ("what happens when someone books a slip?"), or pick **Ask about this** on a card in the map. Chat's agent answers from the map's own lookups, in numbered steps, and draws the parts involved as a small map.
+Questions about the map are answered by [Chat](/concepts/chat), and kept with your chats:
+
+- Type a question in the box under the map ("what happens when someone books a slip?"). Chat answers from the map first, in numbered steps for how something happens, and reads the code for exact lines. The answer shows the parts it involves as a small map, and **Continue in Chat** opens the chat to keep going.
+- Pick **Ask about this** on a card in the map to start a new chat about that part, with the question ready in the box.
+- In Chat, any question about how your app fits together ("how does checkout work?", "what calls the bookings endpoint?", "what's behind the slip page?", "which service charges the card?") uses the map the same way. **Open in App map** under such an answer opens this page on the parts it involves.
+- AI tools connected through [/mcp](/mcp) can read the map too (`map_overview`, `map_find`, `map_part`, `map_screen`, `map_file`, under `code:read`).
 
 ## How it is made and kept current
 

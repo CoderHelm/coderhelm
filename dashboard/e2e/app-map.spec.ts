@@ -34,10 +34,6 @@ async function mockApi(page: Page, opts: { building?: boolean; graph?: unknown }
       if (opts.building) return json(route, { status: { state: "building", updating: true, step: "Reading the repositories", note: "", floorplan: "floorplan--v0.11.0" }, graph: null });
       return json(route, { status: { state: "ready", updating: false, step: "", note: "", floorplan: "floorplan--v0.11.0" }, graph: opts.graph ?? HARBOR });
     }
-    if (p === "/api/app-map/ask") {
-      const mini = { ...HARBOR, nodes: HARBOR.nodes.filter((n: { id: string }) => n.id !== "web"), files: HARBOR.files.filter((f: { r: string }) => f.r === "harbor-api"), links: [], screens: [], tour: [], flows: [], recent: undefined, health: undefined };
-      return json(route, { answer: "1. The slip page sends the booking to the booking service [S1].\n2. The booking service charges the card through Stripe [S2].", grounded: true, steps: ["The slip page sends the booking to the booking service [S1].", "The booking service charges the card through Stripe [S2]."], graph: mini });
-    }
     return json(route, {});
   });
   return calls;
@@ -117,19 +113,6 @@ test.describe("App map", () => {
     await page.getByTestId("app-map-health-toggle").click();
     await expect.poll(() => calls.includes("GET /api/app-map?recent=0&health=0")).toBe(true);
     await expect(page.getByTestId("app-map-recent-toggle")).toHaveAttribute("aria-pressed", "false");
-  });
-
-  test("Ask answers in numbered steps with a small map of the parts involved", async ({ page }) => {
-    const calls = await mockApi(page);
-    await page.goto("/app-map");
-    await page.getByLabel("Ask the map").fill("What happens when someone books a slip?");
-    await page.getByRole("button", { name: "Ask", exact: true }).click();
-    const answer = page.getByTestId("app-map-answer");
-    await expect(answer.locator("li")).toHaveCount(2);
-    await expect(answer).toContainText("charges the card through Stripe");
-    await expect(viewer(page, "app-map-answer-frame").getByText("Booking service").first()).toBeVisible();
-    expect(calls.some((c) => c.startsWith("POST /api/app-map/ask"))).toBe(true);
-    await page.screenshot({ path: path.join(SHOTS_DIR, "app-map-ask.png"), fullPage: true });
   });
 
   test("shows a clear state while the map builds", async ({ page }) => {

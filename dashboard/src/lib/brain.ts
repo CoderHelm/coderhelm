@@ -2,7 +2,7 @@
 // bases: types, API calls, the answer stream and browser uploads. The API
 // keeps its original `/api/brain/*` paths; only the product name changed.
 
-import { request, ApiError } from "./api";
+import { request, ApiError, type FloorplanGraph } from "./api";
 import { streamBase } from "./runtime-config";
 import { streamPost } from "./stream-client";
 
@@ -246,6 +246,39 @@ export interface BrainMessage {
   at: string;
   /** The asker's rating of an answer. */
   feedback?: Rating | null;
+  /** An answer that used the app map: the parts it involves, and their mini map. */
+  map?: ChatMap | null;
+}
+
+/**
+ * The parts an answer's app map lookups touched: their ids (for "Open in
+ * App map") and, when it fits, a smaller map of them in Floorplan's format,
+ * drawn by the same sandboxed viewer the App map page uses.
+ */
+export interface ChatMap {
+  parts: string[];
+  graph?: FloorplanGraph | null;
+}
+
+/** The part ids `?focus=` names, at most ten. */
+export function focusOf(raw: string | null): string[] {
+  return (raw ?? "")
+    .split(",")
+    .map((p) => p.trim().replace(/[^A-Za-z0-9._:-]/g, ""))
+    .filter(Boolean)
+    .slice(0, 10);
+}
+
+/** "Ask about this" on the map: a new chat about those parts, the question in the box. */
+export function askAboutLink(names: string[]): string {
+  const q = `Tell me about ${names.join(", ")}: what it does, what calls it and what it connects to.`;
+  return `/chat?from=app_map&ask=${encodeURIComponent(q)}`;
+}
+
+/** The App map page, focused on these parts. */
+export function appMapLink(parts: string[]): string {
+  const ids = parts.slice(0, 10).map((p) => p.replace(/[^A-Za-z0-9._:-]/g, "")).filter(Boolean);
+  return ids.length ? `/app-map?focus=${ids.map(encodeURIComponent).join(",")}` : "/app-map";
 }
 
 export type Rating = "up" | "down";
@@ -302,7 +335,7 @@ export type BrainEvent =
   | { type: "step"; id: string; label: string; status: "success" | "error" }
   | { type: "text_delta"; text: string }
   | { type: "text_reset" }
-  | { type: "answer"; text: string; citations: Citation[]; grounded: boolean }
+  | { type: "answer"; text: string; citations: Citation[]; grounded: boolean; map?: ChatMap | null }
   | { type: "error"; message: string }
   | { type: "done" };
 
@@ -314,6 +347,8 @@ export interface AskBody {
   /** What the asker pointed the question at with @. */
   mentions: Mention[];
   attachments: { id: string; name: string }[];
+  /** Where it was asked from: a knowledge base page (`kb_page`), or the App map page (`app_map`, the map's lookups first). */
+  origin?: "kb_page" | "app_map";
 }
 
 /** Parses server-sent events out of a growing buffer; returns what's left. */
@@ -561,6 +596,7 @@ export const CITATION_KIND: Record<string, string> = {
   run: "Coderhelm run",
   finding: "Finding",
   record: "Coderhelm",
+  app_map: "App map",
 };
 
 /** A source's short name for a chip: "Leave policy" for "Leave policy.pdf", "leave.ts" for a path. */

@@ -6,10 +6,17 @@
 // viewer draws the map, here in a sandboxed frame (map-frame.tsx) so its code
 // never touches this page. Coderhelm adds its own Recent work (its runs) and
 // Health (its security, infrastructure, log and alert findings) into the
-// map's own fields, and Ask, answered by Chat's agent from the map.
+// map's own fields. Questions are Chat's: the Ask box asks Chat (the map's
+// lookups first) and the chat is kept with the person's others; a part's
+// "Ask about this" opens a new chat about it; an answer's "Open in App map"
+// comes back here focused on its parts (`?focus=`).
 
-import { useCallback, useEffect, useState } from "react";
-import { api, type AppMapAnswer, type AppMapResponse } from "@/lib/api";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { api, type AppMapResponse } from "@/lib/api";
+import { askAboutLink, askBrain, focusOf, type ChatMap, type Citation } from "@/lib/brain";
+import { AnswerView } from "../chat/answer";
 import { useCan } from "@/hooks/use-can";
 import { Page, PageHeader, cardClass } from "@/components/page";
 import { Callout } from "@/components/callout";
@@ -44,7 +51,18 @@ function Credit({ version }: { version?: string }) {
 }
 
 export default function AppMapPage() {
+  return (
+    <Suspense fallback={<Page testId="app-map-page"><Skeleton className="h-96 w-full" /></Page>}>
+      <AppMap />
+    </Suspense>
+  );
+}
+
+function AppMap() {
   const { can } = useCan();
+  const router = useRouter();
+  const params = useSearchParams();
+  const focus = useMemo(() => focusOf(params.get("focus")), [params]);
   const { toast } = useToast();
   const [data, setData] = useState<AppMapResponse | null>(null);
   const [error, setError] = useState("");
@@ -80,11 +98,14 @@ export default function AppMapPage() {
     }
   };
 
-  const onAsk = useCallback((items: { label?: string; id?: string }[]) => {
-    const names = items.map((i) => i.label || i.id).filter(Boolean).slice(0, 4);
-    if (names.length) setQuestion(`Tell me about ${names.join(", ")}: what it does and what it connects to.`);
-    document.getElementById("app-map-ask-input")?.focus();
-  }, []);
+  // The viewer's "Ask about this": a new chat about those parts.
+  const onAsk = useCallback(
+    (items: { label?: string; id?: string }[]) => {
+      const names = items.map((i) => i.label || i.id).filter((n): n is string => !!n).slice(0, 4);
+      if (names.length) router.push(askAboutLink(names));
+    },
+    [router],
+  );
 
   const header = (
     <PageHeader
@@ -150,7 +171,8 @@ export default function AppMapPage() {
               </Toggle>
               <span className="text-sm text-zinc-400">Coderhelm&apos;s runs and findings, shown on the parts they concern.</span>
             </div>
-            <MapFrame graph={data.graph} title="The app map" onAsk={onAsk} />
+            {focus.length > 0 && <FocusNote graph={data.graph} focus={focus} />}
+            <MapFrame graph={data.graph} title="The app map" onAsk={onAsk} focus={focus[0]} />
             <AskBox question={question} setQuestion={setQuestion} />
           </>
         )}
@@ -160,33 +182,76 @@ export default function AppMapPage() {
   );
 }
 
+/** Which parts the page opened on, by name. */
+function FocusNote({ graph, focus }: { graph: NonNullable<AppMapResponse["graph"]>; focus: string[] }) {
+  const nodes = Array.isArray(graph.nodes) ? (graph.nodes as { id?: string; label?: string }[]) : [];
+  const names = focus.map((id) => nodes.find((n) => n.id === id)?.label || id);
+  return (
+    <p className="text-sm text-zinc-400" data-testid="app-map-focus">
+      Opened on {names.join(", ")}, from a chat answer.
+    </p>
+  );
+}
+
+interface Asked {
+  question: string;
+  text: string;
+  citations: Citation[];
+  grounded: boolean;
+  map: ChatMap | null;
+  thread: string;
+  done: boolean;
+  error: string;
+}
+
+/** Ask: the question goes to Chat (the map's lookups first) and is kept in the person's chats. */
 function AskBox({ question, setQuestion }: { question: string; setQuestion: (q: string) => void }) {
-  const [busy, setBusy] = useState(false);
-  const [answer, setAnswer] = useState<AppMapAnswer | null>(null);
-  const [err, setErr] = useState("");
+  const [asked, setAsked] = useState<Asked | null>(null);
+  const busy = !!asked && !asked.done;
   const ask = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!question.trim() || busy) return;
-    setBusy(true);
-    setErr("");
+    const q = question.trim();
+    if (!q || busy) return;
+    setAsked({ question: q, text: "", citations: [], grounded: true, map: null, thread: "", done: false, error: "" });
+    const update = (fn: (a: Asked) => Asked) => setAsked((a) => (a ? fn(a) : a));
     try {
-      setAnswer(await api.askAppMap(question.trim()));
+      await askBrain({ question: q, mentions: [], attachments: [], origin: "app_map" }, (ev) => {
+        switch (ev.type) {
+          case "thread":
+            update((a) => ({ ...a, thread: ev.id }));
+            break;
+          case "text_delta":
+            update((a) => ({ ...a, text: a.text + ev.text }));
+            break;
+          case "text_reset":
+            update((a) => ({ ...a, text: "" }));
+            break;
+          case "answer":
+            update((a) => ({ ...a, text: ev.text, citations: ev.citations, grounded: ev.grounded, map: ev.map ?? null }));
+            break;
+          case "error":
+            update((a) => ({ ...a, error: ev.message }));
+            break;
+          case "done":
+            update((a) => ({ ...a, done: true }));
+            break;
+        }
+      });
     } catch (x) {
-      setErr(errText(x));
-    } finally {
-      setBusy(false);
+      update((a) => ({ ...a, error: errText(x) }));
     }
+    update((a) => ({ ...a, done: true }));
   };
   return (
     <section className={`${cardClass} space-y-3`} data-testid="app-map-ask">
       <form onSubmit={ask} className="flex flex-wrap gap-2">
         <label htmlFor="app-map-ask-input" className="sr-only">
-          Ask the map
+          Ask about the map
         </label>
         <input
           id="app-map-ask-input"
           className={`${inputClass} min-w-0 flex-1 basis-60`}
-          placeholder="Ask the map, like: what happens when someone books a slip?"
+          placeholder="Ask about the map, like: what happens when someone books a slip?"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
         />
@@ -194,23 +259,20 @@ function AskBox({ question, setQuestion }: { question: string; setQuestion: (q: 
           {busy ? "Asking" : "Ask"}
         </button>
       </form>
-      {err && (
+      <p className="text-sm text-zinc-400">Chat answers from the map and the code, and keeps the question with your chats.</p>
+      {asked?.error && (
         <Callout variant="error" title="No answer this time">
-          {err}
+          {asked.error}
         </Callout>
       )}
-      {answer && (
+      {asked && !asked.error && (
         <div className="space-y-3" data-testid="app-map-answer">
-          {answer.steps.length > 0 ? (
-            <ol className="list-decimal space-y-1 pl-5 text-sm text-zinc-200">
-              {answer.steps.map((s, i) => (
-                <li key={i}>{s}</li>
-              ))}
-            </ol>
-          ) : (
-            <p className="whitespace-pre-wrap text-sm text-zinc-200">{answer.answer}</p>
+          <AnswerView text={asked.text} citations={asked.citations} grounded={asked.grounded} streaming={!asked.done} map={asked.map} />
+          {asked.thread && asked.done && (
+            <Link href={`/chat?thread=${encodeURIComponent(asked.thread)}`} className={`${linkButton} text-sm`} data-testid="app-map-answer-chat">
+              Continue in Chat
+            </Link>
           )}
-          {answer.graph && <MapFrame graph={answer.graph} title="The parts this answer involves" height="40vh" testId="app-map-answer-frame" />}
         </div>
       )}
     </section>

@@ -112,6 +112,7 @@ An app reads a base only when three things agree: your CoderHelm role opens what
 | `find_findings` | Security and infrastructure findings, quarantined tests, reviews, alerts, log findings and plans. | The kind's base |
 | `infra_resources` | AWS resources: name, type, account, region, where each is defined in code and what AWS has pending for it. | `infra:read` |
 | `code_search`, `read_file`, `code_symbol`, `history` | Search code, read lines at a commit, ask the code graph, and read a repository's history. | `code:read` |
+| `map_overview`, `map_find`, `map_part`, `map_screen`, `map_file` | Read the team's [app map](/concepts/app-map): its parts, a search of it, one part with what it connects to, everything behind a screen, and one file. Each result links to the App map page. | `code:read` |
 | `knowledge_list` | Lists the knowledge bases you can read in Chat. | Searching knowledge |
 | `knowledge_search` | Finds the best passages for a question in those knowledge bases (or one of them), each with its source's title, link, last updated time and score. | Searching knowledge |
 
