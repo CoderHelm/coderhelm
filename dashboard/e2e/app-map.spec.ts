@@ -56,7 +56,8 @@ async function mockApi(page: Page, opts: { building?: boolean; graph?: unknown; 
 
 async function shot(page: Page, name: string) {
   fs.mkdirSync(SHOTS_DIR, { recursive: true });
-  await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
+  // The dev server's overlay button, out of the picture (a static build has none, and its CSP may refuse the tag).
+  await page.addStyleTag({ content: "nextjs-portal{display:none!important}" }).catch(() => {});
   await page.waitForTimeout(300);
   await page.screenshot({ path: path.join(SHOTS_DIR, `${name}.png`), fullPage: true });
 }

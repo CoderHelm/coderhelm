@@ -163,7 +163,8 @@ async function headerOverCards(frame: Frame): Promise<string[]> {
 
 async function shot(page: Page, name: string) {
   fs.mkdirSync(SHOTS_DIR, { recursive: true });
-  await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
+  // The dev server's overlay button, out of the picture (a static build has none, and its CSP may refuse the tag).
+  await page.addStyleTag({ content: "nextjs-portal{display:none!important}" }).catch(() => {});
   await page.waitForTimeout(400);
   await page.getByTestId("app-map-frame").screenshot({ path: path.join(SHOTS_DIR, `${name}.png`) });
 }

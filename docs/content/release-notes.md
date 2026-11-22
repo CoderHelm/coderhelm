@@ -6,6 +6,13 @@ pull requests that shipped it. Leave out CI, pins and dependency bumps. The page
 groups releases by day: one heading per day, each release a subheading under it.
 -->
 
+## November 22, 2026: the App map, easier to find and to follow
+
+- **Its own place in the menu.** App map is in the menu beside Chat and Knowledge (and in Cmd+K search), no longer a tab under Insights. ([dashboard #470](https://github.com/CoderHelm/coderhelm/pull/470))
+- **One build at a time.** Pressing **Build the map again** while a build is queued or running no longer starts another: the page shows the build that is running instead, and the button is hidden until it is done. ([coderhelm-platform #805](https://github.com/CoderHelm/coderhelm-platform/pull/805), [dashboard #470](https://github.com/CoderHelm/coderhelm/pull/470))
+- **A building page that says what is happening.** The steps in order with the one it is on, when it started, how long a map of your number of repositories usually takes, and what the map will be. If a build stops, the page says at which step, with one **Try again**. With a map there, it says when it was built and from how many repositories. ([coderhelm-platform #805](https://github.com/CoderHelm/coderhelm-platform/pull/805), [dashboard #470](https://github.com/CoderHelm/coderhelm/pull/470))
+- **A cleaner layout.** Lines keep clear of the cards they don't join, lines meeting one card are spaced apart, and the map's title fades while the map is moved under it. ([dashboard #470](https://github.com/CoderHelm/coderhelm/pull/470))
+
 ## November 22, 2026: Chat and the App map as one
 
 - **Chat reads the app map.** When your team has an app map, a question about how the app fits together ("what happens when someone books a slip?", "what calls this endpoint?", "what's behind this screen?") starts from the map and reads the code only for exact lines, with the map cited like any source. With no map yet, Chat says so in one line and answers from the code. ([coderhelm-platform #803](https://github.com/CoderHelm/coderhelm-platform/pull/803), [dashboard #469](https://github.com/CoderHelm/coderhelm/pull/469))
