@@ -2,7 +2,9 @@
 // did not finish. The API's callback sends the person back here with
 // `?signin_error=<code>&provider=<google|github|microsoft|okta>` (services/gateway
 // oauth_signin.rs); the URL carries only that short code, and this turns it
-// into one plain sentence.
+// into one plain sentence. `sso_required` also carries `&sso=<okta|microsoft>`
+// and `&team_id=<id>`: which provider the team takes, so the page can start that
+// sign-in, and the team's id, never shown.
 
 export type SignInProvider = "google" | "github" | "microsoft" | "okta";
 
@@ -13,7 +15,16 @@ export interface SignInProblem {
   sentence: string;
   /** Trying again in this browser can work. False when the browser itself is the problem. */
   canRetry: boolean;
+  /** `sso_required`: the team's id from the URL (never shown). */
+  teamId?: string;
+  /** `sso_required`: the provider the team requires. */
+  sso?: SsoProvider;
 }
+
+/** The identity providers a team can require. */
+export type SsoProvider = "okta" | "microsoft";
+
+export const SSO_NAMES: Record<SsoProvider, string> = { okta: "Okta", microsoft: "Microsoft Entra" };
 
 const NAMES: Record<SignInProvider, string> = { google: "Google", github: "GitHub", microsoft: "Microsoft", okta: "Okta" };
 
@@ -92,6 +103,51 @@ export function signInProblem(search: string): SignInProblem | null {
         sentence: "You signed in with your team's Okta, which works for that team only, so it can't link another sign-in. Sign in with your password, Google, GitHub or Microsoft to do this.",
         canRetry: false,
       };
+    case "sso_required": {
+      // The team (self-hosted: the organization) takes only its own provider.
+      // The URL names the team by id and the provider by its slug only; no
+      // text from the URL is shown.
+      const teamId = (params.get("team_id") || "").trim();
+      const sso: SsoProvider = params.get("sso") === "microsoft" ? "microsoft" : "okta";
+      return {
+        code,
+        provider,
+        teamId,
+        sso,
+        sentence: `Your team requires single sign-on with ${SSO_NAMES[sso]}. Sign in with ${SSO_NAMES[sso]}.`,
+        canRetry: false,
+      };
+    }
+    case "sso_ask_admin":
+      return {
+        code,
+        provider,
+        sentence: "Your team requires single sign-on and your account isn't linked yet. Ask an admin for a one-time link.",
+        canRetry: false,
+      };
+    case "sso_not_linked":
+      return {
+        code,
+        provider,
+        sentence: "Microsoft signed you in, but no Coderhelm account has linked that account yet. Sign in another way first, then choose Link Microsoft in Settings, Security.",
+        canRetry: false,
+      };
+    case "sso_claim_invalid": {
+      const why = params.get("reason");
+      return {
+        code,
+        provider,
+        sentence:
+          why === "used"
+            ? "That one-time link was already used. Ask an admin for a new one."
+            : why === "expired"
+              ? "That one-time link expired. Ask an admin for a new one."
+              : why === "rule_off"
+                ? "That one-time link no longer applies: your team doesn't require single sign-on now. Sign in the usual way."
+                : "That link doesn't work. Ask an admin for a new one.",
+        canRetry: false,
+      };
+    }
     case "server":
       return { code, provider, sentence: "Something went wrong on our side while signing you in.", canRetry: true };
     default:

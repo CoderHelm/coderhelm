@@ -67,6 +67,14 @@ export async function request<T>(path: string, options?: RequestInit): Promise<T
     if (res.status === 403 && serverCode === "two_factor_required" && typeof window !== "undefined") {
       window.dispatchEvent(new Event(TWO_FACTOR_REQUIRED));
     }
+    // The team requires single sign-on and this session started another way:
+    // the server ended it, and the sign-in page offers only the team's provider.
+    if (res.status === 401 && serverCode === "sso_required" && typeof window !== "undefined") {
+      const teamId = typeof parsedBody?.team_id === "string" ? parsedBody.team_id : "";
+      const provider = parsedBody?.provider === "microsoft" ? "microsoft" : "okta";
+      const to = ssoRequiredPath(teamId, provider);
+      if (!window.location.search.includes("signin_error=sso_required")) window.location.assign(to);
+    }
     // The team moved to its own install: the shell sends people there.
     if (res.status === 403 && serverCode === "team_moved" && typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent(TEAM_MOVED, { detail: movedUrl(serverUrl) }));
@@ -86,6 +94,12 @@ export interface RunOutput {
 /** Where one of a run's outputs downloads from (the session cookie goes with it). */
 export function runOutputUrl(runId: string, name: string): string {
   return `${apiBase()}/api/runs/${encodeURIComponent(runId)}/outputs/file?name=${encodeURIComponent(name)}`;
+}
+
+/** The sign-in page for a team that requires single sign-on. The URL carries the team's id and
+ *  the provider's slug only (so the page starts the right sign-in), never text the page shows. */
+export function ssoRequiredPath(teamId: string, provider: "okta" | "microsoft"): string {
+  return `/?signin_error=sso_required&sso=${provider}${teamId ? `&team_id=${encodeURIComponent(teamId)}` : ""}`;
 }
 
 /** Fired when the server holds this session until it has a second factor. */
@@ -168,6 +182,10 @@ export interface SignInSettings {
     role: string;
     two_factor: "cognito" | "app" | null;
     is_self: boolean;
+    /** Linked to the team's live Okta (an Okta sign-in reaches this member). */
+    okta_linked?: boolean;
+    /** Linked to the team's own Microsoft Entra tenant. */
+    microsoft_linked?: boolean;
   }[];
   /** How many people on the team have no second factor yet. */
   without_2fa?: number;
@@ -184,6 +202,85 @@ export interface SignInSettings {
     maker_two_factor?: "cognito" | "app" | null;
   }[];
   your_session_has_2fa?: boolean;
+  /** The team these rules are for (the sign-in page's team tenant link names it). */
+  team_id?: string;
+  /** Every member must sign in with this team's (self-hosted: the organization's) own provider. */
+  require_sso?: SsoProvider | null;
+  require_sso_since?: string | null;
+  /** Each provider the rule can name: what turning it on needs, who isn't linked, recovery. */
+  sso_options?: SsoOption[];
+  /** One-time links for members who aren't linked (never their secret). */
+  claim_links?: ClaimLink[];
+}
+
+export type SsoProvider = "okta" | "microsoft";
+
+export interface SsoOption {
+  provider: SsoProvider;
+  /** "Okta" or "Microsoft Entra". */
+  name: string;
+  set_up: boolean;
+  enabled: boolean;
+  /** Hosted: every email domain of the setup is verified (always true on self-host). */
+  domains_verified: boolean;
+  /** This session came from this provider and is linked to the caller. */
+  session_from_provider: boolean;
+  is_owner: boolean;
+  /** All of the above: the owner may turn the rule on with this provider. */
+  ready: boolean;
+  /** Active members not linked to this provider. */
+  unlinked: UnlinkedMember[];
+  /** What happens when the provider is down, in plain words. */
+  recovery: string;
+  /** API and knowledge keys whose maker isn't linked to this provider: suspended while it is required. */
+  suspended_keys?: { name: string; kind: "api" | "knowledge" }[] | null;
+  /** The team's keys couldn't be read: which would be suspended is unknown. */
+  keys_unread?: boolean;
+}
+
+export interface UnlinkedMember {
+  user_id: string;
+  email: string;
+  name: string;
+  role: string;
+}
+
+export interface ClaimLink {
+  user_id: string;
+  email: string;
+  role: string;
+  provider: SsoProvider | null;
+  expires_at: string | null;
+  used: boolean;
+  used_at: string | null;
+  issued_by: string;
+  issued_at: string;
+}
+
+/** The team's own Microsoft Entra tenant (`GET /api/sign-in/microsoft`). */
+export interface MicrosoftTenantSettings {
+  /** The deployment has its Entra app registration. */
+  available: boolean;
+  redirect_uri: string;
+  setup: {
+    tenant_id: string;
+    domains: string[];
+    enabled: boolean;
+    tested_at: string | null;
+    tested_email: string | null;
+    updated_at: string | null;
+    updated_by: string | null;
+  } | null;
+  self_hosted: boolean;
+  domains: OktaDomainProof[];
+}
+
+/** A member's own link to the team's tenant (`GET /api/users/microsoft/link`). */
+export interface MicrosoftLinkStatus {
+  available: boolean;
+  tenant_id: string | null;
+  linked: boolean;
+  linked_at: string | null;
 }
 
 /** A team's (self-hosted: the organization's) Okta sign-in, live or draft. Never its secret. */
@@ -231,6 +328,10 @@ export interface OktaDomainProof {
   verified_at: string | null;
   /** Another team already proved this domain. */
   other_team: boolean;
+  /** Kept while Okta sign-in is required, but its TXT record is gone (since then). */
+  failing_since?: string | null;
+  /** When a failing proof is released unless its record is back. */
+  release_after?: string | null;
 }
 
 /** The sign-in methods that work on this deployment (`GET /auth/methods`, public). */
@@ -242,6 +343,8 @@ export interface SignInMethods {
   microsoft?: boolean;
   /** Sign in with Okta: a team (hosted) or the organization (self-hosted) turned it on. */
   okta?: boolean;
+  /** Self-hosted: the organization requires single sign-on with this provider (only it shows). */
+  sso_required?: SsoProvider | null;
   /**
    * Self-hosted: where the sign-in page's emails come from, so a person can ask IT to allow
    * them. `setup` is the install's own sender (the set-up email), `reset_codes` Amazon
@@ -1000,8 +1103,16 @@ export const api = {
   verifySecondStep: (code: string) =>
     request<{ status: string; team_id: string }>("/auth/2fa/verify", { method: "POST", body: JSON.stringify({ code }) }),
   signInSettings: () => request<SignInSettings>("/api/sign-in"),
-  updateSignInSettings: (body: { domains?: string[]; require_2fa?: boolean }) =>
-    request<{ domains: string[]; require_2fa: boolean; require_2fa_since: string | null; notified?: number }>("/api/sign-in", {
+  /** `require_sso`: a provider's slug turns it on, "" turns it off. */
+  updateSignInSettings: (body: { domains?: string[]; require_2fa?: boolean; require_sso?: SsoProvider | ""; acknowledge_unlinked?: boolean }) =>
+    request<{
+      domains: string[];
+      require_2fa: boolean;
+      require_2fa_since: string | null;
+      notified?: number;
+      require_sso?: SsoProvider | null;
+      require_sso_since?: string | null;
+    }>("/api/sign-in", {
       method: "PUT",
       body: JSON.stringify(body),
     }),
@@ -1024,6 +1135,20 @@ export const api = {
     request<OktaSettings>("/api/sign-in/okta", { method: "PUT", body: JSON.stringify({ enabled }) }),
   oktaRemove: () => request<OktaSettings>("/api/sign-in/okta", { method: "DELETE" }),
   oktaDiscardDraft: () => request<OktaSettings>("/api/sign-in/okta/draft", { method: "DELETE" }),
+  microsoftTenant: () => request<MicrosoftTenantSettings>("/api/sign-in/microsoft"),
+  microsoftTenantSave: (tenantId: string, domains: string[]) =>
+    request<MicrosoftTenantSettings>("/api/sign-in/microsoft", { method: "PUT", body: JSON.stringify({ tenant_id: tenantId, domains }) }),
+  microsoftTenantTest: () => request<{ test_url: string }>("/api/sign-in/microsoft/test", { method: "POST" }),
+  microsoftTenantEnabled: (enabled: boolean) =>
+    request<MicrosoftTenantSettings>("/api/sign-in/microsoft/enabled", { method: "PUT", body: JSON.stringify({ enabled }) }),
+  microsoftTenantRemove: () => request<MicrosoftTenantSettings>("/api/sign-in/microsoft", { method: "DELETE" }),
+  microsoftLinkStatus: () => request<MicrosoftLinkStatus>("/api/users/microsoft/link"),
+  microsoftLinkStart: () => request<{ url: string }>("/api/users/microsoft/link", { method: "POST" }),
+  microsoftUnlink: () => request<{ linked: boolean }>("/api/users/microsoft/link", { method: "DELETE" }),
+  /** A one-time link for one unlinked member; the URL is shown once. */
+  issueClaimLink: (userId: string) =>
+    request<{ url: string; expires_at: string; claim: ClaimLink | null }>("/api/sign-in/claims", { method: "POST", body: JSON.stringify({ user_id: userId }) }),
+  revokeClaimLink: (userId: string) => request<{ revoked: boolean }>(`/api/sign-in/claims/${encodeURIComponent(userId)}`, { method: "DELETE" }),
   resetTwoFactor: (userId: string, verifiedHow: string) =>
     request<{ status: string }>(`/api/users/${encodeURIComponent(userId)}/2fa/reset`, {
       method: "POST",

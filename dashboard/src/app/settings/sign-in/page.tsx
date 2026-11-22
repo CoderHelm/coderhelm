@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { RoleGuard } from "@/components/role-guard";
 import { Page, PageHeader } from "@/components/page";
 import { Problem } from "@/components/problem";
@@ -11,10 +11,11 @@ import { StatusDot } from "@/components/list";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Field, SettingsSection, Switch } from "@/components/settings";
-import { api, errorStatus, type SignInSettings } from "@/lib/api";
-import { isSelfHosted } from "@/lib/runtime-config";
+import { api, ApiError, errorStatus, type SignInSettings, type SsoOption, type SsoProvider, type UnlinkedMember } from "@/lib/api";
+import { apiBase, isSelfHosted } from "@/lib/runtime-config";
 import { buttonClass, fullWidthOnPhone, linkButton, smallSecondaryButton } from "@/components/ui";
 import { OktaSection } from "./okta-section";
+import { MicrosoftSection } from "./microsoft-section";
 
 export default function SignInSettingsGuarded() {
   return (
@@ -38,6 +39,7 @@ function SignInSettingsPage() {
   const [domainError, setDomainError] = useState("");
   const [saving, setSaving] = useState(false);
   const [resetting, setResetting] = useState<Person | null>(null);
+  const [claimUrl, setClaimUrl] = useState<{ who: string; url: string } | null>(null);
 
   const load = useCallback(() => {
     setFailed(false);
@@ -54,8 +56,8 @@ function SignInSettingsPage() {
         title="Sign-in rules"
         lead={
           selfHosted
-            ? "This install is for one organization. Admins add people, choose whether everyone must use two-factor sign-in, and can turn on Okta sign-in."
-            : "Choose whether everyone on this team must use two-factor sign-in, see who has it set up, and turn on Okta sign-in."
+            ? "This install is for one organization. Admins add people, choose whether everyone must use two-factor sign-in, and can require single sign-on with Okta or Microsoft Entra."
+            : "Choose whether everyone on this team must use two-factor sign-in, see who has it set up, and require single sign-on with Okta or Microsoft Entra."
         }
       />
     </div>
@@ -156,6 +158,106 @@ function SignInSettingsPage() {
 
   const canTurnOn = !!data.your_session_has_2fa;
 
+  const ssoRequired: SsoProvider | null = data.require_sso ?? null;
+  const selfEmail = people.find((p) => p.is_self)?.email ?? "";
+  const teamId = data.team_id ?? "";
+  const options = data.sso_options ?? [];
+  const inUse = options.find((o) => o.provider === ssoRequired) ?? null;
+  const claims = data.claim_links ?? [];
+  const isOwner = options.some((o) => o.is_owner);
+  const names = (list: UnlinkedMember[]) => list.map((m) => m.name || m.email || "A member").join(", ");
+
+  const sendRequireSso = async (to: SsoProvider | "", acknowledge: boolean) => {
+    const r = await api.updateSignInSettings(to ? { require_sso: to, acknowledge_unlinked: acknowledge } : { require_sso: "" });
+    toast(to ? "Single sign-on is required. Sessions on this team from any other way in ended." : "Single sign-on is no longer required");
+    setData({ ...data, require_sso: r.require_sso ?? null, require_sso_since: r.require_sso_since ?? null });
+    load();
+  };
+
+  const turnOn = async (o: SsoOption) => {
+    const ok = await confirm({
+      title: `Require single sign-on with ${o.name} for ${everyone}?`,
+      message: `${o.recovery}${
+        o.unlinked.length > 0
+          ? ` ${o.unlinked.length} ${o.unlinked.length === 1 ? "person hasn't" : "people haven't"} linked ${o.name} yet and can't sign in until an admin gives them a one-time link: ${names(o.unlinked)}.`
+          : ""
+      }${
+        o.keys_unread
+          ? " Coderhelm couldn't read the team's keys, so it can't say which would be suspended. Try again in a minute."
+          : (o.suspended_keys ?? []).length > 0
+          ? ` These keys are suspended until their maker links ${o.name}: ${(o.suspended_keys ?? []).map((k) => k.name).join(", ")}.`
+          : ""
+      } Every session and app connection on this team from any other way in ends now, the owner's included, and stays ended if you turn this off later.`,
+      confirmLabel: `Require ${o.name}`,
+      destructive: true,
+    });
+    if (!ok) return;
+    setSaving(true);
+    try {
+      await sendRequireSso(o.provider, true);
+    } catch (e) {
+      if (e instanceof ApiError && e.code === "unlinked_members") {
+        const list = Array.isArray(e.body?.unlinked) ? (e.body.unlinked as UnlinkedMember[]) : [];
+        const again = await confirm({
+          title: `Some people haven't linked ${o.name}`,
+          message: `${names(list)} can't sign in while single sign-on is required, until an admin gives them a one-time link. Require it anyway?`,
+          confirmLabel: `Require ${o.name}`,
+          destructive: true,
+        });
+        if (again) {
+          try {
+            await sendRequireSso(o.provider, true);
+          } catch (e2) {
+            toast(e2 instanceof Error ? e2.message : "Couldn't save. Try again.", "error");
+          }
+        }
+      } else {
+        toast(e instanceof Error ? e.message : "Couldn't save. Try again.", "error");
+      }
+      load();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const turnOff = async () => {
+    const ok = await confirm({
+      title: "Stop requiring single sign-on?",
+      message: "People can sign in with their password, Google, GitHub, Microsoft or Okta again.",
+      confirmLabel: "Stop requiring it",
+      destructive: true,
+    });
+    if (!ok) return;
+    setSaving(true);
+    try {
+      await sendRequireSso("", false);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Couldn't save. Try again.", "error");
+      load();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const makeClaim = async (m: UnlinkedMember) => {
+    try {
+      const r = await api.issueClaimLink(m.user_id);
+      setClaimUrl({ who: m.name || m.email, url: r.url });
+      load();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Couldn't make the link. Try again.", "error");
+    }
+  };
+  const revokeClaim = async (userId: string) => {
+    try {
+      await api.revokeClaimLink(userId);
+      toast("Link revoked");
+      load();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Couldn't revoke it. Try again.", "error");
+    }
+  };
+
   return (
     <Page>
       {header}
@@ -250,7 +352,156 @@ function SignInSettingsPage() {
           </div>
         </SettingsSection>
 
+        {data.is_org !== false && (
+          <SettingsSection
+            id="require-sso"
+            title="Require single sign-on"
+            description={`While it's on, ${everyone} signs in only with ${selfHosted ? "the organization's" : "this team's"} own identity provider: its Okta, or its Microsoft Entra tenant. Password, Google, GitHub and every other Microsoft account stop working${selfHosted ? "" : " for this team"}, for everyone, the owner included, and sessions that started another way end at once.`}
+          >
+            <div className="space-y-5 px-4 py-4">
+              <p className="text-sm text-zinc-300" data-testid="require-sso-state">
+                {inUse
+                  ? `Required with ${inUse.name}${data.require_sso_since ? ` since ${new Date(data.require_sso_since).toLocaleDateString()}` : ""}. Only the owner can turn it off.`
+                  : "Off: people sign in any way this Coderhelm offers."}
+              </p>
+              {inUse && (
+                <div className="space-y-3">
+                  <p className="text-sm text-amber-300" data-testid="sso-recovery">{inUse.recovery}</p>
+                  <button
+                    type="button"
+                    onClick={turnOff}
+                    disabled={saving || !inUse.is_owner}
+                    className={buttonClass("danger", "sm")}
+                    data-testid="require-sso-off"
+                  >
+                    Stop requiring single sign-on
+                  </button>
+                </div>
+              )}
+              {!inUse &&
+                options.map((o) => (
+                  <div key={o.provider} className="space-y-2 rounded-md border border-zinc-800 px-3 py-3" data-testid={`sso-option-${o.provider}`}>
+                    <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+                      <p className="text-sm font-medium text-zinc-100">{o.name}</p>
+                      <button
+                        type="button"
+                        onClick={() => turnOn(o)}
+                        disabled={saving || !o.ready}
+                        className={buttonClass("primary", "sm")}
+                        data-testid={`require-sso-${o.provider}`}
+                      >
+                        Require {o.name}
+                      </button>
+                    </div>
+                    {!o.ready && (
+                      <ul className="space-y-1 text-sm">
+                        <Need ok={o.is_owner} testId={`need-owner-${o.provider}`}>
+                          Only the owner can turn it on or off.
+                        </Need>
+                        <Need ok={o.set_up && o.enabled} testId={`need-on-${o.provider}`}>
+                          {o.set_up ? `Turn ${o.name} sign-in on below.` : `Set up ${o.name} for ${selfHosted ? "the organization" : "this team"} below and turn it on.`}
+                        </Need>
+                        {!selfHosted && (
+                          <Need ok={o.domains_verified} testId={`need-domains-${o.provider}`}>
+                            Verify every email domain of the {o.name} setup in DNS.
+                          </Need>
+                        )}
+                        <Need ok={o.session_from_provider} testId={`need-session-${o.provider}`}>
+                          <span>Sign in with {selfHosted ? "the organization's" : "this team's"} {o.name} yourself first, as the account you linked, so you know it works for you.</span>
+                          {!o.session_from_provider && o.set_up && o.enabled && o.provider === "okta" && selfEmail && (
+                            <form method="post" action={`${apiBase()}/auth/okta`} className="mt-1">
+                              <input type="hidden" name="email" value={selfEmail} />
+                              <button type="submit" className={linkButton} data-testid="sign-in-with-okta">
+                                Sign in with Okta
+                              </button>
+                            </form>
+                          )}
+                          {!o.session_from_provider && o.set_up && o.enabled && o.provider === "microsoft" && (
+                            <a href={`${apiBase()}/auth/microsoft?team_id=${encodeURIComponent(teamId)}`} className={`mt-1 inline-block ${linkButton}`} data-testid="sign-in-with-microsoft">
+                              Sign in with Microsoft
+                            </a>
+                          )}
+                        </Need>
+                      </ul>
+                    )}
+                    <p className="text-sm text-zinc-400" data-testid={`sso-recovery-${o.provider}`}>{o.recovery}</p>
+                  </div>
+                ))}
+              {(inUse ? [inUse] : options.filter((o) => o.set_up)).map((o) => (
+                <div key={`unlinked-${o.provider}`} data-testid={`sso-unlinked-${o.provider}`}>
+                  <h3 className="text-sm font-medium text-zinc-200">Not linked to {o.name} yet</h3>
+                  {o.unlinked.length === 0 ? (
+                    <p className="mt-1 text-sm text-zinc-400">Everyone on the team has linked {o.name}.</p>
+                  ) : (
+                    <>
+                      <p className="mt-1 text-sm text-zinc-400">
+                        {inUse
+                          ? `They can't sign in until they're linked. Coderhelm never links anyone by email: an admin gives each of them a one-time link, good for 72 hours, that works only through ${o.name} with exactly their own email. The owners are emailed when one is made and when it is used.`
+                          : `They link ${o.name} in Settings, Security. Once single sign-on is required, they can't sign in until an admin gives them a one-time link.`}
+                      </p>
+                      <ul className="mt-2 space-y-1 text-sm text-zinc-200" data-testid="unlinked-list">
+                        {o.unlinked.map((m) => {
+                          const claim = claims.find((c) => c.user_id === m.user_id && !c.used);
+                          return (
+                            <li key={m.user_id} className="flex min-w-0 flex-wrap items-center gap-2">
+                              <StatusDot tone={inUse ? "attention" : "muted"} />
+                              <span className="[overflow-wrap:anywhere]">
+                                {m.name || m.email}
+                                {m.name && m.email && <span className="text-zinc-400"> {m.email}</span>}
+                              </span>
+                              {inUse && m.role !== "owner" && (
+                                claim ? (
+                                  <span className="text-zinc-400">
+                                    Link sent, good until {claim.expires_at ? new Date(claim.expires_at).toLocaleString() : "soon"}.{" "}
+                                    <button type="button" onClick={() => revokeClaim(m.user_id)} className={linkButton} data-testid="revoke-claim">
+                                      Revoke
+                                    </button>{" "}
+                                    <button type="button" onClick={() => makeClaim(m)} className={linkButton}>
+                                      Make a new one
+                                    </button>
+                                  </span>
+                                ) : (
+                                  <button type="button" onClick={() => makeClaim(m)} className={smallSecondaryButton} data-testid="make-claim">
+                                    Make a one-time link
+                                  </button>
+                                )
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </>
+                  )}
+                </div>
+              ))}
+              <p className="text-sm text-zinc-400" data-testid="require-sso-keys">
+                Keys follow their maker: while single sign-on is required, an API key or knowledge key works only while the member who made it is
+                on the team and linked to the provider. Others are suspended, not deleted, and work again once their maker links.
+              </p>
+              {(inUse ? [inUse] : options).some((o) => o.keys_unread) && (
+                <p className="text-sm text-amber-300" data-testid="keys-unread">
+                  Coderhelm couldn&apos;t read the team&apos;s keys, so it can&apos;t say which would be suspended. Try again in a minute.
+                </p>
+              )}
+              {(inUse ? [inUse] : options)
+                .filter((o) => !o.keys_unread && (o.suspended_keys ?? []).length > 0)
+                .map((o) => (
+                  <p key={`keys-${o.provider}`} className="text-sm text-amber-300" data-testid={`suspended-keys-${o.provider}`}>
+                    {inUse ? "Suspended now" : `Suspended with ${o.name}`}: {(o.suspended_keys ?? []).map((k) => k.name).join(", ")}
+                  </p>
+                ))}
+              <p className="text-sm text-zinc-400" data-testid="require-sso-support">
+                Coderhelm support can open a support view of this team only with the support access you grant, and only from a session of
+                theirs that passed a second factor. It is read-only, never a session in your team, and every page they read goes in your audit log.
+                Turning the rule on ends every earlier session from another way in for good: turning it off later doesn&apos;t bring them back.
+              </p>
+            </div>
+          </SettingsSection>
+        )}
+
         {data.is_org !== false && <OktaSection selfHosted={selfHosted} />}
+
+        {data.is_org !== false && <MicrosoftSection selfHosted={selfHosted} isOwner={isOwner} />}
 
         <SettingsSection
           id="who-has-it"
@@ -318,6 +569,23 @@ function SignInSettingsPage() {
         </SettingsSection>
       </div>
 
+      {claimUrl && (
+        <Modal
+          open
+          onOpenChange={(o) => !o && setClaimUrl(null)}
+          title={`One-time link for ${claimUrl.who}`}
+          description="Send it to them yourself. It works once, for 72 hours, only when they sign in through your identity provider with exactly their own email. It isn't shown again."
+          testId="claim-link-dialog"
+          footer={
+            <button type="button" onClick={() => setClaimUrl(null)} className={buttonClass("ghost")}>
+              Done
+            </button>
+          }
+        >
+          <input readOnly value={claimUrl.url} aria-label="One-time link" onFocus={(e) => e.target.select()} className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100" data-testid="claim-url" />
+        </Modal>
+      )}
+
       {resetting && (
         <ResetDialog
           person={resetting}
@@ -331,6 +599,21 @@ function SignInSettingsPage() {
         />
       )}
     </Page>
+  );
+}
+
+/** One thing turning Require single sign-on on needs, and whether it holds now. */
+function Need({ ok, testId, children }: { ok: boolean; testId: string; children: ReactNode }) {
+  return (
+    <li className="flex min-w-0 items-start gap-2" data-testid={testId} data-ok={ok ? "yes" : "no"}>
+      <span className="mt-1.5">
+        <StatusDot tone={ok ? "success" : "attention"} />
+      </span>
+      <span className={`min-w-0 ${ok ? "text-zinc-400" : "text-zinc-200"}`}>
+        <span className="sr-only">{ok ? "Done: " : "Needed: "}</span>
+        {children}
+      </span>
+    </li>
   );
 }
 

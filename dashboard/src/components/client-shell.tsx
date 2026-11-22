@@ -35,7 +35,7 @@ import { SetupBanner } from "@/components/setup-banner";
 import { UpdateReady } from "@/components/update-ready";
 import { CopyButton } from "./copy-button";
 import { MicrosoftMark, OktaMark } from "./brand-icons";
-import { openInChromeHref, signInProblem, type SignInProblem } from "@/lib/sign-in-errors";
+import { openInChromeHref, signInProblem, SSO_NAMES, type SignInProblem, type SsoProvider } from "@/lib/sign-in-errors";
 import { consentReturnTo, rememberConsentReturn, takeConsentReturn } from "@/lib/connected-apps";
 import { TwoFactorSetup } from "./two-factor-setup";
 import { useSignInMethods } from "@/hooks/use-sign-in-methods";
@@ -436,8 +436,8 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
                     try {
                       await api.switchTeam(t.team_id);
                       window.location.reload();
-                    } catch {
-                      window.alert(`Could not switch to ${t.org}. Try again.`);
+                    } catch (e) {
+                      window.alert(e instanceof ApiError && e.code === "sso_required" ? e.message : `Could not switch to ${t.org}. Try again.`);
                     }
                   }}
                   className={`block mx-auto mt-1 text-sm text-zinc-300 hover:text-white underline rounded ${focusRing}`}
@@ -725,8 +725,10 @@ function Sidebar({
     try {
       await api.switchTeam(teamId);
       window.location.reload();
-    } catch {
+    } catch (e) {
       setSwitching(false);
+      // That team takes only its own identity provider: say so instead of doing nothing.
+      if (e instanceof ApiError && e.code === "sso_required") window.alert(e.message);
     }
   };
 
@@ -978,8 +980,8 @@ function TeamMovedNotice({ url, teams }: { url: string | null; teams: TeamInfo[]
                   try {
                     await api.switchTeam(t.team_id);
                     window.location.reload();
-                  } catch {
-                    window.alert(`Could not switch to ${t.org}. Try again.`);
+                  } catch (e) {
+                    window.alert(e instanceof ApiError && e.code === "sso_required" ? e.message : `Could not switch to ${t.org}. Try again.`);
                   }
                 }}
                 className={`block text-sm text-zinc-300 hover:text-white underline rounded ${focusRing}`}
@@ -1115,6 +1117,9 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
   // How a self-hosted install's account form was opened: an admin's invite email or the
   // installer's first-admin link. Without either it has no open sign-up.
   const [joinVia, setJoinVia] = useState<"invite" | "first_admin" | null>(null);
+  // The team (self-hosted: the organization) requires single sign-on: only its provider
+  // shows. There is no other way in, for anyone.
+  const [ssoRequired, setSsoRequired] = useState<{ teamId: string; provider: SsoProvider } | null>(null);
 
   // The hosted site's terms; a self-hosted install has none unless it names a site.
   const site = siteUrl();
@@ -1123,6 +1128,21 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
   // Only the ways in that work here (the API says which).
   const methods = useSignInMethods();
   const providers = methods.google || methods.github || methods.microsoft || methods.okta;
+  const ssoOnly = ssoRequired ?? (methods.sso_required ? { teamId: "", provider: methods.sso_required } : null);
+  const ssoName = ssoOnly ? SSO_NAMES[ssoOnly.provider] : "";
+  // Never a name from the URL: the same plain sentence for every team.
+  const ssoRequiredWords = selfHosted
+    ? `Your organization requires single sign-on with ${ssoName}.`
+    : `Your team requires single sign-on with ${ssoName}.`;
+  const refusedForSso = (e: unknown): boolean => {
+    if (!(e instanceof ApiError) || e.code !== "sso_required") return false;
+    const teamId = typeof e.body?.team_id === "string" ? e.body.team_id : "";
+    setSsoRequired({ teamId, provider: e.body?.provider === "microsoft" ? "microsoft" : "okta" });
+    setPassword("");
+    setCode("");
+    setView("login");
+    return true;
+  };
   // Signed out on an app's consent page: GitHub sign-in comes straight back
   // here, and someone without an account may join as a reader.
   const [consentBack, setConsentBack] = useState<string | null>(null);
@@ -1139,7 +1159,10 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
     const params = new URLSearchParams(window.location.search);
     // Google or GitHub sign-in came back without finishing (the API's callback).
     const failed = signInProblem(window.location.search);
-    if (failed) {
+    if (failed?.code === "sso_required") {
+      setSsoRequired({ teamId: failed.teamId ?? "", provider: failed.sso ?? "okta" });
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (failed) {
       setProblem(failed);
       window.history.replaceState({}, "", window.location.pathname);
     }
@@ -1231,7 +1254,9 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
         onAuth(u);
       }
     } catch (e: unknown) {
-      if (e instanceof ApiError && e.code === "not_invited") {
+      if (refusedForSso(e)) {
+        // The page now shows only the team's provider.
+      } else if (e instanceof ApiError && e.code === "not_invited") {
         setError(NOT_INVITED);
       } else if (e instanceof ApiError && e.code === USE_PASSWORD) {
         setError(e.message);
@@ -1306,6 +1331,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
       const u = await api.me();
       onAuth(u);
     } catch (e: unknown) {
+      if (refusedForSso(e)) return;
       if (e instanceof ApiError && e.code === "locked_out") {
         // Too many wrong codes: the server's sentence says how long the pause is.
         setError(e.message);
@@ -1344,6 +1370,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
       const u = await api.me();
       onAuth(u);
     } catch (e: unknown) {
+      if (refusedForSso(e)) return;
       if (e instanceof ApiError && e.code === "locked_out") {
         setError(e.message);
         setCode("");
@@ -1383,8 +1410,33 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
 
           {view === "reset" && forgotSent && <SenderNote senders={methods.senders} />}
 
+          {/* ── Login, for a team that requires single sign-on: its provider only ── */}
+          {view === "login" && ssoOnly && (
+            <div className="w-full space-y-4" data-testid="sso-required">
+              <div role="status" className="w-full rounded-lg border border-zinc-800 bg-zinc-900/60 px-4 py-3 text-sm text-zinc-200">
+                <p className="wrap-anywhere" data-testid="sso-required-words">{ssoRequiredWords}</p>
+                <p className="mt-1 text-zinc-400">
+                  {ssoOnly.provider === "okta"
+                    ? "Sign in with your work email. We'll send you to its Okta."
+                    : "Sign in with your work Microsoft account."}
+                </p>
+              </div>
+              {ssoOnly.provider === "okta" ? (
+                <OktaEmailForm email={email} onEmail={(v) => { setEmail(v); setError(""); }} />
+              ) : (
+                <a
+                  href={`${apiBase()}/auth/microsoft${ssoOnly.teamId ? `?team_id=${encodeURIComponent(ssoOnly.teamId)}` : ""}`}
+                  className="block w-full rounded-lg bg-blue-600 px-4 py-2.5 text-center text-sm font-medium text-white hover:bg-blue-500 transition-colors"
+                  data-testid="sso-microsoft"
+                >
+                  Continue with Microsoft
+                </a>
+              )}
+            </div>
+          )}
+
           {/* ── Login ── */}
-          {view === "login" && (
+          {view === "login" && !ssoOnly && (
             <div className="w-full space-y-4">
               {!selfHosted && (
               <div className="flex items-center justify-center gap-2 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5">
@@ -1569,15 +1621,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
               <p className="text-sm text-zinc-400 text-center">
                 Enter your work email. We&apos;ll send you to your organization&apos;s Okta to sign in.
               </p>
-              {/* A real form post: the email goes in the body, never in a URL. */}
-              <form method="post" action={`${apiBase()}/auth/okta`} className="space-y-3">
-                <input type="email" name="email" id="okta-email" required autoComplete="email" aria-label="Work email" placeholder="Work email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); }}
-                  className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600" />
-                <button type="submit" disabled={!email}
-                  className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-40 transition-colors cursor-pointer disabled:cursor-not-allowed">
-                  Continue to Okta
-                </button>
-              </form>
+              <OktaEmailForm email={email} onEmail={(v) => { setEmail(v); setError(""); }} />
               <button onClick={() => { setView("login"); setError(""); setMessage(""); }} className="text-xs text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer">
                 Back to sign in
               </button>
@@ -1684,6 +1728,20 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
         </div>
       </div>
     </div>
+  );
+}
+
+/** The Okta sign-in form: a real form post, so the email goes in the body, never in a URL. */
+function OktaEmailForm({ email, onEmail }: { email: string; onEmail: (v: string) => void }) {
+  return (
+    <form method="post" action={`${apiBase()}/auth/okta`} className="space-y-3">
+      <input type="email" name="email" id="okta-email" required autoComplete="email" aria-label="Work email" placeholder="Work email" value={email} onChange={(e) => onEmail(e.target.value)}
+        className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600" />
+      <button type="submit" disabled={!email}
+        className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-40 transition-colors cursor-pointer disabled:cursor-not-allowed">
+        Continue to Okta
+      </button>
+    </form>
   );
 }
 

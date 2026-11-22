@@ -36,6 +36,7 @@ export function useSignInMethods(): SignInMethods {
           github: m.github === true,
           microsoft: m.microsoft === true,
           okta: m.okta === true,
+          sso_required: m.sso_required === "okta" || m.sso_required === "microsoft" ? m.sso_required : null,
           ...(m.senders ? { senders: m.senders } : {}),
         });
       })

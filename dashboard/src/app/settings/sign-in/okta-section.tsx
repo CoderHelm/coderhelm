@@ -294,10 +294,16 @@ export function OktaSection({ selfHosted }: { selfHosted: boolean }) {
                   {(data.domains ?? []).map((d) => (
                     <li key={d.domain} className="min-w-0 rounded-md border border-zinc-800 px-3 py-2 text-sm" data-testid="okta-domain">
                       <p className="flex min-w-0 items-center gap-2">
-                        <StatusDot tone={d.verified_at ? "success" : d.other_team ? "attention" : "muted"} />
+                        <StatusDot tone={d.failing_since ? "attention" : d.verified_at ? "success" : d.other_team ? "attention" : "muted"} />
                         <span className="text-zinc-100 [overflow-wrap:anywhere]">{d.domain}</span>
-                        <span className="text-zinc-400">
-                          {d.verified_at ? `Verified ${when(d.verified_at)}` : d.other_team ? "Verified by another team" : "Not verified"}
+                        <span className="text-zinc-400" data-testid="okta-domain-state">
+                          {d.failing_since
+                            ? `TXT record missing since ${when(d.failing_since)}: add it back, then Verify domains${d.release_after ? `. Released on ${when(d.release_after)} if it is still missing` : ""}`
+                            : d.verified_at
+                              ? `Verified ${when(d.verified_at)}`
+                              : d.other_team
+                                ? "Verified by another team"
+                                : "Not verified"}
                         </span>
                         {d.verified_at && (
                           <button type="button" onClick={() => release(d.domain)} disabled={busy} className={buttonClass("ghost", "sm")}>
