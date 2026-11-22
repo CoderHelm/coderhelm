@@ -13,8 +13,8 @@ export interface SignInProblem {
   sentence: string;
   /** Trying again in this browser can work. False when the browser itself is the problem. */
   canRetry: boolean;
-  /** `okta_required`: the team's name, when the server gave one. */
-  team?: string;
+  /** `okta_required`: the team's id from the URL (never shown). */
+  teamId?: string;
 }
 
 const NAMES: Record<SignInProvider, string> = { google: "Google", github: "GitHub", microsoft: "Microsoft", okta: "Okta" };
@@ -95,13 +95,15 @@ export function signInProblem(search: string): SignInProblem | null {
         canRetry: false,
       };
     case "okta_required": {
-      // The team (self-hosted: the organization) takes only its own Okta.
-      const team = (params.get("team") || "").trim();
+      // The team (self-hosted: the organization) takes only its own Okta. The
+      // URL names the team by id only, for the owner's break-glass sign-in;
+      // no text from the URL is shown.
+      const teamId = (params.get("team_id") || "").trim();
       return {
         code,
         provider,
-        team,
-        sentence: `${team ? `${team} requires` : "Your team requires"} Okta sign-in. Sign in with Okta using your work email.`,
+        teamId,
+        sentence: "Your team requires Okta sign-in. Sign in with Okta using your work email.",
         canRetry: false,
       };
     }

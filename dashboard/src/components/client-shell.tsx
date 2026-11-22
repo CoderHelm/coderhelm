@@ -1119,7 +1119,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
   const [joinVia, setJoinVia] = useState<"invite" | "first_admin" | null>(null);
   // The team (self-hosted: the organization) requires Okta sign-in: only its Okta shows,
   // with a small way in for the owner (password and two-factor code, logged).
-  const [oktaRequired, setOktaRequired] = useState<{ team: string } | null>(null);
+  const [oktaRequired, setOktaRequired] = useState<{ teamId: string } | null>(null);
   const [breakGlass, setBreakGlass] = useState(false);
 
   // The hosted site's terms; a self-hosted install has none unless it names a site.
@@ -1129,16 +1129,13 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
   // Only the ways in that work here (the API says which).
   const methods = useSignInMethods();
   const providers = methods.google || methods.github || methods.microsoft || methods.okta;
-  const oktaOnly = oktaRequired ?? (methods.okta_required ? { team: "" } : null);
-  const oktaRequiredWords = oktaOnly?.team
-    ? `${oktaOnly.team} requires Okta sign-in.`
-    : selfHosted
-      ? "Your organization requires Okta sign-in."
-      : "Your team requires Okta sign-in.";
+  const oktaOnly = oktaRequired ?? (methods.okta_required ? { teamId: "" } : null);
+  // Never a name from the URL: the same plain sentence for every team.
+  const oktaRequiredWords = selfHosted ? "Your organization requires Okta sign-in." : "Your team requires Okta sign-in.";
   const refusedForOkta = (e: unknown): boolean => {
     if (!(e instanceof ApiError) || e.code !== "okta_required") return false;
-    const team = typeof e.body?.team === "string" ? e.body.team : "";
-    setOktaRequired({ team });
+    const teamId = typeof e.body?.team_id === "string" ? e.body.team_id : "";
+    setOktaRequired({ teamId });
     setBreakGlass(false);
     setPassword("");
     setCode("");
@@ -1162,7 +1159,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
     // Google or GitHub sign-in came back without finishing (the API's callback).
     const failed = signInProblem(window.location.search);
     if (failed?.code === "okta_required") {
-      setOktaRequired({ team: failed.team ?? "" });
+      setOktaRequired({ teamId: failed.teamId ?? "" });
       window.history.replaceState({}, "", window.location.pathname);
     } else if (failed) {
       setProblem(failed);
@@ -1240,7 +1237,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
   const handleLogin = async () => {
     setError(""); setLoading(true);
     try {
-      const result = await api.loginEmail(email, password, breakGlass);
+      const result = await api.loginEmail(email, password, breakGlass, oktaOnly?.teamId || undefined);
       if (result.status === "mfa_required" && result.carry_over) {
         setCarryOver(true);
         setView("mfa");
@@ -1367,7 +1364,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
           return;
         }
       } else {
-        await api.mfaVerify(mfaSession, code, email, breakGlass);
+        await api.mfaVerify(mfaSession, code, email, breakGlass, oktaOnly?.teamId || undefined);
       }
       const u = await api.me();
       onAuth(u);

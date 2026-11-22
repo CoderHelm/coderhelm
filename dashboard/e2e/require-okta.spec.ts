@@ -83,7 +83,7 @@ async function mock(page: Page, over: Partial<State> = {}): Promise<State> {
       state.logins.push(body());
       if (state.refuseLogin) {
         state.refuseLogin = false;
-        return json(route, { code: "okta_required", error: "Example requires Okta sign-in.", team: "Example" }, 403);
+        return json(route, { code: "okta_required", error: "Example requires Okta sign-in.", team: "Example", team_id: "TEAM#t1" }, 403);
       }
       return json(route, { status: "mfa_required", session: "cognito-session" });
     }
@@ -95,7 +95,7 @@ async function mock(page: Page, over: Partial<State> = {}): Promise<State> {
     if (p === "/api/me") {
       if (state.ended) {
         state.ended = false;
-        return json(route, { code: "okta_required", error: "Example requires Okta sign-in.", team: "Example" }, 401);
+        return json(route, { code: "okta_required", error: "Example requires Okta sign-in.", team: "Example", team_id: "TEAM#t1" }, 401);
       }
       return state.signedIn ? json(route, ME) : json(route, { error: "unauthorized" }, 401);
     }
@@ -228,8 +228,11 @@ for (const width of [1280, 390]) {
 
     test("a team that requires Okta: only its Okta form, and the owner's way in posts break_glass", async ({ page }) => {
       const state = await mock(page);
-      await page.goto("/?signin_error=okta_required&provider=google&team=Example");
-      await expect(page.getByTestId("okta-required-words")).toHaveText("Example requires Okta sign-in.");
+      // Text in the URL is never shown: a crafted name can't put words on
+      // the sign-in page.
+      await page.goto("/?signin_error=okta_required&provider=google&team_id=TEAM%23t2&team=Pay%20here%20first");
+      await expect(page.getByTestId("okta-required-words")).toHaveText("Your team requires Okta sign-in.");
+      await expect(page.getByText("Pay here first")).toHaveCount(0);
       await expect(page.getByRole("link", { name: "Continue with Google" })).toHaveCount(0);
       await expect(page.getByRole("link", { name: "Continue with Microsoft" })).toHaveCount(0);
       await expect(page.getByLabel("Password")).toHaveCount(0);
@@ -241,10 +244,16 @@ for (const width of [1280, 390]) {
       await glass.getByLabel("Email").fill("owner@example.org");
       await glass.getByLabel("Password").fill("a-password-1!");
       await glass.getByRole("button", { name: "Sign in as the owner" }).click();
-      await expect.poll(() => state.logins.at(-1)).toEqual({ email: "owner@example.org", password: "a-password-1!", break_glass: true });
+      // The team it is for goes with it (an owner of several such teams).
+      await expect.poll(() => state.logins.at(-1)).toEqual({
+        email: "owner@example.org",
+        password: "a-password-1!",
+        break_glass: true,
+        break_glass_team: "TEAM#t2",
+      });
       await page.getByLabel("Six digit code").fill("123456");
       await page.getByRole("button", { name: "Verify" }).click();
-      await expect.poll(() => state.mfas.at(-1)).toMatchObject({ code: "123456", break_glass: true });
+      await expect.poll(() => state.mfas.at(-1)).toMatchObject({ code: "123456", break_glass: true, break_glass_team: "TEAM#t2" });
     });
 
     test("a refused password sign-in turns the screen to the team's Okta", async ({ page }) => {
@@ -253,7 +262,7 @@ for (const width of [1280, 390]) {
       await page.getByLabel("Email").first().fill("ann@example.org");
       await page.getByLabel("Password").fill("a-password-1!");
       await page.getByRole("button", { name: "Sign in", exact: true }).click();
-      await expect(page.getByTestId("okta-required-words")).toHaveText("Example requires Okta sign-in.");
+      await expect(page.getByTestId("okta-required-words")).toHaveText("Your team requires Okta sign-in.");
       expect(state.logins.at(-1)).toEqual({ email: "ann@example.org", password: "a-password-1!" });
     });
   });
@@ -262,7 +271,8 @@ for (const width of [1280, 390]) {
 test("a session the server ended for Okta lands on the team's Okta sign-in", async ({ page }) => {
   await mock(page, { ended: true });
   await page.goto("/");
-  await expect(page.getByTestId("okta-required-words")).toHaveText("Example requires Okta sign-in.");
+  await expect(page).toHaveURL(/signin_error=okta_required&team_id=TEAM%23t1/);
+  await expect(page.getByTestId("okta-required-words")).toHaveText("Your team requires Okta sign-in.");
   await expect(page.getByTestId("okta-required").getByLabel("Work email")).toBeVisible();
 });
 

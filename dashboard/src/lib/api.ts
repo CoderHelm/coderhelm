@@ -70,8 +70,8 @@ export async function request<T>(path: string, options?: RequestInit): Promise<T
     // The team requires Okta sign-in and this session started another way:
     // the server ended it, and the sign-in page offers only the team's Okta.
     if (res.status === 401 && serverCode === "okta_required" && typeof window !== "undefined") {
-      const team = typeof parsedBody?.team === "string" ? parsedBody.team : "";
-      const to = oktaRequiredPath(team);
+      const teamId = typeof parsedBody?.team_id === "string" ? parsedBody.team_id : "";
+      const to = oktaRequiredPath(teamId);
       if (!window.location.search.includes("signin_error=okta_required")) window.location.assign(to);
     }
     // The team moved to its own install: the shell sends people there.
@@ -95,9 +95,16 @@ export function runOutputUrl(runId: string, name: string): string {
   return `${apiBase()}/api/runs/${encodeURIComponent(runId)}/outputs/file?name=${encodeURIComponent(name)}`;
 }
 
-/** The sign-in page for a team that requires Okta sign-in (`team` may be empty). */
-export function oktaRequiredPath(team: string): string {
-  return `/?signin_error=okta_required${team ? `&team=${encodeURIComponent(team)}` : ""}`;
+/** The sign-in page for a team that requires Okta sign-in. The URL carries the team's id
+ *  only (for the owner's break-glass sign-in to name it), never text the page shows. */
+export function oktaRequiredPath(teamId: string): string {
+  return `/?signin_error=okta_required${teamId ? `&team_id=${encodeURIComponent(teamId)}` : ""}`;
+}
+
+/** What a break-glass sign-in sends: the flag, and the team it is for when known. */
+function breakGlassFields(breakGlass: boolean, teamId?: string): Record<string, unknown> {
+  if (!breakGlass) return {};
+  return teamId ? { break_glass: true, break_glass_team: teamId } : { break_glass: true };
 }
 
 /** Fired when the server holds this session until it has a second factor. */
@@ -279,6 +286,8 @@ export interface OktaDomainProof {
   verified_at: string | null;
   /** Another team already proved this domain. */
   other_team: boolean;
+  /** Kept while Okta sign-in is required, but its TXT record is gone (since then). */
+  failing_since?: string | null;
 }
 
 /** The sign-in methods that work on this deployment (`GET /auth/methods`, public). */
@@ -358,10 +367,10 @@ export const api = {
       body: JSON.stringify({ email, password }),
     }),
   /** `breakGlass`: the owner of a team that requires Okta, with their password and two-factor code (logged). */
-  loginEmail: (email: string, password: string, breakGlass = false) =>
+  loginEmail: (email: string, password: string, breakGlass = false, breakGlassTeam?: string) =>
     request<{ status: string; session?: string; team_id?: string; carry_over?: boolean }>(
       "/auth/login",
-      { method: "POST", body: JSON.stringify(breakGlass ? { email, password, break_glass: true } : { email, password }) },
+      { method: "POST", body: JSON.stringify({ email, password, ...breakGlassFields(breakGlass, breakGlassTeam) }) },
     ),
   verifyEmail: (email: string, code: string) =>
     request<{ status: string; message: string }>("/auth/verify-email", {
@@ -385,10 +394,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ email, password, code }),
     }),
-  mfaVerify: (session: string, code: string, email: string, breakGlass = false) =>
+  mfaVerify: (session: string, code: string, email: string, breakGlass = false, breakGlassTeam?: string) =>
     request<{ status: string; team_id?: string }>("/auth/mfa/verify", {
       method: "POST",
-      body: JSON.stringify(breakGlass ? { session, code, email, break_glass: true } : { session, code, email }),
+      body: JSON.stringify({ session, code, email, ...breakGlassFields(breakGlass, breakGlassTeam) }),
     }),
   logout: () => request<void>("/auth/logout", { method: "POST" }),
 
