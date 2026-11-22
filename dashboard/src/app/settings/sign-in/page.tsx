@@ -422,6 +422,10 @@ function SignInSettingsPage() {
               <p className="text-sm text-zinc-400" data-testid="require-okta-keys">
                 API keys and CI tokens aren&apos;t sessions: they never sign in, so they keep working while Okta sign-in is required.
               </p>
+              <p className="text-sm text-zinc-400" data-testid="require-okta-support">
+                Coderhelm support can open a support view of this team only with the support access you grant, and only from a session of
+                theirs that passed a second factor. Every page they read goes in your audit log.
+              </p>
             </div>
           </SettingsSection>
         )}

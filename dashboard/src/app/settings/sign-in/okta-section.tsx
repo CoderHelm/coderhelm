@@ -298,7 +298,7 @@ export function OktaSection({ selfHosted }: { selfHosted: boolean }) {
                         <span className="text-zinc-100 [overflow-wrap:anywhere]">{d.domain}</span>
                         <span className="text-zinc-400" data-testid="okta-domain-state">
                           {d.failing_since
-                            ? `TXT record missing since ${when(d.failing_since)}: add it back, then Verify domains`
+                            ? `TXT record missing since ${when(d.failing_since)}: add it back, then Verify domains${d.release_after ? `. Released on ${when(d.release_after)} if it is still missing` : ""}`
                             : d.verified_at
                               ? `Verified ${when(d.verified_at)}`
                               : d.other_team

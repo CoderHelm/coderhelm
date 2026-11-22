@@ -2,7 +2,8 @@
 // did not finish. The API's callback sends the person back here with
 // `?signin_error=<code>&provider=<google|github|microsoft|okta>` (services/gateway
 // oauth_signin.rs); the URL carries only that short code, and this turns it
-// into one plain sentence. `okta_required` also carries `&team=<name>`.
+// into one plain sentence. `okta_required` may also carry `&team_id=<id>`: the
+// team's id only, sent back with the owner's break-glass sign-in, never shown.
 
 export type SignInProvider = "google" | "github" | "microsoft" | "okta";
 

@@ -49,6 +49,8 @@ interface State {
   oktaPosts: string[];
   /** Refuse the next password sign-in with `okta_required`. */
   refuseLogin: boolean;
+  /** The Okta section's domain proofs. */
+  domains: Record<string, unknown>[];
 }
 
 async function mock(page: Page, over: Partial<State> = {}): Promise<State> {
@@ -56,6 +58,7 @@ async function mock(page: Page, over: Partial<State> = {}): Promise<State> {
     signedIn: false,
     ended: false,
     methods: { password: true, google: true, github: true, microsoft: true, okta: true },
+    domains: [],
     checks: ALL_OK,
     requireOkta: false,
     unlinked: [],
@@ -150,7 +153,7 @@ async function mock(page: Page, over: Partial<State> = {}): Promise<State> {
         live: state.checks.set_up ? { ...LIVE, enabled: state.checks.enabled } : null,
         draft: null,
         self_hosted: false,
-        domains: [],
+        domains: state.domains,
       });
     }
     return json(route, {});
@@ -211,6 +214,30 @@ for (const width of [1280, 390]) {
       await page.getByRole("button", { name: "Require Okta" }).click();
       await expect.poll(() => state.puts.at(-1)).toEqual({ require_okta: true, acknowledge_unlinked: true });
       await expect(page.getByTestId("require-okta")).toHaveAttribute("aria-checked", "true");
+    });
+
+    test("a failing domain proof shows when it will be released, and the support view policy is stated", async ({ page }) => {
+      await mock(page, {
+        signedIn: true,
+        requireOkta: true,
+        domains: [
+          {
+            domain: "example.org",
+            txt_name: "_coderhelm-okta.example.org",
+            txt_value: "coderhelm-okta=abc",
+            verified_at: "2026-11-01T00:00:00Z",
+            other_team: false,
+            failing_since: "2026-11-20T00:00:00Z",
+            release_after: "2026-11-27T00:00:00Z",
+          },
+        ],
+      });
+      await page.goto("/settings/sign-in");
+      const st = page.getByTestId("okta-domain-state");
+      await expect(st).toContainText("TXT record missing since");
+      await expect(st).toContainText("Released on");
+      await expect(page.getByTestId("require-okta-support")).toContainText("only from a session of theirs that passed a second factor");
+      await noSidewaysScroll(page);
     });
 
     test("the owner's sign-ins without Okta are listed", async ({ page }) => {

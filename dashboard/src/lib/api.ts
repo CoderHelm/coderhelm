@@ -288,6 +288,8 @@ export interface OktaDomainProof {
   other_team: boolean;
   /** Kept while Okta sign-in is required, but its TXT record is gone (since then). */
   failing_since?: string | null;
+  /** When a failing proof is released unless its record is back. */
+  release_after?: string | null;
 }
 
 /** The sign-in methods that work on this deployment (`GET /auth/methods`, public). */
