@@ -29,6 +29,7 @@ import {
   type BrainMessage,
   type BrainSources,
   type BrainThread,
+  type ChatMap,
   type Citation,
   type Mention,
   type Rating,
@@ -73,6 +74,8 @@ interface LiveAnswer {
   stopped?: boolean;
   /** When the question was sent (ms): the time so far counts from here, whatever remounts. */
   startedAt: number;
+  /** The parts its app map lookups touched. */
+  map?: ChatMap | null;
 }
 
 const ATTACH_LIMIT = { max_file_bytes: 10 * 1024 * 1024, extensions: ["pdf", "docx", "md", "markdown", "txt", "text", "csv", "xlsx", "html", "htm"] };
@@ -134,6 +137,10 @@ function Chat() {
   // the new chat, so the question still says which run it was about.
   const runTitles = useRef<Record<string, string>>({});
   if (fromRun && fromRunTitle) runTitles.current[fromRun] = fromRunTitle;
+  // Opened from the App map ("Ask about this"): the question is in the box,
+  // unsent, and the new chat reads the map first.
+  const prefill = (params.get("ask") ?? "").slice(0, 2000);
+  const fromMap = params.get("from") === "app_map";
 
   // Asking is the brain_ask capability; managing knowledge is knowledge_manage.
   const { can, ready: capsReady } = useCan();
@@ -275,8 +282,8 @@ function Chat() {
   // Each chat keeps its own unsent text; another chat (or a new one) brings back its own.
   const draftFor = threadId.toLowerCase();
   useEffect(() => {
-    setInput(readDraft(draftFor));
-  }, [draftFor]);
+    setInput(!draftFor && prefill ? prefill : readDraft(draftFor));
+  }, [draftFor, prefill]);
   const changeInput = useCallback(
     (text: string) => {
       setInput(text);
@@ -327,7 +334,7 @@ function Chat() {
     };
     try {
       await askBrain(
-        { thread_id: thread?.id, question, mentions: pointedAt, attachments },
+        { thread_id: thread?.id, question, mentions: pointedAt, attachments, ...(fromMap && !thread ? { origin: "app_map" as const } : {}) },
         (e) => {
           switch (e.type) {
             case "thread":
@@ -356,7 +363,7 @@ function Chat() {
               update((a) => ({ ...a, steps: [...a.steps, { id: e.id, label: e.label, status: e.status }] }));
               break;
             case "answer":
-              update((a) => ({ ...a, text: e.text, citations: e.citations, grounded: e.grounded }));
+              update((a) => ({ ...a, text: e.text, citations: e.citations, grounded: e.grounded, map: e.map ?? null }));
               break;
             case "error":
               broke = true;
@@ -734,6 +741,7 @@ function Chat() {
         rating={m.seq in ratings ? ratings[m.seq] : m.feedback ?? null}
         onRate={mine ? (r) => rate(m.seq, r) : undefined}
         onRetry={mayAsk && mine && m.seq === lastAnswerSeq && !busy ? () => retry(m.seq) : undefined}
+        map={m.map}
       />
     ),
   );
@@ -778,6 +786,7 @@ function Chat() {
           streaming={!live.answer.done}
           steps={live.answer.steps}
           startedAt={live.answer.startedAt}
+          map={live.answer.map}
           after={
             broke ??
             (a.stopped && a.done ? (

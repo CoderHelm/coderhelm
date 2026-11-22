@@ -1395,8 +1395,6 @@ export const api = {
   // graphs (the first visit starts the first build).
   getAppMap: (opts: { recent?: boolean; health?: boolean } = {}) =>
     request<AppMapResponse>(`/api/app-map?recent=${opts.recent ? 1 : 0}&health=${opts.health ? 1 : 0}`),
-  askAppMap: (question: string) =>
-    request<AppMapAnswer>(`/api/app-map/ask`, { method: "POST", body: JSON.stringify({ question }) }),
   rebuildAppMap: () => request<void>(`/api/app-map/rebuild`, { method: "POST" }),
   getReviewerConfig: (repo: string) =>
     request<ReviewerConfig>(`/api/reviewer/config/${repo}`),
@@ -6533,10 +6531,3 @@ export interface AppMapResponse {
   graph: FloorplanGraph | null;
 }
 
-export interface AppMapAnswer {
-  answer: string;
-  grounded: boolean;
-  steps: string[];
-  /** The parts the answer involves, as a smaller map; null when none. */
-  graph: FloorplanGraph | null;
-}

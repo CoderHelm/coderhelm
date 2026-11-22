@@ -88,7 +88,7 @@ export function Ask({
       setAnswer({ ...state });
       setShowPassages(false);
       abort.current = new AbortController();
-      const body: AskBody & { origin: string } = { question: text, mentions: [{ kind: "knowledge", id: kbId }], attachments: [], origin: "kb_page" };
+      const body: AskBody = { question: text, mentions: [{ kind: "knowledge", id: kbId }], attachments: [], origin: "kb_page" };
       await askBrain(
         body,
         (ev) => {

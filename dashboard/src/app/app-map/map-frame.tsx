@@ -11,6 +11,9 @@
 // - the map goes in by postMessage once the frame says it is ready, as one
 //   JSON string under a size cap, never in the URL;
 // - the viewer's layout engine runs in a Web Worker inside the frame.
+//
+// Chat draws an answer's mini map with this same frame (chat/answer-map.tsx),
+// loaded only when an answer has one.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FloorplanGraph } from "@/lib/api";
@@ -18,11 +21,18 @@ import type { FloorplanGraph } from "@/lib/api";
 /** Largest map handed to the frame (the frame checks the same). */
 export const MAX_MAP_BYTES = 25 * 1024 * 1024;
 
+/** The frame's address: the viewer's own hash settings, never the map. */
+export function frameSrc(focus?: string): string {
+  const id = (focus ?? "").replace(/[^A-Za-z0-9._:-]/g, "");
+  return `/app-map/frame.html#ask=host${id ? `&s=${encodeURIComponent(id)}` : ""}`;
+}
+
 export function MapFrame({
   graph,
   title,
   height,
   onAsk,
+  focus,
   testId = "app-map-frame",
 }: {
   graph: FloorplanGraph;
@@ -31,6 +41,8 @@ export function MapFrame({
   height?: string;
   /** The viewer's "Ask about this": the cards it names. */
   onAsk?: (items: { id?: string; label?: string; kind?: string }[]) => void;
+  /** A part's id: the viewer opens with it selected (its own `s=` address). */
+  focus?: string;
   testId?: string;
 }) {
   const ref = useRef<HTMLIFrameElement | null>(null);
@@ -67,10 +79,11 @@ export function MapFrame({
       {problem && <p className="mb-2 text-sm text-zinc-400">{problem}</p>}
       <iframe
         ref={ref}
-        key={json.length + ":" + json.slice(0, 64)}
+        key={json.length + ":" + json.slice(0, 64) + ":" + (focus ?? "")}
         title={title}
-        // `#ask=host`: the viewer's "Ask about this" comes back to this page.
-        src="/app-map/frame.html#ask=host"
+        // `#ask=host`: the viewer's "Ask about this" comes back to this page;
+        // `s=`: the part it opens on.
+        src={frameSrc(focus)}
         sandbox="allow-scripts"
         referrerPolicy="no-referrer"
         loading="lazy"

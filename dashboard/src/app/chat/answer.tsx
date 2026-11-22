@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { ChatMarkdown } from "@/components/chat-markdown";
 import { CodeBlock } from "@/components/code-block";
 import { Modal } from "@/components/modal";
@@ -15,6 +16,7 @@ import {
   CodeIcon,
   CopyIcon,
   DatabaseIcon,
+  GraphIcon,
   ExternalLinkIcon,
   LogsIcon,
   ClipboardIcon,
@@ -34,6 +36,7 @@ import { focusRing, linkButton } from "@/components/ui";
 import {
   CITATION_KIND,
   activitySummary,
+  appMapLink,
   citationWhen,
   stepSource,
   unavailableNote,
@@ -41,10 +44,17 @@ import {
   isWorkKind,
   linkCitations,
   withoutCitations,
+  type ChatMap,
   type Citation,
   type Rating,
   type SourceDoc,
 } from "@/lib/brain";
+
+// The mini map's frame, loaded only when an answer has a map.
+const AnswerMapFrame = dynamic(() => import("./answer-map"), {
+  ssr: false,
+  loading: () => <div className="h-[min(360px,55dvh)] w-full rounded-lg border border-zinc-800 bg-zinc-950" />,
+});
 
 // One answer, the way the best answer pages read:
 // - what Chat did, as one quiet line ("Read 4 files in web, searched the
@@ -93,9 +103,30 @@ export function SourceIcon({ kind }: { kind: string }) {
       return <ShieldAlertIcon />;
     case "record":
       return <LayersIcon />;
+    case "app_map":
+      return <GraphIcon />;
     default:
       return <LogsIcon />;
   }
+}
+
+/** The parts an answer's app map lookups touched: their mini map, and the App map page focused on them. */
+export function AnswerMap({ map }: { map: ChatMap }) {
+  const href = appMapLink(map.parts);
+  return (
+    <section className="mt-4 space-y-2" aria-label="The parts this answer involves" data-testid="answer-map">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-zinc-400">
+          From the app map: {map.parts.length === 1 ? "1 part" : `${map.parts.length} parts`}
+        </p>
+        <Link href={href} className={`${linkButton} inline-flex items-center gap-1 text-sm`} data-testid="answer-map-open">
+          Open in App map
+          <ExternalLinkIcon />
+        </Link>
+      </div>
+      {map.graph && <AnswerMapFrame graph={map.graph} />}
+    </section>
+  );
 }
 
 /** "Lines 12-40" or "Lines 1-17, 30-44" for the parts of a file a source gathers. */
@@ -535,6 +566,7 @@ export function AnswerView({
   anchor,
   startedAt,
   after,
+  map,
 }: {
   text: string;
   citations: Citation[];
@@ -552,6 +584,8 @@ export function AnswerView({
   startedAt?: number;
   /** What follows a cut-short answer: that it was stopped, or what broke. */
   after?: ReactNode;
+  /** The parts its app map lookups touched, when it used the map. */
+  map?: ChatMap | null;
 }) {
   const [open, setOpen] = useState<SourceDoc | null>(null);
   const [copied, setCopied] = useState(false);
@@ -595,6 +629,7 @@ export function AnswerView({
       {((steps && steps.length > 0) || waiting) && <ActivityLine steps={steps ?? []} streaming={!!streaming} hasText={!!text} startedAt={startedAt} />}
       {content}
       {after}
+      {!streaming && map && map.parts.length > 0 && <AnswerMap map={map} />}
       {!streaming && grounded && <SourceList docs={docs} onOpen={setOpen} />}
       {!streaming && text && (
         <div className="-ml-2 mt-3 flex items-center gap-0.5" data-testid="answer-actions">

@@ -20,6 +20,8 @@ Chat works like a teammate who opens the code: it looks a repository over (its R
 
 ## What Chat looks up
 
+When your team has an [app map](/concepts/app-map), questions about how the app fits together ("how does checkout work?", "what happens when someone books a slip?", "what calls this endpoint?", "what's behind this screen?", "which service charges the card?") start from the map: Chat reads its parts, screens and the lines between them, answers in plain words (numbered steps for how something happens), cites the map, and reads the code only for the exact lines. Such an answer shows the parts it involves as a small map under it, with **Open in App map** to see them on the whole map. With no map built yet, Chat says so in one line and answers from the code.
+
 Besides code and knowledge, Chat looks up your team's work directly: Jira tickets by key or words, pull requests and CoderHelm's branches, runs (what is running now, why one stopped, what it waits on), security and infrastructure findings, quarantined tests, reviews, alerts, log findings, plans, and AWS resources from the daily read of your connected accounts. It reads through the team's [built-in bases](/concepts/knowledge#the-teams-built-in-bases), so a base that isn't open to you is left out. When a source it needed couldn't be read, the answer says so. Your [AI tools](/mcp) use the same lookups.
 
 ### What needs you

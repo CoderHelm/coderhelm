@@ -76,7 +76,7 @@
   // scheme and an open side panel. A storage kept in memory for this frame,
   // set before the viewer starts, gives it the dashboard's theme (read by
   // Floorplan's own theme script) and a closed side panel, so the map is what
-  // shows first. The viewer's own Theme and panel buttons still work.
+  // shows first (open when the frame was opened on a part). The viewer's own Theme and panel buttons still work.
   function useMemoryStorage(seed) {
     const data = new Map(Object.entries(seed));
     const storage = {
@@ -127,7 +127,10 @@
     if (!graph || graph.schema !== 'floorplan/graph@1' || !Array.isArray(graph.nodes)) return fail('This is not a map this viewer knows.');
     shown = true;
     const theme = ['dark', 'light'].includes(e.data.theme) ? e.data.theme : 'dark';
-    useMemoryStorage({ 'floorplan-theme': theme, 'floorplan:panel': 'false' });
+    // Opened on a part (`#s=`, from a chat answer's "Open in App map"): its
+    // details show at once.
+    const focused = !!new URLSearchParams(location.hash.slice(1)).get('s');
+    useMemoryStorage({ 'floorplan-theme': theme, 'floorplan:panel': focused ? 'true' : 'false' });
     const html = page(graph);
     document.open();
     document.write(html);
