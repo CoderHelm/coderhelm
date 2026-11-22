@@ -150,8 +150,8 @@ export default function AppMapPage() {
               </Toggle>
               <span className="text-sm text-zinc-400">Coderhelm&apos;s runs and findings, shown on the parts they concern.</span>
             </div>
-            <AskBox question={question} setQuestion={setQuestion} />
             <MapFrame graph={data.graph} title="The app map" onAsk={onAsk} />
+            <AskBox question={question} setQuestion={setQuestion} />
           </>
         )}
         <Credit version={st.floorplan} />

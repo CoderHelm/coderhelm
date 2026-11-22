@@ -59,7 +59,17 @@ test.describe("App map", () => {
     await expect(page.getByTestId("app-map-credit")).toContainText("Floorplan");
     await expect(page.getByTestId("app-map-credit")).toContainText("MIT");
     expect(calls).toContain("GET /api/app-map?recent=1&health=1");
+    // Drawn dark like the dashboard, given the rest of the screen, with the
+    // side panel closed so the map is what shows first.
+    await expect(viewer(page).locator("html")).toHaveAttribute("data-theme", "dark");
+    await expect(viewer(page).locator("body")).toHaveClass(/no-panel/);
+    const box = await frame.boundingBox();
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(640);
     await page.screenshot({ path: path.join(SHOTS_DIR, "app-map-whole.png"), fullPage: true });
+    // Selecting a part opens its details.
+    await viewer(page).getByText("Booking service").first().click();
+    await expect(viewer(page).locator("body")).not.toHaveClass(/no-panel/);
+    await page.screenshot({ path: path.join(SHOTS_DIR, "app-map-selected.png"), fullPage: true });
   });
 
   test("the frame has its own origin and reaches no network", async ({ page }) => {
@@ -77,12 +87,15 @@ test.describe("App map", () => {
         fetched = "blocked";
       }
       let storage = "none";
+      // The browser's own storage is shut; the viewer's settings live in a
+      // store kept in memory for this frame, which is not a real Storage.
       try {
-        localStorage.getItem("x");
+        sessionStorage.getItem("x");
         storage = "open";
       } catch {
         storage = "none";
       }
+      if (localStorage instanceof Storage) storage = "open";
       let parent = "hidden";
       try {
         void window.parent.document.title;
@@ -163,6 +176,7 @@ test.describe("App map", () => {
       await page.emulateMedia({ colorScheme: scheme });
       await page.goto("/app-map");
       await expect(viewer(page).getByText("Harbor website").first()).toBeVisible();
+      await expect(viewer(page).locator("html")).toHaveAttribute("data-theme", "dark");
       const sideways = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
       expect(sideways).toBeLessThanOrEqual(1);
       await page.screenshot({ path: path.join(SHOTS_DIR, `app-map-phone-${scheme}.png`), fullPage: true });

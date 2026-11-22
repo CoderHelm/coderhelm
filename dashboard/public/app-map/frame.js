@@ -71,6 +71,43 @@
       .replace('/*__FLOORPLAN_DATA__*/null', () => scriptJson(graph));
   }
 
+  // The frame has no storage of its own (sandboxed, opaque origin), so the
+  // viewer's settings would fall back to their defaults: the device's color
+  // scheme and an open side panel. A storage kept in memory for this frame,
+  // set before the viewer starts, gives it the dashboard's theme (read by
+  // Floorplan's own theme script) and a closed side panel, so the map is what
+  // shows first. The viewer's own Theme and panel buttons still work.
+  function useMemoryStorage(seed) {
+    const data = new Map(Object.entries(seed));
+    const storage = {
+      getItem: (k) => (data.has(String(k)) ? data.get(String(k)) : null),
+      setItem: (k, v) => { data.set(String(k), String(v)); },
+      removeItem: (k) => { data.delete(String(k)); },
+      clear: () => data.clear(),
+      key: (i) => Array.from(data.keys())[i] ?? null,
+      get length() { return data.size; },
+    };
+    try { Object.defineProperty(window, 'localStorage', { value: storage, configurable: true }); } catch (err) { /* the viewer keeps its defaults */ }
+  }
+
+  // With the panel closed at first, selecting a part opens it (on a phone the
+  // viewer already does this itself).
+  function openPanelOnSelect() {
+    const F = window.Floorplan;
+    if (!F || typeof F.on !== 'function') return;
+    let last = null;
+    F.on('panel', (d) => {
+      const sel = d && d.selected;
+      const key = sel == null ? null : JSON.stringify(sel);
+      if (key && key !== last && document.body.classList.contains('no-panel') && !matchMedia('(max-width: 700px)').matches) {
+        last = key;
+        const btn = document.getElementById('btn-panel');
+        if (btn) btn.click();
+      }
+      last = key;
+    });
+  }
+
   function fail(text) {
     document.body.textContent = '';
     const p = document.createElement('p');
@@ -89,10 +126,13 @@
     try { graph = JSON.parse(text); } catch (err) { return fail('The map could not be read.'); }
     if (!graph || graph.schema !== 'floorplan/graph@1' || !Array.isArray(graph.nodes)) return fail('This is not a map this viewer knows.');
     shown = true;
+    const theme = ['dark', 'light'].includes(e.data.theme) ? e.data.theme : 'dark';
+    useMemoryStorage({ 'floorplan-theme': theme, 'floorplan:panel': 'false' });
     const html = page(graph);
     document.open();
     document.write(html);
     document.close();
+    openPanelOnSelect();
   });
 
   if (!P) fail('The map viewer is missing.');

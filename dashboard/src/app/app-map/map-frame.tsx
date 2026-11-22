@@ -21,12 +21,13 @@ export const MAX_MAP_BYTES = 25 * 1024 * 1024;
 export function MapFrame({
   graph,
   title,
-  height = "70vh",
+  height,
   onAsk,
   testId = "app-map-frame",
 }: {
   graph: FloorplanGraph;
   title: string;
+  /** A fixed height; by default the frame takes the rest of the screen. */
   height?: string;
   /** The viewer's "Ask about this": the cards it names. */
   onAsk?: (items: { id?: string; label?: string; kind?: string }[]) => void;
@@ -45,7 +46,8 @@ export function MapFrame({
       if (!frame || e.source !== frame.contentWindow || !e.data || typeof e.data !== "object") return;
       const { type } = e.data as { type?: string };
       if (type === "coderhelm:app-map-frame-ready") {
-        frame.contentWindow?.postMessage({ type: "coderhelm:app-map-graph", json }, "*");
+        // The dashboard is dark: the viewer is drawn dark to match.
+        frame.contentWindow?.postMessage({ type: "coderhelm:app-map-graph", json, theme: "dark" }, "*");
       } else if (type === "coderhelm:app-map-frame-error") {
         setProblem(String((e.data as { text?: string }).text || "The map couldn't be shown."));
       } else if (type === "floorplan:ask" && onAsk) {
@@ -72,8 +74,8 @@ export function MapFrame({
         sandbox="allow-scripts"
         referrerPolicy="no-referrer"
         loading="lazy"
-        className="block w-full rounded-lg border border-zinc-800 bg-zinc-950"
-        style={{ height }}
+        className={`block w-full rounded-lg border border-zinc-800 bg-zinc-950 ${height ? "" : "h-[max(520px,calc(100dvh-140px))] sm:h-[max(640px,calc(100dvh-180px))]"}`}
+        style={height ? { height } : undefined}
       />
     </div>
   );
