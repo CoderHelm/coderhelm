@@ -44,7 +44,7 @@ export interface TimelineInput {
 /** A note the worker writes for each tool call. */
 export const TOOL_NOTE = /^Tool: /;
 
-const OVER = ["completed", "success", "merged", "failed", "cancelled", "closed", "needs_outside_change", "covered_by_pr", "retried", "archived"];
+const OVER = ["completed", "success", "merged", "failed", "cancelled", "closed", "needs_outside_change", "covered_by_pr", "no_change", "retried", "archived"];
 
 /** A step's title: done in the past tense, running in the present. */
 const TITLES: Record<string, [string, string]> = {
@@ -119,6 +119,8 @@ function endStep(i: TimelineInput): Omit<TimelineStep, "key" | "notes"> | null {
       return { pass: "end", title: "Reported the change to make outside the code", state: "done", started_at: at };
     case "awaiting_setup":
       return { pass: "end", title: "Waiting for the AWS role to allow a read; starts again by itself", state: "waiting", started_at: at };
+    case "no_change":
+      return { pass: "end", title: "No change needed: the code already does it", state: "done", started_at: at };
     case "covered_by_pr":
       return { pass: "end", title: "Linked the open pull request that already does it", state: "done", started_at: at };
     case "cancelled":

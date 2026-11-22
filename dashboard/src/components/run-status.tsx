@@ -20,6 +20,8 @@ const LOOKS: Record<string, RunLook> = {
   awaiting_setup: { label: "Waiting for AWS access", tone: "waiting", group: "waiting" },
   // An open pull request (anyone's) already does the work; the run linked it and built no second fix.
   covered_by_pr: { label: "Covered by an open PR", tone: "muted", group: "done" },
+  // The plan found the code already does it: no pull request, the reason on the run page.
+  no_change: { label: "No change needed", tone: "muted", group: "done" },
   completed: { label: "Done", tone: "success", group: "done" },
   merged: { label: "Merged", tone: "merged", group: "done" },
   failed: { label: "Failed", tone: "danger", group: "failed" },
@@ -37,7 +39,7 @@ const LOOKS: Record<string, RunLook> = {
 export const RUN_GROUP_STATUSES: Record<"active" | "waiting" | "done" | "failed" | "closed", string> = {
   active: "pending,queued,running",
   waiting: "awaiting_ci,needs_input,needs_outside_change,awaiting_setup",
-  done: "completed,success,merged,covered_by_pr",
+  done: "completed,success,merged,covered_by_pr,no_change",
   failed: "failed,cancelled",
   closed: "closed",
 };

@@ -2636,6 +2636,8 @@ export interface RunDetail extends Run {
   tooling_failure?: RunToolingFailure | null;
   /** For a `covered_by_pr` run: the open pull request that already does the work, and why. */
   covered_by?: RunCoveredBy | null;
+  /** For a `no_change` run: why the plan found the code already does it, what it checked, and what it decided about an open pull request it was continuing. */
+  no_change?: RunNoChange | null;
   /** The lesson saved for the repository when people said the fix was elsewhere. */
   lesson?: string | null;
   /** Who closed the run on purpose (their name, login or email), when and why. */
@@ -2727,6 +2729,31 @@ export interface RunToolingFailure {
 }
 
 /** The open pull request that already does a run's work. */
+/** Why a run changed nothing: the plan found the code already does what was asked. */
+export interface RunNoChange {
+  /** The plan's reason, in full, with its evidence. */
+  reason: string;
+  /** What the plan checked, one line each. */
+  checks?: string[];
+  /** The ticket's open pull request (Coderhelm's own) the run was continuing, and the decision about it. */
+  open_pr?: RunNoChangePr | null;
+}
+
+/** What a no-change run decided about the open pull request it was continuing. */
+export interface RunNoChangePr {
+  repo: string;
+  number: number;
+  url?: string;
+  title?: string;
+  /** `keep` (still needed: it stays open) or `not_needed`. */
+  verdict: string;
+  why?: string;
+  /** Coderhelm closed it (only when not needed; its branch is kept). */
+  closed?: boolean;
+  /** The decision in one plain sentence. */
+  line?: string;
+}
+
 export interface RunCoveredBy {
   repo: string;
   number: number;

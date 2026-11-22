@@ -392,14 +392,14 @@ function RunDetailInner() {
   const filesModified = run.files_modified ?? [];
 
   // What each action is allowed for, matching the gateway's own checks.
-  const canRetry = ["failed", "needs_input", "needs_outside_change", "covered_by_pr", "cancelled", "closed"].includes(run.status) && run.current_pass !== "feedback";
+  const canRetry = ["failed", "needs_input", "needs_outside_change", "covered_by_pr", "no_change", "cancelled", "closed"].includes(run.status) && run.current_pass !== "feedback";
   // A closed run is reopened first; the gateway refuses a re-review of it.
   // Offered only when there is something to address: the reviewer asked for
   // changes. (The run doesn't report other people's review comments yet.)
   const canReview =
     !!run.pr_url && !["running", "queued", "merged", "closed"].includes(run.status) && run.pr_review?.verdict === "REQUEST_CHANGES";
   // Starting over closes the pull request: never offered once it is merged.
-  const canReset = ["completed", "failed", "needs_input", "needs_outside_change", "covered_by_pr", "cancelled", "closed", "success"].includes(run.status);
+  const canReset = ["completed", "failed", "needs_input", "needs_outside_change", "covered_by_pr", "no_change", "cancelled", "closed", "success"].includes(run.status);
   // Close is a button while the run works or waits on an answer; otherwise it sits in More.
   const closeAsButton = closable && runCloseIsLikely(run.status);
   const closeInMenu = closable && !closeAsButton;
@@ -754,6 +754,52 @@ function RunDetailInner() {
                 ))}
               </ul>
             </>
+          )}
+        </div>
+      </OutcomeCard>
+    );
+  } else if (run.status === "no_change") {
+    // The plan found the code already does it: the reason, in full, is the
+    // outcome, with what it checked and the decision on an open pull request.
+    const nc = run.no_change;
+    const pr = nc?.open_pr;
+    outcome = (
+      <OutcomeCard
+        tone="neutral"
+        title="No change needed"
+        testId="run-outcome"
+        who="none"
+        actions={
+          <>
+            {pr?.url && (
+              <a href={pr.url} target="_blank" rel="noopener noreferrer" className={secondaryButton} data-testid="no-change-pr-link">
+                Open #{pr.number}
+              </a>
+            )}
+            {retryAs("secondary")}
+          </>
+        }
+      >
+        <div className="min-w-0 space-y-2 [overflow-wrap:anywhere]" data-testid="no-change">
+          <div data-testid="no-change-reason" className="text-zinc-200">
+            <Markdown>{nc?.reason || "The plan found the code already does what was asked."}</Markdown>
+          </div>
+          {!!nc?.checks?.length && (
+            <>
+              <p className="text-sm font-medium text-zinc-200">What it checked</p>
+              <ul className="list-disc space-y-1 pl-5 text-sm" data-testid="no-change-checks">
+                {nc.checks.map((c) => (
+                  <li key={c}>
+                    <InlineMarkdown>{c}</InlineMarkdown>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          {pr && (
+            <p data-testid="no-change-pr" data-verdict={pr.verdict} className="text-zinc-300">
+              <InlineMarkdown>{pr.line || `Pull request #${pr.number}: ${pr.verdict === "keep" ? "stays open" : "no longer needed"}.`}</InlineMarkdown>
+            </p>
           )}
         </div>
       </OutcomeCard>
