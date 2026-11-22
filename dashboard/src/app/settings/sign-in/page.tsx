@@ -181,7 +181,11 @@ function SignInSettingsPage() {
         o.unlinked.length > 0
           ? ` ${o.unlinked.length} ${o.unlinked.length === 1 ? "person hasn't" : "people haven't"} linked ${o.name} yet and can't sign in until an admin gives them a one-time link: ${names(o.unlinked)}.`
           : ""
-      } Every session on this team from any other way in ends now, the owner's included. API keys and CI tokens keep working.`,
+      }${
+        (o.suspended_keys ?? []).length > 0
+          ? ` These keys are suspended until their maker links ${o.name}: ${(o.suspended_keys ?? []).map((k) => k.name).join(", ")}.`
+          : ""
+      } Every session and app connection on this team from any other way in ends now, the owner's included, and stays ended if you turn this off later.`,
       confirmLabel: `Require ${o.name}`,
       destructive: true,
     });
@@ -469,11 +473,20 @@ function SignInSettingsPage() {
                 </div>
               ))}
               <p className="text-sm text-zinc-400" data-testid="require-sso-keys">
-                API keys and CI tokens aren&apos;t sessions: they never sign in, so they keep working while single sign-on is required.
+                Keys follow their maker: while single sign-on is required, an API key or knowledge key works only while the member who made it is
+                on the team and linked to the provider. Others are suspended, not deleted, and work again once their maker links.
               </p>
+              {(inUse ? [inUse] : options)
+                .filter((o) => (o.suspended_keys ?? []).length > 0)
+                .map((o) => (
+                  <p key={`keys-${o.provider}`} className="text-sm text-amber-300" data-testid={`suspended-keys-${o.provider}`}>
+                    {inUse ? "Suspended now" : `Suspended with ${o.name}`}: {(o.suspended_keys ?? []).map((k) => k.name).join(", ")}
+                  </p>
+                ))}
               <p className="text-sm text-zinc-400" data-testid="require-sso-support">
                 Coderhelm support can open a support view of this team only with the support access you grant, and only from a session of
                 theirs that passed a second factor. It is read-only, never a session in your team, and every page they read goes in your audit log.
+                Turning the rule on ends every earlier session from another way in for good: turning it off later doesn&apos;t bring them back.
               </p>
             </div>
           </SettingsSection>

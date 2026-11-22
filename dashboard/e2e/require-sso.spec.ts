@@ -125,6 +125,7 @@ async function mock(page: Page, over: Partial<State> = {}): Promise<State> {
           ready: o.set_up && o.enabled && o.domains_verified && o.session_from_provider && o.is_owner,
           unlinked: state.unlinked,
           recovery: RECOVERY(o.name),
+          suspended_keys: state.unlinked.length ? [{ name: "nightly-ci", kind: "api" }] : [],
         })),
         claim_links: state.claims,
       });
@@ -179,7 +180,8 @@ for (const width of [1280, 390]) {
       await expect(page.getByTestId("require-sso-microsoft")).toBeEnabled();
       // Recovery is said next to the choice, before anything is turned on.
       await expect(page.getByTestId("sso-recovery-microsoft")).toContainText("nobody can sign in until it's fixed");
-      await expect(page.getByTestId("require-sso-keys")).toContainText("API keys and CI tokens");
+      await expect(page.getByTestId("require-sso-keys")).toContainText("Keys follow their maker");
+      await expect(page.getByTestId("require-sso-support")).toContainText("read-only, never a session in your team");
       await noSidewaysScroll(page);
     });
 
@@ -195,6 +197,9 @@ for (const width of [1280, 390]) {
       await expect(confirm).toContainText("If Microsoft Entra is down or misconfigured, nobody can sign in until it's fixed.");
       await expect(confirm).toContainText("Ann Lee");
       await expect(confirm).toContainText("the owner's included");
+      // Keys follow their maker: the ones that will be suspended are named.
+      await expect(confirm).toContainText("These keys are suspended until their maker links Microsoft Entra: nightly-ci.");
+      await expect(confirm).toContainText("stays ended if you turn this off later");
       await noSidewaysScroll(page);
       await page.getByRole("button", { name: "Require Microsoft Entra" }).click();
       await expect.poll(() => state.puts.at(-1)).toEqual({ require_sso: "microsoft", acknowledge_unlinked: true });

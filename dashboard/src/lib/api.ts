@@ -232,6 +232,8 @@ export interface SsoOption {
   unlinked: UnlinkedMember[];
   /** What happens when the provider is down, in plain words. */
   recovery: string;
+  /** API and knowledge keys whose maker isn't linked to this provider: suspended while it is required. */
+  suspended_keys?: { name: string; kind: "api" | "knowledge" }[];
 }
 
 export interface UnlinkedMember {
