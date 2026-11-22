@@ -174,15 +174,22 @@ export function exemplarsFixture(o: Pick<LearningOpts, "repo" | "repo2" | "text"
  * with one quiet (red), some idle and the rest working. `text` goes in the
  * detail lines, so the wide spec gets long strings.
  */
-export function learningHealthFixture(o: { repo: string; text: string; quiet?: string[]; idle?: string[]; extra?: boolean }) {
+export function learningHealthFixture(o: { repo: string; text: string; quiet?: string[]; idle?: string[]; retrying?: string[]; checks?: Record<string, string>; extra?: boolean }) {
   const quiet = new Set(o.quiet ?? ["pr_outcomes"]);
   const idle = new Set(o.idle ?? ["coder_lessons", "stop_outcomes"]);
+  const retrying = new Set(o.retrying ?? []);
   const loop = (key: string, label: string, count: number, expected: number | null, detail: string) => {
-    const state = quiet.has(key) ? "quiet" : idle.has(key) ? "idle" : "ok";
-    return { key, label, state, last_signal_at: state === "idle" ? "" : iso(state === "quiet" ? 9 * DAY : 90), count: state === "idle" ? 0 : count, expected: state === "idle" && expected !== null ? 0 : expected, detail };
+    const state = quiet.has(key) ? "quiet" : idle.has(key) ? "idle" : retrying.has(key) ? "retrying" : "ok";
+    const check = o.checks?.[key];
+    return { key, label, state, last_signal_at: state === "idle" ? "" : iso(state === "quiet" ? 9 * DAY : 90), count: state === "idle" ? 0 : count, expected: state === "idle" && expected !== null ? 0 : expected, detail, ...(check ? { check } : {}) };
   };
+  const prDetail = quiet.has("pr_outcomes")
+    ? `2 closed pull request(s) were never scored: ${o.repo}#12345, ${o.repo}#67890 ${o.text}`
+    : retrying.has("pr_outcomes")
+      ? `3 of 5 pull requests that closed were scored; retrying the other 2 automatically, next try at 18:25 UTC (${o.repo} #12345, #67890) ${o.text}`
+      : "5 of 5 pull requests that closed were scored";
   const loops = [
-    loop("pr_outcomes", "Outcomes of CoderHelm's pull requests", 3, 5, quiet.has("pr_outcomes") ? `2 closed pull request(s) were never scored: ${o.repo}#12345, ${o.repo}#67890 ${o.text}` : "5 of 5 pull requests that closed were scored"),
+    loop("pr_outcomes", "Outcomes of CoderHelm's pull requests", 3, 5, prDetail),
     loop("review_outcomes", "Outcomes of review comments", 4, 6, "4 of 6 reviewed pull request(s) have a comment outcome; comments: 9 acted on, 3 dismissed, 2 left open"),
     loop("calibration", "Reviewer calibration", 4, null, "4 category counter(s) updated; changes: 1 raised, 0 downgraded, 0 suppressed, 0 back to none"),
     loop("reviewer_variants", "Reviewer prompt variants", 4, 6, "4 of 6 pull request(s) have an outcome credited to a variant; 3 arm(s), 41 pull(s) in all"),
@@ -195,7 +202,8 @@ export function learningHealthFixture(o: { repo: string; text: string; quiet?: s
   // A loop a newer gateway adds, which this dashboard has no title for.
   if (o.extra) loops.push(loop("planner_lessons", "Planner lessons (API name)", 1, 2, "1 of 2 plans with a lesson"));
   const q = loops.filter((l) => l.state === "quiet").map((l) => l.key);
-  return { window_days: 7, generated_at: iso(0), state: q.length ? "red" : "ok", quiet: q, loops };
+  const r = loops.filter((l) => l.state === "retrying").map((l) => l.key);
+  return { window_days: 7, generated_at: iso(0), state: q.length ? "red" : "ok", quiet: q, retrying: r, loops };
 }
 
 /** One scope's numbers on GET /api/learning/scorecard (common::scorecard::row). */

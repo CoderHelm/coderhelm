@@ -46,6 +46,7 @@ export const ROUTES: Record<string, RouteInfo> = {
   "/logs": { label: "Logs", description: "Logs from the agent, the API and the services behind this install, searchable by time and level." },
 
   "/releases": { label: "Releases", description: "What's new in each Coderhelm version, and how to update this install." },
+  "/app-map": { label: "App map", description: "How your app fits together across its repositories, in plain words: its parts, what calls what, and the outside services it uses." },
   "/graph": { label: "Code graph", description: "A map of your code: modules, files and how they call each other." },
 
   "/plans": { label: "Plans", description: "Plans written with Coderhelm: specs and task lists to review before any code is written." },

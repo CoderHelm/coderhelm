@@ -15,24 +15,31 @@ import {
   ListToolbar,
   LoadMore,
   StatusText,
+  TONES,
   useListParams,
   usePagedList,
   useTeamRepos,
 } from "@/components/list";
-import { planStatusLook } from "./status";
+import { money, planState, planStatusLook, StateBar } from "./status";
 
-// The status toggles: each is one plan status.
+// The toggles: each is a set of plan states. A plan is Active while its work
+// runs (or sits stalled); Needs you when a task asks a person something,
+// failed, or drafts are left once the rest finished; Done only when every
+// task merged or was dropped.
 const TABS = [
-  { value: "all", label: GROUP_LABEL.all, status: "" },
-  { value: "active", label: GROUP_LABEL.active, status: "executing", tone: "live" },
-  { value: "waiting", label: GROUP_LABEL.waiting, status: "waiting", tone: "waiting" },
-  { value: "draft", label: "Draft", status: "draft", tone: "neutral" },
-  { value: "done", label: GROUP_LABEL.done, status: "done", tone: "success" },
+  { value: "all", label: GROUP_LABEL.all, states: [] as string[] },
+  { value: "active", label: GROUP_LABEL.active, states: ["running", "stalled"], tone: "live" },
+  { value: "needs_you", label: "Needs you", states: ["needs_you"], tone: "attention" },
+  { value: "drafting", label: "Drafting", states: ["drafting"], tone: "neutral" },
+  { value: "done", label: GROUP_LABEL.done, states: ["done"], tone: "success" },
 ] as const;
+
+// Needs you first, then running work, then the rest by date.
+const RANK: Record<string, number> = { needs_you: 0, running: 1, stalled: 2, drafting: 3, done: 4 };
 
 function planMatches(plan: Plan, q: string): boolean {
   if (!q) return true;
-  const hay = [plan.title, plan.description, plan.repo].filter(Boolean).join(" ").toLowerCase();
+  const hay = [plan.title, plan.description, plan.repo, plan.summary].filter(Boolean).join(" ").toLowerCase();
   return q
     .toLowerCase()
     .split(/\s+/)
@@ -49,6 +56,7 @@ export default function PlansPageWithParams() {
 
 function PlansPage() {
   const [params, setParams] = useListParams({ q: "", status: "all", repo: "" });
+  const inTab = (p: Plan, states: readonly string[]) => states.length === 0 || states.includes(planState(p));
   const q = params.q.trim();
   const tab = TABS.find((t) => t.value === params.status) ?? TABS[0];
   const repo = params.repo;
@@ -60,10 +68,11 @@ function PlansPage() {
 
   // Search and repo first, so the toggle counts say what each would show.
   const matched = useMemo(() => plans.filter((p) => planMatches(p, q) && (!repo || p.repo === repo)), [plans, q, repo]);
-  // A running plan is pinned to the top: it is the one people come back to.
-  const shown = (tab.status ? matched.filter((p) => p.status === tab.status) : matched)
+  // What needs a person is pinned to the top, then running work.
+  const shown = matched
+    .filter((p) => inTab(p, tab.states))
     .slice()
-    .sort((a, b) => Number(b.status === "executing") - Number(a.status === "executing"));
+    .sort((a, b) => (RANK[planState(a)] ?? 9) - (RANK[planState(b)] ?? 9));
   const filtered = !!(q || repo || tab.value !== "all");
   const clear = () => setParams({ q: "", status: "all", repo: "" });
 
@@ -71,7 +80,7 @@ function PlansPage() {
     <Page>
       <PageHeader
         title="Plans"
-        lead="Describe a bigger change and Coderhelm splits it into small steps. You approve them, and it builds them one at a time."
+        lead="Describe a bigger change and Coderhelm splits it into tasks. Approve them, and each task's state follows its runs and pull requests until it merges."
         actions={
           <Link href="/plans/new" className={primaryButton}>
             New plan
@@ -95,7 +104,7 @@ function PlansPage() {
             options: TABS.map((t) => ({
               value: t.value,
               label: t.label,
-              count: t.status ? matched.filter((p) => p.status === t.status).length : matched.length,
+              count: matched.filter((p) => inTab(p, t.states)).length,
               tone: "tone" in t ? t.tone : undefined,
             })),
           }}
@@ -118,7 +127,7 @@ function PlansPage() {
               </Link>
             }
           >
-            A plan splits a bigger change into small steps. Coderhelm builds them one at a time, and you approve each one.
+            A plan splits a bigger change into tasks. You approve them, Coderhelm builds each one, and the plan is done when every task merged.
           </ListEmpty>
         ) : shown.length === 0 ? (
           <ListEmpty title={q ? `No plans match “${q}”` : "No plans here"} onClear={clear}>
@@ -127,23 +136,37 @@ function PlansPage() {
         ) : (
           <List label="Plans">
             {shown.map((plan) => {
-              const look = planStatusLook(plan.status);
+              const state = planState(plan);
+              const look = planStatusLook(state);
+              const needs = plan.needs_count ?? 0;
               return (
                 <ListRow
                   key={plan.plan_id}
                   testId="plan-row"
-                  data={{ status: plan.status }}
+                  data={{ status: state }}
+                  status={look}
                   title={plan.title || "Untitled plan"}
                   titleText={plan.title || undefined}
                   href={`/plans/detail?id=${plan.plan_id}`}
                   meta={[
+                    plan.summary || (plan.task_count ? `${plan.task_count} task${plan.task_count === 1 ? "" : "s"}` : null),
+                    plan.cost_usd ? <span key="c" className="tabular-nums">{money(plan.cost_usd)}</span> : null,
                     !repo ? plan.repo || null : null,
-                    plan.task_count ? `${plan.task_count} task${plan.task_count === 1 ? "" : "s"}` : null,
                   ]}
-                  summary={plainSummary(plan.description)}
-                  chips={<StatusText look={look} />}
-                  time={plan.created_at}
-                />
+                  chips={
+                    <>
+                      {needs > 0 && (
+                        <span data-testid="needs-count" className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${TONES.attention.chip}`}>
+                          {needs} need{needs === 1 ? "s" : ""} you
+                        </span>
+                      )}
+                      <StatusText look={look} />
+                    </>
+                  }
+                  time={plan.last_activity_at || plan.created_at}
+                >
+                  {plan.counts && state !== "drafting" && <StateBar counts={plan.counts} className="mt-2" />}
+                </ListRow>
               );
             })}
           </List>
@@ -152,10 +175,4 @@ function PlansPage() {
       </div>
     </Page>
   );
-}
-
-/** A plan's description as one plain line: links become "link" so a row never shows a raw URL. */
-function plainSummary(text: string | null | undefined): string | undefined {
-  if (!text) return undefined;
-  return text.replace(/https?:\/\/\S+/g, "(link)").replace(/[#*`>]/g, "").replace(/\s+/g, " ").trim() || undefined;
 }

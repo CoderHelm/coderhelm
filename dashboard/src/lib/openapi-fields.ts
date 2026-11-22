@@ -2,7 +2,7 @@
 // docs/api/openapi.json. Do not edit; run `npm run openapi:fields` instead.
 
 /** The platform commit this was generated from. */
-export const OPENAPI_REF = "b60be33c1bad33dcbbd883c3442096a6cf4e937c";
+export const OPENAPI_REF = "26f64e8cec0e615f55dea85025ec44989e7ef9ad";
 
 /** The fields each public API schema has. */
 export interface OpenApiFields {
@@ -14,7 +14,7 @@ export interface OpenApiFields {
   CiUploadResult: "ok";
   CodegenEnvMissing: "command" | "repo" | "vars";
   CreateEndpointBody: "description" | "enabled" | "events" | "url";
-  CreatePlan: "description" | "destination" | "repo" | "tasks" | "title";
+  CreatePlan: "description" | "destination" | "repo" | "success_criteria" | "tasks" | "title";
   CreatedEndpoint: "endpoint" | "secret";
   CreatedPlan: "plan_id";
   CustomRoleRef: "id" | "name";
@@ -38,13 +38,14 @@ export interface OpenApiFields {
   Me: "api_key" | "auth_provider" | "avatar_url" | "capabilities" | "custom_role" | "email" | "flags" | "github_login" | "mfa_enabled" | "platform_admin" | "role" | "status" | "team_id" | "user_id";
   MeApiKey: "created_by" | "expires_at" | "id" | "name" | "rate_limit_per_minute";
   MeFlags: "plugins";
-  NewPlanTask: "acceptance_criteria" | "description" | "destination" | "jira_project" | "repo" | "title";
+  NeedsYou: "action" | "ask" | "detail" | "kind" | "run_id" | "task_id" | "url";
+  NewPlanTask: "acceptance_criteria" | "covers" | "description" | "destination" | "jira_project" | "repo" | "title";
   OverviewFile: "description" | "path";
-  Plan: "chat_id" | "created_at" | "description" | "destination" | "executed_at" | "executed_by" | "mcp_servers" | "plan_id" | "repo" | "status" | "task_count" | "title" | "tokens_in" | "tokens_out" | "updated_at";
+  Plan: "attempts" | "chat_id" | "cost_usd" | "counts" | "created_at" | "criteria_count" | "criteria_met" | "description" | "destination" | "executed_at" | "executed_by" | "last_activity_at" | "mcp_servers" | "needs_count" | "plan_id" | "repo" | "state" | "status" | "success_criteria" | "summary" | "task_count" | "title" | "tokens_in" | "tokens_out" | "updated_at";
   PlanDestination: never;
   PlanExecution: "status" | "tasks_queued";
-  PlanTask: "acceptance_criteria" | "approved_at" | "approved_by" | "created_at" | "depends_on" | "description" | "destination" | "issue_number" | "issue_url" | "jira_project" | "jira_ticket_key" | "jira_ticket_url" | "order" | "plan_id" | "pr_url" | "rejected_at" | "rejected_by" | "repo" | "run_id" | "status" | "task_id" | "title";
-  PlanWithTasks: "chat_id" | "created_at" | "description" | "destination" | "executed_at" | "executed_by" | "mcp_servers" | "plan_id" | "repo" | "status" | "task_count" | "tasks" | "title" | "tokens_in" | "tokens_out" | "updated_at";
+  PlanTask: "acceptance_criteria" | "approved_at" | "approved_by" | "attempts" | "cost_usd" | "covers" | "created_at" | "depends_on" | "description" | "destination" | "drift" | "issue_number" | "issue_url" | "jira_project" | "jira_ticket_key" | "jira_ticket_url" | "last_activity_at" | "needs" | "order" | "plan_id" | "pr_url" | "prs" | "rejected_at" | "rejected_by" | "repo" | "run_id" | "runs" | "state" | "state_detail" | "state_reason" | "status" | "task_id" | "ticket_filed" | "title";
+  PlanWithTasks: "attempts" | "chat_id" | "cost_usd" | "counts" | "created_at" | "criteria" | "criteria_count" | "criteria_met" | "description" | "destination" | "estimate" | "executed_at" | "executed_by" | "last_activity_at" | "mcp_servers" | "needs" | "needs_count" | "plan_id" | "repo" | "state" | "status" | "success_criteria" | "summary" | "task_count" | "tasks" | "title" | "tokens_in" | "tokens_out" | "updated_at";
   PlansPage: "next" | "next_cursor" | "plans";
   Point: "deliveries" | "end" | "failed" | "ok" | "p50_ms" | "p95_ms" | "previous_deliveries" | "start" | "success_rate";
   PushedCommit: "message" | "sha";
@@ -65,16 +66,19 @@ export interface OpenApiFields {
   RotateBody: "overlap_hours";
   RotatedSecret: "previous_secret_expires_at" | "secret";
   RoundIncomplete: "at" | "can_resume" | "files" | "kind" | "number" | "pushed" | "reason" | "summary" | "wip_branch";
-  Run: "answers" | "answers_url" | "applied_standards" | "branch" | "branches" | "cache_read_tokens" | "cache_write_tokens" | "checks" | "close_reason" | "closed_at" | "closed_by" | "closed_from" | "codegen_env_missing" | "continued_run_id" | "cost_usd" | "covered_by" | "created_at" | "current_pass" | "draft_hold" | "duration_s" | "error" | "files_modified" | "fix_location" | "github_wait" | "lesson" | "mcp_servers" | "merge_standing" | "outside_change_report" | "pass_history" | "policy_approval" | "policy_note" | "pr_number" | "pr_numbers" | "pr_review" | "pr_review_comments" | "pr_url" | "pr_urls" | "preview" | "progress_notes" | "prs" | "questions" | "questions_url" | "repo" | "round_incomplete" | "run_id" | "sign_in_prompts" | "status" | "stop_kind" | "ticket_id" | "ticket_source" | "title" | "tokens_in" | "tokens_out" | "tooling_failure" | "trigger" | "updated_at" | "waiting_line" | "waiting_on";
+  Run: "answers" | "answers_url" | "applied_standards" | "branch" | "branches" | "cache_read_tokens" | "cache_write_tokens" | "checks" | "close_reason" | "closed_at" | "closed_by" | "closed_from" | "codegen_env_missing" | "continued_run_id" | "cost_usd" | "covered_by" | "created_at" | "current_pass" | "draft_hold" | "duration_s" | "error" | "exploration" | "files_modified" | "fix_location" | "github_wait" | "lesson" | "mcp_servers" | "merge_standing" | "outside_change_report" | "pass_history" | "policy_approval" | "policy_note" | "pr_number" | "pr_numbers" | "pr_review" | "pr_review_comments" | "pr_url" | "pr_urls" | "preview" | "progress_notes" | "prs" | "questions" | "questions_url" | "repo" | "round_incomplete" | "run_id" | "sign_in_prompts" | "status" | "stop_kind" | "ticket_id" | "ticket_source" | "title" | "tokens_in" | "tokens_out" | "tooling_failure" | "traceability" | "trigger" | "updated_at" | "waiting_line" | "waiting_on";
   RunActionResult: "status";
   RunAnswer: "answer" | "answered_at" | "author" | "question" | "question_id";
   RunCheck: "completed_at" | "conclusion" | "name" | "required" | "started_at" | "state" | "url";
   RunCheckCounts: "failed" | "passed" | "queued" | "running" | "skipped";
   RunChecks: "counts" | "items" | "sha";
+  RunCodeMapRefresh: "commit" | "missed" | "rebuilt" | "reused" | "why";
+  RunCoderExploration: "calls_before_first_write" | "map_commit" | "tool_calls";
   RunCoveredBy: "author" | "carried" | "note" | "number" | "open_items" | "outcome" | "own" | "reason" | "repo" | "superseded" | "title" | "url";
   RunCoveredCarried: "branch" | "commits" | "files" | "head" | "rebuilt";
   RunDraftHold: "kind" | "pr_number" | "reasons" | "since" | "summary";
   RunDraftHoldReason: "todo" | "what";
+  RunExploration: "code_map" | "coder";
   RunMergeStanding: "code" | "link" | "needs_person" | "next" | "text";
   RunNote: "message" | "timestamp";
   RunPass: "pass" | "started_at";
@@ -86,6 +90,10 @@ export interface OpenApiFields {
   RunSummary: "cost_usd" | "created_at" | "current_pass" | "duration_s" | "pr_number" | "pr_url" | "repo" | "run_id" | "status" | "ticket_id" | "ticket_source" | "title" | "tokens_in" | "tokens_out" | "trigger";
   RunSupersededPr: "closed" | "closed_by" | "number" | "repo" | "title" | "url";
   RunToolingFailure: "command" | "error" | "tried";
+  RunTrace: "head" | "rows";
+  RunTraceCode: "path" | "symbols";
+  RunTraceProof: "by" | "detail" | "state";
+  RunTraceRow: "code" | "criterion" | "page" | "proof" | "source" | "tests";
   RunTrigger: "by" | "kind" | "label" | "ref" | "ref_url";
   RunWaitingOn: "action" | "detail" | "since" | "url";
   RunsPage: "next" | "runs" | "scanned";
@@ -93,6 +101,8 @@ export interface OpenApiFields {
   SessionStep: "at" | "detail" | "text";
   SnsEnvelope: "Message" | "MessageId" | "Signature" | "SignatureVersion" | "SigningCertURL" | "Subject" | "SubscribeURL" | "Timestamp" | "TopicArn" | "Type";
   SourceRow: "deliveries" | "direction" | "failed" | "failed_series" | "ok" | "p50_ms" | "p95_ms" | "previous_deliveries" | "previous_success_rate" | "series" | "source" | "success_rate";
+  StartEstimate: "cost_high" | "cost_low" | "per_run_high" | "per_run_low" | "runs_high" | "runs_low" | "sample" | "tasks";
+  TaskCounts: "draft" | "dropped" | "failed" | "in_review" | "merged" | "needs_you" | "queued" | "working";
   Totals: "deliveries" | "failed" | "handled" | "ignored" | "p50_ms" | "p95_ms" | "p99_ms" | "retried" | "retried_ok" | "retries" | "success_rate";
   TriggerKind: never;
   UpdateEndpointBody: "description" | "enabled" | "events" | "url";

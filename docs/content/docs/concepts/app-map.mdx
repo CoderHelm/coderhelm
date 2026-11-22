@@ -1,0 +1,40 @@
+---
+title: App map
+description: How your app fits together across all its repositories, in plain words, made with the open-source Floorplan project and kept current with every push.
+---
+
+The **app map** shows how your team's app fits together across every repository CoderHelm works in: its parts, what calls what, the screens and everything behind them, and the outside services it uses. It is written in plain words, so people who don't read code can follow it.
+
+Open **Insights, App map** to see it. The first visit starts the first build, which takes a few minutes; the page says what it is doing and fills in by itself.
+
+Map viewer and extractor from the open-source [Floorplan](https://github.com/haydenschmitty/floorplan) project, MIT. CoderHelm runs a pinned Floorplan release and adds its own Recent work, Health and Ask.
+
+## What is on it
+
+Floorplan reads every repository side by side and finds:
+
+- **parts**: the app's main pieces, chosen and named in plain words, each with its files;
+- **endpoints** the servers answer and **web requests** the apps make, matched to each other by method and address, across repositories too;
+- **screens**, with everything behind each one: the code it uses, the requests it sends, the server code that answers and the outside services behind it;
+- **outside services** from the packages and hosts the code uses (Stripe, AWS, SendGrid, Supabase, Firebase, Sanity and others);
+- a short tour, and a name and one-line description for every file and endpoint.
+
+The map's own search, Screens, tour and Health buttons work as they do in Floorplan. A connection Floorplan worked out from a request's address rather than from an import is shown as inferred.
+
+## Recent work and Health
+
+Two switches above the map add what CoderHelm knows, in the map's own Recent work and Health panels:
+
+- **Recent work** marks the files CoderHelm's runs of the last two weeks changed, each run with its ticket, why (from the run's plan) and its pull request.
+- **Health** adds CoderHelm's open security findings, infrastructure findings, log findings and alerts on the files and parts they concern, each linking to its finding in CoderHelm. Floorplan's own checks stay too, marked **Floorplan check**; one that names the same file and line as a CoderHelm finding is shown once.
+
+## Ask the map
+
+Type a question ("what happens when someone books a slip?"), or pick **Ask about this** on a card in the map. Chat's agent answers from the map's own lookups, in numbered steps, and draws the parts involved as a small map.
+
+## How it is made and kept current
+
+- CoderHelm runs Floorplan's scripts in its code sandbox on a snapshot of the team's repositories, and does Floorplan's writing jobs (choosing the parts, describing files and endpoints) with your team's own model. Their cost is recorded under **App map** in Analytics.
+- After a push to a default branch, the map is brought up to date with Floorplan's own update: unchanged files keep their descriptions, and only new or changed files and endpoints are described again. Nothing is redone when no default branch moved.
+- The map keeps names, paths and short descriptions, never your source files. The viewer runs in a sandboxed frame on the page with no network access of its own.
+- Admins can build the map again from the page's **More** menu.

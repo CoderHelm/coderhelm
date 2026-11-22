@@ -54,6 +54,7 @@ const FEATURE: Record<string, string> = {
   data_source: "data source fields",
   memory: "learning from finished work",
   plugin: "plugins",
+  app_map: "making the app map",
   other: "calls outside any of these",
 };
 const featureLabel = (f: string) => FEATURE[f] ?? f.replace(/_/g, " ");

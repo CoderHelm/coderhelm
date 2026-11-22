@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!--
+  The App map's frame: Floorplan's map viewer (vendor/floorplan, MIT), shown
+  in a sandboxed iframe (allow-scripts only: its own opaque origin, no
+  cookies, no storage, nothing of the dashboard's). The map's data arrives by
+  postMessage from the App map page; this page can reach no network at all.
+-->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' blob:; worker-src blob:; style-src 'unsafe-inline'; font-src data:; img-src data: blob:; connect-src 'none'; form-action 'none'; base-uri 'none'; frame-src 'none'; object-src 'none'">
+<title>App map</title>
+<style>html,body{margin:0;background:#0f0f0f;color:#b4b4b4;font:14px system-ui,sans-serif}p{padding:2rem}</style>
+<script src="viewer.js"></script>
+<script src="frame.js"></script>
+</head>
+<body><p>Loading the map…</p></body>
+</html>

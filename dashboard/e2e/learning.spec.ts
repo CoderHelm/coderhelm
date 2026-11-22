@@ -535,6 +535,29 @@ test("every loop learning reads as fine, with no red", async ({ page }) => {
   await expect(health.getByText("What to check:")).toHaveCount(0);
 });
 
+test("a loop retrying by itself is not red and says when it tries next", async ({ page }) => {
+  await mockApi(page, { health: learningHealthFixture({ repo: REPO, text: "", quiet: [], retrying: ["pr_outcomes"], idle: ["stop_outcomes"] }) });
+  await page.goto("/learning");
+  const health = page.getByTestId("learning-health");
+  await expect(health).toHaveAttribute("data-state", "ok");
+  await expect(health.getByText(/stopped learning/)).toHaveCount(0);
+  const card = page.getByTestId("loop-pr_outcomes");
+  await expect(card).toHaveAttribute("data-state", "retrying");
+  await expect(card).toContainText("Retrying by itself");
+  await expect(card).toContainText("retrying the other 2 automatically, next try at 18:25 UTC");
+  // Nothing for a person to check while it retries.
+  await expect(page.getByTestId("loop-pr_outcomes-check")).toHaveCount(0);
+  await expect(health.getByText(/GitHub App/)).toHaveCount(0);
+});
+
+test("a quiet loop shows the gateway's own words on what to check", async ({ page }) => {
+  const check = "GitHub's pull request events did not arrive for some closes. Check that the GitHub App still gets pull request events (Settings, Integrations, GitHub).";
+  await mockApi(page, { health: learningHealthFixture({ repo: REPO, text: "", quiet: ["pr_outcomes"], checks: { pr_outcomes: check } }) });
+  await page.goto("/learning");
+  await expect(page.getByTestId("loop-pr_outcomes-check")).toContainText(`What to check: ${check}`);
+  await expect(page.getByTestId("loop-pr_outcomes-check")).not.toContainText("Look in the worker's log");
+});
+
 test("a health check that fails says so and retries, and the rest of the page still loads", async ({ page }) => {
   const db = await mockApi(page, { health: 500 });
   await page.goto("/learning");

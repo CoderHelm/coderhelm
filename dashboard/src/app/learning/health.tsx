@@ -11,7 +11,8 @@ import { smallSecondaryButton } from "@/components/ui";
 // "Is Coderhelm still learning?": one card per learning loop (GET
 // /api/learning/health), saying what it learns from, when it last learned,
 // how much it learned this week against what should have fed it, and, for a
-// loop that went quiet, what to check. The week is fixed by the gateway, so
+// loop that went quiet, what to check (the gateway's words when it knows the
+// cause). A loop retrying by itself is not red: its detail says when it tries next. The week is fixed by the gateway, so
 // the page's period and repository filters don't apply here.
 
 /**
@@ -23,7 +24,7 @@ const LOOPS: Record<string, { title: string; from: string; check: string }> = {
   pr_outcomes: {
     title: "What happens to Coderhelm's pull requests",
     from: "Whether Coderhelm's pull requests were merged as written, merged after people's edits, or closed.",
-    check: "Pull requests closed this week were never scored. Check that the GitHub App still gets pull request events (Settings, Integrations, GitHub), then look in the gateway's log for the pull requests named above.",
+    check: "Pull requests closed this week were never scored. Look in the worker's log for \"Reward outcome\" on the pull requests named above.",
   },
   review_outcomes: {
     title: "What people do with review comments",
@@ -71,6 +72,7 @@ const STATE: Record<string, { label: string; tone: "success" | "neutral" | "erro
   ok: { label: "Learning", tone: "success" },
   idle: { label: "Nothing to learn from yet", tone: "neutral" },
   quiet: { label: "Not learning", tone: "error" },
+  retrying: { label: "Retrying by itself", tone: "neutral" },
 };
 const stateOf = (s: string) => STATE[s] ?? { label: s, tone: "neutral" as const };
 
@@ -114,7 +116,7 @@ function LoopCard({ l, days }: { l: LearningLoop; days: number }) {
       {quiet && (
         <p className="mt-2 rounded-md border border-red-500/30 bg-zinc-950/40 px-3 py-2 text-sm text-zinc-200" data-testid={`loop-${l.key}-check`}>
           <span className="font-medium text-red-300">What to check: </span>
-          {known?.check ?? "This loop should have learned from this week's work and did not. Look in the gateway's and the worker's logs for it."}
+          {l.check || known?.check || "This loop should have learned from this week's work and did not. Look in the gateway's and the worker's logs for it."}
         </p>
       )}
     </li>
