@@ -7,6 +7,8 @@ export const TestTubeIcon = () => <svg {...s}><path d="M9 3h6" /><path d="M10 3v
 export const LogFindingsIcon = () => <svg {...s}><path d="M4 5h12" /><path d="M4 10h8" /><path d="M4 15h5" /><circle cx="16.5" cy="15.5" r="3.5" /><path d="M19 18l2.5 2.5" /></svg>;
 /** Three connected nodes: the code graph. */
 export const GraphIcon = () => <svg {...s}><circle cx="5.5" cy="6" r="2.5" /><circle cx="18.5" cy="6" r="2.5" /><circle cx="12" cy="18.5" r="2.5" /><path d="M8 6h8" /><path d="M6.8 8.2l4 8" /><path d="M17.2 8.2l-4 8" /></svg>;
+/** A folded map: the App map, how the app fits together. */
+export const MapIcon = () => <svg {...s}><path d="M9 4L3 6.5v13.5l6-2.5 6 2.5 6-2.5V4l-6 2.5z" /><path d="M9 4v13.5" /><path d="M15 6.5V20" /></svg>;
 /** An open book: the team's written skills. */
 export const BookIcon = () => <svg {...s}><path d="M2.5 5.5A1.5 1.5 0 014 4h5a3 3 0 013 3v13a2.5 2.5 0 00-2.5-2.5h-5.5a1.5 1.5 0 01-1.5-1.5z" /><path d="M21.5 5.5A1.5 1.5 0 0020 4h-5a3 3 0 00-3 3v13a2.5 2.5 0 012.5-2.5H20a1.5 1.5 0 001.5-1.5z" /></svg>;
 /** A checklist: plans and their steps. */

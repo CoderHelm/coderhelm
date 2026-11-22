@@ -21,6 +21,20 @@
   const scriptCode = (src) => String(src).replace(/<\/(script)/gi, '<\\/$1').replace(/<!--/g, '\\x3C!--');
   const escapeHtml = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
+  /** The viewer's graph with Coderhelm's layout options and room for each card's lines. */
+  function tuneGraph(graph, opts) {
+    if (!graph || !opts) return graph;
+    const into = new Map(), out = new Map();
+    const add = (m, id) => m.set(id, (m.get(id) || 0) + 1);
+    for (const e of graph.edges || []) { for (const s of e.sources || []) add(out, s); for (const t of e.targets || []) add(into, t); }
+    const children = (graph.children || []).map((c) => {
+      const lines = Math.max(into.get(c.id) || 0, out.get(c.id) || 0);
+      const need = lines > 1 ? (lines + 1) * opts.lineRoom : 0;
+      return need > (c.height || 0) ? { ...c, height: need } : c;
+    });
+    return { ...graph, children, layoutOptions: { ...(graph.layoutOptions || {}), ...opts.options } };
+  }
+
   // ELK in a worker: the viewer calls `new ELK()` and `elk.layout(graph)`.
   // The worker runs the same bundled engine and answers each layout; the
   // page's ELK becomes a thin stand-in that posts the graph to it. Where a
@@ -38,9 +52,38 @@
     elkWorkerUrl = null;
   }
   window.__coderhelmElkWorker = elkWorkerUrl;
+  // Coderhelm's layout options, laid over the viewer's own on every layout
+  // (the viewer's page is never edited; each layout passes through the
+  // stand-in below). A team's real map is denser than Floorplan's examples:
+  // lines ran along card edges and through the narrow gaps between stacked
+  // cards, and many lines met one side of a busy card a few pixels apart.
+  // So: more room between cards, lines kept well clear of cards they don't
+  // join and of each other, cards placed so lines stay straight and out of
+  // the gaps (Brandes-Koepf, balanced), and every card tall enough that the
+  // lines meeting one side of it are at least LINE_ROOM apart.
+  const LAYOUT = {
+    'elk.edgeRouting': 'ORTHOGONAL',
+    'elk.spacing.nodeNode': '56',
+    'elk.layered.spacing.nodeNodeBetweenLayers': '170',
+    'elk.spacing.edgeNode': '30',
+    'elk.layered.spacing.edgeNodeBetweenLayers': '40',
+    'elk.spacing.edgeEdge': '16',
+    'elk.layered.spacing.edgeEdgeBetweenLayers': '16',
+    'elk.spacing.portPort': '18',
+    'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
+    'elk.layered.nodePlacement.bk.fixedAlignment': 'BALANCED',
+    'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
+  };
+  const LINE_ROOM = 18;
+  window.__coderhelmLayout = { options: LAYOUT, lineRoom: LINE_ROOM };
   const elkShim = `(() => {
-    const Real = window.ELK, url = window.__coderhelmElkWorker;
-    if (!Real || !url) return;
+    const Real = window.ELK, url = window.__coderhelmElkWorker, tune = ${tuneGraph.toString()};
+    const opts = window.__coderhelmLayout;
+    if (!Real) return;
+    if (!url) {
+      window.ELK = function () { const elk = new Real(); return { layout: (graph) => elk.layout(tune(graph, opts)) }; };
+      return;
+    }
     let worker = null, broken = false, n = 0;
     const waiting = new Map();
     const inFrame = (graph) => new Real().layout(graph);
@@ -50,6 +93,7 @@
       worker.onerror = () => { broken = true; for (const [id, p] of waiting) { waiting.delete(id); inFrame(p.graph).then(p.resolve, p.reject); } };
     };
     window.ELK = function () { return { layout(graph) {
+      graph = tune(graph, opts);
       if (broken) return inFrame(graph);
       if (!worker) start();
       const id = ++n;
@@ -108,6 +152,46 @@
     });
   }
 
+  // The map's title and description sit over the canvas. Zoomed in, or with
+  // the map dragged up under them, they used to cover the first cards; the
+  // title block fades out while any card is under it, and back in once the
+  // map is moved clear.
+  function keepTitleClear() {
+    const ctx = document.getElementById('context'), vp = document.getElementById('viewport');
+    if (!ctx || !vp) return;
+    const style = document.createElement('style');
+    // The viewer's "Exported <date>" tag is left out too: the page around
+    // the frame says when the map was built, and on a phone the tag ran
+    // under the zoom buttons.
+    style.textContent = 'body.ch-title-over-map #context{opacity:0;visibility:hidden;transition:opacity .15s ease,visibility 0s linear .15s} .xtag{display:none}';
+    document.head.appendChild(style);
+    let queued = false;
+    const check = () => {
+      queued = false;
+      const r = ctx.getBoundingClientRect();
+      const M = 12; // a card this close under the text already reads as covered
+      let over = false;
+      if (r.width && r.height) {
+        for (const card of vp.querySelectorAll('.node .card')) {
+          const b = card.getBoundingClientRect();
+          if (b.right > r.left - M && b.left < r.right + M && b.bottom > r.top - M && b.top < r.bottom + M) { over = true; break; }
+        }
+      }
+      document.body.classList.toggle('ch-title-over-map', over);
+    };
+    const soon = () => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(check);
+    };
+    // Each move of the map, each new drawing, and once an animated move or the cards rising in has finished.
+    const settle = () => { soon(); setTimeout(soon, 600); };
+    new MutationObserver(settle).observe(vp, { attributes: true, attributeFilter: ['style', 'class'], childList: true });
+    new MutationObserver(settle).observe(ctx, { childList: true, subtree: true, characterData: true });
+    window.addEventListener('resize', settle);
+    settle();
+  }
+
   function fail(text) {
     document.body.textContent = '';
     const p = document.createElement('p');
@@ -136,6 +220,7 @@
     document.write(html);
     document.close();
     openPanelOnSelect();
+    keepTitleClear();
   });
 
   if (!P) fail('The map viewer is missing.');

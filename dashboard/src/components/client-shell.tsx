@@ -18,7 +18,7 @@ import { Logo, TopBar, TopBarProvider } from "./top-bar";
 import { tabTitle as routeTabTitle } from "@/lib/routes";
 import { focusRing } from "./ui";
 import { helpHref, helpTargetFromUrl } from "@/lib/support";
-import { BookIcon, ChatIcon, GearIcon, LifeBuoyIcon, PlanIcon, PlayIcon, ReviewerIcon, ShieldCheckIcon, ShieldIcon, SlidersIcon, TemplateIcon, TrendingUpIcon } from "./icons";
+import { BookIcon, ChatIcon, GearIcon, LifeBuoyIcon, MapIcon, PlanIcon, PlayIcon, ReviewerIcon, ShieldCheckIcon, ShieldIcon, SlidersIcon, TemplateIcon, TrendingUpIcon } from "./icons";
 import { ADMIN_SECTIONS, NAV_SECTIONS, sectionFor, visiblePages, type NavIconKey, type NavSection } from "@/lib/nav";
 import { SETTINGS_ITEMS, offered } from "./settings-items";
 import { isSelfHosted } from "@/lib/runtime-config";
@@ -85,6 +85,7 @@ const NAV_ICONS: Record<NavIconKey, ReactNode> = {
   logs: <LogFindingsIcon />,
   chat: <ChatIcon />,
   knowledge: <BookIcon />,
+  map: <MapIcon />,
   insights: <TrendingUpIcon />,
   settings: <GearIcon />,
   admin: <ShieldIcon />,
@@ -1764,7 +1765,10 @@ function NavItemLink({ href, label, icon, current, badge }: { href: string; labe
         href={href}
         prefetch={false}
         aria-current={current ? "page" : undefined}
-        className={`flex items-center justify-between gap-2 rounded-md px-2 py-1 text-sm transition-colors motion-reduce:transition-none ${focusRing} ${
+        // A little less air between items on a short window, so the whole
+        // menu (with the App map's own entry and the platform pages) still
+        // fits a 1280x800 screen without scrolling.
+        className={`flex items-center justify-between gap-2 rounded-md px-2 py-1 [@media(max-height:860px)]:py-0.5 text-sm transition-colors motion-reduce:transition-none ${focusRing} ${
           current ? "bg-zinc-800 font-medium text-zinc-50" : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-100"
         }`}
       >

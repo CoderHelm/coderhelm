@@ -1,5 +1,6 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import fs from "node:fs";
+import { mockWideApi } from "./wide-data";
 import path from "node:path";
 
 // The App map page: Floorplan's viewer (vendor/floorplan, MIT) in a sandboxed
@@ -19,24 +20,58 @@ function largeMap() {
   return { ...HARBOR, project: { name: "Marina" }, nodes, files, routes: [], links, flows: [], tour: [], screens: [], health: { summary: { high: 0, medium: 0, low: 0 }, issues: [] }, recent: undefined };
 }
 
-async function mockApi(page: Page, opts: { building?: boolean; graph?: unknown } = {}) {
+type Status = Record<string, unknown>;
+const NOW = Math.floor(Date.now() / 1000);
+const BASE: Status = { updating: false, step: "", stage: "", last_build: "ready", note: "", started_at: 0, repos: 0, estimate: null, built_at: 0, built_repos: 0, now: NOW, floorplan: "floorplan--v0.11.0" };
+/** A first build on its second step, started four minutes ago, for 3 repositories. */
+const BUILDING: Status = { ...BASE, state: "building", updating: true, step: "Finding the parts and how they connect", stage: "parts", last_build: "building", started_at: NOW - 4 * 60, repos: 3, estimate: { low_secs: 6 * 60, high_secs: 12 * 60 } };
+const FAILED: Status = { ...BASE, state: "failed", stage: "parts", last_build: "failed", note: "the sandbox couldn't run Floorplan (exit 1)" };
+const EMPTY: Status = { ...BASE, state: "empty", note: "No repositories are turned on for this team." };
+const READY: Status = { ...BASE, state: "ready", stage: "done", built_at: NOW - 3 * 60, built_repos: 12 };
+
+async function mockApi(page: Page, opts: { building?: boolean; graph?: unknown; status?: Status; rebuild?: "accept" | "busy"; role?: string } = {}) {
   const calls: string[] = [];
   const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
+  let status: Status = opts.status ?? (opts.building ? BUILDING : READY);
+  const graph = () => (status.state === "ready" ? (opts.graph ?? HARBOR) : null);
   await page.route((url) => url.hostname !== "localhost", (route) => route.abort());
   await page.route((url) => url.hostname === "localhost" && /^\/(api|auth)\//.test(url.pathname), async (route) => {
     const url = new URL(route.request().url());
     const p = url.pathname;
     calls.push(`${route.request().method()} ${p}${url.search}`);
-    if (p === "/api/me") return json(route, { user_id: "u_1", team_id: "t_1", github_login: null, email: "person@example.com", avatar_url: "", role: "admin", auth_provider: "email", mfa_enabled: false });
+    if (p === "/api/me") return json(route, { user_id: "u_1", team_id: "t_1", github_login: null, email: "person@example.com", avatar_url: "", role: opts.role ?? "admin", auth_provider: "email", mfa_enabled: false });
     if (p === "/api/banners") return json(route, { banners: [] });
     if (p === "/api/teams") return json(route, { teams: [{ team_id: "t_1", org: "harbor", status: "active", current: true }] });
-    if (p === "/api/app-map") {
-      if (opts.building) return json(route, { status: { state: "building", updating: true, step: "Reading the repositories", note: "", floorplan: "floorplan--v0.11.0" }, graph: null });
-      return json(route, { status: { state: "ready", updating: false, step: "", note: "", floorplan: "floorplan--v0.11.0" }, graph: opts.graph ?? HARBOR });
+    if (p === "/api/app-map/rebuild") {
+      if (opts.rebuild === "busy") return json(route, { error: "The map is already being built.", code: "already_building", status: { ...BUILDING, state: status.state === "ready" ? "ready" : "building" } }, 409);
+      const hasMap = status.state === "ready";
+      status = { ...BUILDING, state: hasMap ? "ready" : "building", stage: "reading", step: "Waiting to start", started_at: NOW, built_at: status.built_at, built_repos: status.built_repos };
+      return json(route, { status }, 202);
     }
+    if (p === "/api/app-map") return json(route, { status, graph: url.searchParams.get("graph") === "0" ? null : graph() });
     return json(route, {});
   });
   return calls;
+}
+
+async function shot(page: Page, name: string) {
+  fs.mkdirSync(SHOTS_DIR, { recursive: true });
+  // The dev server's overlay button, out of the picture (a static build has none, and its CSP may refuse the tag).
+  await page.addStyleTag({ content: "nextjs-portal{display:none!important}" }).catch(() => {});
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: path.join(SHOTS_DIR, `${name}.png`), fullPage: true });
+}
+
+/** The page at desktop size, then on a phone, with no sideways scroll. */
+async function bothSizes(page: Page, name: string, ready: () => Promise<void>) {
+  await page.goto("/app-map");
+  await ready();
+  await shot(page, `app-map-${name}-desktop`);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await ready();
+  const sideways = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(sideways).toBeLessThanOrEqual(1);
+  await shot(page, `app-map-${name}-phone`);
 }
 
 const viewer = (page: Page, testId = "app-map-frame") => page.getByTestId(testId).frameLocator("iframe");
@@ -115,13 +150,127 @@ test.describe("App map", () => {
     await expect(page.getByTestId("app-map-recent-toggle")).toHaveAttribute("aria-pressed", "false");
   });
 
-  test("shows a clear state while the map builds", async ({ page }) => {
-    await mockApi(page, { building: true });
+  test("while the map builds: the steps in order, the time, what it will be, and no way to start another", async ({ page }) => {
+    const calls = await mockApi(page, { building: true });
     await page.goto("/app-map");
-    await expect(page.getByTestId("app-map-building")).toContainText("Building your app map");
-    await expect(page.getByTestId("app-map-building")).toContainText("Reading the repositories");
+    const card = page.getByTestId("app-map-building");
+    await expect(card.getByRole("heading", { name: "Building your app map" })).toBeVisible();
+    const steps = page.getByTestId("app-map-steps").getByRole("listitem");
+    await expect(steps).toHaveText([/Reading the repositories/, /Finding the parts and how they connect/, /Describing each part in plain words/, /Done/]);
+    await expect(steps.nth(0)).toHaveAttribute("data-state", "done");
+    await expect(steps.nth(1)).toHaveAttribute("aria-current", "step");
+    await expect(steps.nth(1)).toContainText("Now");
+    await expect(steps.nth(2)).toHaveAttribute("data-state", "next");
+    const startedAt = await page.evaluate((t) => new Date(t * 1000).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }), BUILDING.started_at as number);
+    await expect(page.getByTestId("app-map-timing")).toHaveText(`Started at ${startedAt}, 4 min so far. A map of 3 repositories usually takes 6 to 12 minutes.`);
+    await expect(page.getByTestId("app-map-preview")).toContainText("What you'll get");
+    await expect(page.getByTestId("app-map-preview").getByRole("img")).toBeVisible();
+    // One build at a time: nothing here starts another.
+    await expect(page.getByRole("button", { name: /build/i })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "More" })).toHaveCount(0);
     await expect(page.getByTestId("app-map-frame")).toHaveCount(0);
-    await page.screenshot({ path: path.join(SHOTS_DIR, "app-map-building.png"), fullPage: true });
+    // It watches the status only, not the whole map.
+    await expect.poll(() => calls.some((c) => c === "GET /api/app-map?graph=0"), { timeout: 12_000 }).toBe(true);
+    await bothSizes(page, "building", async () => {
+      await expect(card).toBeVisible();
+    });
+  });
+
+  test("a failed first build says where it stopped and offers one Try again", async ({ page }) => {
+    const calls = await mockApi(page, { status: FAILED, rebuild: "accept" });
+    await page.goto("/app-map");
+    const failed = page.getByTestId("app-map-failed");
+    await expect(failed).toContainText("The map couldn't be built");
+    await expect(failed).toContainText("It stopped while finding the parts and how they connect.");
+    // The raw reason is folded away, not the headline.
+    await expect(failed.getByText("Technical details").first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "Try again" })).toHaveCount(1);
+    await bothSizes(page, "failed", async () => {
+      await expect(failed).toBeVisible();
+    });
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.getByRole("button", { name: "Try again" }).click();
+    await expect(page.getByTestId("app-map-building")).toBeVisible();
+    await expect(page.getByTestId("app-map-steps").getByRole("listitem").nth(0)).toHaveAttribute("aria-current", "step");
+    await expect(page.getByTestId("app-map-building")).toContainText("Waiting for a worker");
+    expect(calls.filter((c) => c === "POST /api/app-map/rebuild")).toHaveLength(1);
+  });
+
+  test("nothing to map yet points to Setup", async ({ page }) => {
+    await mockApi(page, { status: EMPTY });
+    await page.goto("/app-map");
+    const empty = page.getByTestId("app-map-empty");
+    await expect(empty).toContainText("Nothing to map yet");
+    await expect(empty.getByRole("link", { name: "Turn on repositories" })).toHaveAttribute("href", /^\/setup\/?$/);
+    await bothSizes(page, "empty", async () => {
+      await expect(empty).toBeVisible();
+    });
+  });
+
+  test("with a map: the map first, when it was built, a small Build again, and the Chat hint", async ({ page }) => {
+    const calls = await mockApi(page, { rebuild: "accept" });
+    await page.goto("/app-map");
+    await expect(viewer(page).getByText("Harbor website").first()).toBeVisible();
+    await expect(page.getByTestId("app-map-built")).toContainText("Built 3 minutes ago from 12 repositories.");
+    await expect(page.getByTestId("app-map-hint")).toHaveText("Questions about how it works? Ask below or in Chat; answers come from this map.");
+    await expect(page.getByTestId("app-map-hint").getByRole("link", { name: "Chat" })).toHaveAttribute("href", /^\/chat\/?$/);
+    // The map comes before the toggles and the Ask box.
+    const top = async (id: string) => (await page.getByTestId(id).boundingBox())!.y;
+    expect(await top("app-map-frame")).toBeLessThan(await top("app-map-recent-toggle"));
+    expect(await top("app-map-frame")).toBeLessThan(await top("app-map-ask"));
+    await bothSizes(page, "built", async () => {
+      await expect(viewer(page).getByText("Harbor website").first()).toBeVisible();
+    });
+    await page.setViewportSize({ width: 1280, height: 800 });
+    // Building again: the button goes while the update runs, the map stays.
+    await page.getByTestId("app-map-rebuild").click();
+    await expect(page.getByTestId("app-map-built")).toContainText("Updating since");
+    await expect(page.getByTestId("app-map-rebuild")).toHaveCount(0);
+    await expect(viewer(page).getByText("Harbor website").first()).toBeVisible();
+    expect(calls.filter((c) => c === "POST /api/app-map/rebuild")).toHaveLength(1);
+    await shot(page, "app-map-updating-desktop");
+  });
+
+  test("a build already running is shown, not started again", async ({ page }) => {
+    await mockApi(page, { rebuild: "busy" });
+    await page.goto("/app-map");
+    await page.getByTestId("app-map-rebuild").click();
+    await expect(page.getByText("The map is already being built. That build carries on.")).toBeVisible();
+    await expect(page.getByTestId("app-map-built")).toContainText("Updating since");
+    await expect(page.getByTestId("app-map-rebuild")).toHaveCount(0);
+  });
+
+  test("members see when it was built but not the button", async ({ page }) => {
+    await mockApi(page, { role: "member" });
+    await page.goto("/app-map");
+    await expect(page.getByTestId("app-map-built")).toContainText("Built 3 minutes ago");
+    await expect(page.getByTestId("app-map-rebuild")).toHaveCount(0);
+  });
+
+  test("App map has its own place in the menu and the palette, and no longer hides under Insights", async ({ page }) => {
+    // Every page's data, so Insights' own pages draw too.
+    await mockWideApi(page);
+    // Insights' tabs no longer carry it.
+    await page.goto("/analytics/");
+    await expect(page.getByTestId("section-tabs")).toBeVisible();
+    await expect(page.getByTestId("section-tabs")).not.toContainText("App map");
+    // Its own entry, beside Chat and Knowledge, marked current on its page.
+    await page.goto("/app-map/");
+    await expect(page.getByRole("heading", { name: "App map", level: 1 })).toBeVisible();
+    const nav = page.getByTestId("main-nav");
+    const link = nav.getByRole("link", { name: "App map", exact: true });
+    await expect(link).toHaveAttribute("href", /^\/app-map\/?$/);
+    await expect(link).toHaveAttribute("aria-current", "page");
+    const names = await nav.getByRole("link").allInnerTexts();
+    const i = names.findIndex((n) => n.trim() === "App map");
+    expect(names[i - 1]?.trim()).toBe("Knowledge");
+    await expect(page.getByTestId("section-tabs")).toHaveCount(0);
+    await shot(page, "app-map-menu-desktop");
+    // The palette finds it by name.
+    await page.keyboard.press("Control+k");
+    const palette = page.getByRole("dialog", { name: "Search and commands" });
+    await palette.getByRole("combobox").fill("app map");
+    await expect(palette.getByRole("option", { name: /App map/ }).first()).toBeVisible();
   });
 
   test("a large map leaves the page responsive", async ({ page }) => {

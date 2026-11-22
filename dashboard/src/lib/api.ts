@@ -1395,7 +1395,13 @@ export const api = {
   // graphs (the first visit starts the first build).
   getAppMap: (opts: { recent?: boolean; health?: boolean } = {}) =>
     request<AppMapResponse>(`/api/app-map?recent=${opts.recent ? 1 : 0}&health=${opts.health ? 1 : 0}`),
-  rebuildAppMap: () => request<void>(`/api/app-map/rebuild`, { method: "POST" }),
+  /** Only where the build is (no map), for watching a build. */
+  getAppMapStatus: () => request<AppMapResponse>(`/api/app-map?graph=0`),
+  /**
+   * Builds the map again. One build at a time: while one is queued or
+   * running the answer is 409 (`already_building`) with that build's status.
+   */
+  rebuildAppMap: () => request<{ status?: AppMapStatus } | undefined>(`/api/app-map/rebuild`, { method: "POST" }),
   getReviewerConfig: (repo: string) =>
     request<ReviewerConfig>(`/api/reviewer/config/${repo}`),
   updateReviewerConfig: (repo: string, config: ReviewerConfig & ChannelsInput) =>
@@ -6507,14 +6513,35 @@ export interface DecisionsAnalytics {
 
 // ── App map ─────────────────────────────────────────────────────────────────
 
+/** The build's steps in order (`done`: the map is written). */
+export type AppMapStage = "reading" | "parts" | "describing" | "done";
+
 /** Where the team's map build is. */
 export interface AppMapStatus {
   /** `building` while there is no map yet. */
   state: "ready" | "building" | "failed" | "empty" | "not_built";
+  /** A build is queued or running (with a map there: an update). */
   updating: boolean;
-  /** What the build is doing now. */
+  /** What the build is doing now, in plain words. */
   step: string;
+  /** Which of the steps it is on, while one runs. */
+  stage?: AppMapStage | "";
+  /** How the last build ended: with a map there, `failed` is an update that didn't finish. */
+  last_build?: string;
+  /** Why it stopped, or why there is nothing to map. */
   note: string;
+  /** When the running build was asked for (unix seconds; 0 when none runs). */
+  started_at?: number;
+  /** Repositories the build reads. */
+  repos?: number;
+  /** How long a build usually takes for those repositories. */
+  estimate?: { low_secs: number; high_secs: number } | null;
+  /** When the map there now was built (unix seconds; 0 if not known). */
+  built_at?: number;
+  /** Repositories that map covers. */
+  built_repos?: number;
+  /** The server's clock (unix seconds), so elapsed time doesn't depend on this computer's. */
+  now?: number;
   /** The Floorplan release that made it. */
   floorplan: string;
 }
