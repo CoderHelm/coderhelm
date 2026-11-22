@@ -1,20 +1,24 @@
 "use client";
 
 // App map: how the team's app fits together across all its repositories, in
-// plain words. The map is made with Floorplan (vendor/floorplan in the
-// platform, MIT): its extractor reads every repository side by side and its
-// viewer draws the map, here in a sandboxed frame (map-frame.tsx) so its code
-// never touches this page. Coderhelm adds its own Recent work (its runs) and
-// Health (its security, infrastructure, log and alert findings) into the
-// map's own fields. Questions are Chat's: the Ask box asks Chat (the map's
-// lookups first) and the chat is kept with the person's others; a part's
-// "Ask about this" opens a new chat about it; an answer's "Open in App map"
-// comes back here focused on its parts (`?focus=`).
+// plain words. It has its own place in the menu, beside Chat and Knowledge.
+// The map is made with Floorplan (vendor/floorplan in the platform, MIT): its
+// extractor reads every repository side by side and its viewer draws the
+// map, here in a sandboxed frame (map-frame.tsx) so its code never touches
+// this page. Coderhelm adds its own Recent work (its runs) and Health (its
+// security, infrastructure, log and alert findings) into the map's own
+// fields. Questions are Chat's: the Ask box asks Chat (the map's lookups
+// first) and the chat is kept with the person's others; a part's "Ask about
+// this" opens a new chat about it; an answer's "Open in App map" comes back
+// here focused on its parts (`?focus=`).
+//
+// One build at a time (build-status.tsx): while one runs the page shows its
+// steps and time, and offers no way to start another.
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { api, type AppMapResponse } from "@/lib/api";
+import { api, ApiError, type AppMapResponse, type AppMapStatus } from "@/lib/api";
 import { askAboutLink, askBrain, focusOf, type ChatMap, type Citation } from "@/lib/brain";
 import { AnswerView } from "../chat/answer";
 import { useCan } from "@/hooks/use-can";
@@ -23,10 +27,11 @@ import { Callout } from "@/components/callout";
 import { EmptyState } from "@/components/empty-state";
 import { Problem } from "@/components/problem";
 import { Skeleton } from "@/components/skeleton";
-import { GraphIcon } from "@/components/icons";
+import { MapIcon } from "@/components/icons";
 import { useToast } from "@/components/toast";
 import { buttonClass, inputClass, linkButton } from "@/components/ui";
 import { MapFrame } from "./map-frame";
+import { Building, BuiltBar, Failed, serverNow } from "./build-status";
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : "The request failed.");
 
@@ -50,6 +55,18 @@ function Credit({ version }: { version?: string }) {
   );
 }
 
+/** The time now, read again every `ms`. */
+function useNowMs(ms: number, on: boolean): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!on) return;
+    setNow(Date.now());
+    const t = setInterval(() => setNow(Date.now()), ms);
+    return () => clearInterval(t);
+  }, [ms, on]);
+  return now;
+}
+
 export default function AppMapPage() {
   return (
     <Suspense fallback={<Page testId="app-map-page"><Skeleton className="h-96 w-full" /></Page>}>
@@ -65,36 +82,77 @@ function AppMap() {
   const focus = useMemo(() => focusOf(params.get("focus")), [params]);
   const { toast } = useToast();
   const [data, setData] = useState<AppMapResponse | null>(null);
+  // When the status was read, so elapsed time follows the server's clock.
+  const [readAt, setReadAt] = useState(() => Date.now());
   const [error, setError] = useState("");
   const [recent, setRecent] = useState(true);
   const [health, setHealth] = useState(true);
   const [question, setQuestion] = useState("");
+  const [starting, setStarting] = useState(false);
+  const hasMap = !!data?.graph;
+  const hasMapRef = useRef(hasMap);
+  hasMapRef.current = hasMap;
 
+  const take = useCallback((d: AppMapResponse) => {
+    setData(d);
+    setReadAt(Date.now());
+    setError("");
+  }, []);
+  const takeStatus = useCallback((status: AppMapStatus) => {
+    setData((d) => (d ? { ...d, status } : { status, graph: null }));
+    setReadAt(Date.now());
+  }, []);
   const load = useCallback(() => {
     api
       .getAppMap({ recent, health })
-      .then((d) => {
-        setData(d);
-        setError("");
-      })
+      .then(take)
       .catch((e) => setError(errText(e)));
-  }, [recent, health]);
+  }, [recent, health, take]);
   useEffect(load, [load]);
-  // While the first map builds, look again now and then.
-  const building = data?.status.state === "building";
+
+  // While a build runs, watch its status (not the whole map) and read the
+  // map again when it is done.
+  const watching = !!data && (data.status.updating || data.status.state === "building");
   useEffect(() => {
-    if (!building) return;
-    const t = setInterval(load, 8000);
+    if (!watching) return;
+    const t = setInterval(
+      () => {
+        api
+          .getAppMapStatus()
+          .then((d) => {
+            if (d.graph) return take(d);
+            const st = d.status;
+            const done = !st.updating && st.state !== "building";
+            if (done && (st.state === "ready" || hasMapRef.current)) return load();
+            takeStatus(st);
+          })
+          .catch(() => {});
+      },
+      hasMap ? 15000 : 5000,
+    );
     return () => clearInterval(t);
-  }, [building, load]);
+  }, [watching, hasMap, load, take, takeStatus]);
+  const nowMs = useNowMs(15000, watching || hasMap);
+  const now = data ? serverNow(data.status, readAt, nowMs) : nowMs / 1000;
 
   const rebuild = async () => {
+    if (starting) return;
+    setStarting(true);
     try {
-      await api.rebuildAppMap();
-      toast("The map is being built again.");
-      load();
+      const r = await api.rebuildAppMap();
+      if (r?.status) takeStatus(r.status);
+      else load();
+      toast("The map is being built again. This page updates by itself.");
     } catch (e) {
-      toast(errText(e), "error");
+      const running = e instanceof ApiError && e.status === 409 ? (e.body?.status as AppMapStatus | undefined) : undefined;
+      if (running) {
+        takeStatus(running);
+        toast("The map is already being built. That build carries on.");
+      } else {
+        toast(errText(e), "error");
+      }
+    } finally {
+      setStarting(false);
     }
   };
 
@@ -108,11 +166,7 @@ function AppMap() {
   );
 
   const header = (
-    <PageHeader
-      title="App map"
-      lead="How your app fits together across its repositories, in plain words: its parts, what calls what, the screens and what is behind them, and the outside services it uses."
-      more={can("repos") ? [{ label: "Build the map again", onSelect: rebuild }] : undefined}
-    />
+    <PageHeader title="App map" lead="How your app fits together across all its repositories: its parts, what calls what, and the outside services it uses, in plain words." />
   );
 
   if (error && !data) {
@@ -140,28 +194,43 @@ function AppMap() {
       <div className="mt-4 space-y-4">
         {!data.graph ? (
           st.state === "failed" ? (
-            <Problem title="The map couldn't be built" onRetry={rebuild} details={st.note}>
-              Coderhelm keeps what it has; try again in a moment.
-            </Problem>
+            <Failed status={st} onRetry={rebuild} canRetry={can("repos")} busy={starting} />
           ) : st.state === "empty" ? (
-            <EmptyState icon={<GraphIcon />} title="Nothing to map yet" testId="app-map-empty">
-              The map covers the repositories turned on for this team. Turn some on in Setup and it is built.
+            <EmptyState
+              icon={<MapIcon />}
+              title="Nothing to map yet"
+              testId="app-map-empty"
+              action={
+                <Link href="/setup" className={buttonClass("primary", "md")}>
+                  Turn on repositories
+                </Link>
+              }
+            >
+              The map covers the repositories turned on for this team. Turn some on in Setup and the map is built by itself.
             </EmptyState>
           ) : (
-            <div data-testid="app-map-building">
-              <EmptyState icon={<GraphIcon />} title="Building your app map">
-                Coderhelm is reading every repository side by side and describing each part in plain words. A first map takes a few minutes; this page updates by
-                itself.{st.step ? ` Now: ${st.step}.` : ""}
-              </EmptyState>
-            </div>
+            <Building status={st} now={now} />
           )
         ) : (
           <>
-            {st.updating && (
-              <Callout variant="info" title="Updating">
-                The map is being brought up to date{st.step ? ` (${st.step.toLowerCase()})` : ""}; what you see is the last version.
-              </Callout>
-            )}
+            <BuiltBar
+              status={st}
+              now={now}
+              canRebuild={can("repos")}
+              busy={starting}
+              onRebuild={rebuild}
+              hint={
+                <>
+                  Questions about how it works? Ask below or in{" "}
+                  <Link href="/chat" className={linkButton}>
+                    Chat
+                  </Link>
+                  ; answers come from this map.
+                </>
+              }
+            />
+            {focus.length > 0 && <FocusNote graph={data.graph} focus={focus} />}
+            <MapFrame graph={data.graph} title="The app map" onAsk={onAsk} focus={focus[0]} />
             <div className="flex flex-wrap items-center gap-2" role="toolbar" aria-label="What the map shows">
               <Toggle on={recent} onChange={setRecent} testId="app-map-recent-toggle">
                 Recent work
@@ -171,8 +240,6 @@ function AppMap() {
               </Toggle>
               <span className="text-sm text-zinc-400">Coderhelm&apos;s runs and findings, shown on the parts they concern.</span>
             </div>
-            {focus.length > 0 && <FocusNote graph={data.graph} focus={focus} />}
-            <MapFrame graph={data.graph} title="The app map" onAsk={onAsk} focus={focus[0]} />
             <AskBox question={question} setQuestion={setQuestion} />
           </>
         )}

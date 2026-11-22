@@ -1,4 +1,4 @@
-// The app's top-level destinations: nine places a person goes, each with
+// The app's top-level destinations: ten places a person goes, each with
 // the pages that belong to it. The sidebar lists the destinations; when a
 // destination has more than one page, the shell shows its pages as tabs
 // above the page (components/section-tabs.tsx). Settings has its own left
@@ -7,7 +7,7 @@
 import { ANY_CHANGE } from "./capabilities";
 import { KNOWLEDGE_HREF, normalizePath } from "./routes";
 
-export type NavIconKey = "runs" | "plans" | "reviews" | "logs" | "chat" | "knowledge" | "plugins" | "insights" | "settings" | "admin" | "queue" | "security" | "setup";
+export type NavIconKey = "runs" | "plans" | "reviews" | "logs" | "chat" | "knowledge" | "map" | "plugins" | "insights" | "settings" | "admin" | "queue" | "security" | "setup";
 
 export interface NavPage {
   href: string;
@@ -98,6 +98,15 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
+    // How the app fits together across its repositories. Its own entry
+    // beside Chat and Knowledge (Chat answers from it), and only here: not
+    // also a tab under Insights, so one page has one place in the menu.
+    key: "app-map",
+    label: "App map",
+    icon: "map",
+    pages: [{ href: "/app-map", label: "App map", need: ANY_CHANGE }],
+  },
+  {
     // Packages a team installs; hidden until the team's plugins flag is on.
     key: "plugins",
     label: "Plugins",
@@ -117,7 +126,6 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/analytics", label: "Analytics", need: ANY_CHANGE },
       { href: "/learning", label: "Learning", need: ANY_CHANGE },
       { href: "/memory", label: "Memory", need: ANY_CHANGE },
-      { href: "/app-map", label: "App map", need: ANY_CHANGE },
       { href: "/graph", label: "Code graph", need: ANY_CHANGE },
       { href: "/infrastructure", label: "Infrastructure", need: ANY_CHANGE },
       { href: "/health", label: "Health", need: "system" },

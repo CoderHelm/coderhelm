@@ -18,7 +18,7 @@ import { Logo, TopBar, TopBarProvider } from "./top-bar";
 import { tabTitle as routeTabTitle } from "@/lib/routes";
 import { focusRing } from "./ui";
 import { helpHref, helpTargetFromUrl } from "@/lib/support";
-import { BookIcon, ChatIcon, GearIcon, LifeBuoyIcon, PlanIcon, PlayIcon, ReviewerIcon, ShieldCheckIcon, ShieldIcon, SlidersIcon, TemplateIcon, TrendingUpIcon } from "./icons";
+import { BookIcon, ChatIcon, GearIcon, LifeBuoyIcon, MapIcon, PlanIcon, PlayIcon, ReviewerIcon, ShieldCheckIcon, ShieldIcon, SlidersIcon, TemplateIcon, TrendingUpIcon } from "./icons";
 import { ADMIN_SECTIONS, NAV_SECTIONS, sectionFor, visiblePages, type NavIconKey, type NavSection } from "@/lib/nav";
 import { SETTINGS_ITEMS, offered } from "./settings-items";
 import { isSelfHosted } from "@/lib/runtime-config";
@@ -85,6 +85,7 @@ const NAV_ICONS: Record<NavIconKey, ReactNode> = {
   logs: <LogFindingsIcon />,
   chat: <ChatIcon />,
   knowledge: <BookIcon />,
+  map: <MapIcon />,
   insights: <TrendingUpIcon />,
   settings: <GearIcon />,
   admin: <ShieldIcon />,
