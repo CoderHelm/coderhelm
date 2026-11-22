@@ -7,6 +7,12 @@ import * as acm from "aws-cdk-lib/aws-certificatemanager";
 import * as route53 from "aws-cdk-lib/aws-route53";
 import * as targets from "aws-cdk-lib/aws-route53-targets";
 import { Construct } from "constructs";
+
+/** The App map's frame page: Floorplan's viewer, framed by the App map page. */
+export const APP_MAP_FRAME_PATH = "/app-map/frame.html";
+/** Its policy: its own scripts and the layout worker, no network at all, framed by this site only. */
+export const APP_MAP_FRAME_CSP =
+  "default-src 'none'; script-src 'self' 'unsafe-inline' blob:; worker-src blob:; style-src 'unsafe-inline'; font-src data:; img-src data: blob:; connect-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none'; frame-ancestors 'self'";
 import {
   NextExportDeployment,
   NOT_FOUND_PAGE,
@@ -102,6 +108,20 @@ export class AppStack extends cdk.Stack {
       }
     );
 
+    // The App map's frame (dashboard/public/app-map/frame.html): Floorplan's
+    // map viewer, which the App map page shows in a sandboxed iframe. It may be
+    // framed by this site only, and its policy allows no network at all.
+    const appMapFrameHeaders = new cloudfront.ResponseHeadersPolicy(this, "AppMapFrameHeaders", {
+      responseHeadersPolicyName: `${prefix}-app-map-frame-headers`,
+      securityHeadersBehavior: {
+        strictTransportSecurity: { accessControlMaxAge: cdk.Duration.days(365), includeSubdomains: true, preload: true, override: true },
+        contentTypeOptions: { override: true },
+        frameOptions: { frameOption: cloudfront.HeadersFrameOption.SAMEORIGIN, override: true },
+        referrerPolicy: { referrerPolicy: cloudfront.HeadersReferrerPolicy.NO_REFERRER, override: true },
+        contentSecurityPolicy: { contentSecurityPolicy: APP_MAP_FRAME_CSP, override: true },
+      },
+    });
+
     // Page paths open the page's index.html. A path that is no page of the
     // dashboard opens the 404 page right here, so the distribution needs no
     // 404 error response, which would also answer a missing /_next/ script
@@ -132,15 +152,16 @@ function handler(event) {
     });
 
     // CloudFront distribution
+    // LIST lets S3 answer 404 for a page that does not exist. With READ
+    // only, S3 hides missing keys behind 403, so a mistyped address
+    // showed "Access denied" instead of "Page not found".
+    const siteOrigin = origins.S3BucketOrigin.withOriginAccessControl(siteBucket, {
+      originAccessControl: oac,
+      originAccessLevels: [cloudfront.AccessLevel.READ, cloudfront.AccessLevel.LIST],
+    });
     const distribution = new cloudfront.Distribution(this, "Distribution", {
       defaultBehavior: {
-        // LIST lets S3 answer 404 for a page that does not exist. With READ
-        // only, S3 hides missing keys behind 403, so a mistyped address
-        // showed "Access denied" instead of "Page not found".
-        origin: origins.S3BucketOrigin.withOriginAccessControl(siteBucket, {
-          originAccessControl: oac,
-          originAccessLevels: [cloudfront.AccessLevel.READ, cloudfront.AccessLevel.LIST],
-        }),
+        origin: siteOrigin,
         viewerProtocolPolicy:
           cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
@@ -155,6 +176,14 @@ function handler(event) {
             eventType: cloudfront.FunctionEventType.VIEWER_RESPONSE,
           },
         ],
+      },
+      additionalBehaviors: {
+        [APP_MAP_FRAME_PATH]: {
+          origin: siteOrigin,
+          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+          responseHeadersPolicy: appMapFrameHeaders,
+        },
       },
       defaultRootObject: "index.html",
       webAclId: props.webAclArn,

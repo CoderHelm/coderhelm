@@ -6,6 +6,10 @@ pull requests that shipped it. Leave out CI, pins and dependency bumps. The page
 groups releases by day: one heading per day, each release a subheading under it.
 -->
 
+## November 21, 2026: the app map
+
+- **App map: how your app fits together, in plain words.** A new page under **Insights** shows every part of your app across all your repositories, the screens and what is behind each one, web requests matched to the endpoints that answer them across repositories, and the outside services each part uses. It is made with the open-source [Floorplan](https://github.com/haydenschmitty/floorplan) project (MIT): CoderHelm runs a pinned Floorplan release in its code sandbox, does its writing jobs with your team's model (recorded under App map in Analytics) and shows Floorplan's viewer in a sandboxed frame. **Recent work** adds CoderHelm's runs of the last two weeks and **Health** its open security, infrastructure, log and alert findings, in the map's own panels. **Ask** answers a question about the map in numbered steps with the parts involved. After each push only new or changed files are described again. ([#799](https://github.com/CoderHelm/coderhelm-platform/pull/799), [dashboard #DASH_PR](https://github.com/CoderHelm/coderhelm/pull/DASH_PR))
+
 ## November 19, 2026: sign in with Microsoft and Okta
 
 - **Sign in with Microsoft.** Work, school and personal Microsoft accounts can sign in, on CoderHelm's cloud and on self-hosted installs that add their own Entra app registration. CoderHelm checks Microsoft's signature, the account's own tenant, the nonce and the expiry, and takes the email only when Microsoft says its domain is verified. The button shows only where it is set up. ([#793](https://github.com/CoderHelm/coderhelm-platform/pull/793), [dashboard #463](https://github.com/CoderHelm/coderhelm/pull/463))

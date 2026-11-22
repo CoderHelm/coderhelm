@@ -117,6 +117,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/analytics", label: "Analytics", need: ANY_CHANGE },
       { href: "/learning", label: "Learning", need: ANY_CHANGE },
       { href: "/memory", label: "Memory", need: ANY_CHANGE },
+      { href: "/app-map", label: "App map", need: ANY_CHANGE },
       { href: "/graph", label: "Code graph", need: ANY_CHANGE },
       { href: "/infrastructure", label: "Infrastructure", need: ANY_CHANGE },
       { href: "/health", label: "Health", need: "system" },

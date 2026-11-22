@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "floorplan": "node scripts/floorplan-frame.mjs",
+    "postinstall": "node scripts/floorplan-frame.mjs",
+    "predev": "node scripts/floorplan-frame.mjs",
+    "prebuild": "node scripts/floorplan-frame.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

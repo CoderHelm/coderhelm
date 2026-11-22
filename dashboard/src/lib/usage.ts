@@ -79,6 +79,7 @@ export const FEATURE_LABELS: Record<string, string> = {
   tests: "Test results",
   live_sources: "Live sources",
   memory: "Memory",
+  app_map: "App map",
   other: "Other",
 };
 
