@@ -182,7 +182,9 @@ function SignInSettingsPage() {
           ? ` ${o.unlinked.length} ${o.unlinked.length === 1 ? "person hasn't" : "people haven't"} linked ${o.name} yet and can't sign in until an admin gives them a one-time link: ${names(o.unlinked)}.`
           : ""
       }${
-        (o.suspended_keys ?? []).length > 0
+        o.keys_unread
+          ? " Coderhelm couldn't read the team's keys, so it can't say which would be suspended. Try again in a minute."
+          : (o.suspended_keys ?? []).length > 0
           ? ` These keys are suspended until their maker links ${o.name}: ${(o.suspended_keys ?? []).map((k) => k.name).join(", ")}.`
           : ""
       } Every session and app connection on this team from any other way in ends now, the owner's included, and stays ended if you turn this off later.`,
@@ -476,8 +478,13 @@ function SignInSettingsPage() {
                 Keys follow their maker: while single sign-on is required, an API key or knowledge key works only while the member who made it is
                 on the team and linked to the provider. Others are suspended, not deleted, and work again once their maker links.
               </p>
+              {(inUse ? [inUse] : options).some((o) => o.keys_unread) && (
+                <p className="text-sm text-amber-300" data-testid="keys-unread">
+                  Coderhelm couldn&apos;t read the team&apos;s keys, so it can&apos;t say which would be suspended. Try again in a minute.
+                </p>
+              )}
               {(inUse ? [inUse] : options)
-                .filter((o) => (o.suspended_keys ?? []).length > 0)
+                .filter((o) => !o.keys_unread && (o.suspended_keys ?? []).length > 0)
                 .map((o) => (
                   <p key={`keys-${o.provider}`} className="text-sm text-amber-300" data-testid={`suspended-keys-${o.provider}`}>
                     {inUse ? "Suspended now" : `Suspended with ${o.name}`}: {(o.suspended_keys ?? []).map((k) => k.name).join(", ")}

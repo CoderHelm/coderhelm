@@ -45,6 +45,7 @@ interface State {
   issued: string[];
   revoked: string[];
   refuseLogin: Provider | null;
+  keysUnread: boolean;
 }
 
 async function mock(page: Page, over: Partial<State> = {}): Promise<State> {
@@ -64,6 +65,7 @@ async function mock(page: Page, over: Partial<State> = {}): Promise<State> {
     issued: [],
     revoked: [],
     refuseLogin: null,
+    keysUnread: false,
     ...over,
   };
   const json = (route: Route, body: unknown, status = 200) =>
@@ -125,7 +127,8 @@ async function mock(page: Page, over: Partial<State> = {}): Promise<State> {
           ready: o.set_up && o.enabled && o.domains_verified && o.session_from_provider && o.is_owner,
           unlinked: state.unlinked,
           recovery: RECOVERY(o.name),
-          suspended_keys: state.unlinked.length ? [{ name: "nightly-ci", kind: "api" }] : [],
+          suspended_keys: state.keysUnread ? null : state.unlinked.length ? [{ name: "nightly-ci", kind: "api" }] : [],
+          keys_unread: state.keysUnread,
         })),
         claim_links: state.claims,
       });
@@ -205,6 +208,17 @@ for (const width of [1280, 390]) {
       await expect.poll(() => state.puts.at(-1)).toEqual({ require_sso: "microsoft", acknowledge_unlinked: true });
       await expect(page.getByTestId("require-sso-state")).toContainText("Required with Microsoft Entra");
       await expect(page.getByTestId("sso-recovery")).toContainText("support verifies them out of band");
+    });
+
+    test("keys that couldn't be read are said so, never as none suspended", async ({ page }) => {
+      await mock(page, { signedIn: true, keysUnread: true });
+      await page.goto("/settings/sign-in");
+      await expect(page.getByTestId("keys-unread")).toContainText("couldn't read the team's keys");
+      await page.getByTestId("require-sso-microsoft").click();
+      const confirm = page.getByTestId("confirm-dialog");
+      await expect(confirm).toContainText("couldn't read the team's keys, so it can't say which would be suspended");
+      await expect(confirm).not.toContainText("These keys are suspended");
+      await noSidewaysScroll(page);
     });
 
     test("an unlinked member gets a one-time link, shown once, and it can be revoked", async ({ page }) => {
