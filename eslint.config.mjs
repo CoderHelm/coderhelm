@@ -8,7 +8,9 @@ const __dirname = dirname(__filename);
 const compat = new FlatCompat({ baseDirectory: __dirname });
 
 const eslintConfig = [
-  { ignores: [".next/", "docs/"] },
+  // The vendored Floorplan viewer is third-party code, never edited; the
+  // viewer parts are generated from it (dashboard/scripts/floorplan-frame.mjs).
+  { ignores: [".next/", "docs/", "dashboard/vendor/", "dashboard/public/app-map/viewer.js"] },
   ...compat.extends("next/core-web-vitals"),
 ];
 

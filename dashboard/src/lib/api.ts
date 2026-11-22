@@ -1266,6 +1266,13 @@ export const api = {
     }),
   rebuildGraph: (repo: string) =>
     request<void>(`/api/graph/rebuild/${repo}`, { method: "POST" }),
+  // App map: the team's app across its repositories, built from the code
+  // graphs (the first visit starts the first build).
+  getAppMap: (opts: { recent?: boolean; health?: boolean } = {}) =>
+    request<AppMapResponse>(`/api/app-map?recent=${opts.recent ? 1 : 0}&health=${opts.health ? 1 : 0}`),
+  askAppMap: (question: string) =>
+    request<AppMapAnswer>(`/api/app-map/ask`, { method: "POST", body: JSON.stringify({ question }) }),
+  rebuildAppMap: () => request<void>(`/api/app-map/rebuild`, { method: "POST" }),
   getReviewerConfig: (repo: string) =>
     request<ReviewerConfig>(`/api/reviewer/config/${repo}`),
   updateReviewerConfig: (repo: string, config: ReviewerConfig & ChannelsInput) =>
@@ -6373,4 +6380,38 @@ export interface DecisionsAnalytics {
     decisions: number;
     proceeded: number;
   };
+}
+
+// ── App map ─────────────────────────────────────────────────────────────────
+
+/** Where the team's map build is. */
+export interface AppMapStatus {
+  /** `building` while there is no map yet. */
+  state: "ready" | "building" | "failed" | "empty" | "not_built";
+  updating: boolean;
+  /** What the build is doing now. */
+  step: string;
+  note: string;
+  /** The Floorplan release that made it. */
+  floorplan: string;
+}
+
+/**
+ * A map in Floorplan's own format (`floorplan/graph@1`). The dashboard never
+ * reads inside it: it goes as it is to Floorplan's viewer in the App map
+ * page's sandboxed frame.
+ */
+export type FloorplanGraph = { schema: "floorplan/graph@1" } & Record<string, unknown>;
+
+export interface AppMapResponse {
+  status: AppMapStatus;
+  graph: FloorplanGraph | null;
+}
+
+export interface AppMapAnswer {
+  answer: string;
+  grounded: boolean;
+  steps: string[];
+  /** The parts the answer involves, as a smaller map; null when none. */
+  graph: FloorplanGraph | null;
 }

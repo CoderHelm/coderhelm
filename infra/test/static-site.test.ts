@@ -12,7 +12,7 @@ import * as path from "node:path";
 import * as vm from "node:vm";
 import * as cdk from "aws-cdk-lib";
 import { Template } from "aws-cdk-lib/assertions";
-import { AppStack } from "../lib/app-stack";
+import { APP_MAP_FRAME_CSP, APP_MAP_FRAME_PATH, AppStack } from "../lib/app-stack";
 import { FrontendStack } from "../lib/frontend-stack";
 import { DOCS_CSP, DocsStack, INSTALL_GUIDE_CSP, INSTALL_GUIDE_PATH, UNINSTALL_GUIDE_CSP, UNINSTALL_GUIDE_PATH, docsRedirects } from "../lib/docs-stack";
 import { ASSET_CACHE_CONTROL, PAGE_CACHE_CONTROL, SWEEP_CODE, pageRoutes } from "../lib/static-site";
@@ -334,4 +334,23 @@ test("site and app: the CSP lets Google Analytics 4 load and send from every hos
     // GA4 sends to regional hosts (region1.google-analytics.com), not only www.
     for (const h of GA_HOSTS) assert.ok(directive("connect-src").split(" ").includes(h), `${kind} connect-src ${h}`);
   }
+});
+
+test("app: the App map frame may be framed by the app only, and reaches no network", () => {
+  const r = synth("app");
+  const policies = Object.fromEntries(
+    ofType(r, "AWS::CloudFront::ResponseHeadersPolicy").map(([id, v]) => [id, v.Properties.ResponseHeadersPolicyConfig]),
+  );
+  const [frameId] = Object.entries(policies).filter(([, c]: [string, any]) => c.SecurityHeadersConfig.ContentSecurityPolicy.ContentSecurityPolicy === APP_MAP_FRAME_CSP).map(([id]) => id);
+  assert.ok(frameId, "the frame's policy is in the stack");
+  assert.equal((policies[frameId] as any).SecurityHeadersConfig.FrameOptions.FrameOption, "SAMEORIGIN");
+  assert.match(APP_MAP_FRAME_CSP, /connect-src 'none'/);
+  assert.match(APP_MAP_FRAME_CSP, /frame-ancestors 'self'/);
+  const [, dist] = ofType(r, "AWS::CloudFront::Distribution")[0];
+  const cfg = dist.Properties.DistributionConfig;
+  const frame = cfg.CacheBehaviors.find((b: any) => b.PathPattern === APP_MAP_FRAME_PATH);
+  assert.deepEqual(frame.ResponseHeadersPolicyId, { Ref: frameId });
+  // Every other page keeps the app's own headers, which deny framing.
+  assert.notDeepEqual(cfg.DefaultCacheBehavior.ResponseHeadersPolicyId, { Ref: frameId });
+  assert.equal(cfg.CacheBehaviors.length, 1);
 });

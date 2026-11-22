@@ -25,3 +25,6 @@ dashboard/playwright-report/
 dashboard/blob-report/
 test-results/
 playwright-report/
+
+# Written by dashboard/scripts/floorplan-frame.mjs from dashboard/vendor/floorplan
+dashboard/public/app-map/viewer.js
