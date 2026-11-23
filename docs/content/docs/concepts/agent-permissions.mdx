@@ -139,6 +139,8 @@ Each repository has an allowlist of build and test commands the sandbox may run 
 
 The sandbox's network is limited to a list of domains. A domain also covers its subdomains. The list starts with the common package registries and code hosts. Requests to anything else are refused, and the run's check output names each refused domain.
 
+Alongside your list, the sandbox can always reach two kinds of hosts. The first is what CoderHelm's own tools need: Playwright's browser downloads, GitHub's release downloads and the Terraform registry. The second is your team's own sites, taken from your settings: the domains you list as your sites, and the test and preview addresses you saved. Nothing else is added. A site that is refused is CoderHelm's setup to fix, so a run never asks you to change this list for its own tools.
+
 The limit works for every tool that honours proxy settings, such as npm, pip, cargo, go, curl and git. It isn't a firewall. An admin can turn the limit off.
 
 ## Pausing every agent
