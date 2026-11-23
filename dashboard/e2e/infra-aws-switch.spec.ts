@@ -35,8 +35,8 @@ function account(on: boolean, available: boolean | null) {
   };
 }
 
-async function mockApi(page: Page) {
-  const db = { on: false, puts: [] as unknown[] };
+async function mockApi(page: Page, init: { on?: boolean; liveHasReads?: boolean } = {}) {
+  const db = { on: init.on ?? false, puts: [] as unknown[] };
   const json = (r: Route, body: unknown, status = 200) => r.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
   await page.route((url) => url.hostname !== "localhost", (r) => r.abort());
   await page.route((url) => url.hostname === "localhost" && /^\/(api|auth)\//.test(url.pathname), async (r) => {
@@ -59,7 +59,14 @@ async function mockApi(page: Page) {
       if (typeof body.infrastructure === "boolean") db.on = body.infrastructure;
       return json(r, { account: conn().abilities, status: "connected", reason: "", last_check: new Date().toISOString() });
     }
-    if (/permissions\/check$/.test(p)) return json(r, { account: conn().abilities, status: "connected", reason: "", last_check: new Date().toISOString(), permissions: conn().abilities.permissions });
+    if (/permissions\/check$/.test(p)) {
+      if (init.liveHasReads) {
+        // The role has the reads now: a check newer than the saved one.
+        const now = permissionsView(A, { optionalOff: [] });
+        return json(r, { account: conn().abilities, status: "connected", reason: "", last_check: new Date().toISOString(), permissions: { ...now, checked_at: new Date(Date.now() + 60_000).toISOString() } });
+      }
+      return json(r, { account: conn().abilities, status: "connected", reason: "", last_check: new Date().toISOString(), permissions: conn().abilities.permissions });
+    }
     if (/\/log-groups$/.test(p)) return json(r, { log_groups: [] });
     return json(r, { error: `not mocked: ${p}` }, 404);
   });
@@ -82,4 +89,12 @@ test("switching on Infrastructure vulnerabilities names what it reads and the up
   await expect(missing.getByRole("link", { name: "creates the update stack" })).toHaveAttribute("href", /InfrastructureVulnerabilities=on/);
   await missing.scrollIntoViewIfNeeded();
   await shoot(page, "aws-infrastructure-switch");
+});
+
+test("a saved warning about the reads goes away when the page's live check finds them", async ({ page }) => {
+  await mockApi(page, { on: true, liveHasReads: true });
+  await page.goto("/settings/integrations/aws/");
+  await expect(page.getByRole("switch", { name: "Infrastructure vulnerabilities" })).toBeChecked();
+  await expect(page.getByTestId(`aws-perms-${A}`)).toContainText("Permissions up to date");
+  await expect(page.getByTestId("infra-reads-missing")).toHaveCount(0);
 });

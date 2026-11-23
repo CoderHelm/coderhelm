@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { api, type AwsAccountAbilities, type AwsAbilityReply, type Connector, type ConnectorId, type KeyConnectorKind } from "@/lib/api";
 import { errorMessage, timeAgo } from "@/lib/data-sources";
+import { infraMissingOf, usePermissionChecks } from "@/hooks/use-permission-checks";
 import { Callout } from "./callout";
+import { PermissionCheckNote } from "./permission-check-note";
 import { Field, SecretInput } from "./field";
 import { MarkdownEditor } from "./markdown-editor";
 import { Switch } from "./teams-webhook";
@@ -360,6 +362,17 @@ export function AwsAbilitiesPanel({
   const set = (body: Parameters<typeof api.setAwsAbilities>[1]) => run(() => api.setAwsAbilities(a.account, body), "Saved");
   const ABILITY: Record<string, string> = { metrics: "CloudWatch metrics", airflow: "Airflow", infra: "the Infrastructure vulnerabilities reads" };
   const missing = (a.missing ?? []).map((m) => ABILITY[m] ?? m);
+  // The warning below comes from the last saved check, which can be a day
+  // old: while it shows, check the role live (and again after Update), and
+  // take the fresh account the check answers with.
+  const warned = !a.install_account && (missing.length > 0 || a.permissions?.status === "update_needed") && !!a.update_url;
+  const infraOn = !!a.infrastructure?.on;
+  const targets = useMemo(() => (warned ? [{ account: a.account }] : []), [warned, a.account]);
+  const perms = usePermissionChecks(targets, {
+    enabled: canEdit,
+    settled: (v) => v.status === "up_to_date" && (!infraOn || infraMissingOf(v)?.length === 0),
+    onReply: (_, r) => onChange(r),
+  });
 
   return (
     <div className="mt-4 flex flex-col gap-4 border-t border-zinc-800 pt-4" data-testid={`aws-panel-${a.account}`}>
@@ -428,7 +441,7 @@ export function AwsAbilitiesPanel({
           <p>Nothing to do. Each version update brings this release&apos;s read-only permissions to this account&apos;s read role by itself.</p>
         </Callout>
       )}
-      {!a.install_account && (missing.length > 0 || a.permissions?.status === "update_needed") && a.update_url && (
+      {warned && a.update_url && (
         <Callout
           variant="warning"
           title={
@@ -444,11 +457,12 @@ export function AwsAbilitiesPanel({
           </p>
           {canEdit && (
             <p className="mt-2">
-              <a href={a.update_url} target="_blank" rel="noreferrer" className={primaryButton}>
+              <a href={a.update_url} target="_blank" rel="noreferrer" className={primaryButton} onClick={() => perms.pressed(a.account)}>
                 Update in AWS
               </a>
             </p>
           )}
+          {canEdit && <PermissionCheckNote s={perms.of(a.account)} />}
         </Callout>
       )}
       {error && (

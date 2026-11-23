@@ -1,5 +1,6 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import { shoot } from "./infra-shots";
+import { permissionsView } from "./aws-permissions-data";
 import { ACCOUNT_MISSING, INFRA_FEEDS, INFRA_INSIGHTS, INFRA_RESOURCES, infraFinding, infraOverview, iso } from "./infra-data";
 
 // Infrastructure vulnerabilities: Security › Infrastructure grouped by fix
@@ -14,10 +15,14 @@ interface Db {
   overview: unknown;
   overviewCode: number;
   calls: { call: string; body: unknown }[];
+  /** The live permission check's answer for an account (infra reads it lacks), or null for a failed check. */
+  live: (account: string) => string[] | null;
+  /** Holds the live check's answer until it resolves. */
+  hold: Promise<void> | null;
 }
 
 async function mockApi(page: Page, init: Partial<Db> = {}): Promise<Db> {
-  const db: Db = { role: "admin", overview: infraOverview(), overviewCode: 200, calls: [], ...init };
+  const db: Db = { role: "admin", overview: infraOverview(), overviewCode: 200, calls: [], live: () => null, hold: null, ...init };
   const json = (route: Route, body: unknown, code = 200) => route.fulfill({ status: code, contentType: "application/json", body: JSON.stringify(body) });
   await page.route((url) => url.hostname !== "localhost", (route) => route.abort());
   await page.route((url) => url.hostname === "localhost" && /^\/(api|auth)\//.test(url.pathname), async (route) => {
@@ -30,7 +35,16 @@ async function mockApi(page: Page, init: Partial<Db> = {}): Promise<Db> {
     } catch {
       body = null;
     }
-    if (p.startsWith("/api/security")) db.calls.push({ call: `${method} ${p}`, body });
+    if (p.startsWith("/api/security") || p.startsWith("/api/aws-connections")) db.calls.push({ call: `${method} ${p}`, body });
+    const live = p.match(/^\/api\/aws-connections\/(\d{12})\/permissions\/check$/);
+    if (live && method === "POST") {
+      if (db.hold) await db.hold;
+      const infra = db.live(live[1]);
+      if (!infra) return json(route, { error: "Coderhelm couldn't take on the role." }, 502);
+      const view = permissionsView(live[1], { optionalOff: [] });
+      view.abilities = view.abilities.map((g) => (g.key === "infra" ? { ...g, missing: infra } : g));
+      return json(route, { account: { account: live[1] }, status: "connected", reason: "", last_check: iso(0), permissions: view });
+    }
     if (p === "/api/me") return json(route, { user_id: "u_1", team_id: "t_1", github_login: null, email: "admin@example.com", avatar_url: "", role: db.role });
     if (p === "/api/usage") return json(route, { month: "2026-11", total_tokens: 0, tokens_in: 0, tokens_out: 0, total_runs: 0, max_tokens: 0 });
     if (p === "/api/banners") return json(route, { banners: [] });
@@ -251,6 +265,61 @@ test.describe("Infrastructure vulnerabilities", () => {
     await expect(warn).toContainText("ec2:DescribeInstances");
     await expect(warn.getByRole("link", { name: "Update the role in AWS" })).toHaveAttribute("href", /InfrastructureVulnerabilities=on/);
     await shoot(page, "security-infrastructure-missing");
+  });
+
+  test("the warning goes away when the live check finds the reads (the saved check was a day old)", async ({ page }) => {
+    let release = () => {};
+    const db = await mockApi(page, {
+      overview: infraOverview({ accounts: [...infraOverview().accounts, ACCOUNT_MISSING] }),
+      live: () => [],
+      hold: new Promise<void>((r) => (release = r)),
+    });
+    await page.goto("/security/infrastructure");
+    const warn = page.getByTestId("missing-reads");
+    // The saved check shows at once, and says quietly that it is checking.
+    await expect(warn).toContainText("needs 4 more read-only permissions in account 444455556666");
+    await expect(warn.getByTestId("permission-check-note")).toHaveText("Checking the role now…");
+    release();
+    await expect(warn).toHaveCount(0);
+    // Only the warned account is checked.
+    expect(call(db, "POST /api/aws-connections/444455556666/permissions/check").length).toBeGreaterThan(0);
+    expect(call(db, "POST /api/aws-connections/111122223333/permissions/check")).toHaveLength(0);
+  });
+
+  test("the live check's list replaces the saved one; after Update the page checks again on focus and drops the warning", async ({ page }) => {
+    let fixed = false;
+    const db = await mockApi(page, {
+      overview: infraOverview({ accounts: [...infraOverview().accounts, ACCOUNT_MISSING] }),
+      live: () => (fixed ? [] : ["ec2:DescribeInstances"]),
+    });
+    await page.goto("/security/infrastructure");
+    const warn = page.getByTestId("missing-reads");
+    await expect(warn).toContainText("needs 1 more read-only permission in account 444455556666");
+    await expect(warn).not.toContainText("eks:DescribeNodegroup");
+
+    // The AWS console tab opens on the context, where nothing leaves this machine.
+    await page.context().route((url) => url.hostname !== "localhost", (route) => route.abort());
+    const [popup] = await Promise.all([page.waitForEvent("popup"), warn.getByRole("link", { name: "Update the role in AWS" }).click()]);
+    await popup.close();
+    await expect(warn.getByTestId("permission-check-note")).toContainText("Waiting for the update");
+    fixed = true;
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await expect(warn).toHaveCount(0);
+    expect(call(db, "POST /api/aws-connections/444455556666/permissions/check").some((c) => (c.body as { pressed?: boolean } | null)?.pressed === true)).toBe(true);
+  });
+
+  test("a check that fails keeps the saved warning; a member never runs the check", async ({ page }) => {
+    const db = await mockApi(page, { overview: infraOverview({ accounts: [...infraOverview().accounts, ACCOUNT_MISSING] }), live: () => null });
+    await page.goto("/security/infrastructure");
+    const warn = page.getByTestId("missing-reads");
+    await expect.poll(() => call(db, "POST /api/aws-connections/444455556666/permissions/check").length).toBeGreaterThan(0);
+    await expect(warn).toContainText("needs 4 more read-only permissions");
+    await expect(warn.getByTestId("permission-check-note")).toHaveText("");
+
+    const member = await mockApi(page, { role: "member", overview: infraOverview({ accounts: [...infraOverview().accounts, ACCOUNT_MISSING] }), live: () => [] });
+    await page.goto("/security/infrastructure");
+    await expect(page.getByTestId("missing-reads")).toContainText("needs 4 more read-only permissions");
+    expect(call(member, "POST /api/aws-connections/444455556666/permissions/check")).toHaveLength(0);
   });
 
   test("with no account switched on, the page says how to start; a member sees no buttons", async ({ page }) => {
