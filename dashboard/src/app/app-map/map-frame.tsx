@@ -17,11 +17,18 @@
 //   JSON string under a size cap, never in the URL;
 // - the viewer's layout engine runs in a Web Worker inside the frame.
 //
+// - on the App map page (`full`), the frame adds Coderhelm's presentation
+//   (public/app-map/present.js): the System, Parts and Code levels, Journeys
+//   and Screens, a journey played on one board (`flow`), and a step's place
+//   in the code, which the frame can't open itself (no popups in the
+//   sandbox): it names the file and line and this page opens it on GitHub.
+//
 // Chat draws an answer's mini map with this same frame (chat/answer-map.tsx),
-// loaded only when an answer has one.
+// loaded only when an answer has one, without the presentation.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FloorplanGraph } from "@/lib/api";
+import { fileUrl } from "@/lib/skills";
 
 /** Largest map handed to the frame (the frame checks the same). */
 export const MAX_MAP_BYTES = 25 * 1024 * 1024;
@@ -33,10 +40,41 @@ export interface MapContext {
   desc: string;
 }
 
-/** The frame's address: the viewer's own hash settings, never the map. */
-export function frameSrc(focus?: string): string {
-  const id = (focus ?? "").replace(/[^A-Za-z0-9._:-]/g, "");
-  return `/app-map/frame.html#ask=host${id ? `&s=${encodeURIComponent(id)}` : ""}`;
+const safeId = (v?: string) => (v ?? "").replace(/[^A-Za-z0-9._:-]/g, "").slice(0, 200);
+
+/**
+ * The frame's address: the viewer's own hash settings, never the map.
+ * `full`: the App map page's presentation, with no tour (`tour=0`);
+ * `flow`: the journey it opens on.
+ */
+export function frameSrc(focus?: string, opts: { full?: boolean; flow?: string } = {}): string {
+  const id = safeId(focus);
+  const flow = safeId(opts.flow);
+  const parts = ["ask=host"];
+  if (opts.full) parts.push("tour=0", "full=1");
+  if (flow && opts.full) parts.push(`flow=${encodeURIComponent(flow)}`);
+  if (id) parts.push(`s=${encodeURIComponent(id)}`);
+  return `/app-map/frame.html#${parts.join("&")}`;
+}
+
+/**
+ * Where a file of the map is on GitHub, at the commit the map was built
+ * from: the map names each repository's folder (`coderhelm.repos`) and its
+ * commit (`meta.repos[].head`). Null for a file outside them.
+ */
+export function sourceUrl(graph: FloorplanGraph, file: unknown, line: unknown): string | null {
+  if (typeof file !== "string" || !file || file.length > 1000) return null;
+  const segs = file.split("/");
+  if (segs.length < 2 || segs.some((s) => !s || s === "." || s === "..")) return null;
+  const ch = (graph.coderhelm && typeof graph.coderhelm === "object" ? graph.coderhelm : {}) as { repos?: unknown };
+  const repos = (ch.repos && typeof ch.repos === "object" ? ch.repos : {}) as Record<string, unknown>;
+  const repo = Object.prototype.hasOwnProperty.call(repos, segs[0]) ? repos[segs[0]] : null;
+  if (typeof repo !== "string" || !/^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/.test(repo)) return null;
+  const meta = (graph.meta && typeof graph.meta === "object" ? graph.meta : {}) as { repos?: unknown };
+  const entry = (Array.isArray(meta.repos) ? meta.repos : []).find((r) => r && typeof r === "object" && (r as { path?: unknown }).path === segs[0]) as { head?: unknown } | undefined;
+  const sha = typeof entry?.head === "string" && /^[0-9a-f]{7,40}$/.test(entry.head) ? entry.head : "";
+  const n = typeof line === "number" && Number.isInteger(line) && line > 0 ? line : 0;
+  return `${fileUrl(repo, sha, segs.slice(1).join("/"))}${n ? `#L${n}` : ""}`;
 }
 
 export function MapFrame({
@@ -46,6 +84,8 @@ export function MapFrame({
   onAsk,
   focus,
   onContext,
+  full = false,
+  flow,
   testId = "app-map-frame",
 }: {
   graph: FloorplanGraph;
@@ -58,6 +98,10 @@ export function MapFrame({
   focus?: string;
   /** What the viewer shows now, each time it changes. */
   onContext?: (c: MapContext) => void;
+  /** The App map page's presentation: levels, journeys and screens. */
+  full?: boolean;
+  /** A journey's id: the viewer opens playing it. */
+  flow?: string;
   testId?: string;
 }) {
   const ref = useRef<HTMLIFrameElement | null>(null);
@@ -81,6 +125,10 @@ export function MapFrame({
         const d = e.data as Record<string, unknown>;
         const str = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max) : "");
         onContext({ kind: str(d.kind, 80), name: str(d.name, 300), desc: str(d.desc, 2000) });
+      } else if (type === "coderhelm:app-map-source") {
+        const d = e.data as { file?: unknown; line?: unknown };
+        const url = sourceUrl(graph, d.file, d.line);
+        if (url) window.open(url, "_blank", "noopener,noreferrer");
       } else if (type === "floorplan:ask" && onAsk) {
         const items = Array.isArray((e.data as { items?: unknown }).items) ? ((e.data as { items: unknown[] }).items.slice(0, 10) as { id?: string; label?: string; kind?: string }[]) : [];
         onAsk(items.filter((i) => i && typeof i === "object"));
@@ -88,7 +136,7 @@ export function MapFrame({
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [json, tooBig, onAsk, onContext]);
+  }, [json, graph, tooBig, onAsk, onContext]);
 
   if (tooBig) {
     return <p className="text-sm text-zinc-400">This map is too large to show here.</p>;
@@ -98,11 +146,11 @@ export function MapFrame({
       {problem && <p className="mb-2 text-sm text-zinc-400">{problem}</p>}
       <iframe
         ref={ref}
-        key={json.length + ":" + json.slice(0, 64) + ":" + (focus ?? "")}
+        key={json.length + ":" + json.slice(0, 64) + ":" + (focus ?? "") + ":" + (flow ?? "")}
         title={title}
         // `#ask=host`: the viewer's "Ask about this" comes back to this page;
-        // `s=`: the part it opens on.
-        src={frameSrc(focus)}
+        // `s=`: the part it opens on; `full=1`, `flow=`: see frameSrc.
+        src={frameSrc(focus, { full, flow })}
         sandbox="allow-scripts"
         allow="fullscreen"
         referrerPolicy="no-referrer"

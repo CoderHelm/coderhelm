@@ -19,7 +19,18 @@ Floorplan reads every repository side by side and finds:
 - **outside services** from the packages and hosts the code uses (Stripe, AWS, SendGrid, Supabase, Firebase, Sanity and others);
 - a short tour, and a name and one-line description for every file and endpoint.
 
-The map's own search, Screens, tour and Health buttons work as they do in Floorplan. A connection Floorplan worked out from a request's address rather than from an import is shown as inferred.
+The map's own search and Health buttons work as they do in Floorplan; its Screens and Flows menus are replaced by the Journeys and Screens list beside the map, and its tour doesn't open by itself.
+
+## Finding your way
+
+The map opens on its **System** level, with **Journeys** and **Screens** beside it.
+
+- **System** shows the whole app on one board of at most about 24 cards: the apps people use, the servers behind them, where they run and keep data (the CDN, functions, databases, caches and buckets that connect to your code), and the outside services they call. **Parts** shows the parts as Floorplan found them, and **Code** opens a part (the one you picked, else the largest) down to its folders, files and endpoints. Double-click any card to open it.
+- **Journeys** are the paths through your app that matter, like signing in or booking: type a few words ("sign in") to find one. A journey plays on one board that never moves: its steps are numbered on the cards and listed beside them, each with what happens and where it is in the code (`file:line`, which opens on GitHub). **Back** and **Next**, or the arrow keys, light one step at a time.
+- **Screens** lists every screen by app, signed-out screens first, then signed-in ones by area. Pick one to see everything behind it.
+- Solid lines were found in the code. **Dashed** lines were inferred: joined by a name, an env var or infrastructure code rather than a call the code makes. The key at the bottom right says so.
+- An answer in Chat that follows a journey links to it: **Open the journey in App map** opens this page playing it.
+- On a phone, the **Journeys** button at the top opens the list over the map.
 
 ## Recent work and Health
 

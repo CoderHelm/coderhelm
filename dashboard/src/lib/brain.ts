@@ -258,6 +258,8 @@ export interface BrainMessage {
 export interface ChatMap {
   parts: string[];
   graph?: FloorplanGraph | null;
+  /** Journeys (the map's flows) the answer cites, by id: the first opens on the App map. */
+  flows?: string[];
 }
 
 /** The part ids `?focus=` names, at most ten. */
@@ -273,6 +275,17 @@ export function focusOf(raw: string | null): string[] {
 export function askAboutLink(names: string[]): string {
   const q = `Tell me about ${names.join(", ")}: what it does, what calls it and what it connects to.`;
   return `/chat?from=app_map&ask=${encodeURIComponent(q)}`;
+}
+
+/** A journey's id from `?flow=`, or "" when there is none. */
+export function flowOf(raw: string | null): string {
+  return (raw ?? "").trim().replace(/[^A-Za-z0-9._:-]/g, "").slice(0, 200);
+}
+
+/** The App map page, playing this journey. */
+export function appMapFlowLink(flow: string): string {
+  const id = flowOf(flow);
+  return id ? `/app-map?flow=${encodeURIComponent(id)}` : "/app-map";
 }
 
 /** The App map page, focused on these parts. */

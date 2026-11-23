@@ -83,7 +83,8 @@ test.describe("App map", () => {
     await expect(page.getByRole("heading", { name: "App map" })).toBeVisible();
     const frame = page.getByTestId("app-map-frame").locator("iframe");
     await expect(frame).toHaveAttribute("sandbox", "allow-scripts");
-    await expect(frame).toHaveAttribute("src", "/app-map/frame.html#ask=host");
+    // The App map page's frame: Coderhelm's levels, journeys and screens, no tour.
+    await expect(frame).toHaveAttribute("src", "/app-map/frame.html#ask=host&tour=0&full=1");
     // The viewer drew the harbor map: its parts are on the board.
     await expect(viewer(page).getByText("Harbor website").first()).toBeVisible();
     await expect(viewer(page).getByText("Booking service").first()).toBeVisible();
@@ -380,9 +381,9 @@ async function mockBucket(page: Page, opts: { bucket?: "ok" | "unreachable"; han
   return calls;
 }
 
-/** What the viewer was given, read back inside the frame. */
+/** What the viewer was given, read back inside the frame (none while a new frame replaces it). */
 async function shownGraph(page: Page) {
-  const inner = page.frames().find((f) => f !== page.mainFrame() && f.url().includes("/app-map/frame.html"))!;
+  const inner = page.frames().find((f) => f !== page.mainFrame() && !f.isDetached() && f.url().includes("/app-map/frame.html"))!;
   return inner.evaluate(() => {
     const G = (window as unknown as { FLOORPLAN: { recent?: { tasks?: { title: string }[] }; health?: { issues?: { id: string }[]; summary?: unknown } } }).FLOORPLAN;
     return { tasks: (G.recent?.tasks ?? []).map((t) => t.title), issues: (G.health?.issues ?? []).map((i) => i.id), summary: G.health?.summary };
@@ -407,7 +408,7 @@ test.describe("App map reading", () => {
     await expect.poll(() => calls.includes("GET /api/app-map?recent=0&health=1")).toBe(true);
     await expect(viewer(page).getByText("Harbor website").first()).toBeVisible();
     expect(calls.filter((c) => c.startsWith("BUCKET"))).toHaveLength(1);
-    await expect.poll(async () => (await shownGraph(page)).tasks).toEqual([]);
+    await expect.poll(async () => (await shownGraph(page).catch(() => null))?.tasks).toEqual([]);
   });
 
   test("when the bucket can't be reached, the same map comes through the API", async ({ page }) => {
@@ -461,7 +462,8 @@ test.describe("App map reading", () => {
     await page.goto("/app-map");
     await expect(viewer(page).getByText("Harbor website").first()).toBeVisible();
     const title = page.getByTestId("app-map-title");
-    await expect(title).toContainText("Overview");
+    // The map opens on its System level (present.js), named above the map.
+    await expect(title).toContainText("System");
     await expect(title.getByRole("heading")).toHaveText(HARBOR.project.name);
     await expect(viewer(page).locator("#context")).toBeHidden();
     // Opening a part: its name and description follow above the map.

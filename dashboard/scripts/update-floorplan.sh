@@ -11,9 +11,12 @@
 # It clones the release tag, checks every file it copies against the release's
 # own CHECKSUMS.txt, copies only those files, and records the tag in
 # vendor/floorplan/VERSION. Vendored files are never edited: anything
-# CoderHelm-specific lives in our adapter (public/app-map/frame.js and
-# scripts/floorplan-frame.mjs, which writes public/app-map/viewer.js from these
-# files). After a bump, run: npm run floorplan && npx playwright test e2e/app-map.spec.ts
+# CoderHelm-specific lives in our adapter (public/app-map/frame.js,
+# public/app-map/present.js and scripts/floorplan-frame.mjs, which writes
+# public/app-map/viewer.js from these files). present.js uses only the
+# viewer's extension API (window.Floorplan) and a few of its class names; see
+# its header. After a bump, run:
+#   npm run floorplan && npx playwright test e2e/app-map.spec.ts e2e/app-map-present.spec.ts
 set -euo pipefail
 
 TAG="${1:?usage: scripts/update-floorplan.sh <release tag, like floorplan--v0.11.0>}"

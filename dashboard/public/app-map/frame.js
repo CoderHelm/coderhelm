@@ -21,18 +21,100 @@
   const scriptCode = (src) => String(src).replace(/<\/(script)/gi, '<\\/$1').replace(/<!--/g, '\\x3C!--');
   const escapeHtml = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
-  /** The viewer's graph with Coderhelm's layout options and room for each card's lines. */
+  /** Whether a layout is the board present.js named (`opts.board`): the same cards. */
+  function isBoard(graph, b) {
+    const kids = (graph && graph.children) || [];
+    return !!b && Array.isArray(b.items) && kids.length === b.items.length && kids.every((c) => b.items.includes(c.id));
+  }
+  /**
+   * The viewer's graph with Coderhelm's layout options and room for each
+   * card's lines. The System board (present.js names it in `opts.board`)
+   * gets columns of at most `bound` cards, so a long list of outside
+   * services doesn't make one column too tall to read at the first fit.
+   */
   function tuneGraph(graph, opts) {
     if (!graph || !opts) return graph;
+    const b = opts.board;
+    const onBoard = isBoard(graph, b) && b.mode === 'system';
+    const extra = onBoard ? {
+      'elk.layered.layering.strategy': 'COFFMAN_GRAHAM',
+      'elk.layered.layering.coffmanGraham.layerBound': String(b.bound || 7),
+      'elk.layered.spacing.nodeNodeBetweenLayers': '110',
+      'elk.spacing.nodeNode': '40',
+    } : {};
     const into = new Map(), out = new Map();
     const add = (m, id) => m.set(id, (m.get(id) || 0) + 1);
     for (const e of graph.edges || []) { for (const s of e.sources || []) add(out, s); for (const t of e.targets || []) add(into, t); }
     const children = (graph.children || []).map((c) => {
       const lines = Math.max(into.get(c.id) || 0, out.get(c.id) || 0);
       const need = lines > 1 ? (lines + 1) * opts.lineRoom : 0;
-      return need > (c.height || 0) ? { ...c, height: need } : c;
+      // On the System board the column sizes decide, so no card is held to the last column.
+      const lo = onBoard && c.layoutOptions ? { ...c.layoutOptions, 'elk.layered.layering.layerConstraint': 'NONE' } : c.layoutOptions;
+      return { ...c, ...(lo ? { layoutOptions: lo } : {}), ...(need > (c.height || 0) ? { height: need } : {}) };
     });
-    return { ...graph, children, layoutOptions: { ...(graph.layoutOptions || {}), ...opts.options } };
+    return { ...graph, children, layoutOptions: { ...(graph.layoutOptions || {}), ...opts.options, ...extra } };
+  }
+  /**
+   * A journey's board, laid out here instead of by ELK: its cards in the
+   * steps' order on a grid, read like text (left to right, then the next
+   * row), with as many columns as make the cards largest in the free map
+   * area (`b.w` by `b.h`). The viewer draws the cards; the step lines
+   * (`ch-step-<i>`, from step i to step i + 1) are kept in `opts.lastBoard`
+   * for present.js to draw, and the board's other lines are left out.
+   */
+  function journeyLayout(graph, b, opts) {
+    const kids = graph.children || [];
+    const byId = new Map(kids.map((c) => [c.id, c]));
+    const order = [];
+    for (const id of b.chain || []) if (byId.has(id) && !order.includes(id)) order.push(id);
+    for (const c of kids) if (!order.includes(c.id)) order.push(c.id);
+    const n = order.length, GX = 56, GY = 52, P = 22;
+    const cw = Math.max(1, ...kids.map((c) => c.width || 0));
+    const rowsOf = (cols) => {
+      const rows = [];
+      for (let i = 0; i < n; i += cols) rows.push(order.slice(i, i + cols));
+      return rows.map((r) => ({ ids: r, h: Math.max(...r.map((id) => byId.get(id).height || 0)) }));
+    };
+    let best = null;
+    for (let cols = 1; cols <= Math.min(n, 6); cols++) {
+      const rows = rowsOf(cols);
+      const W = cols * cw + (cols - 1) * GX + 2 * P;
+      const H = rows.reduce((a, r) => a + r.h, 0) + (rows.length - 1) * GY + 2 * P;
+      const k = Math.min((b.w || 800) / (W + 40), (b.h || 600) / (H + 20));
+      if (!best || k > best.k + 1e-6) best = { cols, rows, W, H, k };
+    }
+    const at = new Map();
+    let y = P;
+    best.rows.forEach((r, ri) => {
+      r.ids.forEach((id, ci) => { const c = byId.get(id); at.set(id, { ...c, x: P + ci * (cw + GX) + (cw - c.width) / 2, y, row: ri, col: ci, rowBottom: y + r.h }); });
+      y += r.h + GY;
+    });
+    const steps = [];
+    const chain = b.chain || [];
+    for (let i = 0; i + 1 < chain.length; i++) {
+      const a = at.get(chain[i]), z = at.get(chain[i + 1]);
+      if (!a || !z || a === z) continue;
+      let pts;
+      if (a.row === z.row && z.col > a.col) {
+        // Along the row: side to side.
+        pts = [{ x: a.x + a.width, y: a.y + a.height / 2 }, { x: z.x, y: z.y + z.height / 2 }];
+        if (pts[0].y !== pts[1].y) { const mx = (pts[0].x + pts[1].x) / 2; pts.splice(1, 0, { x: mx, y: pts[0].y }, { x: mx, y: pts[1].y }); }
+      } else if (z.row > a.row) {
+        // To a later row: down into the gap under the row, across, and down onto the card.
+        const cy = a.rowBottom + GY / 2;
+        const sx = a.x + a.width / 2, ex = z.x + z.width / 2;
+        pts = [{ x: sx, y: a.y + a.height }, { x: sx, y: cy }, { x: ex, y: cy }, { x: ex, y: z.y }];
+        if (z.row > a.row + 1) { const lane = P / 2; pts.splice(2, 1, { x: lane, y: cy }, { x: lane, y: z.y - GY / 2 }, { x: ex, y: z.y - GY / 2 }); }
+      } else {
+        // Back to an earlier card: out along the left edge and in from above.
+        const lane = P / 2, sx = a.x, sy = a.y + a.height / 2, ex = z.x + z.width / 2, ty = z.y - GY / 2;
+        pts = [{ x: sx, y: sy }, { x: lane, y: sy }, { x: lane, y: ty }, { x: ex, y: ty }, { x: ex, y: z.y }];
+      }
+      steps.push({ id: 'ch-step-' + i, sources: [a.id], targets: [z.id], sections: [{ startPoint: pts[0], endPoint: pts[pts.length - 1], bendPoints: pts.slice(1, -1) }] });
+    }
+    opts.lastBoard = { edges: steps };
+    const children = order.map((id) => { const c = at.get(id); return { id, x: c.x, y: c.y, width: c.width, height: c.height }; });
+    return { id: graph.id, x: 0, y: 0, width: best.W, height: best.H, children, edges: [] };
   }
 
   // ELK in a worker: the viewer calls `new ELK()` and `elk.layout(graph)`.
@@ -78,8 +160,11 @@
   window.__coderhelmLayout = { options: LAYOUT, lineRoom: LINE_ROOM };
   const elkShim = `(() => {
     const Real = window.ELK, url = window.__coderhelmElkWorker, tune = ${tuneGraph.toString()};
+    const isBoard = ${isBoard.toString()}, journeyLayout = ${journeyLayout.toString()};
     const opts = window.__coderhelmLayout;
     if (!Real) return;
+    // A journey's board never reaches ELK (see journeyLayout).
+    const journey = (graph) => (opts.board && opts.board.mode === 'journey' && isBoard(graph, opts.board) ? journeyLayout(graph, opts.board, opts) : null);
     let broken = !url;
     const inFrame = (graph) => { window.__coderhelmElkRan = 'frame'; return new Real().layout(graph); };
     window.ELK = function () {
@@ -96,6 +181,8 @@
         } });
       };
       return { layout(graph) {
+        const j = journey(graph);
+        if (j) return Promise.resolve(j);
         graph = tune(graph, opts);
         if (broken) return inFrame(graph);
         try { if (!elk) start(); } catch (e) { broken = true; return inFrame(graph); }
@@ -205,8 +292,10 @@
     return g;
   }
 
-  function page(graph) {
-    const ui = P.ui.map((u) => `<script>/* ui/${u.name} */\n${scriptCode(u.code)}</script>`).join('\n');
+  function page(graph, present) {
+    const ui = P.ui.map((u) => `<script>/* ui/${u.name} */\n${scriptCode(u.code)}</script>`).join('\n')
+      // Coderhelm's presentation (present.js), after the viewer's own add-ons.
+      + (typeof window.CoderhelmPresent === 'function' ? `\n<script>/* coderhelm present.js */\n(${scriptCode(String(window.CoderhelmPresent))})(${scriptJson(present)});</script>` : '');
     const title = `${graph.project && graph.project.name ? graph.project.name : 'App'} map`;
     return P.template
       .replace('/*__GRAPH_QUERY__*/', () => scriptCode(P.graphQuery))
@@ -335,7 +424,8 @@
     const theme = ['dark', 'light'].includes(e.data.theme) ? e.data.theme : 'dark';
     // Opened on a part (`#s=`, from a chat answer's "Open in App map"): its
     // details show at once.
-    const focused = !!new URLSearchParams(location.hash.slice(1)).get('s');
+    const hash = new URLSearchParams(location.hash.slice(1));
+    const focused = !!hash.get('s');
     // Lines: the map shows how parts call each other (web requests, data,
     // outside services); the many import lines between code files are off
     // at first, and the viewer's own Connection types menu turns them on.
@@ -343,7 +433,13 @@
     const t0 = performance.now();
     capBoards(graph);
     window.__coderhelmGroupMs = Math.round(performance.now() - t0);
-    const html = page(graph);
+    // The App map page (`full=1`) gets Coderhelm's levels, journeys and
+    // screens panel (present.js); a chat answer's mini map only its lines.
+    const present = { full: hash.get('full') === '1', flow: (hash.get('flow') || '').slice(0, 200), focus: focused };
+    if (typeof window.CoderhelmPresentPrepare === 'function') {
+      try { window.CoderhelmPresentPrepare(graph); } catch (err) { graph.flows = []; }
+    }
+    const html = page(graph, present);
     document.open();
     document.write(html);
     document.close();

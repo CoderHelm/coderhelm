@@ -10,7 +10,12 @@
 // fields. Questions are Chat's: the Ask box asks Chat (the map's lookups
 // first) and the chat is kept with the person's others; a part's "Ask about
 // this" opens a new chat about it; an answer's "Open in App map" comes back
-// here focused on its parts (`?focus=`).
+// here focused on its parts (`?focus=`), and an answer that cites a journey
+// opens it (`?flow=`).
+//
+// The map opens on its System level (the apps, servers, data, cloud and
+// outside services), with Journeys and Screens beside it; the frame draws
+// them (public/app-map/present.js), see map-frame.tsx.
 //
 // One build at a time (build-status.tsx): while one runs the page shows its
 // steps and time, and offers no way to start another.
@@ -27,7 +32,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api, ApiError, type AppMapResponse, type AppMapStatus, type FloorplanGraph } from "@/lib/api";
 import { applyOverlays, fetchMapGraph, LOAD_TIMEOUT_MS } from "@/lib/app-map-load";
-import { askAboutLink, askBrain, focusOf, type ChatMap, type Citation } from "@/lib/brain";
+import { askAboutLink, askBrain, flowOf, focusOf, type ChatMap, type Citation } from "@/lib/brain";
 import { AnswerView } from "../chat/answer";
 import { useCan } from "@/hooks/use-can";
 import { Page, PageHeader, cardClass } from "@/components/page";
@@ -88,6 +93,7 @@ function AppMap() {
   const router = useRouter();
   const params = useSearchParams();
   const focus = useMemo(() => focusOf(params.get("focus")), [params]);
+  const flow = useMemo(() => flowOf(params.get("flow")), [params]);
   const { toast } = useToast();
   const [data, setData] = useState<AppMapResponse | null>(null);
   // When the status was read, so elapsed time follows the server's clock.
@@ -293,8 +299,9 @@ function AppMap() {
               </p>
             )}
             {focus.length > 0 && <FocusNote graph={data.graph} focus={focus} />}
+            {flow && <FlowNote graph={data.graph} flow={flow} />}
             <MapTitle graph={data.graph} context={context} />
-            <MapFrame graph={data.graph} title="The app map" onAsk={onAsk} focus={focus[0]} onContext={setContext} />
+            <MapFrame graph={data.graph} title="The app map" onAsk={onAsk} focus={focus[0]} flow={flow} full onContext={setContext} />
             <div className="flex flex-wrap items-center gap-2" role="toolbar" aria-label="What the map shows">
               <Toggle on={recent} onChange={setRecent} testId="app-map-recent-toggle">
                 Recent work
@@ -352,6 +359,18 @@ function FocusNote({ graph, focus }: { graph: NonNullable<AppMapResponse["graph"
   return (
     <p className="text-sm text-zinc-400" data-testid="app-map-focus">
       Opened on {names.join(", ")}, from a chat answer.
+    </p>
+  );
+}
+
+/** The journey the page opened on, by name. */
+function FlowNote({ graph, flow }: { graph: NonNullable<AppMapResponse["graph"]>; flow: string }) {
+  const flows = Array.isArray(graph.flows) ? (graph.flows as { id?: unknown; title?: unknown; hidden?: unknown; visible?: unknown }[]) : [];
+  // A journey kept back (below the ship gate) is never shown.
+  const found = flows.find((f) => f && f.id === flow && f.hidden !== true && f.visible !== false);
+  return (
+    <p className="text-sm text-zinc-400" data-testid="app-map-flow">
+      {found && typeof found.title === "string" ? `Opened on the journey ${found.title}, from a chat answer.` : "The journey from that answer is not on this map any more."}
     </p>
   );
 }

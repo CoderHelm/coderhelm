@@ -36,6 +36,7 @@ import { focusRing, linkButton } from "@/components/ui";
 import {
   CITATION_KIND,
   activitySummary,
+  appMapFlowLink,
   appMapLink,
   citationWhen,
   stepSource,
@@ -112,7 +113,9 @@ export function SourceIcon({ kind }: { kind: string }) {
 
 /** The parts an answer's app map lookups touched: their mini map, and the App map page focused on them. */
 export function AnswerMap({ map }: { map: ChatMap }) {
-  const href = appMapLink(map.parts);
+  const flow = (map.flows ?? []).find((f) => typeof f === "string" && f);
+  // An answer that cites a journey opens the App map playing it.
+  const href = flow ? appMapFlowLink(flow) : appMapLink(map.parts);
   return (
     <section className="mt-4 space-y-2" aria-label="The parts this answer involves" data-testid="answer-map">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -120,7 +123,7 @@ export function AnswerMap({ map }: { map: ChatMap }) {
           From the app map: {map.parts.length === 1 ? "1 part" : `${map.parts.length} parts`}
         </p>
         <Link href={href} className={`${linkButton} inline-flex items-center gap-1 text-sm`} data-testid="answer-map-open">
-          Open in App map
+          {flow ? "Open the journey in App map" : "Open in App map"}
           <ExternalLinkIcon />
         </Link>
       </div>
