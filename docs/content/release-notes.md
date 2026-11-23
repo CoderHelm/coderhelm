@@ -8,10 +8,10 @@ groups releases by day: one heading per day, each release a subheading under it.
 
 ## November 23, 2026: the App map opens on the whole system, with journeys and screens beside it
 
-- **System, Parts and Code.** The map opens on one board of the whole system: the apps, the servers behind them, where they run and keep data, and the outside services they call, at most about 24 cards. Parts and Code are one click away. Cloud pieces that start or deploy code, like an image resizer behind a CDN, are drawn connected to the code they run. ([dashboard #PR](https://github.com/CoderHelm/coderhelm/pull/PR))
-- **Journeys.** Type a few words to find a journey like signing in, and it plays on one board that stays put, its steps numbered on the cards and listed beside them, each with where it is in the code, linked to GitHub. Back and Next light one step at a time. A Chat answer that follows a journey opens it here. ([dashboard #PR](https://github.com/CoderHelm/coderhelm/pull/PR))
-- **Screens by app.** Every screen, by app, signed-out screens first, then signed-in ones by area, with search. ([dashboard #PR](https://github.com/CoderHelm/coderhelm/pull/PR))
-- **Found in code, or inferred.** Lines joined by a name, an env var or infrastructure code are dashed, with a key. ([dashboard #PR](https://github.com/CoderHelm/coderhelm/pull/PR))
+- **System, Parts and Code.** The map opens on one board of the whole system: the apps, the servers behind them, where they run and keep data, and the outside services they call, at most about 24 cards. Parts and Code are one click away. Cloud pieces that start or deploy code, like an image resizer behind a CDN, are drawn connected to the code they run. ([dashboard #475](https://github.com/CoderHelm/coderhelm/pull/475))
+- **Journeys.** Type a few words to find a journey like signing in, and it plays on one board that stays put, its steps numbered on the cards and listed beside them, each with where it is in the code, linked to GitHub. Back and Next light one step at a time. A Chat answer that follows a journey opens it here. ([dashboard #475](https://github.com/CoderHelm/coderhelm/pull/475))
+- **Screens by app.** Every screen, by app, signed-out screens first, then signed-in ones by area, with search. ([dashboard #475](https://github.com/CoderHelm/coderhelm/pull/475))
+- **Found in code, or inferred.** Lines joined by a name, an env var or infrastructure code are dashed, with a key. ([dashboard #475](https://github.com/CoderHelm/coderhelm/pull/475))
 
 ## November 23, 2026: the App map opens quickly, goes full screen, and keeps its title off the cards
 
