@@ -132,6 +132,21 @@ export function largeRealShapedMap() {
   };
 }
 
+/**
+ * A part as big as the largest on a real map: a member portal of 1,008 files
+ * in 60 feature folders of 14 files, 40 tests and 128 files loose in its
+ * root, which the viewer alone drew as one board of 1,008 cards.
+ */
+export function onePartOfAThousandFiles() {
+  const g = marinaMap();
+  const files: { p: string; n: string; r: string; l: string; loc: number; name: string; d: string }[] = [];
+  for (let f = 0; f < 60; f++) for (let i = 0; i < 14; i++) files.push({ p: `marina/portal/feature${String(f).padStart(2, "0")}/part${i}.ts`, n: "web", r: "marina", l: "typescript", loc: 40, name: `Feature ${f} part ${i}`, d: "One piece of the member portal." });
+  for (let i = 0; i < 40; i++) files.push({ p: `marina/portal/__tests__/case${i}.test.ts`, n: "web", r: "marina", l: "typescript", loc: 40, name: `Test ${i}`, d: "A test." });
+  for (let i = 0; i < 128; i++) files.push({ p: `marina/portal/loose${String(i).padStart(3, "0")}.ts`, n: "web", r: "marina", l: "typescript", loc: 40, name: `Loose ${i}`, d: "A helper." });
+  const links = [...g.links, ...files.slice(0, 600).map((f, i) => ({ a: `f:${f.p}`, b: `f:${files[(i * 7 + 3) % files.length].p}`, k: "import", w: 1 }))];
+  return { ...g, files: [...g.files, ...files], links };
+}
+
 async function mockApi(page: Page, graph: unknown) {
   const json = (route: Route, body: unknown) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
   await page.route((url) => url.hostname !== "localhost", (route) => route.abort());
@@ -259,6 +274,42 @@ test.describe("App map layout", () => {
     expect(p.alongOrThrough, "a line runs along or through a card it doesn't join").toEqual([]);
     expect(p.sharedPorts, "two lines meet a card at the same point").toEqual([]);
     expect(p.minPortGap, "lines meeting one side of a card are packed tight").toBeGreaterThanOrEqual(14);
+  });
+
+  test("a part of a thousand files opens at once, in boards of at most 30 cards, laid out off the frame's thread", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    const frame = await open(page, onePartOfAThousandFiles());
+    const facts = await frame.evaluate(() => {
+      const w = window as unknown as { __coderhelmGroupMs: number; __coderhelmElkRan: string; Floorplan: { state: { kinds: Record<string, boolean> } } };
+      return { groupMs: w.__coderhelmGroupMs, ran: w.__coderhelmElkRan, imports: w.Floorplan.state.kinds.import };
+    });
+    // Grouping runs once, quickly; layouts run in ELK's worker; import lines start hidden.
+    expect(facts.groupMs).toBeLessThan(250);
+    expect(facts.ran).toBe("worker");
+    expect(facts.imports).toBe(false);
+    const opened = await frame.evaluate(async () => {
+      const F = (window as unknown as { Floorplan: { go: (id: string) => Promise<void>; children: (id: string) => unknown[]; graph: { nodes: { id: string }[] } } }).Floorplan;
+      const t = performance.now();
+      await F.go("n:web");
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const ms = performance.now() - t;
+      const cards = document.querySelectorAll("#viewport .node .card").length;
+      // Every board on the map, as the viewer would draw it.
+      let largest = 0;
+      for (const n of F.graph.nodes) largest = Math.max(largest, F.children(`n:${n.id}`).length);
+      return { ms, cards, largest };
+    });
+    console.log(`app-map large part: ${JSON.stringify({ ...facts, ...opened })}`);
+    expect(opened.ms).toBeLessThan(5_000);
+    expect(opened.cards).toBeGreaterThan(1);
+    expect(opened.cards).toBeLessThanOrEqual(30);
+    expect(opened.largest).toBeLessThanOrEqual(30);
+    await shot(page, "app-map-large-part-opened");
+    // The frame still answers.
+    await zoom(frame, "Zoom in", 1);
+    expect(errors).toEqual([]);
   });
 
   for (const size of [{ name: "desktop", width: 1440, height: 1000 }, { name: "laptop", width: 1280, height: 800 }, { name: "phone", width: 390, height: 844 }])

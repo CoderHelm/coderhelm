@@ -105,7 +105,6 @@ export function MapFrame({
         src={frameSrc(focus)}
         sandbox="allow-scripts"
         allow="fullscreen"
-        allowFullScreen
         referrerPolicy="no-referrer"
         loading="lazy"
         className={`block w-full rounded-lg border border-zinc-800 bg-zinc-950 ${height ? "" : "h-[max(520px,calc(100dvh-140px))] sm:h-[max(640px,calc(100dvh-180px))]"}`}
