@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { api, type AwsConnection, type AwsPermissions } from "@/lib/api";
+import { useMemo } from "react";
+import type { AwsConnection } from "@/lib/api";
 import { timeAgo } from "@/lib/data-sources";
+import { usePermissionChecks, type AccountPermissions } from "@/hooks/use-permission-checks";
 import { Callout } from "./callout";
 import { CheckIcon, ExternalLinkIcon, WarningIcon, AlertCircleIcon } from "./icons";
 import { buttonClass, primaryButton, secondaryButton } from "./ui";
@@ -14,23 +15,10 @@ import { OptionalReads, useInstallStatus } from "./aws-install-options";
 // read of each kind for older roles), with the one-click update: a small
 // stack that adds exactly the new permissions to the existing role. After
 // someone presses Update the page checks again by itself, when they come
-// back to the tab and every 15 seconds for a while, and shows the result.
+// back to the tab and every 15 seconds for a while, and shows the result
+// (usePermissionChecks, shared with every page that shows a saved warning).
 
-const POLL_MS = 15_000;
-/** How long after pressing Update the page keeps checking by itself. */
-const WATCH_MS = 15 * 60_000;
-
-export interface AccountPermissions {
-  view: AwsPermissions | null;
-  checking: boolean;
-  /** When someone pressed Update for this account (this page view). */
-  pressedAt: number | null;
-  /** The update landed while this page watched. */
-  updated: boolean;
-  error: string | null;
-}
-
-const EMPTY: AccountPermissions = { view: null, checking: false, pressedAt: null, updated: false, error: null };
+export type { AccountPermissions };
 
 function accountOf(c: AwsConnection): string {
   return c.abilities?.account ?? c.connection_id;
@@ -38,73 +26,14 @@ function accountOf(c: AwsConnection): string {
 
 /** Live permission state for every connected account, and the actions on it. */
 export function useAwsPermissions(connections: AwsConnection[]) {
-  const [state, setState] = useState<Record<string, AccountPermissions>>({});
-  const stateRef = useRef(state);
-  stateRef.current = state;
-  const accounts = connections.map(accountOf).join(",");
-
-  const patch = useCallback((account: string, p: Partial<AccountPermissions>) => {
-    setState((s) => ({ ...s, [account]: { ...EMPTY, ...s[account], ...p } }));
-  }, []);
-
-  const check = useCallback(
-    async (account: string, pressed = false) => {
-      patch(account, { checking: true, error: null });
-      try {
-        const r = await api.checkAwsPermissions(account, pressed);
-        const before = stateRef.current[account];
-        const view = r.permissions;
-        const landed = !!before?.pressedAt && before.view?.status === "update_needed" && view?.status === "up_to_date";
-        patch(account, {
-          view,
-          checking: false,
-          updated: before?.updated || landed,
-          pressedAt: view?.status === "up_to_date" ? null : before?.pressedAt ?? null,
-        });
-      } catch (e) {
-        patch(account, { checking: false, error: e instanceof Error && e.message ? e.message : "The check didn't run." });
-      }
-    },
-    [patch],
-  );
-
-  // The stored check shows at once; a live check of each account follows.
-  useEffect(() => {
-    for (const c of connections) {
-      const a = accountOf(c);
-      if (!stateRef.current[a]) patch(a, { view: c.abilities?.permissions ?? null });
-      check(a);
-    }
+  const key = connections.map(accountOf).join(",");
+  const targets = useMemo(
+    () => connections.map((c) => ({ account: accountOf(c), saved: c.abilities?.permissions ?? null })),
     // Only when the set of accounts changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accounts]);
-
-  // After Update: check again when the person comes back to this tab, and
-  // every POLL_MS while the update is outstanding.
-  const watching = Object.entries(state).filter(([, s]) => s.pressedAt && Date.now() - s.pressedAt < WATCH_MS).map(([a]) => a);
-  const watchKey = watching.join(",");
-  useEffect(() => {
-    if (!watchKey) return;
-    const list = watchKey.split(",");
-    const again = () => {
-      for (const a of list) if (!stateRef.current[a]?.checking) check(a, true);
-    };
-    const onVisible = () => {
-      if (document.visibilityState === "visible") again();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    window.addEventListener("focus", again);
-    const t = window.setInterval(again, POLL_MS);
-    return () => {
-      document.removeEventListener("visibilitychange", onVisible);
-      window.removeEventListener("focus", again);
-      window.clearInterval(t);
-    };
-  }, [watchKey, check]);
-
-  const pressed = useCallback((account: string) => patch(account, { pressedAt: Date.now(), updated: false }), [patch]);
-
-  return { state, check, pressed, of: (account: string) => state[account] ?? EMPTY };
+    [key],
+  );
+  return usePermissionChecks(targets);
 }
 
 export type AwsPermissionsApi = ReturnType<typeof useAwsPermissions>;

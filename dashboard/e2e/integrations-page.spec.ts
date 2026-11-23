@@ -372,6 +372,37 @@ test("an AWS role without the permissions offers the one-click stack", async ({ 
   await expect(aws.getByRole("switch", { name: "Let agents read Airflow" })).toBeDisabled();
 });
 
+test("an AWS account's saved update warning is checked live and goes away when the role is up to date", async ({ page }) => {
+  const update = "https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/quickcreate?stackName=CoderHelmLogReaderOps";
+  const list = items().map((i) =>
+    i.id === `aws-${ACCOUNT}`
+      ? { ...i, detail: awsDetail({ update_url: update, permissions: { status: "update_needed", missing_count: 20 } }) }
+      : i,
+  );
+  const db = await mockApi(page, { items: list });
+  let release = () => {};
+  const held = new Promise<void>((r) => (release = r));
+  await page.context().route(`**/api/aws-connections/${ACCOUNT}/permissions/check`, async (r) => {
+    db.calls.push({ method: r.request().method(), path: new URL(r.request().url()).pathname, body: null });
+    await held;
+    await r.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ account: awsDetail({ permissions: { status: "up_to_date", missing_count: 0 } }), status: "connected", reason: "", last_check: ago(0), permissions: { status: "up_to_date", missing_count: 0, abilities: [] } }),
+    });
+  });
+  await page.goto("/settings/integrations");
+  const aws = row(page, `aws-${ACCOUNT}`);
+  await control(page, `aws-${ACCOUNT}`, `AWS account ${ACCOUNT}`).click();
+  const panel = aws.getByTestId(`aws-panel-${ACCOUNT}`);
+  await expect(panel.getByText("Update needed: 20 new read-only permissions")).toBeVisible();
+  await expect(panel.getByTestId("permission-check-note")).toHaveText("Checking the role now…");
+  release();
+  await expect(panel.getByText("Update needed: 20 new read-only permissions")).toHaveCount(0);
+  await expect(aws.getByRole("link", { name: "Update in AWS" })).toHaveCount(0);
+  expect(db.calls.some((c) => c.method === "POST" && c.path === `/api/aws-connections/${ACCOUNT}/permissions/check`)).toBe(true);
+});
+
 test("a self-hosted install's own account never asks for anything: the release brings the permissions", async ({ page }) => {
   const list = items().map((i) =>
     i.id === `aws-${ACCOUNT}`

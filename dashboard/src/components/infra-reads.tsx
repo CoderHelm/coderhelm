@@ -7,7 +7,8 @@
 
 import { Code } from "@/components/settings";
 import { linkButton } from "@/components/ui";
-import type { AwsAccountAbilities } from "@/lib/api";
+import { infraMissingOf } from "@/hooks/use-permission-checks";
+import type { AwsAccountAbilities, AwsPermissions } from "@/lib/api";
 
 /** Every action the option adds, as the role templates grant them. */
 export const INFRA_ACTIONS = [
@@ -32,11 +33,15 @@ export const INFRA_ACTIONS = [
   "ssm:GetParameters",
 ];
 
-export function InfraReadsHelp({ a, on }: { a: AwsAccountAbilities; on: boolean }) {
+/** `live`: the page's live check of the role, which wins over the saved one on `a` when it is newer. */
+export function InfraReadsHelp({ a, on, live }: { a: AwsAccountAbilities; on: boolean; live?: AwsPermissions | null }) {
   const infra = a.infrastructure;
   const row = a.permissions?.abilities.find((x) => x.key === "infra");
-  const missing = infra?.missing?.length ? infra.missing : on && infra?.available === false ? (row?.missing.length ? row.missing : INFRA_ACTIONS) : [];
-  const update = a.permissions?.update ?? null;
+  const newer = live && (!a.permissions || live.checked_at > a.permissions.checked_at) ? live : null;
+  const fresh = infraMissingOf(newer);
+  const saved = infra?.missing?.length ? infra.missing : on && infra?.available === false ? (row?.missing.length ? row.missing : INFRA_ACTIONS) : [];
+  const missing = fresh ? (on ? fresh : []) : saved;
+  const update = (newer ?? a.permissions)?.update ?? null;
   return (
     <>
       Reads which AMIs, node groups, databases and caches run here, once a day, so Security can say what you have to fix and what AWS patches for you.

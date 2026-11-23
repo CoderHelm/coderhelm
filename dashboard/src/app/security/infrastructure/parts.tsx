@@ -7,7 +7,12 @@
 // runbook when a person applies it.
 
 import Link from "next/link";
+import { useMemo } from "react";
 import { Callout } from "@/components/callout";
+import { PermissionCheckNote } from "@/components/permission-check-note";
+import { useCan } from "@/hooks/use-can";
+import { infraMissingOf, usePermissionChecks } from "@/hooks/use-permission-checks";
+import type { AwsPermissions } from "@/lib/api";
 import { CodeBlock } from "@/components/code-block";
 import { Chip, DetailBlock, Time } from "@/components/list";
 import { Code } from "@/components/settings";
@@ -57,24 +62,42 @@ export function LocationLink({ fix }: { fix: InfraFix }) {
   return href ? <OutLink href={href}>{words}</OutLink> : <span className="text-zinc-300 [overflow-wrap:anywhere]">{words}</span>;
 }
 
+/** A check says nothing is left for Infrastructure vulnerabilities: the role has its reads. */
+const infraSettled = (v: AwsPermissions) => infraMissingOf(v)?.length === 0;
+
 /**
  * Accounts where Infrastructure vulnerabilities is on but the role lacks the
- * reads: a warning that names the feature, and the one-click update.
+ * reads: a warning that names the feature, and the one-click update. The
+ * list comes from the last saved check (once a day), so the page checks
+ * each warned account live and drops the warning when the role has the
+ * reads; after Update it keeps checking, like Settings › AWS.
  */
 export function MissingReads({ accounts }: { accounts: InfraAccount[] }) {
+  const { ready, can } = useCan();
   const short = accounts.filter((a) => a.on && a.missing.length > 0);
-  if (short.length === 0) return null;
+  const key = short.map((a) => a.account).join(",");
+  // Only when the set of warned accounts changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const targets = useMemo(() => short.map((a) => ({ account: a.account })), [key]);
+  const perms = usePermissionChecks(targets, { enabled: ready && can("integrations"), settled: infraSettled });
+  const shown = short
+    .map((a) => {
+      const s = perms.of(a.account);
+      return { a, s, missing: infraMissingOf(s.view) ?? a.missing };
+    })
+    .filter((x) => x.missing.length > 0);
+  if (shown.length === 0) return null;
   return (
     <div className="space-y-3" data-testid="missing-reads">
-      {short.map((a) => (
+      {shown.map(({ a, s, missing }) => (
         <Callout
           key={a.account}
           variant="warning"
-          title={`Infrastructure vulnerabilities needs ${a.missing.length} more read-only permission${a.missing.length === 1 ? "" : "s"} in account ${a.account}`}
+          title={`Infrastructure vulnerabilities needs ${missing.length} more read-only permission${missing.length === 1 ? "" : "s"} in account ${a.account}`}
           actions={
             <>
               {a.update_url && (
-                <a href={a.update_url} target="_blank" rel="noreferrer" className={linkButton}>
+                <a href={a.update_url} target="_blank" rel="noreferrer" className={linkButton} onClick={() => perms.pressed(a.account)}>
                   Update the role in AWS
                 </a>
               )}
@@ -86,13 +109,14 @@ export function MissingReads({ accounts }: { accounts: InfraAccount[] }) {
         >
           <p>
             An AWS admin signs in to account {a.account} and creates the update stack. It adds only describe and list calls:{" "}
-            {a.missing.map((m, i) => (
+            {missing.map((m, i) => (
               <span key={m}>
                 <Code>{m}</Code>
-                {i < a.missing.length - 1 ? ", " : "."}
+                {i < missing.length - 1 ? ", " : "."}
               </span>
             ))}
           </p>
+          <PermissionCheckNote s={s} />
         </Callout>
       ))}
     </div>

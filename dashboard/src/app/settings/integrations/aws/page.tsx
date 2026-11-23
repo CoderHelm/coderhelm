@@ -541,7 +541,7 @@ function AccountSettings({
               label="Infrastructure vulnerabilities"
               layout="toggle"
               unsaved={dirty("infrastructure")}
-              help={<InfraReadsHelp a={a} on={v.infrastructure} />}
+              help={<InfraReadsHelp a={a} on={v.infrastructure} live={perms.of(a.account).view} />}
               control={(ids) => (
                 <Switch
                   id={ids.inputId}
