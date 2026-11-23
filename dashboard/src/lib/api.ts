@@ -4468,7 +4468,8 @@ export interface Analytics {
     fix_rate: number | null;
     fix_attempts: number;
     fix_commits: number;
-    /** Runs red only on checks that also fail on the base branch. */
+    /** Runs red only on failures that aren't the change's: checks that also
+     * fail on the base branch, or a test the fix round showed is outside it. */
     red_on_base_runs?: number;
     /** How each red run ended. Missing from older backends. */
     outcomes?: AnalyticsCiOutcomes;
@@ -4579,7 +4580,8 @@ export interface AnalyticsCiOutcomes {
   green_without_fix: number;
   /** Green after a re-run of the failed jobs, with no code change. */
   flaky: number;
-  /** Red only on checks that also fail on the base branch. */
+  /** Red only on failures that aren't the change's (base branch, or a test
+   * outside the change). */
   red_on_base: number;
   gave_up: number;
   running: number;

@@ -304,14 +304,14 @@ test("failures show their step and retries, the rest summed, and what waiting ru
 test("where it struggles places every red CI run in one outcome, base-branch failures apart", async ({ page }) => {
   await mockApi(page);
   await page.goto("/analytics?tab=reliability");
-  await expect(page.getByTestId("ci-line")).toContainText("CI went red on 8 runs, plus 1 run red only on checks that already fail on the base branch");
+  await expect(page.getByTestId("ci-line")).toContainText("CI went red on 8 runs, plus 1 run red only on failures that aren't the change's");
   await expect(page.getByTestId("ci-line")).toContainText("6 ended green after its fixes");
   const outcomes = page.getByRole("table", { name: "CI outcomes" });
   await expect(outcomes.locator("tbody tr td:first-child")).toHaveText([
     "Green after a Coderhelm fix",
     "Green without a Coderhelm fix",
     "Flaky: green on a re-run",
-    "Red only on checks that fail on the base branch",
+    "Red, not the change's: fails on the base branch or outside the change",
     "Gave up: Fix attempts used up",
     "Still running",
   ]);
