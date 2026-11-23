@@ -444,6 +444,8 @@ test.describe("App map reading", () => {
     await expect(viewer(page).getByText("Harbor website").first()).toBeVisible();
     const button = viewer(page).locator("#ch-fullscreen");
     await expect(button).toHaveAttribute("aria-label", "Full screen");
+    // The zoom buttons sit at the bottom of the map; the page scrolls to them (a click can't scroll the sandboxed frame's page for us).
+    await frame.evaluate((el) => el.scrollIntoView({ block: "end" }));
     await button.click();
     await expect.poll(() => page.evaluate(() => document.fullscreenElement?.tagName ?? "")).toBe("IFRAME");
     await expect(button).toHaveAttribute("aria-label", "Leave full screen");

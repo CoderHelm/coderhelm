@@ -98,7 +98,11 @@ test.describe("App map presentation", () => {
     expect(st.cards).toBeLessThanOrEqual(30);
     await expect(frame.locator('#ch-start [data-lv="system"]')).toHaveAttribute("aria-pressed", "true");
     // What people use, what runs behind it, where it runs, and outside services, on one board.
-    for (const name of ["Website", "Fitness mobile app", "Main server", "Main database", "Image CDN", "Member system"]) await expect(frame.locator("#viewport g.node", { hasText: name }).first()).toBeVisible();
+    // The eight outside services are one card, and the cloud resources that run no code are
+    // shown by their cloud setup part; the CDN and functions on the resizer's path stay.
+    for (const name of ["Website", "Fitness mobile app", "Main server", "Image CDN", "Image resizer function", "Cloud setup", "Outside services"]) await expect(frame.locator("#viewport g.node", { hasText: name }).first()).toBeVisible();
+    await expect(frame.locator("#viewport g.node", { hasText: "Outside services" })).toContainText("8 services");
+    await expect(frame.locator("#viewport g.node .title", { hasText: /^Member system sign-in API$/ })).toHaveCount(0);
     // Developer tools and the cloud setup's own folder stay a level down.
     await expect(frame.locator("#viewport g.node", { hasText: "Developer tools" })).toHaveCount(0);
     await expect(frame.locator("#tour")).toBeHidden();
@@ -211,6 +215,53 @@ test.describe("App map presentation", () => {
     await expect(frame.locator("#ch-start [data-sc]")).toHaveCount(1);
     await frame.locator("#ch-start [data-sc]").click();
     await expect.poll(async () => (await viewerState(frame)).board).toBe("Forgot Password");
+  });
+
+  test("the System board reads at its first fit on a laptop, with the panel open", async ({ page }) => {
+    // A 1280 by 800 laptop: the page's frame is about 1,000 by 640, the panel takes 330 of it.
+    await page.setViewportSize({ width: 1280, height: 800 });
+    const { frame } = await open(page);
+    await expect(frame.locator("#ch-start")).toBeVisible();
+    const read = await frame.evaluate(() => {
+      const F = (window as unknown as { Floorplan: { state: { t: { k: number } } } }).Floorplan;
+      const px = (sel: string) => Math.min(...Array.from(document.querySelectorAll(sel)).map((el) => parseFloat(getComputedStyle(el).fontSize) * F.state.t.k));
+      const descs = Array.from(document.querySelectorAll("#viewport g.node .card .desc")).filter((d) => getComputedStyle(d).display !== "none" && (d as HTMLElement).offsetHeight > 0);
+      return { k: F.state.t.k, title: px("#viewport g.node .card .title"), desc: px("#viewport g.node .card .desc"), descs: descs.length, cards: document.querySelectorAll("#viewport g.node").length };
+    });
+    timings.systemZoomLaptop = Number(read.k.toFixed(2));
+    timings.systemTitlePx = Number(read.title.toFixed(1));
+    // Titles at 10px or more on screen, and every card's description shown.
+    expect(read.title).toBeGreaterThanOrEqual(10);
+    expect(read.desc).toBeGreaterThanOrEqual(7.5);
+    expect(read.descs).toBe(read.cards);
+    await shot(page, "app-map-present-system-laptop");
+  });
+
+  test("past 24 System cards, the rest are one More card that opens them", async ({ page }) => {
+    const big = v2Map();
+    // Twenty more services of the system's own, each a System node.
+    for (let i = 0; i < 20; i++) big.nodes.push({ id: `svc${i}`, parent: null, label: `Back-office service ${i}`, kind: "service", summary: `Runs back-office job ${i}.`, details: "", tags: [], paths: [], packages: [], hosts: [], level: "system", stats: { files: 0, loc: 0, langs: {}, repos: [] } });
+    await mockApi(page, big);
+    await page.goto("/app-map");
+    const frame = await frameOf(page);
+    await expect(frame.locator("#viewport g.node").first()).toBeVisible({ timeout: 60_000 });
+    await expect(frame.locator("#viewport g.node")).toHaveCount(24);
+    const more = frame.locator("#viewport g.node", { hasText: "More of the system" });
+    await expect(more).toHaveCount(1);
+    await expect(more).toContainText("More of the system (");
+    // Every candidate is reachable: the ones not on the board are on More's board.
+    const onBoard = await frame.locator("#viewport g.node .title").allInnerTexts();
+    const missing = Array.from({ length: 20 }, (_, i) => `Back-office service ${i}`).filter((n) => !onBoard.includes(n));
+    expect(missing.length).toBeGreaterThan(0);
+    await page.getByTestId("app-map-frame").locator("iframe").evaluate((el) => el.scrollIntoView({ block: "end" }));
+    await more.click();
+    await expect.poll(async () => (await viewerState(frame)).board).toBe("More of the system");
+    for (const n of missing) await expect(frame.locator("#viewport g.node", { hasText: n }).first()).toBeVisible();
+    await shot(page, "app-map-present-system-more");
+    // The More card is the System board's own: Parts doesn't show it.
+    await frame.locator('#ch-start [data-lv="parts"]').click();
+    await expect.poll(async () => (await viewerState(frame)).container).toBe("root");
+    await expect(frame.locator("#viewport g.node", { hasText: "More of the system" })).toBeHidden();
   });
 
   test("inferred links are dashed, with a key; found in code stays solid", async ({ page }) => {

@@ -26,33 +26,92 @@
     const kids = (graph && graph.children) || [];
     return !!b && Array.isArray(b.items) && kids.length === b.items.length && kids.every((c) => b.items.includes(c.id));
   }
-  /**
-   * The viewer's graph with Coderhelm's layout options and room for each
-   * card's lines. The System board (present.js names it in `opts.board`)
-   * gets columns of at most `bound` cards, so a long list of outside
-   * services doesn't make one column too tall to read at the first fit.
-   */
+  /** The viewer's graph with Coderhelm's layout options and room for each card's lines. */
   function tuneGraph(graph, opts) {
     if (!graph || !opts) return graph;
-    const b = opts.board;
-    const onBoard = isBoard(graph, b) && b.mode === 'system';
-    const extra = onBoard ? {
-      'elk.layered.layering.strategy': 'COFFMAN_GRAHAM',
-      'elk.layered.layering.coffmanGraham.layerBound': String(b.bound || 7),
-      'elk.layered.spacing.nodeNodeBetweenLayers': '110',
-      'elk.spacing.nodeNode': '40',
-    } : {};
     const into = new Map(), out = new Map();
     const add = (m, id) => m.set(id, (m.get(id) || 0) + 1);
     for (const e of graph.edges || []) { for (const s of e.sources || []) add(out, s); for (const t of e.targets || []) add(into, t); }
     const children = (graph.children || []).map((c) => {
       const lines = Math.max(into.get(c.id) || 0, out.get(c.id) || 0);
       const need = lines > 1 ? (lines + 1) * opts.lineRoom : 0;
-      // On the System board the column sizes decide, so no card is held to the last column.
-      const lo = onBoard && c.layoutOptions ? { ...c.layoutOptions, 'elk.layered.layering.layerConstraint': 'NONE' } : c.layoutOptions;
-      return { ...c, ...(lo ? { layoutOptions: lo } : {}), ...(need > (c.height || 0) ? { height: need } : {}) };
+      return need > (c.height || 0) ? { ...c, height: need } : c;
     });
-    return { ...graph, children, layoutOptions: { ...(graph.layoutOptions || {}), ...opts.options, ...extra } };
+    return { ...graph, children, layoutOptions: { ...(graph.layoutOptions || {}), ...opts.options } };
+  }
+  /**
+   * The System board, laid out here instead of by ELK, so it reads at its
+   * first fit beside the panel: its cards on a grid of equal cells, in the
+   * order present.js gives (what people use, what runs behind it, where it
+   * runs and keeps data, outside services), filled column by column, with as
+   * many columns as make the cards largest in the free map area (`b.w` by
+   * `b.h`). Lines run in the gaps: out of a card's side into the gap beside
+   * its column, along the gap between rows, and into the other card's side,
+   * each on its own lane so they stay apart.
+   */
+  function systemLayout(graph, b) {
+    const kids = graph.children || [];
+    const byId = new Map(kids.map((c) => [c.id, c]));
+    const order = (b.items || []).filter((id) => byId.has(id));
+    for (const c of kids) if (!order.includes(c.id)) order.push(c.id);
+    const n = order.length, GX = 80, GY = 56, P = 40;
+    const CW = Math.max(1, ...kids.map((c) => c.width || 0));
+    // Each row as tall as its tallest card.
+    const rowHeights = (rows) => { const hs = new Array(rows).fill(0); order.forEach((id, i) => { hs[i % rows] = Math.max(hs[i % rows], byId.get(id).height || 0); }); return hs; };
+    let best = null;
+    for (let cols = 1; cols <= Math.min(n, 8); cols++) {
+      const rows = Math.ceil(n / cols), hs = rowHeights(rows);
+      const W = cols * CW + (cols - 1) * GX + 2 * P, H = hs.reduce((a, h) => a + h, 0) + (rows - 1) * GY + 2 * P;
+      const k = Math.min((b.w || 800) / (W + 40), (b.h || 600) / (H + 20));
+      if (!best || k > best.k + 1e-6) best = { cols, rows, hs, W, H, k };
+    }
+    const rowTop = []; for (let r = 0, y = P; r < best.rows; y += best.hs[r] + GY, r++) rowTop.push(y);
+    const at = new Map();
+    order.forEach((id, i) => {
+      const col = Math.floor(i / best.rows), row = i % best.rows, c = byId.get(id);
+      at.set(id, { id, col, row, x: P + col * (CW + GX) + (CW - c.width) / 2, y: rowTop[row], width: c.width, height: c.height });
+    });
+    const cellX = (col) => P + col * (CW + GX);
+    const gapRight = (col) => cellX(col) + CW + GX / 2; // the gap to a column's right
+    const gapBelow = (row) => rowTop[row] + best.hs[row] + GY / 2; // the gap under a row
+    // Lanes: each line in a gap gets its own offset; ports spread along a card's side.
+    // Lanes stay at least 12px clear of the cards on either side of their gap (7 in a column gap, 5 in a row gap; more share them).
+    const lanes = new Map();
+    const lane = (key) => { const k = lanes.get(key) || 0; lanes.set(key, k + 1); const m = key[0] === 'v' ? 7 : 5, j = k % m; return (j % 2 ? 1 : -1) * Math.ceil(j / 2) * (key[0] === 'v' ? 8 : 6); };
+    const ports = new Map();
+    const port = (c, side) => { const key = c.id + side; const k = ports.get(key) || 0; ports.set(key, k + 1); return c.y + Math.min(c.height - 10, 18 + k * 14); };
+    const edges = [];
+    for (const e of graph.edges || []) {
+      const a = at.get(e.sources && e.sources[0]), z = at.get(e.targets && e.targets[0]);
+      if (!a || !z || a === z) continue;
+      let pts;
+      if (z.col > a.col) {
+        const sx = a.x + a.width, sy = port(a, 'r'), ex = z.x, ey = port(z, 'l');
+        const g1 = gapRight(a.col) + lane('v' + a.col);
+        if (z.col === a.col + 1) pts = [{ x: sx, y: sy }, { x: g1, y: sy }, { x: g1, y: ey }, { x: ex, y: ey }];
+        else {
+          const g2 = gapRight(z.col - 1) + lane('v' + (z.col - 1));
+          const cy = (z.row > 0 ? gapBelow(z.row - 1) : P / 2) + lane('h' + z.row);
+          pts = [{ x: sx, y: sy }, { x: g1, y: sy }, { x: g1, y: cy }, { x: g2, y: cy }, { x: g2, y: ey }, { x: ex, y: ey }];
+        }
+      } else if (z.col < a.col) {
+        const sx = a.x, sy = port(a, 'l'), ex = z.x + z.width, ey = port(z, 'r');
+        const g1 = gapRight(a.col - 1) + lane('v' + (a.col - 1));
+        if (z.col === a.col - 1) pts = [{ x: sx, y: sy }, { x: g1, y: sy }, { x: g1, y: ey }, { x: ex, y: ey }];
+        else {
+          const g2 = gapRight(z.col) + lane('v' + z.col);
+          const cy = (z.row > 0 ? gapBelow(z.row - 1) : P / 2) + lane('h' + z.row);
+          pts = [{ x: sx, y: sy }, { x: g1, y: sy }, { x: g1, y: cy }, { x: g2, y: cy }, { x: g2, y: ey }, { x: ex, y: ey }];
+        }
+      } else {
+        // The same column: out of the right side, down the gap, back in.
+        const sx = a.x + a.width, sy = port(a, 'r'), ey = port(z, 'r'), g = gapRight(a.col) + lane('v' + a.col);
+        pts = [{ x: sx, y: sy }, { x: g, y: sy }, { x: g, y: ey }, { x: z.x + z.width, y: ey }];
+      }
+      edges.push({ id: e.id, sources: e.sources, targets: e.targets, sections: [{ startPoint: pts[0], endPoint: pts[pts.length - 1], bendPoints: pts.slice(1, -1) }] });
+    }
+    const children = order.map((id) => { const c = at.get(id); return { id, x: c.x, y: c.y, width: c.width, height: c.height }; });
+    return { id: graph.id, x: 0, y: 0, width: best.W, height: best.H, children, edges };
   }
   /**
    * A journey's board, laid out here instead of by ELK: its cards in the
@@ -160,11 +219,15 @@
   window.__coderhelmLayout = { options: LAYOUT, lineRoom: LINE_ROOM };
   const elkShim = `(() => {
     const Real = window.ELK, url = window.__coderhelmElkWorker, tune = ${tuneGraph.toString()};
-    const isBoard = ${isBoard.toString()}, journeyLayout = ${journeyLayout.toString()};
+    const isBoard = ${isBoard.toString()}, journeyLayout = ${journeyLayout.toString()}, systemLayout = ${systemLayout.toString()};
     const opts = window.__coderhelmLayout;
     if (!Real) return;
-    // A journey's board never reaches ELK (see journeyLayout).
-    const journey = (graph) => (opts.board && opts.board.mode === 'journey' && isBoard(graph, opts.board) ? journeyLayout(graph, opts.board, opts) : null);
+    // A journey's board and the System board never reach ELK (see journeyLayout and systemLayout).
+    const journey = (graph) => {
+      const b = opts.board;
+      if (!b || !isBoard(graph, b)) return null;
+      return b.mode === 'journey' ? journeyLayout(graph, b, opts) : b.mode === 'system' ? systemLayout(graph, b) : null;
+    };
     let broken = !url;
     const inFrame = (graph) => { window.__coderhelmElkRan = 'frame'; return new Real().layout(graph); };
     window.ELK = function () {
@@ -437,7 +500,7 @@
     // screens panel (present.js); a chat answer's mini map only its lines.
     const present = { full: hash.get('full') === '1', flow: (hash.get('flow') || '').slice(0, 200), focus: focused };
     if (typeof window.CoderhelmPresentPrepare === 'function') {
-      try { window.CoderhelmPresentPrepare(graph); } catch (err) { graph.flows = []; }
+      try { window.CoderhelmPresentPrepare(graph, present); } catch (err) { graph.flows = []; }
     }
     const html = page(graph, present);
     document.open();

@@ -228,7 +228,9 @@ async function headerOverCards(frame: Frame): Promise<string[]> {
     const ctx = document.getElementById("context");
     if (!ctx) return [];
     if (getComputedStyle(ctx).display !== "none") return ["the title block is on the canvas"];
+    // Hidden (kept off the canvas): it has no box to sit over anything.
     const r = ctx.getBoundingClientRect();
+    if (!r.width || !r.height) return [];
     const out: string[] = [];
     for (const n of Array.from(document.querySelectorAll("#viewport .node .card"))) {
       const c = n.getBoundingClientRect();

@@ -31,9 +31,115 @@
 (() => {
   'use strict';
 
-  /** The map's journeys in the viewer's own form ({ref, note}), or left out. */
-  function prepare(graph) {
-    if (!graph || !Array.isArray(graph.flows)) return graph;
+  const SYSTEM_MAX = 24; // the most cards the viewer puts on one board
+  const SYSTEM_READABLE = 12; // past this, plain cloud resources fold into their cloud setup part
+  const OUTSIDE = 'coderhelm-outside', MORE = 'coderhelm-more';
+  const SYSTEM_KINDS = ['ui', 'service', 'worker', 'data', 'database', 'queue', 'external'];
+  const ORDER = { ui: 0, service: 1, worker: 2, library: 3, data: 4, database: 4, queue: 4, infra: 5, external: 6 };
+  const listNames = (ns) => (ns.length <= 3 ? ns.map((n) => n.label).join(', ') : `${ns.slice(0, 3).map((n) => n.label).join(', ')} and ${ns.length - 3} more`);
+
+  /**
+   * The System board's cards, chosen once before the viewer starts (the
+   * App map page only). A map with `level` says which nodes are System
+   * ones; an older map's are its top parts of those kinds and the
+   * infrastructure resources inside its cloud setup. Infrastructure that
+   * starts or deploys code (trigger and deploy links) is always on it, with
+   * the part its code is in, so that path is drawn connected.
+   *
+   * So the board reads at its first fit, with the panel beside it on a
+   * laptop: more than three outside services become one "Outside services"
+   * card (their own nodes move inside it, so lines to them still reach it,
+   * and opening it shows each one); past SYSTEM_READABLE cards, cloud
+   * resources that start or deploy no code are shown by their cloud setup
+   * part, which opens to them. Anything still past SYSTEM_MAX cards goes
+   * into one "More of the system" card that opens a board of the rest, so
+   * every candidate stays one click away.
+   */
+  function shapeSystem(graph) {
+    const nodes = graph.nodes;
+    const byId = new Map(nodes.map((n) => [n.id, n]));
+    const v2 = nodes.some((n) => n.level);
+    const shaped = (n) => (n.tags || []).some((t) => t === 'coderhelm-shaped' || t === 'coderhelm-grouped') || n.level === 'code' || n.level === 'part';
+    let list = v2
+      ? nodes.filter((n) => n.level === 'system')
+      : [
+        ...nodes.filter((n) => !n.parent && SYSTEM_KINDS.includes(n.kind)),
+        ...nodes.filter((n) => n.parent && !shaped(n) && byId.get(n.parent) && !byId.get(n.parent).parent && byId.get(n.parent).kind === 'infra'),
+      ];
+    // The node each link end belongs to, then its chain of parents.
+    const files = new Map((graph.files || []).map((f) => [f.p, f]));
+    const routes = graph.routes || [];
+    const ownerOf = (ref) => {
+      if (typeof ref !== 'string') return null;
+      if (ref.startsWith('n:')) return ref.slice(2);
+      if (ref.startsWith('f:')) return files.get(ref.slice(2))?.n ?? null;
+      if (ref.startsWith('r:')) return files.get(routes[Number(ref.slice(2))]?.f)?.n ?? null;
+      if (ref.startsWith('s:')) return files.get(ref.slice(2, ref.lastIndexOf('#')))?.n ?? null;
+      return null;
+    };
+    const chainOf = (id) => { const out = []; for (let x = id, i = 0; x && byId.has(x) && i < 40; x = byId.get(x).parent, i++) out.push(x); return out; };
+    const on = new Set(list.map((n) => n.id));
+    const must = new Set();
+    for (const l of graph.links || []) {
+      if (!l || (l.k !== 'trigger' && l.k !== 'deploy')) continue;
+      for (const r of [l.a, l.b]) {
+        const ch = chainOf(ownerOf(r));
+        if (!ch.length) continue;
+        const keep = ch.find((x) => on.has(x)) || ch[ch.length - 1];
+        must.add(keep);
+        if (!on.has(keep)) { on.add(keep); list.push(byId.get(keep)); }
+      }
+    }
+    // Outside services, as one card when there are more than three.
+    const outside = list.filter((n) => n.kind === 'external' && !n.parent && !must.has(n.id));
+    if (outside.length > 3) {
+      const group = { id: OUTSIDE, parent: null, label: 'Outside services', kind: 'external', summary: `${outside.length} services: ${listNames(outside)}. Open to see each one and what calls it.`, details: '', tags: ['coderhelm-group'], paths: [], packages: [], hosts: [], ...(v2 ? { level: 'system' } : {}), stats: { files: 0, loc: 0, langs: {}, repos: [] } };
+      for (const n of outside) n.parent = OUTSIDE;
+      nodes.push(group);
+      list = [...list.filter((n) => !outside.includes(n)), group];
+    }
+    // Cloud resources that start or deploy no code fold into their own cloud
+    // setup part (opening it shows each one), when the board would be crowded.
+    if (list.length > SYSTEM_READABLE) {
+      const keep = [], folded = new Map();
+      for (const n of list) {
+        const p = n.parent && byId.get(n.parent);
+        if (p && !p.parent && p.kind === 'infra' && !must.has(n.id) && n.id !== OUTSIDE) folded.set(p.id, p);
+        else keep.push(n);
+      }
+      if (folded.size) list = [...keep, ...[...folded.values()].filter((p) => !keep.includes(p))];
+    }
+    const rank = (n) => (must.has(n.id) ? 0 : 10) + (ORDER[n.kind] ?? 9) / 10;
+    list.sort((a, b) => rank(a) - rank(b));
+    let more = [];
+    if (list.length > SYSTEM_MAX) {
+      // Room is taken from the kind with the most cards, so every kind keeps some on the board.
+      list = list.slice();
+      while (list.length > SYSTEM_MAX - 1) {
+        const count = new Map();
+        for (const n of list) if (!must.has(n.id) && n.id !== OUTSIDE) count.set(n.kind, (count.get(n.kind) || 0) + 1);
+        const kind = [...count.entries()].sort((a, b) => b[1] - a[1])[0];
+        if (!kind) break;
+        const i = list.map((n) => n.kind === kind[0] && !must.has(n.id) && n.id !== OUTSIDE).lastIndexOf(true);
+        more.unshift(list.splice(i, 1)[0]);
+      }
+      const card = { id: MORE, parent: null, label: `More of the system (${more.length})`, kind: 'feature', summary: `${listNames(more)}. Open to see them on their own board.`, details: '', tags: ['coderhelm-group'], paths: [], packages: [], hosts: [], ...(v2 ? { level: 'system' } : {}), stats: { files: 0, loc: 0, langs: {}, repos: [] } };
+      nodes.push(card);
+      list.push(card);
+    }
+    list.sort((a, b) => (ORDER[a.kind] ?? 9) - (ORDER[b.kind] ?? 9));
+    graph.coderhelmSystem = { items: list.map((n) => 'n:' + n.id), more: more.map((n) => 'n:' + n.id) };
+  }
+
+  /**
+   * The map before the viewer sees it: journeys in the viewer's own form
+   * ({ref, note}), hidden ones left out; on the App map page (`full`), the
+   * System board's cards (shapeSystem).
+   */
+  function prepare(graph, opts) {
+    if (!graph || !Array.isArray(graph.nodes)) return graph;
+    if (opts && opts.full) { try { shapeSystem(graph); } catch (e) { delete graph.coderhelmSystem; } }
+    if (!Array.isArray(graph.flows)) return graph;
     const nodeIds = new Set((graph.nodes || []).map((n) => n && n.id));
     const filePaths = new Set((graph.files || []).map((f) => f && f.p));
     const routes = Array.isArray(graph.routes) ? graph.routes : [];
@@ -141,7 +247,10 @@
     // the part its code is in, so that path is drawn connected.
     const ORDER = { ui: 0, service: 1, worker: 2, library: 3, data: 4, database: 4, queue: 4, infra: 5, external: 6 };
     const shaped = (n) => (n.tags || []).some((t) => t === 'coderhelm-shaped' || t === 'coderhelm-grouped') || n.level === 'code' || n.level === 'part';
+    // Chosen before the viewer started (shapeSystem); the rest of this is for a map it couldn't shape.
+    const prepared = G.coderhelmSystem && Array.isArray(G.coderhelmSystem.items) ? G.coderhelmSystem : null;
     function systemItems() {
+      if (prepared) return prepared.items.filter((id) => F.exists(id)).map((id) => ({ id, note: '' }));
       const hasLevel = nodes.some((n) => n.level);
       let list = hasLevel
         ? nodes.filter((n) => n.level === 'system')
@@ -181,7 +290,9 @@
       body.ch-full #flows-btn, body.ch-full #screens-btn{display:none!important}
       #ch-start{position:fixed;left:10px;top:calc(var(--hh,64px) + 4px);bottom:10px;width:312px;border-radius:18px;display:none;flex-direction:column;z-index:5;overflow:hidden}
       body.ch-start #ch-start{display:flex}
-      @media (min-width:761px){body.ch-start #madewith,body.ch-start #loading,body.ch-start #toast{left:calc(332px + (100% - 332px - var(--pw)) / 2)}}
+      @media (min-width:761px){body.ch-start #toast{left:calc(332px + (100% - 332px - var(--pw)) / 2)}body.ch-start #madewith{left:16px;transform:none}}
+      /* Beside the panel the zoom buttons sit at the bottom right, where the boards' grids (filled column by column, the last column shortest) leave room (below 1000px the viewer would put them at the top right, over the board), and Floorplan's badge at the bottom left. */
+      @media (min-width:761px){body.ch-start #zoom{left:auto;right:calc(var(--pw, 0px) + 16px);top:auto;bottom:16px;flex-direction:row;border-radius:999px}}
       @media (max-width:760px){body.ch-start #stage{left:0}#ch-start{width:auto;right:10px}}
       #ch-start .hd{padding:12px 12px 6px}
       #ch-start .lv{display:flex;gap:4px;background:rgba(var(--ink),.05);border-radius:12px;padding:3px;margin-bottom:10px}
@@ -229,6 +340,11 @@
       svg.ch-play .node.ch-seen .card>*{opacity:1}
       svg.ch-play .node.ch-now .card{box-shadow:0 0 0 2px var(--on,#6aa3ff),0 8px 28px rgba(0,0,0,.35)}
       .card{position:relative}
+      /* The System board is seen whole, so its cards' words are set larger to read at that zoom. */
+      svg.ch-sys .card .title{font-size:22.5px;line-height:1.2}
+      svg.ch-sys .card .desc{font-size:16px;line-height:1.38}
+      svg.ch-sys .card .desc,svg.ch-sys.lod-mid .card .desc{-webkit-line-clamp:2!important;max-height:45px!important;overflow:hidden}
+      svg.ch-sys.lod-low .card .desc{display:-webkit-box!important;-webkit-line-clamp:1!important;max-height:22px!important}
       .card .ch-n{position:absolute;top:10px;right:10px;min-width:22px;height:22px;padding:0 7px;box-sizing:border-box;border-radius:999px;display:grid;place-items:center;font:600 12px Inter,system-ui,sans-serif;background:rgba(var(--ink),.12);color:var(--text);opacity:1!important}
       svg.ch-play .node.ch-seen .card .ch-n{background:var(--on,#6aa3ff);color:#000}
       .ch-step{fill:none;stroke:var(--text-3);stroke-width:2;stroke-opacity:.35;stroke-linecap:round;stroke-linejoin:round}
@@ -389,10 +505,9 @@
       board = 'system';
       level = 'system';
       const items = systemItems();
-      // Columns of at most `bound` cards, so the board's shape follows the free area's.
+      // On a grid that fills the free area (frame.js systemLayout).
       const a = F.freeArea();
-      const aspect = Math.max(0.6, Math.min(3, a.w / Math.max(1, a.h)));
-      layoutOpts.board = { mode: 'system', items: items.map((x) => x.id), bound: Math.max(3, Math.ceil(Math.sqrt(items.length / (aspect * 0.45)))) };
+      layoutOpts.board = { mode: 'system', items: items.map((x) => x.id), w: a.w, h: a.h };
       F.showBoard({ kind: 'System', icon: 'service', title: systemTitle, question: (G.project && G.project.summary) || SYSTEM_Q, items });
       draw();
     }
@@ -502,8 +617,29 @@
       }
     }
 
+    // ---------- the System board's "More of the system" card ----------
+    // Picking it (or opening it) shows the System candidates past the board's
+    // 24 on a board of their own. It belongs to the System board only.
+    const moreItems = prepared ? prepared.more.filter((id) => F.exists(id)) : [];
+    if (moreItems.length) {
+      F.on('panel', (d) => {
+        if (!d || d.selected !== 'n:coderhelm-more') return;
+        // After the viewer has handled the pick: its details panel (opened for a pick) closes, so the board has the room.
+        setTimeout(() => {
+          if (!document.body.classList.contains('no-panel')) document.getElementById('btn-panel')?.click();
+          endJourney();
+          board = 'system';
+          const a = F.freeArea();
+          layoutOpts.board = { mode: 'system', items: moreItems, w: a.w, h: a.h };
+          F.showBoard({ kind: 'System', icon: 'feature', title: 'More of the system', question: 'The rest of the apps, servers, data and services the System board had no room for', items: moreItems.map((id) => ({ id, note: '' })) });
+        }, 0);
+      });
+      F.on('render', ({ container }) => { if (container === 'root') { const g = F.state.chipEls && F.state.chipEls.get('n:coderhelm-more'); if (g) g.style.display = 'none'; } });
+    }
+
     // ---------- following the viewer ----------
     F.on('render', ({ container }) => {
+      if (svg) svg.classList.toggle('ch-sys', container === 'q:answer' && board === 'system');
       if (container === 'q:answer') {
         if (board === 'journey' && journey) { drawSteps(); lightSteps(); }
         return;
