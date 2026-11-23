@@ -6574,6 +6574,8 @@ export interface AppMapStatus {
   now?: number;
   /** The Floorplan release that made it. */
   floorplan: string;
+  /** `release` while the map is built again because this release finds more than the one that made it. */
+  reason?: "release" | "";
 }
 
 /**

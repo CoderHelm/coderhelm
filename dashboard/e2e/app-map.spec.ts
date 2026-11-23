@@ -241,6 +241,16 @@ test.describe("App map", () => {
     await expect(page.getByTestId("app-map-rebuild")).toHaveCount(0);
   });
 
+  test("a map made before this release is rebuilt with its improvements, the old map shown meanwhile", async ({ page }) => {
+    const calls = await mockApi(page, { status: { ...READY, updating: true, step: "Reading the repositories", stage: "reading", last_build: "building", started_at: NOW - 60, reason: "release" } });
+    await page.goto("/app-map");
+    await expect(viewer(page).getByText("Harbor website").first()).toBeVisible();
+    await expect(page.getByTestId("app-map-built")).toContainText("Rebuilding with this release's improvements since");
+    await expect(page.getByTestId("app-map-built")).toContainText("You're looking at the last map until it's done.");
+    await expect(page.getByTestId("app-map-rebuild")).toHaveCount(0);
+    expect(calls.filter((c) => c === "POST /api/app-map/rebuild")).toHaveLength(0);
+  });
+
   test("members see when it was built but not the button", async ({ page }) => {
     await mockApi(page, { role: "member" });
     await page.goto("/app-map");
