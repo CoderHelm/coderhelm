@@ -38,12 +38,15 @@ interface Db {
   threads: { id: string; title: string; shared: boolean; mine: boolean; owner_email: string; created_at: string; updated_at: string; messages: number; origin?: string }[];
   /** Whether answers use the map. */
   withMap: boolean;
+  /** Journeys (the map's flows) the answer cites. */
+  flows: string[];
   scripts: string[];
   frameAssets: string[];
 }
 
 async function mockApi(page: Page, init: Partial<Db> = {}): Promise<Db> {
-  const db: Db = { asks: [], threads: [], withMap: true, scripts: [], frameAssets: [], ...init };
+  const db: Db = { asks: [], threads: [], withMap: true, flows: [], scripts: [], frameAssets: [], ...init };
+  const map = () => (db.flows.length ? { ...MAP, flows: db.flows } : MAP);
   const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
   page.on("request", (r) => {
     const u = new URL(r.url());
@@ -83,7 +86,7 @@ async function mockApi(page: Page, init: Partial<Db> = {}): Promise<Db> {
             attachments: [],
             used: [{ kind: "code", name: "map_screen", label: "Followed the screen /slips/:id on the app map", summary: "Read" }],
             at: iso,
-            ...(db.withMap ? { map: MAP } : {}),
+            ...(db.withMap ? { map: map() } : {}),
           },
         ],
         can_ask: true,
@@ -102,7 +105,7 @@ async function mockApi(page: Page, init: Partial<Db> = {}): Promise<Db> {
           ev("tool_start", { id: "t1", name: "map_screen", kind: "code" }) +
           ev("tool_result", { id: "t1", name: "map_screen", label: "Followed the screen /slips/:id on the app map", status: "success", summary: "Read", sources: [CITED[0]] }) +
           ev("text_delta", { text }) +
-          ev("answer", { text, citations: db.withMap ? CITED : [CITED[1]], grounded: true, map: db.withMap ? MAP : null }) +
+          ev("answer", { text, citations: db.withMap ? CITED : [CITED[1]], grounded: true, map: db.withMap ? map() : null }) +
           ev("done", {}),
       });
     }
@@ -169,9 +172,23 @@ test.describe("Chat and the App map", () => {
     await page.getByTestId("answer-map-open").click();
     await expect(page).toHaveURL(/\/app-map\/?\?focus=api,stripe,web$/);
     await expect(page.getByTestId("app-map-focus")).toContainText("Opened on Booking service, Stripe, Harbor website");
-    await expect(page.getByTestId("app-map-frame").locator("iframe")).toHaveAttribute("src", "/app-map/frame.html#ask=host&s=api");
+    await expect(page.getByTestId("app-map-frame").locator("iframe")).toHaveAttribute("src", "/app-map/frame.html#ask=host&tour=0&full=1&s=api");
     // The viewer opened with the part selected: its details panel is open.
     await expect(viewer(page, "app-map-frame").locator("body")).not.toHaveClass(/no-panel/);
+  });
+
+  test("an answer that follows a journey opens the App map playing it; its mini map stays the plain map", async ({ page }) => {
+    await mockApi(page, { flows: ["book-slip"] });
+    await page.goto("/chat");
+    await ask(page, "What happens when someone books a slip?");
+    const mini = page.getByTestId("answer").last().getByTestId("answer-map");
+    const open = mini.getByTestId("answer-map-open");
+    await expect(open).toHaveText(/Open the journey in App map/);
+    await expect(open).toHaveAttribute("href", /^\/app-map\/?\?flow=book-slip$/);
+    // The mini map has none of the App map page's levels, journeys or screens.
+    await expect(mini.getByTestId("answer-map-frame").locator("iframe")).toHaveAttribute("src", "/app-map/frame.html#ask=host");
+    await expect(viewer(page, "answer-map-frame").getByText("Booking service").first()).toBeVisible();
+    await expect(viewer(page, "answer-map-frame").locator("#ch-start")).toHaveCount(0);
   });
 
   test("an answer without the map loads no map frame, and the chat page's own code holds no Floorplan", async ({ page }) => {

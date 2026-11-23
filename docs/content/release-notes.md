@@ -6,6 +6,13 @@ pull requests that shipped it. Leave out CI, pins and dependency bumps. The page
 groups releases by day: one heading per day, each release a subheading under it.
 -->
 
+## November 23, 2026: the App map opens on the whole system, with journeys and screens beside it
+
+- **System, Parts and Code.** The map opens on one board of the whole system: the apps, the servers behind them, where they run and keep data, and the outside services they call, laid out to read at first sight beside the list, with outside services in one card that opens to each of them and a **More of the system** card for anything past what fits. Parts and Code are one click away. Cloud pieces that start or deploy code, like an image resizer behind a CDN, are drawn connected to the code they run. ([dashboard #475](https://github.com/CoderHelm/coderhelm/pull/475))
+- **Journeys.** Type a few words to find a journey like signing in, and it plays on one board that stays put, its steps numbered on the cards and listed beside them, each with where it is in the code, linked to GitHub. Back and Next light one step at a time. A Chat answer that follows a journey opens it here. ([dashboard #475](https://github.com/CoderHelm/coderhelm/pull/475))
+- **Screens by app.** Every screen, by app, signed-out screens first, then signed-in ones by area, with search. ([dashboard #475](https://github.com/CoderHelm/coderhelm/pull/475))
+- **Found in code, or inferred.** Lines joined by a name, an env var or infrastructure code are dashed, with a key. ([dashboard #475](https://github.com/CoderHelm/coderhelm/pull/475))
+
 ## November 23, 2026: the App map opens quickly, goes full screen, and keeps its title off the cards
 
 - **Opens in about a second, at any size.** The page reads the map straight from your install's storage, written once when the map is built, and asks the API only for Recent work and Health. A large map used to take 18 to 30 seconds per visit and sometimes never loaded. ([coderhelm-platform #809](https://github.com/CoderHelm/coderhelm-platform/pull/809), [dashboard #473](https://github.com/CoderHelm/coderhelm/pull/473))
