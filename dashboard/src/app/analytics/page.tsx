@@ -334,7 +334,7 @@ function Body({ data, loading, stats, tab }: { data: Analytics; loading: boolean
         {(data.ci.runs_with_red_ci > 0 || (data.ci.red_on_base_runs ?? 0) > 0) && (
           <p className="mt-3 text-sm text-zinc-400" data-testid="ci-line">
             CI went red on {plural(data.ci.runs_with_red_ci, "run")}
-            {(data.ci.red_on_base_runs ?? 0) > 0 && <>, plus {plural(data.ci.red_on_base_runs ?? 0, "run")} red only on checks that already fail on the base branch</>}
+            {(data.ci.red_on_base_runs ?? 0) > 0 && <>, plus {plural(data.ci.red_on_base_runs ?? 0, "run")} red only on failures that aren&apos;t the change&apos;s (a check that already fails on the base branch, or a test its fix round showed fails outside the change)</>}
             . Coderhelm tried {plural(data.ci.fix_attempts, "fix", "fixes")}, pushed {plural(data.ci.fix_commits, "change")}, and {count(data.ci.fixed_by_coderhelm)} ended green after its fixes.
           </p>
         )}
@@ -744,7 +744,7 @@ function CiOutcomes({ ci, outcomes }: { ci: Analytics["ci"]; outcomes: Analytics
     ["Green after a Coderhelm fix", outcomes.green_after_fix],
     ["Green without a Coderhelm fix", outcomes.green_without_fix],
     ["Flaky: green on a re-run", outcomes.flaky],
-    ["Red only on checks that fail on the base branch", outcomes.red_on_base],
+    ["Red, not the change's: fails on the base branch or outside the change", outcomes.red_on_base],
     ...gaveUp,
     ["Still running", outcomes.running],
   ];
