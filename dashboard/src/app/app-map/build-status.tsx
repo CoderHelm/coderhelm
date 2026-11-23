@@ -147,7 +147,12 @@ export function BuiltBar({
         <p className="text-sm text-zinc-300">
           {updating ? (
             <>
-              {builtLine(status, now)}. <span className="text-zinc-100">Updating since {clockTime(status.started_at || now)}</span>
+              {builtLine(status, now)}.{" "}
+              <span className="text-zinc-100">
+                {status.reason === "release"
+                  ? `Rebuilding with this release's improvements since ${clockTime(status.started_at || now)}`
+                  : `Updating since ${clockTime(status.started_at || now)}`}
+              </span>
               {status.step ? `: ${status.step.toLowerCase()}` : ""}. You&apos;re looking at the last map until it&apos;s done.
             </>
           ) : (

@@ -52,6 +52,7 @@ Questions about the map are answered by [Chat](/concepts/chat), and kept with yo
 
 - CoderHelm runs Floorplan's scripts in its code sandbox on a snapshot of the team's repositories, and does Floorplan's writing jobs (choosing the parts, describing files and endpoints) with your team's own model. Their cost is recorded under **App map** in Analytics.
 - After a push to a default branch, the map is brought up to date with Floorplan's own update: unchanged files keep their descriptions, and only new or changed files and endpoints are described again. Nothing is redone when no default branch moved.
+- When a CoderHelm release finds more in code than the one that made your map (new kinds of screens, a newer Floorplan), the map is built again once, by itself, the next time the page is opened: every file is read again, while the parts and the descriptions that still fit are kept. Until it's done the page shows the map from before, with **Rebuilding with this release's improvements**.
 - The map keeps names, paths and short descriptions, never your source files. The viewer runs in a sandboxed frame on the page with no network access of its own.
 - Above the map the page says when it was built and from how many repositories. Admins can build it again with the small **Build the map again** button there.
 - One build runs at a time per team. While one is queued or running, the button is hidden and the page says what the build is doing; pressing it twice, or a second admin pressing it at the same time, never starts a second build.

@@ -6,6 +6,10 @@ pull requests that shipped it. Leave out CI, pins and dependency bumps. The page
 groups releases by day: one heading per day, each release a subheading under it.
 -->
 
+## November 23, 2026: the App map is rebuilt by itself after a release that finds more
+
+- **No more maps stuck on an older release.** Each map now remembers which version of the map maker built it. When a release finds more (new kinds of screens, a newer Floorplan), the map is built again once, by itself, reading every file again, the next time the page is opened, even if no default branch moved. Meanwhile the page shows the map from before, saying it is being rebuilt with this release's improvements. A map made before used to keep its old content until someone pressed **Build the map again**. ([coderhelm-platform #819](https://github.com/CoderHelm/coderhelm-platform/pull/819), [dashboard #477](https://github.com/CoderHelm/coderhelm/pull/477))
+
 ## November 23, 2026: the App map opens on the whole system, with journeys and screens beside it
 
 - **System, Parts and Code.** The map opens on one board of the whole system: the apps, the servers behind them, where they run and keep data, and the outside services they call, laid out to read at first sight beside the list, with outside services in one card that opens to each of them and a **More of the system** card for anything past what fits. Parts and Code are one click away. Cloud pieces that start or deploy code, like an image resizer behind a CDN, are drawn connected to the code they run. ([dashboard #475](https://github.com/CoderHelm/coderhelm/pull/475))
