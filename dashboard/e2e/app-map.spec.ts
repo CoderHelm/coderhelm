@@ -273,6 +273,19 @@ test.describe("App map", () => {
     await expect(palette.getByRole("option", { name: /App map/ }).first()).toBeVisible();
   });
 
+  for (const role of ["viewer", "member", "admin", "owner"]) {
+    test(`every role that can read the map has App map in the menu (${role})`, async ({ page }) => {
+      await mockApi(page, { role });
+      await page.goto("/app-map");
+      await expect(viewer(page).getByText("Harbor website").first()).toBeVisible();
+      const link = page.getByTestId("main-nav").getByRole("link", { name: "App map", exact: true });
+      await expect(link).toBeVisible();
+      await expect(link).toHaveAttribute("aria-current", "page");
+      // Building it again stays an admin's.
+      await expect(page.getByRole("button", { name: "Build the map again" })).toHaveCount(role === "admin" || role === "owner" ? 1 : 0);
+    });
+  }
+
   test("a large map leaves the page responsive", async ({ page }) => {
     await mockApi(page, { graph: largeMap() });
     // Long tasks on the dashboard's own main thread, from the first paint on.
@@ -313,5 +326,150 @@ test.describe("App map", () => {
       expect(sideways).toBeLessThanOrEqual(1);
       await page.screenshot({ path: path.join(SHOTS_DIR, `app-map-phone-${scheme}.png`), fullPage: true });
     }
+  });
+});
+
+// The map read from where the API says it is (a signed address of the
+// bucket, or the same bytes through the API), Coderhelm's overlays laid over
+// it on the page, a read that never answers, and the viewer's full screen.
+const VIEW_PATH = "/bucket/app-map/t_1/view.json.gz";
+/** The page's copy as the server writes it: the map without Recent work. */
+const VIEW = (() => {
+  const g = JSON.parse(JSON.stringify(HARBOR));
+  delete g.recent;
+  return g;
+})();
+const OVERLAYS = {
+  recent: { updatedAt: "2026-11-21T00:00:00Z", source: "coderhelm", tasks: [{ title: "DOCK-42: Stop double bookings", request: "", summary: "Two boaters could book one slip.", status: "completed" }], items: [{ id: "f:harbor-api/src/bookings.js", task: 0, change: "changed", note: "Changed by Coderhelm's run for DOCK-42" }] },
+  health: {
+    add: [{ id: "coderhelm:security:f1", kind: "coderhelm-security", severity: "high", title: "Coderhelm security: Prototype pollution in a parser", detail: "Found by Coderhelm.", items: ["f:harbor-api/src/bookings.js"], notes: {}, locations: [{ file: "harbor-api/src/bookings.js", line: 5 }], fix: "", source: "coderhelm", link: "/security/detail?id=f1" }],
+    drop: ["no-auth:harbor-api"],
+    summary: { high: 2, medium: 0, low: 0 },
+  },
+};
+
+async function mockBucket(page: Page, opts: { bucket?: "ok" | "unreachable"; hang?: () => boolean } = {}) {
+  const calls: string[] = [];
+  const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
+  await page.route((url) => url.hostname !== "localhost", (route) => route.abort());
+  await page.route((url) => url.hostname === "localhost" && url.pathname.startsWith("/bucket/"), async (route) => {
+    const url = new URL(route.request().url());
+    calls.push(`BUCKET ${url.pathname}${url.search}`);
+    // The signed address is the credential: no cookies go with it.
+    calls.push(`cookie:${route.request().headers()["cookie"] ? "sent" : "none"}`);
+    if (opts.bucket === "unreachable") return route.abort("failed");
+    return json(route, VIEW);
+  });
+  await page.route((url) => url.hostname === "localhost" && /^\/(api|auth)\//.test(url.pathname), async (route) => {
+    const url = new URL(route.request().url());
+    const p = url.pathname;
+    calls.push(`${route.request().method()} ${p}${url.search}`);
+    if (p === "/api/me") return json(route, { user_id: "u_1", team_id: "t_1", github_login: null, email: "person@example.com", avatar_url: "", role: "admin", auth_provider: "email", mfa_enabled: false });
+    if (p === "/api/banners") return json(route, { banners: [] });
+    if (p === "/api/teams") return json(route, { teams: [{ team_id: "t_1", org: "harbor", status: "active", current: true }] });
+    if (p === "/api/app-map/graph") return json(route, VIEW);
+    if (p === "/api/app-map") {
+      if (opts.hang?.()) return; // never answers
+      const recent = url.searchParams.get("recent") === "1";
+      const health = url.searchParams.get("health") === "1";
+      const overlays = { ...(recent ? { recent: OVERLAYS.recent } : {}), ...(health ? { health: OVERLAYS.health } : {}) };
+      return json(route, { status: READY, graph: null, graph_url: `${url.origin}${VIEW_PATH}?X-Amz-Expires=900&X-Amz-Signature=abc`, graph_fallback: "/api/app-map/graph", graph_at: NOW - 180, overlays });
+    }
+    return json(route, {});
+  });
+  return calls;
+}
+
+/** What the viewer was given, read back inside the frame. */
+async function shownGraph(page: Page) {
+  const inner = page.frames().find((f) => f !== page.mainFrame() && f.url().includes("/app-map/frame.html"))!;
+  return inner.evaluate(() => {
+    const G = (window as unknown as { FLOORPLAN: { recent?: { tasks?: { title: string }[] }; health?: { issues?: { id: string }[]; summary?: unknown } } }).FLOORPLAN;
+    return { tasks: (G.recent?.tasks ?? []).map((t) => t.title), issues: (G.health?.issues ?? []).map((i) => i.id), summary: G.health?.summary };
+  });
+}
+
+test.describe("App map reading", () => {
+  test("reads the map from the bucket once and lays Coderhelm's overlays over it", async ({ page }) => {
+    const calls = await mockBucket(page);
+    await page.goto("/app-map");
+    await expect(viewer(page).getByText("Harbor website").first()).toBeVisible();
+    expect(calls.filter((c) => c.startsWith("BUCKET"))).toEqual([`BUCKET ${VIEW_PATH}?X-Amz-Expires=900&X-Amz-Signature=abc`]);
+    expect(calls).toContain("cookie:none");
+    expect(calls).not.toContain("GET /api/app-map/graph");
+    const g = await shownGraph(page);
+    expect(g.tasks).toEqual(["DOCK-42: Stop double bookings"]);
+    expect(g.issues).toContain("coderhelm:security:f1");
+    expect(g.issues).not.toContain("no-auth:harbor-api");
+    expect(g.summary).toEqual({ high: 2, medium: 0, low: 0 });
+    // The toggles ask for the overlays again, never the map.
+    await page.getByTestId("app-map-recent-toggle").click();
+    await expect.poll(() => calls.includes("GET /api/app-map?recent=0&health=1")).toBe(true);
+    await expect(viewer(page).getByText("Harbor website").first()).toBeVisible();
+    expect(calls.filter((c) => c.startsWith("BUCKET"))).toHaveLength(1);
+    await expect.poll(async () => (await shownGraph(page)).tasks).toEqual([]);
+  });
+
+  test("when the bucket can't be reached, the same map comes through the API", async ({ page }) => {
+    const calls = await mockBucket(page, { bucket: "unreachable" });
+    await page.goto("/app-map");
+    await expect(viewer(page).getByText("Harbor website").first()).toBeVisible();
+    expect(calls).toContain("GET /api/app-map/graph");
+  });
+
+  test("a read that never answers ends in Try again, never an endless placeholder", async ({ page }) => {
+    let hang = true;
+    await mockBucket(page, { hang: () => hang });
+    await page.goto("/app-map");
+    // While it waits, the page says what it is doing.
+    await expect(page.getByTestId("app-map-loading")).toContainText(/Reading where the map is|Loading the map/);
+    await shot(page, "app-map-loading");
+    const problem = page.getByTestId("problem");
+    await expect(problem).toContainText("The map couldn't be loaded", { timeout: 30_000 });
+    await expect(page.getByTestId("app-map-loading")).toHaveCount(0);
+    await problem.getByText("Technical details").click();
+    await expect(problem.getByText("The map took too long to load.")).toBeVisible();
+    await shot(page, "app-map-timed-out");
+    hang = false;
+    await problem.getByRole("button", { name: "Try again" }).click();
+    await expect(viewer(page).getByText("Harbor website").first()).toBeVisible();
+  });
+
+  test("the viewer's Full screen button puts the map on the whole screen and back", async ({ page }) => {
+    await mockBucket(page);
+    await page.goto("/app-map");
+    const frame = page.getByTestId("app-map-frame").locator("iframe");
+    await expect(frame).toHaveAttribute("allow", "fullscreen");
+    await expect(viewer(page).getByText("Harbor website").first()).toBeVisible();
+    const button = viewer(page).locator("#ch-fullscreen");
+    await expect(button).toHaveAttribute("aria-label", "Full screen");
+    await button.click();
+    await expect.poll(() => page.evaluate(() => document.fullscreenElement?.tagName ?? "")).toBe("IFRAME");
+    await expect(button).toHaveAttribute("aria-label", "Leave full screen");
+    const size = await page.evaluate(() => ({ w: window.innerWidth, h: window.innerHeight }));
+    const box = await frame.boundingBox();
+    expect(Math.round(box?.width ?? 0)).toBe(size.w);
+    expect(Math.round(box?.height ?? 0)).toBe(size.h);
+    await page.screenshot({ path: path.join(SHOTS_DIR, "app-map-fullscreen.png") });
+    await button.click();
+    await expect.poll(() => page.evaluate(() => document.fullscreenElement?.tagName ?? "")).toBe("");
+    await expect(button).toHaveAttribute("aria-label", "Full screen");
+  });
+
+  test("the map's title and description show above the map and follow the viewer, never over the cards", async ({ page }) => {
+    await mockBucket(page);
+    await page.goto("/app-map");
+    await expect(viewer(page).getByText("Harbor website").first()).toBeVisible();
+    const title = page.getByTestId("app-map-title");
+    await expect(title).toContainText("Overview");
+    await expect(title.getByRole("heading")).toHaveText(HARBOR.project.name);
+    await expect(viewer(page).locator("#context")).toBeHidden();
+    // Opening a part: its name and description follow above the map.
+    const inner = page.frames().find((f) => f !== page.mainFrame() && f.url().includes("/app-map/frame.html"))!;
+    await inner.evaluate(() => {
+      document.getElementById("context")!.innerHTML = '<div class="k">Service</div><h1>Booking service</h1><p class="cd">Takes every booking.</p>';
+    });
+    await expect(title.getByRole("heading")).toHaveText("Booking service");
+    await expect(title).toContainText("Takes every booking.");
   });
 });

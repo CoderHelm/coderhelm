@@ -336,6 +336,13 @@ test("site and app: the CSP lets Google Analytics 4 load and send from every hos
   }
 });
 
+test("app: the App map page may read the team's map from the data bucket's signed URLs", () => {
+  const [[, policy]] = ofType(synth("app"), "AWS::CloudFront::ResponseHeadersPolicy");
+  const csp: string = policy.Properties.ResponseHeadersPolicyConfig.SecurityHeadersConfig.ContentSecurityPolicy.ContentSecurityPolicy;
+  const connect = (csp.split(";").map((d) => d.trim()).find((d) => d.startsWith("connect-src ")) ?? "").split(" ");
+  for (const h of ["https://*.s3.amazonaws.com", "https://*.s3.us-east-1.amazonaws.com"]) assert.ok(connect.includes(h), h);
+});
+
 test("app: the App map frame may be framed by the app only, and reaches no network", () => {
   const r = synth("app");
   const policies = Object.fromEntries(

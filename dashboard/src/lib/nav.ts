@@ -101,10 +101,13 @@ export const NAV_SECTIONS: NavSection[] = [
     // How the app fits together across its repositories. Its own entry
     // beside Chat and Knowledge (Chat answers from it), and only here: not
     // also a tab under Insights, so one page has one place in the menu.
+    // Reading the map is everyone's (the gateway's GET /api/app-map is in no
+    // capability), so every role has the entry; building it again is an
+    // admin's, and the page hides that button by itself.
     key: "app-map",
     label: "App map",
     icon: "map",
-    pages: [{ href: "/app-map", label: "App map", need: ANY_CHANGE }],
+    pages: [{ href: "/app-map", label: "App map" }],
   },
   {
     // Packages a team installs; hidden until the team's plugins flag is on.

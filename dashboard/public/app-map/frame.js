@@ -36,18 +36,18 @@
   }
 
   // ELK in a worker: the viewer calls `new ELK()` and `elk.layout(graph)`.
-  // The worker runs the same bundled engine and answers each layout; the
-  // page's ELK becomes a thin stand-in that posts the graph to it. Where a
-  // worker can't start, or fails, the engine runs in the frame as before.
-  const workerSrc = P.elk + `
-;(() => { const elk = new self.ELK();
-  self.onmessage = (e) => { const d = e.data || {};
-    elk.layout(d.graph).then((r) => self.postMessage({ id: d.id, ok: r }), (err) => self.postMessage({ id: d.id, err: String((err && err.message) || err) })); };
-})();`;
+  // In a worker, ELK's bundle is ELK's own layout worker: its worker part,
+  // loaded by the first `new ELK()`, answers ELK's messages on the worker's
+  // `onmessage` (that `new ELK()` then throws "_Worker is not a constructor",
+  // which is expected there and caught). The page's ELK gets a
+  // `workerFactory` that starts that worker, so layouts never run on this
+  // frame's thread. (Before, the worker answered in a format of our own that
+  // ELK's part never got to, the throw went uncaught, and every layout ran in
+  // the frame: a large board froze it.) Where a worker can't start, or
+  // fails, the engine runs in the frame.
   let elkWorkerUrl = null;
   try {
-    elkWorkerUrl = URL.createObjectURL(new Blob([workerSrc], { type: 'text/javascript' }));
-    new Worker(elkWorkerUrl).terminate();
+    elkWorkerUrl = URL.createObjectURL(new Blob([P.elk + '\n;try { new self.ELK(); } catch (e) { /* the worker part is loaded */ }'], { type: 'text/javascript' }));
   } catch (e) {
     elkWorkerUrl = null;
   }
@@ -80,26 +80,130 @@
     const Real = window.ELK, url = window.__coderhelmElkWorker, tune = ${tuneGraph.toString()};
     const opts = window.__coderhelmLayout;
     if (!Real) return;
-    if (!url) {
-      window.ELK = function () { const elk = new Real(); return { layout: (graph) => elk.layout(tune(graph, opts)) }; };
-      return;
-    }
-    let worker = null, broken = false, n = 0;
-    const waiting = new Map();
-    const inFrame = (graph) => new Real().layout(graph);
-    const start = () => {
-      worker = new Worker(url);
-      worker.onmessage = (e) => { const p = waiting.get(e.data.id); if (!p) return; waiting.delete(e.data.id); if (e.data.err) p.reject(new Error(e.data.err)); else p.resolve(e.data.ok); };
-      worker.onerror = () => { broken = true; for (const [id, p] of waiting) { waiting.delete(id); inFrame(p.graph).then(p.resolve, p.reject); } };
+    let broken = !url;
+    const inFrame = (graph) => { window.__coderhelmElkRan = 'frame'; return new Real().layout(graph); };
+    window.ELK = function () {
+      let elk = null;
+      const waiting = new Set();
+      const start = () => {
+        elk = new Real({ workerFactory: () => {
+          const w = new Worker(url);
+          w.addEventListener('error', () => {
+            broken = true;
+            for (const p of waiting) { waiting.delete(p); inFrame(p.graph).then(p.resolve, p.reject); }
+          });
+          return w;
+        } });
+      };
+      return { layout(graph) {
+        graph = tune(graph, opts);
+        if (broken) return inFrame(graph);
+        try { if (!elk) start(); } catch (e) { broken = true; return inFrame(graph); }
+        return new Promise((resolve, reject) => {
+          const p = { graph, resolve, reject };
+          waiting.add(p);
+          elk.layout(graph).then(
+            (r) => { if (waiting.delete(p)) { window.__coderhelmElkRan = 'worker'; resolve(r); } },
+            (e) => { if (waiting.delete(p)) reject(e); },
+          );
+        });
+      } };
     };
-    window.ELK = function () { return { layout(graph) {
-      graph = tune(graph, opts);
-      if (broken) return inFrame(graph);
-      if (!worker) start();
-      const id = ++n;
-      return new Promise((resolve, reject) => { waiting.set(id, { resolve, reject, graph }); worker.postMessage({ id, graph }); });
-    } }; };
   })();`;
+
+  // Large maps, in boards a person can read. The viewer groups a part's files
+  // by folder one level deep, so on a large real map one board held 1,008
+  // cards (803 and 691 on others): opening it never finished and the frame
+  // stopped answering. Before the viewer starts, each part with more files
+  // than one board lists gets sub-parts, one per folder, recursively, so no
+  // board has more than about BOARD_CAP cards: tests, mocks and fixtures
+  // become one "Tests" sub-part, more folders than fit become alphabetical
+  // ranges ("Billing … Leads"), and more than LEAF files in one folder
+  // become runs. Only the map's `nodes` and each file's part (`n`) change,
+  // in the frame's own copy; lines, endpoints and screens stay as they are.
+  const BOARD_CAP = 30;
+  const LEAF = 24; // the viewer lists up to 24 files flat, then groups by folder
+  const TESTY = /(^|\/)(__tests__|__mocks__|tests?|e2e|spec|fixtures|mocks?|stories)(\/|$)|\.(test|spec|stories)\.[a-z]+$/i;
+  const human = (s) => { s = s.replace(/[_\-.]+/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').trim(); return s.charAt(0).toUpperCase() + s.slice(1); };
+  const dirOf = (p) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '');
+
+  function capBoards(g) {
+    if (!Array.isArray(g.files) || !Array.isArray(g.nodes)) return g;
+    const nodes = g.nodes.slice();
+    const ids = new Set(nodes.map((n) => n.id));
+    const byNode = new Map();
+    for (const f of g.files) { if (!byNode.has(f.n)) byNode.set(f.n, []); byNode.get(f.n).push(f); }
+    const childCount = new Map();
+    for (const n of nodes) if (n.parent) childCount.set(n.parent, (childCount.get(n.parent) || 0) + 1);
+    const mk = (parent, idTail, label, summary) => {
+      let id = `${parent.id}~${idTail}`.replace(/[^A-Za-z0-9_.~:-]/g, '_').slice(0, 120);
+      for (let i = 2; ids.has(id); i++) id = `${id.slice(0, 114)}~${i}`;
+      ids.add(id);
+      const n = { id, parent: parent.id, label, kind: parent.kind, summary, details: '', tags: ['coderhelm-grouped'], paths: [], packages: [], hosts: [], stats: { files: 0, loc: 0, langs: {}, repos: [] } };
+      nodes.push(n);
+      return n;
+    };
+    const move = (fs, to) => { for (const f of fs) f.n = to.id; };
+    function split(node, files, depth) {
+      if (files.length <= LEAF || depth > 12) return;
+      const room = BOARD_CAP - (childCount.get(node.id) || 0);
+      if (!depth) {
+        const tests = files.filter((f) => TESTY.test(f.p));
+        if (tests.length >= 2 && tests.length < files.length) {
+          const t = mk(node, 'tests', 'Tests', `${tests.length} test, mock and fixture files`);
+          move(tests, t);
+          split(t, tests, 1);
+          files = files.filter((f) => !TESTY.test(f.p));
+          if (files.length <= LEAF) return;
+        }
+      }
+      // The folder they share, then one group per next folder.
+      const dirs = files.map((f) => dirOf(f.p).split('/'));
+      let common = dirs[0].slice();
+      for (const d of dirs) { let i = 0; while (i < common.length && d[i] === common[i]) i++; common = common.slice(0, i); }
+      const groups = new Map();
+      files.forEach((f, i) => { const k = dirs[i][common.length] ?? ''; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(f); });
+      let loose = groups.get('') || [];
+      groups.delete('');
+      let list = [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+      for (const [, fs] of list) if (fs.length < 2) loose = loose.concat(fs);
+      list = list.filter(([, fs]) => fs.length >= 2);
+      const runs = loose.length > LEAF ? Math.ceil(loose.length / LEAF) : 0;
+      const slots = Math.max(2, room - (runs || loose.length));
+      if (list.length <= slots) {
+        for (const [seg, fs] of list) {
+          const sub = mk(node, seg, human(seg), `${fs.length} files in ${[...common, seg].join('/')}/`);
+          move(fs, sub);
+          split(sub, fs, depth + 1);
+        }
+      } else {
+        const per = Math.ceil(list.length / slots);
+        for (let i = 0; i < list.length; i += per) {
+          const chunk = list.slice(i, i + per);
+          const a0 = chunk[0][0], a1 = chunk[chunk.length - 1][0];
+          const fs = chunk.flatMap(([, x]) => x);
+          const sub = mk(node, `${a0}--${a1}`, chunk.length > 1 ? `${human(a0)} … ${human(a1)}` : human(a0), `${chunk.length} folders, ${fs.length} files`);
+          move(fs, sub);
+          split(sub, fs, depth + 1);
+        }
+      }
+      if (runs) {
+        const sorted = loose.slice().sort((a, b) => a.p.localeCompare(b.p));
+        for (let i = 0; i < runs; i++) {
+          const fs = sorted.slice(i * LEAF, (i + 1) * LEAF);
+          const first = fs[0].p.split('/').pop(), last = fs[fs.length - 1].p.split('/').pop();
+          move(fs, mk(node, `files${i}`, `Files ${first.slice(0, 3)}…${last.slice(0, 3)}`, `${fs.length} files, ${first} to ${last}`));
+        }
+      }
+    }
+    for (const n of g.nodes) { const fs = byNode.get(n.id); if (fs && fs.length > LEAF) split(n, fs, 0); }
+    // Each part's counts, its sub-parts' files included.
+    const stats = new Map(nodes.map((n) => [n.id, (n.stats = { ...(n.stats || {}), files: 0, loc: 0 })]));
+    const parent = new Map(nodes.map((n) => [n.id, n.parent]));
+    for (const f of g.files) { for (let id = f.n, hops = 0; id && hops < 40; id = parent.get(id), hops++) { const st = stats.get(id); if (st) { st.files++; st.loc += f.loc || 0; } } }
+    g.nodes = nodes;
+    return g;
+  }
 
   function page(graph) {
     const ui = P.ui.map((u) => `<script>/* ui/${u.name} */\n${scriptCode(u.code)}</script>`).join('\n');
@@ -152,44 +256,62 @@
     });
   }
 
-  // The map's title and description sit over the canvas. Zoomed in, or with
-  // the map dragged up under them, they used to cover the first cards; the
-  // title block fades out while any card is under it, and back in once the
-  // map is moved clear.
-  function keepTitleClear() {
-    const ctx = document.getElementById('context'), vp = document.getElementById('viewport');
-    if (!ctx || !vp) return;
+  // The viewer draws the title and description of what it shows (the app,
+  // or the part opened) over the canvas, top left and large. On a real map
+  // the first cards sit right under it, at the first fit and zoomed in, so
+  // the text covered them. It is kept off the canvas: hidden here, and sent
+  // to the page, which shows it above the map. The viewer's "Exported
+  // <date>" tag is left out too: the page around the frame says when the map
+  // was built, and on a phone the tag ran under the zoom buttons.
+  function titleOffCanvas() {
     const style = document.createElement('style');
-    // The viewer's "Exported <date>" tag is left out too: the page around
-    // the frame says when the map was built, and on a phone the tag ran
-    // under the zoom buttons.
-    style.textContent = 'body.ch-title-over-map #context{opacity:0;visibility:hidden;transition:opacity .15s ease,visibility 0s linear .15s} .xtag{display:none}';
+    style.textContent = '#context{display:none!important} .xtag{display:none}';
     document.head.appendChild(style);
-    let queued = false;
-    const check = () => {
-      queued = false;
-      const r = ctx.getBoundingClientRect();
-      const M = 12; // a card this close under the text already reads as covered
-      let over = false;
-      if (r.width && r.height) {
-        for (const card of vp.querySelectorAll('.node .card')) {
-          const b = card.getBoundingClientRect();
-          if (b.right > r.left - M && b.left < r.right + M && b.bottom > r.top - M && b.top < r.bottom + M) { over = true; break; }
-        }
-      }
-      document.body.classList.toggle('ch-title-over-map', over);
+    const ctx = document.getElementById('context');
+    if (!ctx) return;
+    const text = (el, max) => String((el && el.textContent) || '').replace(/\s+/g, ' ').trim().slice(0, max);
+    let last = '';
+    const report = () => {
+      const msg = { type: 'coderhelm:app-map-context', kind: text(ctx.querySelector('.k'), 80), name: text(ctx.querySelector('h1'), 300), desc: text(ctx.querySelector('p'), 2000) };
+      const key = JSON.stringify(msg);
+      if (key === last) return;
+      last = key;
+      window.parent.postMessage(msg, '*');
     };
-    const soon = () => {
-      if (queued) return;
-      queued = true;
-      requestAnimationFrame(check);
+    new MutationObserver(report).observe(ctx, { childList: true, subtree: true, characterData: true });
+    report();
+  }
+
+  // Full screen: the viewer has none of its own (its corner-arrows button
+  // fits the map to the frame). One more button in its zoom bar puts the
+  // frame on the whole screen and back; Escape leaves too. The page gives
+  // the frame `allow="fullscreen"`, so this works inside the sandbox.
+  function addFullScreen() {
+    const bar = document.getElementById('zoom');
+    if (!bar || !document.fullscreenEnabled) return;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.id = 'ch-fullscreen';
+    const ICON_ON = '<svg class="i" viewBox="0 0 24 24"><path d="M14 4h6v6M10 20H4v-6M20 4l-6 6M4 20l6-6"/></svg>';
+    const ICON_OFF = '<svg class="i" viewBox="0 0 24 24"><path d="M20 10h-6V4M4 14h6v6M14 10l6-6M10 14l-6 6"/></svg>';
+    const show = () => {
+      const on = !!document.fullscreenElement;
+      b.title = on ? 'Leave full screen (Esc)' : 'Full screen';
+      b.setAttribute('aria-label', on ? 'Leave full screen' : 'Full screen');
+      b.setAttribute('aria-pressed', String(on));
+      b.innerHTML = on ? ICON_OFF : ICON_ON;
     };
-    // Each move of the map, each new drawing, and once an animated move or the cards rising in has finished.
-    const settle = () => { soon(); setTimeout(soon, 600); };
-    new MutationObserver(settle).observe(vp, { attributes: true, attributeFilter: ['style', 'class'], childList: true });
-    new MutationObserver(settle).observe(ctx, { childList: true, subtree: true, characterData: true });
-    window.addEventListener('resize', settle);
-    settle();
+    b.addEventListener('click', () => {
+      const go = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+      Promise.resolve(go).catch(() => {});
+    });
+    document.addEventListener('fullscreenchange', () => {
+      show();
+      // The map fills the new size.
+      setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+    });
+    show();
+    bar.appendChild(b);
   }
 
   function fail(text) {
@@ -214,13 +336,20 @@
     // Opened on a part (`#s=`, from a chat answer's "Open in App map"): its
     // details show at once.
     const focused = !!new URLSearchParams(location.hash.slice(1)).get('s');
-    useMemoryStorage({ 'floorplan-theme': theme, 'floorplan:panel': focused ? 'true' : 'false' });
+    // Lines: the map shows how parts call each other (web requests, data,
+    // outside services); the many import lines between code files are off
+    // at first, and the viewer's own Connection types menu turns them on.
+    useMemoryStorage({ 'floorplan-theme': theme, 'floorplan:panel': focused ? 'true' : 'false', 'floorplan:kinds': JSON.stringify({ import: false }) });
+    const t0 = performance.now();
+    capBoards(graph);
+    window.__coderhelmGroupMs = Math.round(performance.now() - t0);
     const html = page(graph);
     document.open();
     document.write(html);
     document.close();
     openPanelOnSelect();
-    keepTitleClear();
+    titleOffCanvas();
+    addFullScreen();
   });
 
   if (!P) fail('The map viewer is missing.');

@@ -6,6 +6,11 @@
 // - `sandbox="allow-scripts"` and nothing else: the frame has its own opaque
 //   origin (no cookies, no storage, nothing of the dashboard's), and its page
 //   (public/app-map/frame.html) allows no network at all;
+// - `allow="fullscreen"`: the viewer's Full screen button (added by
+//   frame.js) may put the frame on the whole screen, nothing more;
+// - the viewer's title and description are kept off the canvas, where they
+//   covered cards: the frame sends them here (`onContext`) and the page shows
+//   them above the map;
 // - mounted only while this component is on screen, torn down when it
 //   leaves; a new map mounts a fresh frame;
 // - the map goes in by postMessage once the frame says it is ready, as one
@@ -21,6 +26,13 @@ import type { FloorplanGraph } from "@/lib/api";
 /** Largest map handed to the frame (the frame checks the same). */
 export const MAX_MAP_BYTES = 25 * 1024 * 1024;
 
+/** What the viewer shows now (the app, or the part opened), sent by the frame. */
+export interface MapContext {
+  kind: string;
+  name: string;
+  desc: string;
+}
+
 /** The frame's address: the viewer's own hash settings, never the map. */
 export function frameSrc(focus?: string): string {
   const id = (focus ?? "").replace(/[^A-Za-z0-9._:-]/g, "");
@@ -33,6 +45,7 @@ export function MapFrame({
   height,
   onAsk,
   focus,
+  onContext,
   testId = "app-map-frame",
 }: {
   graph: FloorplanGraph;
@@ -43,6 +56,8 @@ export function MapFrame({
   onAsk?: (items: { id?: string; label?: string; kind?: string }[]) => void;
   /** A part's id: the viewer opens with it selected (its own `s=` address). */
   focus?: string;
+  /** What the viewer shows now, each time it changes. */
+  onContext?: (c: MapContext) => void;
   testId?: string;
 }) {
   const ref = useRef<HTMLIFrameElement | null>(null);
@@ -62,6 +77,10 @@ export function MapFrame({
         frame.contentWindow?.postMessage({ type: "coderhelm:app-map-graph", json, theme: "dark" }, "*");
       } else if (type === "coderhelm:app-map-frame-error") {
         setProblem(String((e.data as { text?: string }).text || "The map couldn't be shown."));
+      } else if (type === "coderhelm:app-map-context" && onContext) {
+        const d = e.data as Record<string, unknown>;
+        const str = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max) : "");
+        onContext({ kind: str(d.kind, 80), name: str(d.name, 300), desc: str(d.desc, 2000) });
       } else if (type === "floorplan:ask" && onAsk) {
         const items = Array.isArray((e.data as { items?: unknown }).items) ? ((e.data as { items: unknown[] }).items.slice(0, 10) as { id?: string; label?: string; kind?: string }[]) : [];
         onAsk(items.filter((i) => i && typeof i === "object"));
@@ -69,7 +88,7 @@ export function MapFrame({
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [json, tooBig, onAsk]);
+  }, [json, tooBig, onAsk, onContext]);
 
   if (tooBig) {
     return <p className="text-sm text-zinc-400">This map is too large to show here.</p>;
@@ -85,6 +104,7 @@ export function MapFrame({
         // `s=`: the part it opens on.
         src={frameSrc(focus)}
         sandbox="allow-scripts"
+        allow="fullscreen"
         referrerPolicy="no-referrer"
         loading="lazy"
         className={`block w-full rounded-lg border border-zinc-800 bg-zinc-950 ${height ? "" : "h-[max(520px,calc(100dvh-140px))] sm:h-[max(640px,calc(100dvh-180px))]"}`}

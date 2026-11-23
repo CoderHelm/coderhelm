@@ -44,4 +44,8 @@ Questions about the map are answered by [Chat](/concepts/chat), and kept with yo
 - The map keeps names, paths and short descriptions, never your source files. The viewer runs in a sandboxed frame on the page with no network access of its own.
 - Above the map the page says when it was built and from how many repositories. Admins can build it again with the small **Build the map again** button there.
 - One build runs at a time per team. While one is queued or running, the button is hidden and the page says what the build is doing; pressing it twice, or a second admin pressing it at the same time, never starts a second build.
-- The map's layout keeps lines clear of the cards they don't join, spaces the lines that meet one card apart, and the map's title fades while the map is moved under it.
+- The map's layout keeps lines clear of the cards they don't join and spaces the lines that meet one card apart. The title and description of what the map shows (the app, or the part you opened) sit above the map, never over its cards.
+- On a large app, a part with many files opens as smaller parts, one per folder (tests together in **Tests**), so no board holds more than about 30 cards and every part opens at once.
+- At first the map shows how parts call each other (web requests, data, outside services). Lines for code imports are off; turn them on in the map's **Connection types** menu.
+- **Full screen** (the button with outward arrows, under the zoom buttons) puts the map on the whole screen; press it again or Esc to come back. The button with four corners fits the map to its frame.
+- The page reads the map straight from your install's storage once per build, and only Recent work and Health from the API, so a large map opens quickly. If a read takes longer than 20 seconds, the page says so with **Try again**.
