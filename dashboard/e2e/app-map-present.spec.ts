@@ -35,8 +35,9 @@ function watchErrors(page: Page): string[] {
   page.on("console", (m: ConsoleMessage) => {
     if (m.type() !== "error") return;
     const t = m.text();
-    // The dev server's own noise, never the map's.
-    if (/Download the React DevTools|webpack-hmr|Fast Refresh|favicon/i.test(t)) return;
+    // The dev server's own noise, and the static test server's test fonts
+    // (scripts/serve-out.mjs adds them to every page; the frame's CSP refuses them), never the map's.
+    if (/Download the React DevTools|webpack-hmr|Fast Refresh|favicon|\/__e2e\//i.test(t)) return;
     errors.push(`${m.location().url || "page"}: ${t}`);
   });
   page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
