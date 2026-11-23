@@ -152,44 +152,62 @@
     });
   }
 
-  // The map's title and description sit over the canvas. Zoomed in, or with
-  // the map dragged up under them, they used to cover the first cards; the
-  // title block fades out while any card is under it, and back in once the
-  // map is moved clear.
-  function keepTitleClear() {
-    const ctx = document.getElementById('context'), vp = document.getElementById('viewport');
-    if (!ctx || !vp) return;
+  // The viewer draws the title and description of what it shows (the app,
+  // or the part opened) over the canvas, top left and large. On a real map
+  // the first cards sit right under it, at the first fit and zoomed in, so
+  // the text covered them. It is kept off the canvas: hidden here, and sent
+  // to the page, which shows it above the map. The viewer's "Exported
+  // <date>" tag is left out too: the page around the frame says when the map
+  // was built, and on a phone the tag ran under the zoom buttons.
+  function titleOffCanvas() {
     const style = document.createElement('style');
-    // The viewer's "Exported <date>" tag is left out too: the page around
-    // the frame says when the map was built, and on a phone the tag ran
-    // under the zoom buttons.
-    style.textContent = 'body.ch-title-over-map #context{opacity:0;visibility:hidden;transition:opacity .15s ease,visibility 0s linear .15s} .xtag{display:none}';
+    style.textContent = '#context{display:none!important} .xtag{display:none}';
     document.head.appendChild(style);
-    let queued = false;
-    const check = () => {
-      queued = false;
-      const r = ctx.getBoundingClientRect();
-      const M = 12; // a card this close under the text already reads as covered
-      let over = false;
-      if (r.width && r.height) {
-        for (const card of vp.querySelectorAll('.node .card')) {
-          const b = card.getBoundingClientRect();
-          if (b.right > r.left - M && b.left < r.right + M && b.bottom > r.top - M && b.top < r.bottom + M) { over = true; break; }
-        }
-      }
-      document.body.classList.toggle('ch-title-over-map', over);
+    const ctx = document.getElementById('context');
+    if (!ctx) return;
+    const text = (el, max) => String((el && el.textContent) || '').replace(/\s+/g, ' ').trim().slice(0, max);
+    let last = '';
+    const report = () => {
+      const msg = { type: 'coderhelm:app-map-context', kind: text(ctx.querySelector('.k'), 80), name: text(ctx.querySelector('h1'), 300), desc: text(ctx.querySelector('p'), 2000) };
+      const key = JSON.stringify(msg);
+      if (key === last) return;
+      last = key;
+      window.parent.postMessage(msg, '*');
     };
-    const soon = () => {
-      if (queued) return;
-      queued = true;
-      requestAnimationFrame(check);
+    new MutationObserver(report).observe(ctx, { childList: true, subtree: true, characterData: true });
+    report();
+  }
+
+  // Full screen: the viewer has none of its own (its corner-arrows button
+  // fits the map to the frame). One more button in its zoom bar puts the
+  // frame on the whole screen and back; Escape leaves too. The page gives
+  // the frame `allow="fullscreen"`, so this works inside the sandbox.
+  function addFullScreen() {
+    const bar = document.getElementById('zoom');
+    if (!bar || !document.fullscreenEnabled) return;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.id = 'ch-fullscreen';
+    const ICON_ON = '<svg class="i" viewBox="0 0 24 24"><path d="M14 4h6v6M10 20H4v-6M20 4l-6 6M4 20l6-6"/></svg>';
+    const ICON_OFF = '<svg class="i" viewBox="0 0 24 24"><path d="M20 10h-6V4M4 14h6v6M14 10l6-6M10 14l-6 6"/></svg>';
+    const show = () => {
+      const on = !!document.fullscreenElement;
+      b.title = on ? 'Leave full screen (Esc)' : 'Full screen';
+      b.setAttribute('aria-label', on ? 'Leave full screen' : 'Full screen');
+      b.setAttribute('aria-pressed', String(on));
+      b.innerHTML = on ? ICON_OFF : ICON_ON;
     };
-    // Each move of the map, each new drawing, and once an animated move or the cards rising in has finished.
-    const settle = () => { soon(); setTimeout(soon, 600); };
-    new MutationObserver(settle).observe(vp, { attributes: true, attributeFilter: ['style', 'class'], childList: true });
-    new MutationObserver(settle).observe(ctx, { childList: true, subtree: true, characterData: true });
-    window.addEventListener('resize', settle);
-    settle();
+    b.addEventListener('click', () => {
+      const go = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+      Promise.resolve(go).catch(() => {});
+    });
+    document.addEventListener('fullscreenchange', () => {
+      show();
+      // The map fills the new size.
+      setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+    });
+    show();
+    bar.appendChild(b);
   }
 
   function fail(text) {
@@ -220,7 +238,8 @@
     document.write(html);
     document.close();
     openPanelOnSelect();
-    keepTitleClear();
+    titleOffCanvas();
+    addFullScreen();
   });
 
   if (!P) fail('The map viewer is missing.');

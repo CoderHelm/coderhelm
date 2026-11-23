@@ -90,9 +90,11 @@ export class AppStack extends cdk.Stack {
               cloudfront.HeadersReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN,
             override: true,
           },
+          // connect-src: the API, the chat streams, signed URLs of the data
+          // bucket (the App map reads the team's map from it), and analytics.
           contentSecurityPolicy: {
             contentSecurityPolicy:
-              "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://api.coderhelm.com https://stream.coderhelm.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com; font-src 'self'",
+              "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://api.coderhelm.com https://stream.coderhelm.com https://*.s3.amazonaws.com https://*.s3.us-east-1.amazonaws.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com; font-src 'self'",
             override: true,
           },
         },

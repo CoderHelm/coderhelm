@@ -71,6 +71,67 @@ export function marinaMap() {
   };
 }
 
+/**
+ * A map shaped like a large team's real one: 12 top-level parts (a website,
+ * a phone app, two content editors, a main server, pipelines, cloud setup,
+ * outside services) over 9 repositories, about 3,800 files spread unevenly
+ * between them, about 11,000 import lines between files and 75 web requests
+ * matched to endpoints, 110 endpoints, 20 Floorplan checks, and a long name
+ * with a three-line description. Made-up names.
+ */
+export function largeRealShapedMap() {
+  const parts: [string, string, string, string, number][] = [
+    ["web", "Website", "ui", "The public website where members find classes, book them and pay.", 1090],
+    ["studio", "Website content editor", "ui", "Where staff write the website's pages and offers.", 180],
+    ["mobile", "Fitness mobile app", "ui", "The phone app for bookings, check-in and the member card.", 760],
+    ["mobilecms", "Mobile app content editor", "ui", "Where staff write the screens and notices the app shows.", 80],
+    ["api", "Main server", "service", "Takes every booking, payment and account request from the website and the app.", 900],
+    ["lambdas", "Image and video helpers", "worker", "Small cloud functions that resize images and make video previews.", 5],
+    ["data", "Analytics pipelines", "worker", "Scheduled data jobs and models that count bookings and visits.", 320],
+    ["display", "Class schedule display", "ui", "A screen listing upcoming classes at each location.", 38],
+    ["tools", "Developer tools", "library", "Scripts and helpers the team runs by hand.", 260],
+    ["infra", "Cloud setup", "infra", "The cloud hosting, set up as code.", 170],
+    ["payments", "Payments provider", "external", "Card payments and refunds.", 0],
+    ["content", "Content service", "external", "Holds the written content the website and the app show.", 0],
+  ];
+  const repos = ["site", "site-studio", "app", "app-cms", "server", "helpers", "pipelines", "screens", "devtools"];
+  const nodes = parts.map(([id, label, kind, summary, n]) => ({
+    id, parent: null, label, kind, summary, details: "", tags: [], paths: n ? [`${repos[parts.findIndex((p) => p[0] === id) % repos.length]}/`] : [], packages: [], hosts: [],
+    stats: { files: n, loc: n * 90, langs: n ? { typescript: n * 90 } : {}, repos: n ? [repos[parts.findIndex((p) => p[0] === id) % repos.length]] : [] },
+  }));
+  const files: { p: string; n: string; r: string; l: string; loc: number; name: string; d: string }[] = [];
+  parts.forEach(([id, label, , , n], pi) => {
+    const r = repos[pi % repos.length];
+    for (let i = 0; i < n; i++) files.push({ p: `${r}/src/${id}/area${i % 25}/file${i}.ts`, n: id, r, l: "typescript", loc: 90, name: `${label} file ${i}`, d: `Part of the ${label.toLowerCase()}: one screen, route or helper.` });
+  });
+  const byPart = new Map<string, string[]>();
+  for (const f of files) byPart.set(f.n, [...(byPart.get(f.n) ?? []), f.p]);
+  const pick = (part: string, i: number) => { const xs = byPart.get(part)!; return xs[i % xs.length]; };
+  const links: { a: string; b: string; k: string; w: number }[] = [];
+  for (let i = 0; i < 11_142; i++) {
+    const f = files[(i * 7) % files.length];
+    // Most imports stay inside a part; some cross to the server, the tools or the content editor.
+    const to = i % 9 === 0 ? pick(["api", "tools", "studio"][i % 3], i) : pick(f.n, i * 13 + 1);
+    links.push({ a: `f:${f.p}`, b: `f:${to}`, k: "import", w: 1 });
+  }
+  for (let i = 0; i < 75; i++) links.push({ a: `f:${pick(["web", "mobile", "display"][i % 3], i)}`, b: `f:${pick("api", i * 3)}`, k: "http", w: 1 });
+  links.push({ a: `f:${pick("api", 1)}`, b: "n:payments", k: "import", w: 4 }, { a: `f:${pick("web", 2)}`, b: "n:content", k: "import", w: 6 }, { a: `f:${pick("mobilecms", 3)}`, b: "n:content", k: "import", w: 3 });
+  const routes = Array.from({ length: 110 }, (_, i) => ({ m: ["GET", "POST", "PUT"][i % 3], p: `/api/area${i % 20}/item${i}`, f: pick("api", i * 5), l: 10 + i, name: `Endpoint ${i}`, d: "Answers a booking request." }));
+  const issues = Array.from({ length: 20 }, (_, i) => ({ id: `open-endpoints:${pick("web", i * 11)}`, kind: "open-endpoints", severity: i % 4 ? "medium" : "high", title: "An endpoint anyone can call", detail: "", items: [`f:${pick("web", i * 11)}`], notes: {}, locations: [{ file: pick("web", i * 11), line: 3 }], fix: "" }));
+  return {
+    ...HARBOR,
+    project: {
+      name: "Riverside Clubs Digital Platform",
+      summary: "Riverside Clubs' apps and back office: a public website (Next.js with a hosted content service), a fitness mobile app (React Native), a main server (NestJS) behind them, analytics pipelines, and cloud hosting set up as code.",
+    },
+    nodes, files, routes, links, flows: [], tour: [], screens: [],
+    health: { summary: { high: 5, medium: 15, low: 0 }, issues: issues.map((x) => ({ ...x, source: "floorplan", title: `Floorplan check: ${x.title}` })), checked: [], appWide: [] },
+    recent: undefined,
+    coderhelm: { repos: Object.fromEntries(repos.map((r) => [r, `riverside/${r}`])), floorplan: "floorplan--v0.11.0" },
+    meta: { ...HARBOR.meta, repos },
+  };
+}
+
 async function mockApi(page: Page, graph: unknown) {
   const json = (route: Route, body: unknown) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
   await page.route((url) => url.hostname !== "localhost", (route) => route.abort());
@@ -146,11 +207,12 @@ async function layoutProblems(frame: Frame): Promise<Problems> {
   });
 }
 
-/** Whether the map's title block covers any card on screen. */
+/** Whether the map's title block covers any card on screen (it is kept off the canvas: never). */
 async function headerOverCards(frame: Frame): Promise<string[]> {
   return frame.evaluate(() => {
     const ctx = document.getElementById("context");
-    if (!ctx || getComputedStyle(ctx).opacity === "0" || getComputedStyle(ctx).visibility === "hidden") return [];
+    if (!ctx) return [];
+    if (getComputedStyle(ctx).display !== "none") return ["the title block is on the canvas"];
     const r = ctx.getBoundingClientRect();
     const out: string[] = [];
     for (const n of Array.from(document.querySelectorAll("#viewport .node .card"))) {
@@ -169,8 +231,8 @@ async function shot(page: Page, name: string) {
   await page.getByTestId("app-map-frame").screenshot({ path: path.join(SHOTS_DIR, `${name}.png`) });
 }
 
-async function open(page: Page): Promise<Frame> {
-  await mockApi(page, marinaMap());
+async function open(page: Page, graph: unknown = marinaMap()): Promise<Frame> {
+  await mockApi(page, graph);
   await page.goto("/app-map");
   const outer = page.getByTestId("app-map-frame").frameLocator("iframe");
   await expect(outer.getByText("Main server").first()).toBeVisible({ timeout: 60_000 });
@@ -199,16 +261,26 @@ test.describe("App map layout", () => {
     expect(p.minPortGap, "lines meeting one side of a card are packed tight").toBeGreaterThanOrEqual(14);
   });
 
-  for (const size of [{ name: "desktop", width: 1440, height: 1000 }, { name: "phone", width: 390, height: 844 }]) {
-    test(`the title and description never sit over the cards (${size.name})`, async ({ page }) => {
+  for (const size of [{ name: "desktop", width: 1440, height: 1000 }, { name: "laptop", width: 1280, height: 800 }, { name: "phone", width: 390, height: 844 }])
+  for (const map of [{ name: "23-parts", graph: marinaMap }, { name: "large", graph: largeRealShapedMap }]) {
+    test(`the title and description never sit over the cards (${map.name}, ${size.name})`, async ({ page }) => {
       await page.setViewportSize({ width: size.width, height: size.height });
-      const frame = await open(page);
+      const g = map.graph();
+      const frame = await open(page, g);
+      // Above the map instead, in the page.
+      const title = page.getByTestId("app-map-title");
+      await expect(title.getByRole("heading")).toHaveText(g.project.name);
+      await expect(title).toContainText(g.project.summary);
+      const titleBox = (await title.boundingBox())!;
+      const frameBox = (await page.getByTestId("app-map-frame").boundingBox())!;
+      expect(titleBox.y + titleBox.height).toBeLessThanOrEqual(frameBox.y);
       expect(await headerOverCards(frame), "at first").toEqual([]);
+      await page.screenshot({ path: path.join(SHOTS_DIR, `app-map-title-${map.name}-${size.name}.png`), fullPage: true });
       await zoom(frame, "Zoom in", 3);
-      await shot(page, `app-map-header-zoomed-in-${size.name}`);
+      await shot(page, `app-map-header-${map.name}-zoomed-in-${size.name}`);
       expect(await headerOverCards(frame), "zoomed in").toEqual([]);
       await zoom(frame, "Zoom out", 6);
-      await shot(page, `app-map-header-zoomed-out-${size.name}`);
+      await shot(page, `app-map-header-${map.name}-zoomed-out-${size.name}`);
       expect(await headerOverCards(frame), "zoomed out").toEqual([]);
       // Dragged up under the title.
       const box = (await page.getByTestId("app-map-frame").boundingBox())!;
@@ -217,7 +289,7 @@ test.describe("App map layout", () => {
       await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 - 220, { steps: 8 });
       await page.mouse.up();
       await frame.waitForTimeout(400);
-      await shot(page, `app-map-header-panned-${size.name}`);
+      await shot(page, `app-map-header-${map.name}-panned-${size.name}`);
       expect(await headerOverCards(frame), "panned").toEqual([]);
     });
   }

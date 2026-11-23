@@ -14,11 +14,19 @@
 //
 // One build at a time (build-status.tsx): while one runs the page shows its
 // steps and time, and offers no way to start another.
+//
+// Loading (lib/app-map-load.ts): the API answers with the status, where to
+// read the map and Coderhelm's overlays; the map is read once per build and
+// the overlays laid over it here. Each read gives up after LOAD_TIMEOUT_MS
+// and shows Try again, so the page never waits on a request forever. The
+// map's own title and description show above it (the viewer drew them over
+// the cards), following what the viewer opens.
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { api, ApiError, type AppMapResponse, type AppMapStatus } from "@/lib/api";
+import { api, ApiError, type AppMapResponse, type AppMapStatus, type FloorplanGraph } from "@/lib/api";
+import { applyOverlays, fetchMapGraph, LOAD_TIMEOUT_MS } from "@/lib/app-map-load";
 import { askAboutLink, askBrain, focusOf, type ChatMap, type Citation } from "@/lib/brain";
 import { AnswerView } from "../chat/answer";
 import { useCan } from "@/hooks/use-can";
@@ -30,7 +38,7 @@ import { Skeleton } from "@/components/skeleton";
 import { MapIcon } from "@/components/icons";
 import { useToast } from "@/components/toast";
 import { buttonClass, inputClass, linkButton } from "@/components/ui";
-import { MapFrame } from "./map-frame";
+import { MapFrame, type MapContext } from "./map-frame";
 import { Building, BuiltBar, Failed, serverNow } from "./build-status";
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : "The request failed.");
@@ -89,6 +97,12 @@ function AppMap() {
   const [health, setHealth] = useState(true);
   const [question, setQuestion] = useState("");
   const [starting, setStarting] = useState(false);
+  // What a read is doing now: the status, or the map itself.
+  const [loading, setLoading] = useState<"" | "status" | "map">("status");
+  // The map as read, per build: the toggles and status checks don't read it again.
+  const mapRef = useRef<{ at: number; graph: FloorplanGraph } | null>(null);
+  const readSeq = useRef(0);
+  const [context, setContext] = useState<MapContext | null>(null);
   const hasMap = !!data?.graph;
   const hasMapRef = useRef(hasMap);
   hasMapRef.current = hasMap;
@@ -103,12 +117,51 @@ function AppMap() {
     setReadAt(Date.now());
   }, []);
   const load = useCallback(() => {
-    api
-      .getAppMap({ recent, health })
-      .then(take)
-      .catch((e) => setError(errText(e)));
+    const n = ++readSeq.current;
+    const live = () => n === readSeq.current;
+    const ctl = new AbortController();
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      ctl.abort();
+    }, LOAD_TIMEOUT_MS);
+    setError("");
+    setLoading("status");
+    (async () => {
+      try {
+        const r = await api.getAppMap({ recent, health }, ctl.signal);
+        clearTimeout(timer);
+        if (!live()) return;
+        let graph = r.graph ?? null;
+        if (!graph && r.graph_url) {
+          const at = r.graph_at ?? 0;
+          const kept = mapRef.current;
+          if (kept && at > 0 && kept.at === at) {
+            graph = kept.graph;
+          } else {
+            setLoading("map");
+            graph = await fetchMapGraph(r, LOAD_TIMEOUT_MS);
+            if (graph) mapRef.current = { at, graph };
+          }
+        }
+        if (!live()) return;
+        take({ ...r, graph: graph ? applyOverlays(graph, r.overlays) : null });
+      } catch (e) {
+        if (live()) setError(timedOut ? "The map took too long to load." : errText(e));
+      } finally {
+        clearTimeout(timer);
+        if (live()) setLoading("");
+      }
+    })();
   }, [recent, health, take]);
-  useEffect(load, [load]);
+  useEffect(() => {
+    load();
+    // Leaving the page (or reading again): a read still running is ignored.
+    const seq = readSeq;
+    return () => {
+      seq.current++;
+    };
+  }, [load]);
 
   // While a build runs, watch its status (not the whole map) and read the
   // map again when it is done.
@@ -183,7 +236,7 @@ function AppMap() {
     return (
       <Page testId="app-map-page">
         {header}
-        <Skeleton className="h-96 w-full" />
+        <Loading what={loading === "map" ? "Loading the map…" : "Reading where the map is…"} />
       </Page>
     );
   }
@@ -229,8 +282,19 @@ function AppMap() {
                 </>
               }
             />
+            {error && (
+              <Problem compact title="The map couldn't be updated" onRetry={load} details={error}>
+                This is the map as it was last read.
+              </Problem>
+            )}
+            {loading === "map" && (
+              <p role="status" className="text-sm text-zinc-400" data-testid="app-map-loading">
+                Loading the new map…
+              </p>
+            )}
             {focus.length > 0 && <FocusNote graph={data.graph} focus={focus} />}
-            <MapFrame graph={data.graph} title="The app map" onAsk={onAsk} focus={focus[0]} />
+            <MapTitle graph={data.graph} context={context} />
+            <MapFrame graph={data.graph} title="The app map" onAsk={onAsk} focus={focus[0]} onContext={setContext} />
             <div className="flex flex-wrap items-center gap-2" role="toolbar" aria-label="What the map shows">
               <Toggle on={recent} onChange={setRecent} testId="app-map-recent-toggle">
                 Recent work
@@ -246,6 +310,38 @@ function AppMap() {
         <Credit version={st.floorplan} />
       </div>
     </Page>
+  );
+}
+
+/** While the page reads the status or the map: what it is doing, never a blank wait. */
+function Loading({ what }: { what: string }) {
+  return (
+    <div className="mt-4 space-y-3" data-testid="app-map-loading">
+      <p role="status" className="text-sm text-zinc-400">
+        {what}
+      </p>
+      <Skeleton className="h-96 w-full" />
+    </div>
+  );
+}
+
+/**
+ * The title and description of what the map shows (the app, or the part
+ * opened in the viewer), above the map: the viewer drew them over the cards.
+ */
+function MapTitle({ graph, context }: { graph: NonNullable<AppMapResponse["graph"]>; context: MapContext | null }) {
+  const project = (graph.project && typeof graph.project === "object" ? graph.project : {}) as { name?: unknown; summary?: unknown };
+  const str = (v: unknown) => (typeof v === "string" ? v : "");
+  const name = context?.name || str(project.name);
+  const desc = context ? context.desc : str(project.summary);
+  const kind = context?.kind || "Overview";
+  if (!name) return null;
+  return (
+    <div className="min-w-0" data-testid="app-map-title">
+      <p className="text-xs uppercase tracking-wide text-zinc-400">{kind}</p>
+      <h2 className="mt-0.5 text-lg font-semibold text-zinc-100 [overflow-wrap:anywhere]">{name}</h2>
+      {desc && <p className="mt-1 max-w-3xl text-sm text-zinc-400 [overflow-wrap:anywhere]">{desc}</p>}
+    </div>
   );
 }
 

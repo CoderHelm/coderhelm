@@ -6,12 +6,20 @@ pull requests that shipped it. Leave out CI, pins and dependency bumps. The page
 groups releases by day: one heading per day, each release a subheading under it.
 -->
 
+## November 23, 2026: the App map opens quickly, goes full screen, and keeps its title off the cards
+
+- **Opens in about a second, at any size.** The page reads the map straight from your install's storage, written once when the map is built, and asks the API only for Recent work and Health. A large map used to take 18 to 30 seconds per visit and sometimes never loaded. ([coderhelm-platform #807](https://github.com/CoderHelm/coderhelm-platform/pull/807), [dashboard #473](https://github.com/CoderHelm/coderhelm/pull/473))
+- **Never stuck loading.** While it loads, the page says so; a read that takes longer than 20 seconds shows **Try again** instead of an endless placeholder. ([dashboard #473](https://github.com/CoderHelm/coderhelm/pull/473))
+- **Full screen works.** A **Full screen** button under the map's zoom buttons puts the map on the whole screen; Esc comes back. ([dashboard #473](https://github.com/CoderHelm/coderhelm/pull/473))
+- **The title is above the map.** The name and description of what the map shows sit above it, following the part you open, and never cover a card. ([dashboard #473](https://github.com/CoderHelm/coderhelm/pull/473))
+- **In everyone's menu.** Every role that can read the map, viewers included, has **App map** in the menu. ([dashboard #473](https://github.com/CoderHelm/coderhelm/pull/473))
+
 ## November 22, 2026: the App map, easier to find and to follow
 
 - **Its own place in the menu.** App map is in the menu beside Chat and Knowledge (and in Cmd+K search), no longer a tab under Insights. ([dashboard #470](https://github.com/CoderHelm/coderhelm/pull/470))
 - **One build at a time.** Pressing **Build the map again** while a build is queued or running no longer starts another: the page shows the build that is running instead, and the button is hidden until it is done. ([coderhelm-platform #805](https://github.com/CoderHelm/coderhelm-platform/pull/805), [dashboard #470](https://github.com/CoderHelm/coderhelm/pull/470))
 - **A building page that says what is happening.** The steps in order with the one it is on, when it started, how long a map of your number of repositories usually takes, and what the map will be. If a build stops, the page says at which step, with one **Try again**. With a map there, it says when it was built and from how many repositories. ([coderhelm-platform #805](https://github.com/CoderHelm/coderhelm-platform/pull/805), [dashboard #470](https://github.com/CoderHelm/coderhelm/pull/470))
-- **A cleaner layout.** Lines keep clear of the cards they don't join, lines meeting one card are spaced apart, and the map's title fades while the map is moved under it. ([dashboard #470](https://github.com/CoderHelm/coderhelm/pull/470))
+- **A cleaner layout.** Lines keep clear of the cards they don't join, and lines meeting one card are spaced apart. ([dashboard #470](https://github.com/CoderHelm/coderhelm/pull/470))
 
 ## November 22, 2026: Chat and the App map as one
 

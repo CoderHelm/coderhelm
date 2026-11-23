@@ -1391,10 +1391,11 @@ export const api = {
     }),
   rebuildGraph: (repo: string) =>
     request<void>(`/api/graph/rebuild/${repo}`, { method: "POST" }),
-  // App map: the team's app across its repositories, built from the code
-  // graphs (the first visit starts the first build).
-  getAppMap: (opts: { recent?: boolean; health?: boolean } = {}) =>
-    request<AppMapResponse>(`/api/app-map?recent=${opts.recent ? 1 : 0}&health=${opts.health ? 1 : 0}`),
+  // App map: the team's app across its repositories (the first visit starts
+  // the first build). The answer says where to read the map
+  // (lib/app-map-load.ts).
+  getAppMap: (opts: { recent?: boolean; health?: boolean } = {}, signal?: AbortSignal) =>
+    request<AppMapResponse>(`/api/app-map?recent=${opts.recent ? 1 : 0}&health=${opts.health ? 1 : 0}`, { signal }),
   /** Only where the build is (no map), for watching a build. */
   getAppMapStatus: () => request<AppMapResponse>(`/api/app-map?graph=0`),
   /**
@@ -6582,6 +6583,15 @@ export type FloorplanGraph = { schema: "floorplan/graph@1" } & Record<string, un
 
 export interface AppMapResponse {
   status: AppMapStatus;
+  /** The map itself: only from servers before the map was read from the bucket. */
   graph: FloorplanGraph | null;
+  /** A short-lived signed address of the page's copy of the map (gzipped JSON the browser unzips). */
+  graph_url?: string;
+  /** The same copy through the API, for a browser that can't reach the bucket. */
+  graph_fallback?: string;
+  /** When that map was written (unix seconds): the page reads it again only when this changes. */
+  graph_at?: number;
+  /** Coderhelm's Recent work and Health, laid over the map on the page (lib/app-map-load.ts). */
+  overlays?: import("./app-map-load").AppMapOverlays;
 }
 
