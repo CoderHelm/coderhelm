@@ -1188,8 +1188,16 @@ export const api = {
       { method: "DELETE" },
     ),
   getAlertNotify: () => request<AlertNotifySettings>("/api/alert-notify"),
-  saveAlertNotify: (s: { enabled: boolean } & ChannelsInput) =>
+  /** Left out, `kinds` keeps what the channel takes. */
+  saveAlertNotify: (s: { enabled: boolean; kinds?: NotifyKind[] } & ChannelsInput) =>
     request<{ ok: boolean }>("/api/alert-notify", {
+      method: "PUT",
+      body: JSON.stringify(s),
+    }),
+  /** The team channel for updates and requests for a person. */
+  getUpdatesNotify: () => request<AlertNotifySettings>("/api/updates-notify"),
+  saveUpdatesNotify: (s: { enabled: boolean; kinds?: NotifyKind[] } & ChannelsInput) =>
+    request<{ ok: boolean }>("/api/updates-notify", {
       method: "PUT",
       body: JSON.stringify(s),
     }),
@@ -3576,9 +3584,21 @@ export interface TopicAlarm {
   metric?: string | null;
 }
 
+/**
+ * What a chat message is: an alert (a production alarm or incident, a failed
+ * deploy, a critical security finding), action (a person has to do
+ * something Coderhelm can't) or an update (a fix PR opened or merged, new
+ * findings). Each team channel takes the kinds it lists.
+ */
+export type NotifyKind = "alert" | "action" | "update";
+
+/** A team channel: the alert channel or the updates channel. */
 export interface AlertNotifySettings {
   enabled: boolean;
   webhooks: WebhooksView;
+  /** The kinds it takes. Saved before kinds existed: alerts only for the alert channel. */
+  kinds?: NotifyKind[];
+  default_kinds?: NotifyKind[];
 }
 
 /** A chat channel Coderhelm posts to. */
@@ -3604,6 +3624,7 @@ export interface ChannelsInput {
 /** Whose saved webhook a test message uses (and which sample it posts). */
 export type NotifyDestination =
   | { destination: "alerts" }
+  | { destination: "updates" }
   | { destination: "route"; topic_arn: string }
   | { destination: "recommendations" }
   | { destination: "reviewer"; repo: string };

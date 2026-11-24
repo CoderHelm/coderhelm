@@ -202,6 +202,8 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     if (p === "/api/alerts") return at("member") ? json(r, { alerts: db.alerts, next: null }) : forbidden();
     if (p === "/api/alert-notify" && method === "GET") return at("admin") ? json(r, { enabled: true, webhooks: { teams: { set: true, hint: TEAMS_HINT }, slack: { set: false, hint: "" } } }) : forbidden();
     if (p === "/api/alert-notify" && method === "PUT") return at("admin") ? json(r, { ok: true }) : forbidden();
+    if (p === "/api/updates-notify" && method === "GET") return at("admin") ? json(r, { enabled: false, kinds: ["action", "update"], webhooks: { teams: { set: false, hint: "" }, slack: { set: false, hint: "" } } }) : forbidden();
+    if (p === "/api/updates-notify" && method === "PUT") return at("admin") ? json(r, { ok: true }) : forbidden();
     if (p === "/api/notify/test") return at("admin") ? json(r, { ok: true }) : forbidden();
     if (p === "/api/alert-budget" && method === "GET") return at("admin") ? json(r, { daily_tokens: 2_000_000, used_24h_tokens: 600_000, open_runs: 1, open_run_reserve_tokens: 50_000, max_runs_per_rule_per_day: 5 }) : forbidden();
     if (p === "/api/alert-budget" && method === "PUT") return at("admin") ? json(r, { ok: true }) : forbidden();
@@ -654,6 +656,25 @@ test.describe("Where alerts post", () => {
     // Teams is kept as saved (no URL sent); Slack is the new one.
     expect(callsTo(db, "PUT", /\/api\/alert-notify$/).at(-1)!.body).toEqual({ enabled: true, slack_webhook: { url: SLACK_HOOK } });
     await shot(page, "alerts-team-channel-both");
+  });
+
+  test("the alert channel takes alerts only unless ticked; updates and requests for a person have their own channel", async ({ page }) => {
+    const db = await mockApi(page);
+    await page.goto("/settings/alerts");
+    const kinds = page.getByTestId("team-channel-kinds");
+    await expect(kinds.getByRole("checkbox", { name: /Requests for a person/ })).not.toBeChecked();
+    await expect(kinds.getByRole("checkbox", { name: /Updates/ })).not.toBeChecked();
+    await kinds.getByRole("checkbox", { name: /Requests for a person/ }).check();
+    const updates = page.getByTestId("updates-channel-row");
+    await updates.getByRole("switch").click();
+    const picker = page.getByTestId("updates-channels");
+    await picker.getByRole("checkbox", { name: "Slack" }).check();
+    await picker.getByRole("textbox", { name: "Slack webhook address" }).fill(SLACK_HOOK);
+    const bar = page.getByRole("region", { name: "Save changes" });
+    await bar.getByRole("button", { name: "Save changes" }).click();
+    await expect(page.getByText("Alert settings saved")).toBeVisible();
+    expect(callsTo(db, "PUT", /\/api\/alert-notify$/).at(-1)!.body).toEqual({ enabled: true, kinds: ["alert", "action"] });
+    expect(callsTo(db, "PUT", /\/api\/updates-notify$/).at(-1)!.body).toEqual({ enabled: true, slack_webhook: { url: SLACK_HOOK } });
   });
 
   test("a route can post to its own Slack channel and test it", async ({ page }) => {

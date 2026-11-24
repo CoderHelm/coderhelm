@@ -423,6 +423,7 @@ export const reviewData: Handler = ({ method, path, url }) => {
   if (path === "/api/alert-routes") return ALERT_ROUTES;
   if (path === "/api/alert-routes/alarms") return { alarms: [{ name: "production-payments-reconciliation-service-5xx-rate-above-threshold", state: "ALARM" }], messages: [] };
   if (path === "/api/alert-budget") return { daily_tokens: 2_000_000, used_24h_tokens: 600_000, open_runs: 1, open_run_reserve_tokens: 50_000, max_runs_per_rule_per_day: 5 };
+  if (path === "/api/updates-notify") return { enabled: false, kinds: ["action", "update"], webhooks: { teams: { set: false, hint: "" }, slack: { set: false, hint: "" } } };
   if (path === "/api/alert-notify") return { enabled: true, webhooks: { teams: { set: true, hint: "example.environment.api.powerplatform.com …ab12" }, slack: { set: false, hint: "" } } };
 
   // Support

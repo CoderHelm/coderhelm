@@ -223,6 +223,10 @@ export async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<
       return at("admin") ? json(r, { enabled: true, webhooks: { teams: { set: true, hint: TEAMS_HINT }, slack: { set: false, hint: "" } } }) : json(r, { error: "Forbidden" }, 403);
     }
     if (p === "/api/alert-notify" && method === "PUT") return json(r, { ok: true });
+    if (p === "/api/updates-notify" && method === "GET") {
+      return at("admin") ? json(r, { enabled: false, kinds: ["action", "update"], webhooks: { teams: { set: false, hint: "" }, slack: { set: false, hint: "" } } }) : json(r, { error: "Forbidden" }, 403);
+    }
+    if (p === "/api/updates-notify" && method === "PUT") return json(r, { ok: true });
     if (p === "/api/notify/test") return json(r, { ok: true });
     if (p === "/api/alert-budget" && method === "GET") {
       return at("admin") ? json(r, { daily_tokens: 2_000_000, used_24h_tokens: 600_000, open_runs: 1, open_run_reserve_tokens: 50_000, max_runs_per_rule_per_day: 5 }) : json(r, { error: "Forbidden" }, 403);
