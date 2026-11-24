@@ -434,33 +434,69 @@
     report();
   }
 
-  // Full screen: the viewer has none of its own (its corner-arrows button
-  // fits the map to the frame). One more button in its zoom bar puts the
-  // frame on the whole screen and back; Escape leaves too. The page gives
-  // the frame `allow="fullscreen"`, so this works inside the sandbox.
+  // Full screen: the viewer has none of its own (its four-corners button
+  // fits the map to the frame, and says so). One more button in its zoom bar
+  // puts the map on the whole screen and back; Escape leaves too.
+  // - First the frame asks for itself, in the click (a browser grants full
+  //   screen only inside the person's click). A browser may refuse that to
+  //   this sandboxed frame ("not granted", or full screen not offered here
+  //   at all, when this button used to be left out without a word).
+  // - Refused (or not offered), it asks the page: the click's activation
+  //   reaches the page too, and the page puts the map's whole box on the
+  //   screen, its own Full screen button with it. The page says back when
+  //   that starts and ends, so this button's words follow either way.
   function addFullScreen() {
     const bar = document.getElementById('zoom');
-    if (!bar || !document.fullscreenEnabled) return;
+    if (!bar) return;
+    const fit = document.getElementById('z-fit');
+    if (fit) {
+      fit.title = 'Fit to screen (F)';
+      fit.setAttribute('aria-label', 'Fit to screen');
+    }
     const b = document.createElement('button');
     b.type = 'button';
     b.id = 'ch-fullscreen';
     const ICON_ON = '<svg class="i" viewBox="0 0 24 24"><path d="M14 4h6v6M10 20H4v-6M20 4l-6 6M4 20l6-6"/></svg>';
     const ICON_OFF = '<svg class="i" viewBox="0 0 24 24"><path d="M20 10h-6V4M4 14h6v6M14 10l6-6M10 14l-6 6"/></svg>';
+    const own = () => document.fullscreenElement || document.webkitFullscreenElement || null;
+    let pageOn = false;
     const show = () => {
-      const on = !!document.fullscreenElement;
-      b.title = on ? 'Leave full screen (Esc)' : 'Full screen';
-      b.setAttribute('aria-label', on ? 'Leave full screen' : 'Full screen');
+      const on = !!own() || pageOn;
+      b.title = on ? 'Exit full screen (Esc)' : 'Full screen';
+      b.setAttribute('aria-label', on ? 'Exit full screen' : 'Full screen');
       b.setAttribute('aria-pressed', String(on));
       b.innerHTML = on ? ICON_OFF : ICON_ON;
     };
+    const askPage = (on) => window.parent.postMessage({ type: 'coderhelm:app-map-fullscreen', on }, '*');
     b.addEventListener('click', () => {
-      const go = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
-      Promise.resolve(go).catch(() => {});
+      if (own()) {
+        const out = document.exitFullscreen ? document.exitFullscreen() : document.webkitExitFullscreen && document.webkitExitFullscreen();
+        Promise.resolve(out).catch(() => {});
+        return;
+      }
+      if (pageOn) return askPage(false);
+      const el = document.documentElement;
+      const enabled = document.fullscreenEnabled || document.webkitFullscreenEnabled;
+      let go = null;
+      try {
+        if (enabled && el.requestFullscreen) go = el.requestFullscreen();
+        else if (enabled && el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+      } catch (err) { go = Promise.reject(err); }
+      if (!enabled) return askPage(true);
+      // Only a refusal goes to the page; the page wouldn't be asked twice.
+      if (go) go.catch(() => askPage(true));
     });
-    document.addEventListener('fullscreenchange', () => {
+    const changed = () => {
       show();
       // The map fills the new size.
       setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+    };
+    document.addEventListener('fullscreenchange', changed);
+    document.addEventListener('webkitfullscreenchange', changed);
+    window.addEventListener('message', (e) => {
+      if (e.source !== window.parent || !e.data || e.data.type !== 'coderhelm:app-map-fullscreen-state') return;
+      pageOn = e.data.on === true;
+      changed();
     });
     show();
     bar.appendChild(b);
