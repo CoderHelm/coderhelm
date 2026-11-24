@@ -385,8 +385,31 @@ const post = (body: unknown): RequestInit => ({ method: "POST", body: JSON.strin
 const put = (body: unknown): RequestInit => ({ method: "PUT", body: JSON.stringify(body) });
 const e = encodeURIComponent;
 
+/**
+ * The App map as a source on the Knowledge page (`app_map` on
+ * `GET /api/knowledge`). Not split into passages: runs and Chat look things
+ * up in it directly.
+ */
+export interface AppMapSource {
+  state: "built" | "building" | "rebuilding" | "failed" | "not_built";
+  /** When the map there now was built (unix seconds; 0 when there is none). */
+  built_at: number;
+  /** With a map there, the last update didn't finish (the map is the one before it). */
+  last_failed: boolean;
+  /** Why a build stopped. */
+  note: string;
+  repos: number;
+  /** What the map covers; null when it hasn't been counted yet. */
+  coverage: { screens: Record<string, number>; outside_services: number; cloud_links: number; repos: number; journeys: number } | null;
+  href: string;
+  /** Admins build it again (one build at a time). */
+  can_rebuild: boolean;
+  embedded: false;
+  explain: string;
+}
+
 export const knowledge = {
-  list: () => request<{ bases: Base[]; can_manage: boolean; limits: KnowledgeLimits }>("/api/knowledge"),
+  list: () => request<{ bases: Base[]; can_manage: boolean; limits: KnowledgeLimits; app_map?: AppMapSource }>("/api/knowledge"),
   get: (id: string) =>
     request<{ base: Base; files: Item[]; sources: Source[]; can_manage: boolean; limits: KnowledgeLimits; visibility_note: string }>(
       `/api/knowledge/${e(id)}`,
