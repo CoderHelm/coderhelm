@@ -9,7 +9,7 @@ export type Scope = "team" | "repo" | "agent";
 export type Autonomy = "read_only" | "standard" | "full";
 export type CallKind = "tool" | "mcp" | "data_source" | "command" | "egress" | "outbound";
 export type AgentKey =
-  | "planner" | "coder" | "reviewer" | "plan_chat" | "brain_chat" | "alert_fixer" | "log_autofix" | "plugin";
+  | "planner" | "coder" | "reviewer" | "plan_chat" | "brain_chat" | "alert_fixer" | "log_autofix" | "plugin" | "skill_run";
 export type Preset = "cautious" | "standard" | "autonomous";
 
 export interface Rule {
@@ -190,6 +190,7 @@ export const AGENT_LABELS: Record<AgentKey, string> = {
   alert_fixer: "Alert fixer",
   log_autofix: "Log auto-fix",
   plugin: "Plugin runs",
+  skill_run: "Skill runs",
 };
 
 export const AUTONOMY_OPTIONS: { value: Autonomy; label: string; help: string }[] = [
