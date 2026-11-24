@@ -25,8 +25,6 @@ jobs:
       # when the PR's text is edited. Title and body come from the event
       # file, never from a script.
       - name: Public text guard
-        env:
-          GUARD_DENYLIST: ${{ secrets.GUARD_DENYLIST }}
         run: |
           python3 -m unittest discover -s .github/scripts -p test_text_guard.py
           python3 .github/scripts/text_guard.py
@@ -244,3 +242,30 @@ jobs:
       - run: npm ci
       # Deploy-safety checks on the synthesized stacks (test/static-site.test.ts).
       - run: npm test
+
+  # Last: CoderHelm's "Customer details guard" check run on the PR's head
+  # (customer names, hosts and keys from its own records, never listed
+  # here) passed or was skipped; failing or missing after five minutes
+  # fails. An edit to the PR's text after this ran sets the guard again,
+  # and the Customer details guard rerun workflow runs this job again.
+  # Prints only pass or fail (.github/scripts/customer_guard_gate.py).
+  customer-guard:
+    name: Customer details guard (CI)
+    needs: [lint-build, dashboard-build, dashboard-e2e, dashboard, docs, selfhost-dashboard, infra]
+    if: ${{ github.event_name == 'pull_request' && !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      checks: read
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Gate tests
+        run: python3 -m unittest discover -s .github/scripts -p test_customer_guard_gate.py
+      - name: The guard passed on this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .github/scripts/customer_guard_gate.py
