@@ -814,7 +814,7 @@ function AlertSettings() {
       try {
         await api.saveAlertNotify({
           enabled: form.values.enabled,
-          kinds: alertKinds(form.values.alertExtra),
+          ...(kindsDirty ? { kinds: alertKinds(form.values.alertExtra) } : {}),
           ...channelsPayload(draft, notify.webhooks),
         });
       } catch {

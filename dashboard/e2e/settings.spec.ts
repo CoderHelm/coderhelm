@@ -95,6 +95,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     if (p === "/api/alert-routes") return atLeast(db.role, "member") ? json(route, { endpoint_path: "/webhooks/alerts/sns", routes: [] }) : forbidden(route);
     if (p === "/api/alerts") return atLeast(db.role, "member") ? json(route, { alerts: [], next: null }) : forbidden(route);
     if (p === "/api/alert-budget") return admin ? json(route, { daily_tokens: 2_000_000, used_24h_tokens: 0, open_runs: 0, open_run_reserve_tokens: 0, max_runs_per_rule_per_day: 3 }) : forbidden(route);
+    if (p === "/api/updates-notify") return admin ? json(route, { enabled: false, kinds: ["action", "update"], webhooks: { teams: { set: false, hint: "" }, slack: { set: false, hint: "" } } }) : forbidden(route);
     if (p === "/api/alert-notify") return admin ? json(route, { enabled: false, webhooks: { teams: { set: false, hint: "" }, slack: { set: false, hint: "" } } }) : forbidden(route);
     if (p === "/api/data-sources") return json(route, { sources: [] });
     if (p === "/api/data-sources/activity") return json(route, { events: [] });
