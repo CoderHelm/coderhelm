@@ -9,6 +9,7 @@ import {
   type AlertBudget,
   type AlertEvent,
   type AlertNotifySettings,
+  type NotifyKind,
   type AlertRepeat,
   type AlertRoute,
   type AlertRule,
@@ -670,7 +671,38 @@ function fmtTokens(n: number): string {
   return String(n);
 }
 
-type AlertForm = { enabled: boolean; budget: string };
+type AlertForm = {
+  enabled: boolean;
+  budget: string;
+  /** What the alert channel takes beyond alerts: "", "action", "update" or "action,update". */
+  alertExtra: string;
+  updatesEnabled: boolean;
+};
+
+const EXTRA_KINDS: { kind: NotifyKind; label: string; help: string }[] = [
+  {
+    kind: "action",
+    label: "Requests for a person",
+    help: "A merge conflict that needs a call, a sign-in to renew, a plugin to approve.",
+  },
+  {
+    kind: "update",
+    label: "Updates",
+    help: "Fix pull requests opened or merged, new log findings, security findings below critical.",
+  },
+];
+
+/** The alert channel's kinds beyond alerts, as the form keeps them. */
+function extraOf(kinds?: NotifyKind[]): string {
+  return EXTRA_KINDS.filter((k) => kinds?.includes(k.kind))
+    .map((k) => k.kind)
+    .join(",");
+}
+
+/** The alert channel always takes alerts; the rest is the team's choice. */
+function alertKinds(extra: string): NotifyKind[] {
+  return ["alert", ...(extra.split(",").filter(Boolean) as NotifyKind[])];
+}
 
 /** A budget typed as "2M" and saved as 2000000 are the same; text that isn't a number is a change. */
 const sameAlertField = (a: unknown, b: unknown, key: keyof AlertForm) => {
@@ -681,20 +713,26 @@ const sameAlertField = (a: unknown, b: unknown, key: keyof AlertForm) => {
 };
 
 /**
- * The team channel (Teams, Slack or both) and the daily token budget for
- * alert runs: two settings rows saved by one bar. Each still saves through
- * its own request, as before.
+ * The team's two channels (alerts, and updates with requests for a person)
+ * and the daily token budget for alert runs: settings rows saved by one bar.
+ * Each still saves through its own request.
  */
 function AlertSettings() {
   const { toast } = useToast();
   const [notify, setNotify] = useState<AlertNotifySettings | null>(null);
   const [notifyError, setNotifyError] = useState(false);
+  const [updates, setUpdates] = useState<AlertNotifySettings | null>(null);
+  const [updatesError, setUpdatesError] = useState(false);
   const [budget, setBudget] = useState<AlertBudget | null>(null);
   const [budgetError, setBudgetError] = useState(false);
   const [draft, setDraft] = useState<ChannelsDraft>(draftFrom(NO_WEBHOOKS));
+  const [updatesDraft, setUpdatesDraft] = useState<ChannelsDraft>(draftFrom(NO_WEBHOOKS));
   const [saving, setSaving] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
-  const form = useDirtyForm<AlertForm>({ enabled: false, budget: "" }, { same: sameAlertField, disabled: !notify && !budget });
+  const form = useDirtyForm<AlertForm>(
+    { enabled: false, budget: "", alertExtra: "", updatesEnabled: false },
+    { same: sameAlertField, disabled: !notify && !budget && !updates },
+  );
   const { reset } = form;
 
   /** Re-reads the saved channels (they come back as hints, never as addresses). */
@@ -706,22 +744,35 @@ function AlertSettings() {
         setDraft(draftFrom(s.webhooks));
       })
       .catch(() => {});
+    api
+      .getUpdatesNotify()
+      .then((s) => {
+        setUpdates(s);
+        setUpdatesDraft(draftFrom(s.webhooks));
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
     let live = true;
-    Promise.allSettled([api.getAlertNotify(), api.getAlertBudget()]).then(([n, b]) => {
+    Promise.allSettled([api.getAlertNotify(), api.getAlertBudget(), api.getUpdatesNotify()]).then(([n, b, u]) => {
       if (!live) return;
-      const next: AlertForm = { enabled: false, budget: "" };
+      const next: AlertForm = { enabled: false, budget: "", alertExtra: "", updatesEnabled: false };
       if (n.status === "fulfilled") {
         setNotify(n.value);
         setDraft(draftFrom(n.value.webhooks));
         next.enabled = n.value.enabled;
+        next.alertExtra = extraOf(n.value.kinds);
       } else setNotifyError(true);
       if (b.status === "fulfilled") {
         setBudget(b.value);
         next.budget = fmtTokens(b.value.daily_tokens);
       } else setBudgetError(true);
+      if (u.status === "fulfilled") {
+        setUpdates(u.value);
+        setUpdatesDraft(draftFrom(u.value.webhooks));
+        next.updatesEnabled = u.value.enabled;
+      } else setUpdatesError(true);
       reset(next);
     });
     return () => {
@@ -730,19 +781,29 @@ function AlertSettings() {
   }, [reset]);
 
   const channelsDirty = !!notify && draftDirty(draft, notify.webhooks);
-  const notifyDirty = !!notify && (form.isDirty("enabled") || channelsDirty);
+  const kindsDirty = !!notify && form.isDirty("alertExtra");
+  const notifyDirty = !!notify && (form.isDirty("enabled") || channelsDirty || kindsDirty);
+  const updatesChannelsDirty = !!updates && draftDirty(updatesDraft, updates.webhooks);
+  const updatesDirty = !!updates && (form.isDirty("updatesEnabled") || updatesChannelsDirty);
   const budgetDirty = !!budget && form.isDirty("budget");
-  const count = (notify && form.isDirty("enabled") ? 1 : 0) + (channelsDirty ? 1 : 0) + (budgetDirty ? 1 : 0);
+  const count =
+    (notify && form.isDirty("enabled") ? 1 : 0) +
+    (channelsDirty ? 1 : 0) +
+    (kindsDirty ? 1 : 0) +
+    (updates && form.isDirty("updatesEnabled") ? 1 : 0) +
+    (updatesChannelsDirty ? 1 : 0) +
+    (budgetDirty ? 1 : 0);
   const n = parseTokens(form.values.budget);
   const budgetValid = n !== null && n <= 100_000_000;
   const channelsValid = draftValid(draft, notify?.webhooks, form.values.enabled);
+  const updatesValid = draftValid(updatesDraft, updates?.webhooks, form.values.updatesEnabled);
 
   const save = async () => {
     if (budgetDirty && !budgetValid) {
       setProblem("Enter a daily budget such as 500k or 2M, up to 100M.");
       return;
     }
-    if (notifyDirty && !channelsValid) {
+    if ((notifyDirty && !channelsValid) || (updatesDirty && !updatesValid)) {
       setProblem("Check the webhook addresses. A channel that is ticked needs a working address.");
       return;
     }
@@ -751,9 +812,23 @@ function AlertSettings() {
     const failed: string[] = [];
     if (notifyDirty && notify) {
       try {
-        await api.saveAlertNotify({ enabled: form.values.enabled, ...channelsPayload(draft, notify.webhooks) });
+        await api.saveAlertNotify({
+          enabled: form.values.enabled,
+          kinds: alertKinds(form.values.alertExtra),
+          ...channelsPayload(draft, notify.webhooks),
+        });
       } catch {
         failed.push("the team channel (check the webhook address)");
+      }
+    }
+    if (updatesDirty && updates) {
+      try {
+        await api.saveUpdatesNotify({
+          enabled: form.values.updatesEnabled,
+          ...channelsPayload(updatesDraft, updates.webhooks),
+        });
+      } catch {
+        failed.push("the updates channel (check the webhook address)");
       }
     }
     if (budgetDirty && n !== null) {
@@ -765,8 +840,12 @@ function AlertSettings() {
       }
     }
     const edited = form.values;
+    const teamSaved = notifyDirty && !failed.some((f) => f.startsWith("the team"));
+    const updatesSaved = updatesDirty && !failed.some((f) => f.startsWith("the updates"));
     const next: AlertForm = {
-      enabled: notifyDirty && !failed.some((f) => f.startsWith("the team")) ? edited.enabled : form.saved.enabled,
+      enabled: teamSaved ? edited.enabled : form.saved.enabled,
+      alertExtra: teamSaved ? edited.alertExtra : form.saved.alertExtra,
+      updatesEnabled: updatesSaved ? edited.updatesEnabled : form.saved.updatesEnabled,
       budget: budgetDirty && !failed.includes("the budget") && n !== null ? fmtTokens(n) : form.saved.budget,
     };
     reset(next);
@@ -777,27 +856,34 @@ function AlertSettings() {
     } else {
       toast("Alert settings saved");
     }
-    if (notifyDirty && !failed.some((f) => f.startsWith("the team"))) reloadChannels();
+    if (teamSaved || updatesSaved) reloadChannels();
     setSaving(false);
   };
 
   const discard = () => {
     form.discard();
     if (notify) setDraft(draftFrom(notify.webhooks));
+    if (updates) setUpdatesDraft(draftFrom(updates.webhooks));
     setProblem(null);
+  };
+
+  const extra = form.values.alertExtra.split(",").filter(Boolean);
+  const toggleExtra = (kind: NotifyKind, on: boolean) => {
+    const next = EXTRA_KINDS.map((k) => k.kind).filter((k) => (k === kind ? on : extra.includes(k)));
+    form.set("alertExtra", next.join(","));
   };
 
   const used = budget ? Math.min(100, (budget.used_24h_tokens / Math.max(budget.daily_tokens, 1)) * 100) : 0;
 
   return (
     <>
-      <SettingsSection id="alert-settings" title="Team channel and budget">
+      <SettingsSection id="alert-settings" title="Team channels and budget">
         <SettingsRow
           label="Post alerts to the team channel"
           layout="toggle"
           testId="team-channel-row"
           unsaved={notifyDirty}
-          help="Routes set to the team channel post here: a red message when an alarm fires, a follow up with the pull request link, and green recoveries on routes that post them."
+          help="Only alerts post here: a red message when an alarm fires, a follow up with the pull request link, green recoveries on routes that post them, critical security findings. Pull request status, findings and requests for a person go to the updates channel below, unless you tick them here."
           control={(ids) => (
             <Switch
               id={ids.inputId}
@@ -819,6 +905,55 @@ function AlertSettings() {
               onChange={setDraft}
               disabled={!notify}
               destination={{ destination: "alerts" }}
+            />
+          )}
+          {notify && (
+            <fieldset className="mt-3" data-testid="team-channel-kinds">
+              <legend className="text-xs text-zinc-400">Also post here (off by default)</legend>
+              {EXTRA_KINDS.map((k) => (
+                <label key={k.kind} className="mt-1.5 flex items-start gap-2 text-sm text-zinc-200">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={extra.includes(k.kind)}
+                    onChange={(e) => toggleExtra(k.kind, e.target.checked)}
+                  />
+                  <span>
+                    {k.label}
+                    <span className="block text-xs text-zinc-400">{k.help}</span>
+                  </span>
+                </label>
+              ))}
+            </fieldset>
+          )}
+        </SettingsRow>
+        <SettingsRow
+          label="Post updates and requests for a person"
+          layout="toggle"
+          testId="updates-channel-row"
+          unsaved={updatesDirty}
+          help="A separate channel for things that are not alerts: a merge conflict that needs a person's call, a sign-in to renew, fix pull requests opened or merged, new log findings. Waiting on a review is never posted: it shows on the pull request. Leave it off and these stay on the pull request, the run page and email."
+          control={(ids) => (
+            <Switch
+              id={ids.inputId}
+              checked={form.values.updatesEnabled}
+              onChange={(on) => form.set("updatesEnabled", on)}
+              labelledBy={ids.labelId}
+              describedBy={ids.helpId}
+              disabled={!updates}
+            />
+          )}
+        >
+          {updatesError ? (
+            <Callout variant="error"><p>Could not load the updates channel. Reload the page to try again.</p></Callout>
+          ) : (
+            <ChannelPicker
+              idPrefix="updates"
+              draft={updatesDraft}
+              saved={updates?.webhooks}
+              onChange={setUpdatesDraft}
+              disabled={!updates}
+              destination={{ destination: "updates" }}
             />
           )}
         </SettingsRow>
