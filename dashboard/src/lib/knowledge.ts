@@ -186,6 +186,11 @@ export interface Source {
   paused: boolean;
   status: SourceStatus;
   error: SourceError | null;
+  /** The last sync stopped for a passing reason (the app or its sign-in server briefly unavailable): nothing to do, the next sync tries again (newer gateways). */
+  retrying?: SourceError | null;
+  /** Syncs in a row that stopped, and since when (newer gateways). */
+  stops?: number;
+  stopped_since?: string;
   /** `fetching` counts what this sync brings in (it can span several runs); `waiting`: the app asked us to slow down. */
   progress: { phase: "listing" | "fetching" | "removing" | "waiting" | string; done: number; total: number } | null;
   /** Documents searchable now (kept up to date while a sync runs). */
@@ -603,12 +608,26 @@ export function estimateLine(kind: string, e: SyncEstimate): string {
 }
 
 /** Where a source is, in one plain line. */
+/** Several syncs in a row that stopped, said once: "3 syncs in a row since 9:33 AM." Empty for one. */
+export function stopsLine(s: Partial<Pick<Source, "stops" | "stopped_since">>): string {
+  const n = s.stops ?? 0;
+  if (n < 2) return "";
+  const t = s.stopped_since ? new Date(s.stopped_since) : null;
+  const since = t && !Number.isNaN(t.getTime()) ? ` since ${t.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : "";
+  return `${n} syncs in a row${since}.`;
+}
+
 export function sourceHealth(
-  s: Pick<Source, "status" | "paused" | "progress" | "last_success_at" | "error" | "kind"> & Partial<Pick<Source, "items" | "total" | "listed" | "estimate">>,
+  s: Pick<Source, "status" | "paused" | "progress" | "last_success_at" | "error" | "kind"> &
+    Partial<Pick<Source, "items" | "total" | "listed" | "estimate" | "retrying" | "stops" | "stopped_since">>,
   now = Date.now(),
 ): Health {
   const label = KIND_LABEL[s.kind] ?? "the app";
-  if (s.status === "error") return { tone: "attention", words: s.error?.fix || `Reconnect ${label} to keep it up to date.` };
+  const stops = stopsLine(s);
+  if (s.status === "error") {
+    const fix = s.error?.fix || `Reconnect ${label} to keep it up to date.`;
+    return { tone: "attention", words: stops ? `${fix} Stopped ${stops}` : fix };
+  }
   if (s.status === "approval") {
     return { tone: "queued", words: s.estimate ? estimateLine(s.kind, s.estimate) : "A large first sync is waiting for an admin to start it." };
   }
@@ -624,6 +643,8 @@ export function sourceHealth(
     return { tone: "live", words: s.last_success_at ? "Checking for changes" : "Getting started" };
   }
   if (s.paused) return { tone: "muted", words: `Paused. Changes in ${label} aren't brought in.` };
+  // A passing stop: the cause once, nothing for anyone to do.
+  if (s.retrying) return { tone: "queued", words: stops ? `${s.retrying.message} ${stops}` : s.retrying.message };
   if (s.status === "queued") return { tone: "queued", words: "Starting in a moment" };
   const when = ago(s.last_success_at, now);
   return { tone: "success", words: when ? `Up to date, checked ${when}` : "Up to date" };

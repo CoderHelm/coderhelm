@@ -23,7 +23,7 @@ export const LIMITS = {
   read_roles: ["viewer", "member", "admin"],
 };
 
-export type State = "healthy" | "first_sync" | "error" | "empty" | "in_place" | "waiting";
+export type State = "healthy" | "first_sync" | "error" | "empty" | "in_place" | "waiting" | "retrying";
 
 export interface Src {
   id: string;
@@ -35,6 +35,9 @@ export interface Src {
   paused: boolean;
   status: "queued" | "syncing" | "ready" | "error";
   error: { message: string; fix: string; action: string; at: string } | null;
+  retrying?: { message: string; fix: string; action: string; at: string } | null;
+  stops?: number;
+  stopped_since?: string;
   progress: { phase: string; done: number; total: number } | null;
   items: number;
   failed_items: number;
@@ -246,6 +249,23 @@ function sourcesFor(state: State): Src[] {
           last_success_at: iso(60 * 26),
         }),
       ];
+    case "retrying":
+      return [
+        source({
+          status: "ready",
+          error: null,
+          retrying: {
+            message: "Atlassian's sign-in server was briefly unavailable (HTTP 503); retrying.",
+            fix: "Nothing to do: the sync tries again on its own.",
+            action: "retry",
+            at: iso(5),
+          },
+          stops: 3,
+          stopped_since: iso(65),
+          last_sync_at: iso(5),
+          last_success_at: iso(95),
+        }),
+      ];
     default:
       return [];
   }
@@ -353,7 +373,7 @@ export interface Run {
   started_at: string;
   ended_at: string;
   took_secs: number;
-  result: "done" | "problems" | "waiting" | "stopped";
+  result: "done" | "problems" | "waiting" | "retrying" | "stopped";
   listed: number;
   added: number;
   updated: number;
@@ -434,6 +454,10 @@ export function runsFor(db: Backend): Run[] {
   }
   if (db.state === "empty" || db.state === "in_place") return [];
   if (db.state === "first_sync") return [];
+  if (db.state === "retrying") {
+    const passing = { message: "Atlassian's sign-in server was briefly unavailable (HTTP 503); retrying.", fix: "Nothing to do: the sync tries again on its own.", action: "retry", at: iso(5) };
+    return [5, 35, 65].map((m) => run({ started_at: iso(m), ended_at: iso(m), took_secs: 0, result: "retrying", listed: 0, updated: 0, unchanged: 0, embedded: 0, reused: 0, error: { ...passing, at: iso(m) } }));
+  }
   if (db.state === "error")
     return [
       run({ started_at: iso(30), ended_at: iso(30), took_secs: 0, result: "stopped", listed: 0, updated: 0, unchanged: 0, embedded: 0, reused: 0, error: { message: "Confluence refused the saved sign-in.", fix: "Reconnect Confluence to sign in again.", action: "reconnect", at: iso(30) } }),

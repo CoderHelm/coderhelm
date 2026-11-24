@@ -407,8 +407,8 @@ export interface SyncRun {
   started_at: string;
   ended_at: string;
   took_secs: number;
-  /** `done`, `problems`, `waiting` (some items are read again on their own) or `stopped`. */
-  result: "done" | "problems" | "waiting" | "stopped";
+  /** `done`, `problems`, `waiting` (some items are read again on their own), `retrying` (ended on a passing cause; the next sync tries again) or `stopped` (a person must fix the cause). */
+  result: "done" | "problems" | "waiting" | "retrying" | "stopped";
   listed: number;
   added: number;
   updated: number;
@@ -448,6 +448,7 @@ export const RESULT_WORDS: Record<SyncRun["result"], string> = {
   done: "Done",
   problems: "Done with problems",
   waiting: "Done, some waiting to retry",
+  retrying: "Retrying",
   stopped: "Stopped",
 };
 

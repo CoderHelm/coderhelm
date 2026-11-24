@@ -267,6 +267,24 @@ test.describe("knowledge base page: sync history and reading pages again", () =>
     await expect(page.getByTestId("history-detail")).toContainText("Reconnect Confluence to sign in again.");
   });
 
+  test("a sign-in server that was briefly down says retrying once and asks nobody to reconnect", async ({ page }) => {
+    const db = newBackend("retrying");
+    await mockKnowledge(page, db);
+    await page.goto("/knowledge/base/?id=kb_dw");
+    const health = page.getByTestId("source-card").first().getByTestId("source-health");
+    await expect(health).toContainText("Atlassian's sign-in server was briefly unavailable (HTTP 503); retrying.");
+    await expect(health).toContainText("3 syncs in a row since");
+    // Not a problem to fix: only the items that couldn't be read are listed there.
+    await expect(page.getByTestId("problem").filter({ hasText: "sign-in" })).toHaveCount(0);
+    await expect(page.getByTestId("source-fix")).toHaveCount(0);
+    await expect(health).not.toContainText("Reconnect");
+    const rows = page.locator('[data-testid="history-row"][data-result="retrying"]');
+    await expect(rows).toHaveCount(3);
+    await expect(rows.first()).toContainText("Retrying");
+    await rows.first().getByTestId("history-open").click();
+    await expect(page.getByTestId("history-detail")).toContainText("Nothing to do: the sync tries again on its own.");
+  });
+
   test("pages that couldn't be read or were skipped can be read again", async ({ page }) => {
     const db = newBackend("healthy");
     await mockKnowledge(page, db);

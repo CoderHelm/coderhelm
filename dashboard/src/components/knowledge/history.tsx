@@ -28,7 +28,7 @@ import {
 // group with a few of its items, their error and fix.
 // A table on wide screens, stacked rows on a phone.
 
-const RESULT_TONE: Record<SyncRun["result"], Tone> = { done: "success", problems: "attention", waiting: "waiting", stopped: "danger" };
+const RESULT_TONE: Record<SyncRun["result"], Tone> = { done: "success", problems: "attention", waiting: "waiting", retrying: "waiting", stopped: "danger" };
 /** Items shown under each reason before "and N more". */
 const EXAMPLES = 3;
 const KIND_WORDS = { failed: "Couldn't read", skipped: "Skipped", waiting: "Waiting to retry" } as const;
