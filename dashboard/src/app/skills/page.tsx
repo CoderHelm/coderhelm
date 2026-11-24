@@ -331,11 +331,16 @@ function SkillsPage() {
         title="Skills"
         lead="Write down how your team works, in skills, agent briefs and commands kept in a repository, and Coderhelm follows them on every task."
         actions={
-          canManage ? (
-            <button type="button" className={primaryButton} onClick={() => setConnectOpen(true)}>
-              Connect repository
-            </button>
-          ) : undefined
+          <div className="flex flex-wrap gap-2">
+            <a href="/skills/schedules" className={secondaryButton}>
+              Scheduled runs
+            </a>
+            {canManage && (
+              <button type="button" className={primaryButton} onClick={() => setConnectOpen(true)}>
+                Connect repository
+              </button>
+            )}
+          </div>
         }
       />
 

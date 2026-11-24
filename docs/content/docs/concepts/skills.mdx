@@ -116,3 +116,20 @@ max_rows: 1
 ```
 
 Every version runs once with its examples, and then another admin must approve that exact version (a team with one admin approves its own). Any edit makes a new version that needs approval again. A tool can also be set to **ask me first**, so each call waits for a person's yes (for up to ten minutes).
+
+## Scheduled skill runs
+
+A skill can also run on its own, on a schedule. Under **Skills**, open **Scheduled runs**, press **New schedule** and pick:
+
+- **The skill**, from your connected skill repositories. It runs as written: its `SKILL.md` is the run's instructions, and its scripts run in the code sandbox from the skill's folder (`CLAUDE_SKILL_DIR`), whatever their size.
+- **The schedule**: five cron fields read in your team's time zone (`23 7 * * MON` is Mondays at 07:23, across daylight saving).
+- **The tools it calls**: each tool by the name the skill uses, the connected MCP server that offers it, and whether it only reads. Only these tools exist in the run. Athena through your read-only AWS role is one more choice, limited to one workgroup and a number of GB per run, one query at a time.
+- **Its memory folder**, inside the skill's output folder (for example `snapshots`). The last run's files come back before each run and the new ones are kept after it, so a weekly report can compare with last week.
+- **A budget**: model spend and minutes per run.
+- **Where the result goes**: always the run page; also your chat channels (after every run, or on failure), and an issue in the skill's repository when a scheduled run fails.
+
+Every run is listed with your team's runs. It is read-only by default: a tool that may change something is refused before it runs unless the schedule allows writes, and a tool that sends, publishes or deletes is never granted. Files the run makes (the report, the snapshot) are its **Outputs**; an HTML report reads in place on the run page, with scripts off.
+
+When access is missing (a server not connected, a key revoked, a role that can't read), the run stops and lists each one under **Needs access**. It never keeps a partial report, and the memory folder is left as it was.
+
+**Run now** runs a schedule at once, paused or not, and opens its run page: the way to test one before it runs on its own.

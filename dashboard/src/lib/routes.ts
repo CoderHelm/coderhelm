@@ -88,6 +88,7 @@ export const ROUTES: Record<string, RouteInfo> = {
   "/skills": { label: "Skills", description: "Skills and agents Coderhelm uses: how-tos, checks and instructions it follows on each run." },
   "/skills/item": { label: "Skill", parent: "/skills", detail: true, description: "One skill: what it tells Coderhelm to do, when it applies and how often it is used." },
   "/skills/agent": { label: "Agent", parent: "/skills", detail: true, description: "One agent: its role, the skills it uses and what it may do." },
+  "/skills/schedules": { label: "Scheduled runs", parent: "/skills", description: "Team skills Coderhelm runs on a schedule, read-only by default, with Run now to test one and each run's report." },
 
   "/connections": { label: "Connected accounts", description: "The outside accounts you connected to Coderhelm, and what each one lets it do." },
 
