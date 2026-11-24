@@ -6,8 +6,11 @@
 // - `sandbox="allow-scripts"` and nothing else: the frame has its own opaque
 //   origin (no cookies, no storage, nothing of the dashboard's), and its page
 //   (public/app-map/frame.html) allows no network at all;
-// - `allow="fullscreen"`: the viewer's Full screen button (added by
-//   frame.js) may put the frame on the whole screen, nothing more;
+// - full screen is the page's: its Full screen button (beside the map, on
+//   the App map page) puts the map's box on the whole screen in the click
+//   itself, and the viewer's own button (added by frame.js) asks the page
+//   when the browser won't give full screen to the sandboxed frame;
+//   `allow="fullscreen"` lets the frame try first, nothing more;
 // - the viewer's title and description are kept off the canvas, where they
 //   covered cards: the frame sends them here (`onContext`) and the page shows
 //   them above the map;
@@ -26,7 +29,8 @@
 // Chat draws an answer's mini map with this same frame (chat/answer-map.tsx),
 // loaded only when an answer has one, without the presentation.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { buttonClass } from "@/components/ui";
 import type { FloorplanGraph } from "@/lib/api";
 import { fileUrl } from "@/lib/skills";
 
@@ -77,6 +81,33 @@ export function sourceUrl(graph: FloorplanGraph, file: unknown, line: unknown): 
   return `${fileUrl(repo, sha, segs.slice(1).join("/"))}${n ? `#L${n}` : ""}`;
 }
 
+/** The browser's full screen calls, with Safari's older names. */
+type FsDoc = Document & { webkitFullscreenElement?: Element | null; webkitFullscreenEnabled?: boolean; webkitExitFullscreen?: () => void };
+type FsEl = HTMLElement & { webkitRequestFullscreen?: () => void };
+
+const fullScreenElement = () => document.fullscreenElement ?? (document as FsDoc).webkitFullscreenElement ?? null;
+const fullScreenOffered = () => !!(document.fullscreenEnabled || (document as FsDoc).webkitFullscreenEnabled);
+
+/**
+ * Puts `el` on the whole screen, or takes it off. Called in the person's
+ * click (or the frame's, which reaches this page too): a browser grants full
+ * screen only then, so nothing is awaited before the call.
+ */
+function setFullScreen(el: HTMLElement | null, on: boolean) {
+  if (!el) return;
+  const d = document as FsDoc;
+  if (!on) {
+    if (!fullScreenElement()) return;
+    if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+    else d.webkitExitFullscreen?.();
+    return;
+  }
+  if (fullScreenElement() === el) return;
+  const e = el as FsEl;
+  if (e.requestFullscreen) e.requestFullscreen().catch(() => {});
+  else e.webkitRequestFullscreen?.();
+}
+
 export function MapFrame({
   graph,
   title,
@@ -105,6 +136,28 @@ export function MapFrame({
   testId?: string;
 }) {
   const ref = useRef<HTMLIFrameElement | null>(null);
+  const box = useRef<HTMLDivElement | null>(null);
+  // Whether the map is on the whole screen; whether this browser offers it
+  // at all (read after the first paint, so the static page matches).
+  const [isFull, setIsFull] = useState(false);
+  const [offered, setOffered] = useState(false);
+  const toggleFull = useCallback((on: boolean) => setFullScreen(box.current, on), []);
+
+  useEffect(() => {
+    setOffered(fullScreenOffered());
+    const changed = () => {
+      const on = !!box.current && fullScreenElement() === box.current;
+      setIsFull(on);
+      // The viewer's own button says the same.
+      ref.current?.contentWindow?.postMessage({ type: "coderhelm:app-map-fullscreen-state", on }, "*");
+    };
+    document.addEventListener("fullscreenchange", changed);
+    document.addEventListener("webkitfullscreenchange", changed);
+    return () => {
+      document.removeEventListener("fullscreenchange", changed);
+      document.removeEventListener("webkitfullscreenchange", changed);
+    };
+  }, []);
   const json = useMemo(() => JSON.stringify(graph), [graph]);
   const [problem, setProblem] = useState("");
   const tooBig = json.length > MAX_MAP_BYTES;
@@ -125,6 +178,10 @@ export function MapFrame({
         const d = e.data as Record<string, unknown>;
         const str = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max) : "");
         onContext({ kind: str(d.kind, 80), name: str(d.name, 300), desc: str(d.desc, 2000) });
+      } else if (type === "coderhelm:app-map-fullscreen") {
+        // The viewer's Full screen button, when the browser won't give the
+        // sandboxed frame full screen: the page puts the map's box there.
+        toggleFull((e.data as { on?: unknown }).on === true);
       } else if (type === "coderhelm:app-map-source") {
         const d = e.data as { file?: unknown; line?: unknown };
         const url = sourceUrl(graph, d.file, d.line);
@@ -136,13 +193,30 @@ export function MapFrame({
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [json, graph, tooBig, onAsk, onContext]);
+  }, [json, graph, tooBig, onAsk, onContext, toggleFull]);
 
   if (tooBig) {
     return <p className="text-sm text-zinc-400">This map is too large to show here.</p>;
   }
   return (
-    <div className="min-w-0" data-testid={testId}>
+    <div ref={box} className={isFull ? "flex h-full w-full flex-col gap-2 bg-zinc-950 p-2" : "min-w-0"} data-testid={testId} data-fullscreen={isFull ? "on" : "off"}>
+      {full && offered && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            data-testid="app-map-fullscreen"
+            aria-pressed={isFull}
+            title={isFull ? "Exit full screen (Esc)" : "Show the map on the whole screen"}
+            onClick={() => toggleFull(!isFull)}
+            className={`${buttonClass("secondary", "sm")} gap-1.5`}
+          >
+            <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <path d={isFull ? "M20 10h-6V4M4 14h6v6M14 10l6-6M10 14l-6 6" : "M14 4h6v6M10 20H4v-6M20 4l-6 6M4 20l6-6"} />
+            </svg>
+            {isFull ? "Exit full screen" : "Full screen"}
+          </button>
+        </div>
+      )}
       {problem && <p className="mb-2 text-sm text-zinc-400">{problem}</p>}
       <iframe
         ref={ref}
@@ -155,8 +229,8 @@ export function MapFrame({
         allow="fullscreen"
         referrerPolicy="no-referrer"
         loading="lazy"
-        className={`block w-full rounded-lg border border-zinc-800 bg-zinc-950 ${height ? "" : "h-[max(520px,calc(100dvh-140px))] sm:h-[max(640px,calc(100dvh-180px))]"}`}
-        style={height ? { height } : undefined}
+        className={`block w-full rounded-lg border border-zinc-800 bg-zinc-950 ${isFull ? "min-h-0 flex-1" : height ? "" : "h-[max(520px,calc(100dvh-140px))] sm:h-[max(640px,calc(100dvh-180px))]"}`}
+        style={height && !isFull ? { height } : undefined}
       />
     </div>
   );

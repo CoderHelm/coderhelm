@@ -446,26 +446,68 @@ test.describe("App map reading", () => {
     await expect(viewer(page).getByText("Harbor website").first()).toBeVisible();
   });
 
-  test("the viewer's Full screen button puts the map on the whole screen and back", async ({ page }) => {
+  // Full screen is the page's own button, above the map and in view without
+  // scrolling, called in the click itself; the viewer's button in its zoom
+  // bar asks the page when the browser refuses the sandboxed frame. Each
+  // test fails if a button goes missing or stops answering its click.
+  const fullScreenOf = (page: Page) => page.evaluate(() => document.fullscreenElement?.getAttribute("data-testid") ?? document.fullscreenElement?.tagName ?? "");
+
+  test("the page's Full screen button puts the map on the whole screen and back", async ({ page }) => {
+    await mockBucket(page);
+    await page.goto("/app-map");
+    await expect(viewer(page).getByText("Harbor website").first()).toBeVisible();
+    const button = page.getByTestId("app-map-fullscreen");
+    await expect(button).toHaveText("Full screen");
+    await expect(button).toBeInViewport();
+    await button.click();
+    await expect.poll(() => fullScreenOf(page)).toBe("app-map-frame");
+    await expect(button).toHaveText("Exit full screen");
+    await expect(button).toHaveAttribute("aria-pressed", "true");
+    // The map fills the screen, below the button.
+    const size = await page.evaluate(() => ({ w: window.innerWidth, h: window.innerHeight }));
+    const box = (await page.getByTestId("app-map-frame").locator("iframe").boundingBox())!;
+    expect(box.width).toBeGreaterThan(size.w - 40);
+    expect(box.height).toBeGreaterThan(size.h - 100);
+    // The viewer's own button says the same.
+    await expect(viewer(page).locator("#ch-fullscreen")).toHaveAttribute("aria-label", "Exit full screen");
+    await page.screenshot({ path: path.join(SHOTS_DIR, "app-map-fullscreen.png") });
+    await button.click();
+    await expect.poll(() => fullScreenOf(page)).toBe("");
+    await expect(button).toHaveText("Full screen");
+    await expect(viewer(page).locator("#ch-fullscreen")).toHaveAttribute("aria-label", "Full screen");
+  });
+
+  test("the viewer's Full screen button works, and asks the page when the browser refuses the frame", async ({ page }) => {
     await mockBucket(page);
     await page.goto("/app-map");
     const frame = page.getByTestId("app-map-frame").locator("iframe");
     await expect(frame).toHaveAttribute("allow", "fullscreen");
     await expect(viewer(page).getByText("Harbor website").first()).toBeVisible();
+    // The four-corners button fits the map, and says so.
+    await expect(viewer(page).locator("#z-fit")).toHaveAttribute("aria-label", "Fit to screen");
     const button = viewer(page).locator("#ch-fullscreen");
     await expect(button).toHaveAttribute("aria-label", "Full screen");
     // The zoom buttons sit at the bottom of the map; the page scrolls to them (a click can't scroll the sandboxed frame's page for us).
     await frame.evaluate((el) => el.scrollIntoView({ block: "end" }));
+    // Granted to the frame: the frame itself fills the screen.
     await button.click();
-    await expect.poll(() => page.evaluate(() => document.fullscreenElement?.tagName ?? "")).toBe("IFRAME");
-    await expect(button).toHaveAttribute("aria-label", "Leave full screen");
-    const size = await page.evaluate(() => ({ w: window.innerWidth, h: window.innerHeight }));
-    const box = await frame.boundingBox();
-    expect(Math.round(box?.width ?? 0)).toBe(size.w);
-    expect(Math.round(box?.height ?? 0)).toBe(size.h);
-    await page.screenshot({ path: path.join(SHOTS_DIR, "app-map-fullscreen.png") });
+    await expect.poll(() => fullScreenOf(page)).toBe("IFRAME");
+    await expect(button).toHaveAttribute("aria-label", "Exit full screen");
     await button.click();
-    await expect.poll(() => page.evaluate(() => document.fullscreenElement?.tagName ?? "")).toBe("");
+    await expect.poll(() => fullScreenOf(page)).toBe("");
+    await expect(button).toHaveAttribute("aria-label", "Full screen");
+    // Refused to the frame, as a browser may: the page puts the map there.
+    const inner = page.frames().find((f) => f !== page.mainFrame() && !f.isDetached() && f.url().includes("/app-map/frame.html"))!;
+    await inner.evaluate(() => {
+      Element.prototype.requestFullscreen = () => Promise.reject(new TypeError("not granted"));
+    });
+    await frame.evaluate((el) => el.scrollIntoView({ block: "end" }));
+    await button.click();
+    await expect.poll(() => fullScreenOf(page)).toBe("app-map-frame");
+    await expect(button).toHaveAttribute("aria-label", "Exit full screen");
+    await expect(page.getByTestId("app-map-fullscreen")).toHaveText("Exit full screen");
+    await button.click();
+    await expect.poll(() => fullScreenOf(page)).toBe("");
     await expect(button).toHaveAttribute("aria-label", "Full screen");
   });
 
