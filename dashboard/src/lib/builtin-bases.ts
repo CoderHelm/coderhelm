@@ -36,6 +36,9 @@ export interface BuiltinBase {
   live?: boolean;
   /** When what it holds last changed; null: not read yet. */
   updated_at: string | null;
+  /** When a sync that stopped did (its last sync stopped); null or absent:
+   *  none did. `updated_at` still says what it holds. */
+  stopped_at?: string | null;
   /** Whether the person looking may read it, and why not. */
   access: { open: boolean; why: string | null };
   audience: BuiltinAudience;
