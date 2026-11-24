@@ -10,9 +10,10 @@ import { useCan } from "@/hooks/use-can";
 import { buttonClass, focusRing, primaryButton, secondaryButton } from "@/components/ui";
 import { AddFlow } from "@/components/knowledge/add-flow";
 import { BuiltinBases } from "@/components/knowledge/builtin";
+import { AppMapSourceCard } from "@/components/knowledge/app-map-source";
 import { SyncLimits } from "@/components/knowledge/sync-limits";
 import { LogoStack, SourceLogo } from "@/components/knowledge/logos";
-import { KIND_LABEL, READ_SHORT, baseHealth, itemWord, knowledge, type AddKind, type Base, type KnowledgeLimits, type SourceKind, connectedInPlace } from "@/lib/knowledge";
+import { KIND_LABEL, READ_SHORT, baseHealth, itemWord, knowledge, type AddKind, type AppMapSource, type Base, type KnowledgeLimits, type SourceKind, connectedInPlace } from "@/lib/knowledge";
 
 // Knowledge: what the team's answers come from. Each knowledge base holds
 // pages from the apps the team already uses (kept up to date on their own)
@@ -36,6 +37,7 @@ function Knowledge() {
   const canManage = can("knowledge_manage");
   const [bases, setBases] = useState<Base[] | null>(null);
   const [limits, setLimits] = useState<KnowledgeLimits | null>(null);
+  const [appMap, setAppMap] = useState<AppMapSource | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [flow, setFlow] = useState<{ open: boolean; start: AddKind | null }>({ open: false, start: null });
   const [limitsOpen, setLimitsOpen] = useState(false);
@@ -47,6 +49,7 @@ function Knowledge() {
       .then((r) => {
         setBases(r.bases);
         setLimits(r.limits);
+        setAppMap(r.app_map ?? null);
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Couldn't load Knowledge."));
   }, []);
@@ -99,6 +102,11 @@ function Knowledge() {
       <div className="mt-8">
         <BuiltinBases />
       </div>
+      {appMap && (
+        <div className="mt-6">
+          <AppMapSourceCard source={appMap} onChange={setAppMap} />
+        </div>
+      )}
       <div className="mt-10">
         <h2 className="mb-4 text-base font-semibold text-zinc-100" data-testid="custom-heading">
           Made by your team
