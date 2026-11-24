@@ -25,6 +25,7 @@ interface Base {
   builtin: true;
   counts: { label: string; count: number }[];
   updated_at: string | null;
+  stopped_at?: string | null;
   access: { open: boolean; why: string | null };
   audience: { roles: string[]; people: string[]; readers: boolean; paused: boolean };
   audience_label: string;
@@ -480,6 +481,24 @@ test.describe("built-in search: switching the base", () => {
     // Still there a moment later: nothing hands focus back to the card.
     await page.waitForTimeout(300);
     await expect(box(page)).toBeFocused();
+  });
+
+  test("Knowledge says when it last synced, and a stopped sync plainly, never the base's old settings date", async ({ page }) => {
+    const db = await mock(page, true);
+    const team = db.bases.find((b) => b.key === "team")!;
+    // The gateway's newest successful sync, 4 minutes ago.
+    team.updated_at = iso(4);
+    await page.goto("/knowledge/");
+    await expect(card(page, "team").getByTestId("builtin-fresh")).toHaveText("Updated 4 min ago");
+    await expect(card(page, "team").getByTestId("builtin-state")).toHaveCount(0);
+
+    // The latest sync stopped: the row says so, the panel keeps what it holds.
+    team.stopped_at = iso(5);
+    team.updated_at = iso(35);
+    await page.reload();
+    await expect(card(page, "team").getByTestId("builtin-fresh")).toHaveText("Last sync stopped 5 min ago");
+    await card(page, "team").getByTestId("builtin-open").click();
+    await expect(page.getByTestId("builtin-panel")).toContainText("Updated 35 min ago. Last sync stopped 5 min ago");
   });
 
   test("with nothing typed a tab only narrows; the next search runs there", async ({ page }) => {

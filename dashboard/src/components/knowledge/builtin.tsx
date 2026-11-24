@@ -68,15 +68,23 @@ function BaseIcon({ k, size = "md" }: { k: BuiltinKey; size?: "sm" | "md" }) {
 
 function freshness(b: BuiltinBase): { words: string; live: boolean } {
   if (b.live) return { words: b.updated_at ? `Live, updated ${timeAgo(b.updated_at)}` : "Live", live: true };
-  if (b.updated_at) return { words: `Updated ${timeAgo(b.updated_at)}`, live: false };
-  return { words: "Not read yet", live: false };
+  const stopped = b.stopped_at ? `Last sync stopped ${timeAgo(b.stopped_at)}` : "";
+  if (b.updated_at) return { words: `Updated ${timeAgo(b.updated_at)}${stopped ? `. ${stopped}` : ""}`, live: false };
+  return { words: stopped || "Not read yet", live: false };
+}
+
+/** The row's few words: "Live", a stopped sync, or how long ago it changed. */
+function rowFreshness(b: BuiltinBase): string {
+  if (b.live) return "Live";
+  if (b.stopped_at) return `Last sync stopped ${timeAgo(b.stopped_at)}`;
+  return b.updated_at ? `Updated ${timeAgo(b.updated_at)}` : "";
 }
 
 /** The one state worth a pill on the overview, if any. */
 function stateOf(b: BuiltinBase): { tone: "warning" | "neutral"; words: string } | null {
   if (!b.access.open) return { tone: "warning", words: "Not open to you" };
   if (b.audience.paused) return { tone: "neutral", words: "Paused" };
-  if (!b.updated_at && !b.live) return { tone: "neutral", words: "Not read yet" };
+  if (!b.updated_at && !b.live && !b.stopped_at) return { tone: "neutral", words: "Not read yet" };
   return null;
 }
 
@@ -228,15 +236,15 @@ function BaseCard({ b, onOpen }: { b: BuiltinBase; onOpen: (el: HTMLElement) => 
   const people = b.audience.people.length;
   const who = `${roles.length ? roles.join(", ") : "All roles"}${people ? ` +${people}` : ""}`;
   const whoSpoken = `${roles.length ? listWords(roles) : "All roles"}${people ? ` and ${plural(people, "person", "people")}` : ""}`;
-  // The row says "Live" or how long ago; the panel has both.
-  const fresh = b.live ? "Live" : b.updated_at ? `Updated ${timeAgo(b.updated_at)}` : "";
+  // The row says "Live", a stopped sync, or how long ago; the panel has all.
+  const fresh = rowFreshness(b);
   const status = state ? (
     <span data-testid="builtin-state" className="min-w-0 max-w-full">
       <StatusPill tone={state.tone}>{state.words}</StatusPill>
     </span>
   ) : (
     <span className="flex min-w-0 items-center gap-1.5 text-xs text-zinc-400" data-testid="builtin-fresh">
-      <StatusDot tone={b.live ? "success" : "neutral"} live={false} className="!h-1.5 !w-1.5" />
+      <StatusDot tone={b.live ? "success" : b.stopped_at ? "waiting" : "neutral"} live={false} className="!h-1.5 !w-1.5" />
       <span className="truncate">{fresh}</span>
     </span>
   );
@@ -700,7 +708,7 @@ function PanelBody({ b, canManage, readersOn, onChange, onSearch }: { b: Builtin
         <span data-testid="builtin-access">{b.access.open ? <StatusPill tone="success">Open to you</StatusPill> : <StatusPill tone="warning">Not open to you</StatusPill>}</span>
         {b.audience.paused && <StatusPill tone="neutral">Paused</StatusPill>}
         <span className="flex items-center gap-1.5 text-zinc-400">
-          <StatusDot tone={fresh.live ? "success" : b.updated_at ? "neutral" : "muted"} live={false} className="!h-1.5 !w-1.5" />
+          <StatusDot tone={fresh.live ? "success" : b.stopped_at ? "waiting" : b.updated_at ? "neutral" : "muted"} live={false} className="!h-1.5 !w-1.5" />
           {fresh.words}
         </span>
       </div>
