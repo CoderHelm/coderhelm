@@ -221,6 +221,44 @@
     }
     F.on('render', () => { if (anyInferred) markInferred(); });
 
+    // ---------- System cards named by their repositories ----------
+    // The platform titles a System card by the repositories it is
+    // (common::app_map::name_by_repo): `label` is the repository's name,
+    // `role` the plain words for what it does, `repos` every repository
+    // when the title had room for only the first. The role is a small label
+    // on the card; every name is in the card's tooltip and its side panel.
+    const roleOf = (n) => (n && typeof n.role === 'string' && n.role.trim() ? n.role.trim() : '');
+    const reposOf = (n) => (n && Array.isArray(n.repos) ? n.repos.filter((r) => typeof r === 'string' && r) : []);
+    const nodeOf = (ref) => (typeof ref === 'string' && ref.startsWith('n:') ? (G.nodes || []).find((n) => n && n.id === ref.slice(2)) : null);
+    add(`.card .ch-role{order:-1;margin:-4px 0 -2px;font:600 11px Inter,system-ui,sans-serif;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      svg.ch-sys .card .ch-role{font-size:13px}`);
+    const markRoles = () => {
+      for (const [id, g] of F.state.chipEls ? F.state.chipEls.entries() : []) {
+        const n = nodeOf(id);
+        const role = roleOf(n), repos = reposOf(n);
+        if (!role && !repos.length) continue;
+        const card = g.querySelector('.card');
+        if (!card) continue;
+        if (role && !card.querySelector('.ch-role')) {
+          const r = document.createElement('div');
+          r.className = 'ch-role';
+          r.textContent = role;
+          card.insertBefore(r, card.firstChild);
+        }
+        card.title = [repos.length ? repos.join(', ') : n.label, role].filter(Boolean).join('\n');
+      }
+    };
+    F.on('render', markRoles);
+    if (typeof F.addPanelSection === 'function') {
+      F.addPanelSection('item', (target) => {
+        const n = nodeOf(target);
+        const role = roleOf(n), repos = reposOf(n);
+        if (!role && !repos.length) return null;
+        const rows = repos.map((r) => `<div class="row" style="cursor:default"><span class="dot" style="background:var(--text-4)"></span><span class="rt"><div class="rn">${h(r)}</div></span></div>`).join('');
+        return { top: true, html: `<div class="sec" data-ch-repos>${role ? `<p class="pd" data-ch-role><b>Role:</b> ${h(role)}</p>` : ''}${repos.length ? `<h3>${repos.length === 1 ? 'Repository' : 'Repositories'} <span class="c">${repos.length}</span></h3><div class="list">${rows}</div>` : ''}</div>` };
+      });
+    }
+
     if (!opts.full) return;
 
     // ======================= the App map page =======================

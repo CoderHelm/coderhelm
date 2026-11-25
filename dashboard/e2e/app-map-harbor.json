@@ -41,7 +41,11 @@
   {
    "id": "web",
    "parent": null,
-   "label": "Harbor website",
+   "label": "harbor-web",
+   "role": "Harbor website",
+   "repos": [
+    "harbor-web"
+   ],
    "kind": "ui",
    "summary": "Where boaters find a slip and book it.",
    "details": "",
@@ -65,7 +69,11 @@
   {
    "id": "api",
    "parent": null,
-   "label": "Booking service",
+   "label": "harbor-api",
+   "role": "Booking service",
+   "repos": [
+    "harbor-api"
+   ],
    "kind": "service",
    "summary": "Takes bookings and charges for them.",
    "details": "",

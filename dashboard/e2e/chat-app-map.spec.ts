@@ -171,7 +171,7 @@ test.describe("Chat and the App map", () => {
     // "Open in App map": the page opens on those parts.
     await page.getByTestId("answer-map-open").click();
     await expect(page).toHaveURL(/\/app-map\/?\?focus=api,stripe,web$/);
-    await expect(page.getByTestId("app-map-focus")).toContainText("Opened on Booking service, Stripe, Harbor website");
+    await expect(page.getByTestId("app-map-focus")).toContainText("Opened on harbor-api, Stripe, harbor-web");
     await expect(page.getByTestId("app-map-frame").locator("iframe")).toHaveAttribute("src", "/app-map/frame.html#ask=host&tour=0&full=1&s=api");
     // The viewer opened with the part selected: its details panel is open.
     await expect(viewer(page, "app-map-frame").locator("body")).not.toHaveClass(/no-panel/);
