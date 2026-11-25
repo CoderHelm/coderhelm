@@ -119,17 +119,16 @@ Every version runs once with its examples, and then another admin must approve t
 
 ## Scheduled skill runs
 
-A skill can also run on its own, on a schedule. Under **Skills**, open **Scheduled runs**, press **New schedule** and pick:
+A skill can also run on its own, on a schedule. Under **Skills**, open **Scheduled runs**, press **New schedule**, pick the skill and set the schedule (five cron fields read in your team's time zone: `23 7 * * MON` is Mondays at 07:23, across daylight saving). Then press **Run now** to test it. Nothing else needs setting up.
 
-- **The skill**, from your connected skill repositories. It runs as written: its `SKILL.md` is the run's instructions, and its scripts run in the code sandbox from the skill's folder (`CLAUDE_SKILL_DIR`), whatever their size.
-- **The schedule**: five cron fields read in your team's time zone (`23 7 * * MON` is Mondays at 07:23, across daylight saving).
-- **The tools it calls**: each tool by the name the skill uses, the connected MCP server that offers it, and whether it only reads. Only these tools exist in the run. Athena through your read-only AWS role is one more choice, limited to one workgroup and a number of GB per run, one query at a time.
-- **Its memory folder**, inside the skill's output folder (for example `snapshots`). The last run's files come back before each run and the new ones are kept after it, so a weekly report can compare with last week.
-- **A budget**: model spend and minutes per run.
-- **Where the result goes**: always the run page; also your chat channels (after every run, or on failure), and an issue in the skill's repository when a scheduled run fails.
+When you pick the skill, Coderhelm reads it and finds everything it needs:
 
-Every run is listed with your team's runs. It is read-only by default: a tool that may change something is refused before it runs unless the schedule allows writes, and a tool that sends, publishes or deletes is never granted. Files the run makes (the report, the snapshot) are its **Outputs**; an HTML report reads in place on the run page, with scripts off.
+- **Its tools.** Each tool the skill names is mapped to what your team has: a connected MCP server, a stdio MCP server in one of your repositories (a `package.json` whose `bin` names an MCP server), or one of Coderhelm's own connections that offers the same tool. A stdio server runs inside the run's own sandbox, pinned at the commit Coderhelm read, installed from its lockfile.
+- **Whether each tool only reads.** The server's own annotations decide (`readOnlyHint`, `destructiveHint`). When a server says nothing, one model check reads the tool's description and input schema, and the answer is kept for that version of the server. The schedule shows each tool's verdict and why; an admin can still change it. A tool that sends, publishes or deletes never runs.
+- **Its memory folder**, from the paths it names (like `snapshots/`). The last run's files come back before each run and the new ones are kept after it, so a weekly report can compare with last week.
 
-When access is missing (a server not connected, a key revoked, a role that can't read), the run stops and lists each one under **Needs access**. It never keeps a partial report, and the memory folder is left as it was.
+Runs are read-only by default: a tool that may change something is refused before it runs unless the schedule allows writes. A server that reads AWS reads through your team's read-only role (Coderhelm's reader role in a connected account), with short-lived keys given only to that server in the sandbox. If the role lacks a permission the tool needs, the run stops and names it under **Needs access**, and Settings offers the role's update that adds it.
 
-**Run now** runs a schedule at once, paused or not, and opens its run page: the way to test one before it runs on its own.
+Each run is listed with your team's runs. Its scripts run in the sandbox from the skill's folder (`CLAUDE_SKILL_DIR`); the files it makes (the report, the snapshot) are its **Outputs**, and an HTML report reads in place on the run page with scripts off. A long run goes on across steps, its sandbox servers still running, until its time or model budget is used. When access is missing, the run stops before it reads anything, keeps no partial report and leaves the memory folder as it was.
+
+Where the result goes: always the run page; and, as you choose, your chat channels, email, a comment on a Jira ticket, a Jira ticket in a project when a scheduled run fails, and an issue in the skill's repository when a scheduled run fails.

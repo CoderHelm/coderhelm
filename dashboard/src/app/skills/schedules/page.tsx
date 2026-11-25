@@ -27,8 +27,16 @@ import {
   type ScheduleOptions,
   type SkillRunEntry,
   type SkillSchedule,
-  type ToolGrant,
+  type Resolution,
+  basisLabel,
+  sourceLabel,
 } from "@/lib/skill-runs";
+
+const WHEN: { value: "off" | "always" | "failure"; label: string }[] = [
+  { value: "off", label: "Never (the run page only)" },
+  { value: "always", label: "After every run" },
+  { value: "failure", label: "When a run fails" },
+];
 
 const STATUS_TONE: Record<SkillRunEntry["status"], "neutral" | "info" | "success" | "warning" | "error"> = {
   queued: "neutral",
@@ -54,14 +62,85 @@ function Field({ label, hint, children, htmlFor }: { label: string; hint?: strin
   );
 }
 
+/** The skill's tools, as reading it found them: where each comes from and how far it may go.
+ *  Nothing to tick: an admin may only change a tool's risk. */
+function ToolsFound({
+  d,
+  resolution,
+  reading,
+  onRisk,
+}: {
+  d: ScheduleDraft;
+  resolution: Resolution | null;
+  reading: boolean;
+  onRisk: (name: string, risk: "" | "read" | "write") => void;
+}) {
+  if (!d.skill_repo) return null;
+  if (reading && !resolution) {
+    return (
+      <p className="text-sm text-zinc-400" role="status" data-testid="tools-reading">
+        Finding the skill&apos;s tools: its connected servers, and servers in your repositories it can start in its sandbox.
+      </p>
+    );
+  }
+  if (!resolution) return null;
+  return (
+    <div className="space-y-2" data-testid="tools-found">
+      {resolution.tools.length === 0 ? (
+        <p className="text-sm text-zinc-400">The skill names no tool a connected server offers. It runs with its scripts only.</p>
+      ) : (
+        <ul className="divide-y divide-zinc-800 rounded-lg border border-zinc-800">
+          {resolution.tools.map((t) => {
+            const own = d.tools.find((g) => g.name === t.name);
+            const never = t.risk === "consequential";
+            return (
+              <li key={t.name} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-sm" data-testid="tool-found">
+                <Code>{t.name}</Code>
+                <span className="text-xs text-zinc-400">{sourceLabel(t.source, resolution.servers)}</span>
+                <StatusPill tone={t.risk === "read" ? "success" : never ? "error" : "warning"}>
+                  {t.risk === "read" ? "Reads" : never ? "Never runs" : d.allow_writes ? "Writes" : "Writes: refused"}
+                </StatusPill>
+                <span className="text-xs text-zinc-400">{basisLabel(t)}</span>
+                {!never && (
+                  <span className="ml-auto">
+                    <Select
+                      aria-label={`Risk of ${t.name}`}
+                      size="sm"
+                      value={own?.risk ?? ""}
+                      onChange={(v) => onRisk(t.name, v as "" | "read" | "write")}
+                      options={[
+                        { value: "", label: "As found" },
+                        { value: "read", label: "Only reads" },
+                        { value: "write", label: "Writes" },
+                      ]}
+                    />
+                  </span>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {resolution.missing.length > 0 && (
+        <p className="text-xs text-amber-300">
+          No connected server offers {resolution.missing.map((m) => `\`${m}\``).join(", ")}. A run that needs one stops with what to connect.
+        </p>
+      )}
+      {resolution.problems.length > 0 && <p className="text-xs text-zinc-400">Not read: {resolution.problems.join("; ")}</p>}
+    </div>
+  );
+}
+
 /** The schedule's form: create or edit. */
 function ScheduleForm({
   initial,
+  initialResolution,
   options,
   onSave,
   onCancel,
 }: {
   initial: ScheduleDraft;
+  initialResolution: Resolution | null;
   options: ScheduleOptions;
   onSave: (d: ScheduleDraft) => Promise<void>;
   onCancel: () => void;
@@ -69,10 +148,43 @@ function ScheduleForm({
   const [d, setD] = useState<ScheduleDraft>(initial);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [resolution, setResolution] = useState<Resolution | null>(initialResolution);
+  const [reading, setReading] = useState(false);
   const set = (patch: Partial<ScheduleDraft>) => setD((x) => ({ ...x, ...patch }));
-  const setTool = (i: number, patch: Partial<ToolGrant>) =>
-    set({ tools: d.tools.map((t, j) => (j === i ? { ...t, ...patch } : t)) });
   const skillKey = d.skill_repo ? `${d.skill_repo}#${d.skill_path}` : "";
+
+  // Reading the skill's tools: the worker maps what it names to the team's servers.
+  async function readTools(skill: { skill_repo: string; skill_path: string; skill_name: string }) {
+    setResolution(null);
+    setReading(true);
+    try {
+      const { id } = await skillRunsApi.resolve(skill);
+      for (let i = 0; i < 100; i++) {
+        await new Promise((r) => setTimeout(r, i === 0 ? 500 : 3000));
+        const { draft } = await skillRunsApi.resolved(id);
+        if (draft.done && draft.resolution) {
+          const res = draft.resolution;
+          setResolution(res);
+          setD((x) =>
+            x.skill_path !== skill.skill_path
+              ? x
+              : {
+                  ...x,
+                  tools: res.tools.map((t) => ({ name: t.name, server: t.source, tool: t.tool === t.name ? "" : t.tool })),
+                  stdio: res.servers,
+                  auto_tools: true,
+                  state_dirs: x.state_dirs.filter(Boolean).length ? x.state_dirs : res.memory ?? [],
+                },
+          );
+          return;
+        }
+      }
+    } catch {
+      // The run reads the tools again before it starts.
+    } finally {
+      setReading(false);
+    }
+  }
 
   return (
     <form
@@ -99,7 +211,9 @@ function ScheduleForm({
           value={skillKey}
           onChange={(v) => {
             const s = options.skills.find((x) => `${x.repo}#${x.path}` === v);
-            set(s ? { skill_repo: s.repo, skill_path: s.path, skill_name: s.name } : { skill_repo: "", skill_path: "", skill_name: "" });
+            const skill = s ? { skill_repo: s.repo, skill_path: s.path, skill_name: s.name } : { skill_repo: "", skill_path: "", skill_name: "" };
+            set({ ...skill, tools: [], stdio: [] });
+            if (s) void readTools(skill);
           }}
           options={options.skills.map((s) => ({ value: `${s.repo}#${s.path}`, label: `${s.name} (${s.repo})` }))}
         />
@@ -114,46 +228,14 @@ function ScheduleForm({
         </Field>
       </div>
 
-      <fieldset className="space-y-3">
+      <fieldset className="space-y-2">
         <legend className="text-sm font-medium text-zinc-200">Tools the skill calls</legend>
-        <p className="text-xs text-zinc-400">
-          Name each tool as the skill does, and pick the connected server that offers it. Only these tools exist in the run. A tool that may change something is refused unless writes are allowed below.
-        </p>
-        {d.tools.map((t, i) => (
-          <div key={i} className="grid items-end gap-2 sm:grid-cols-[1fr_1fr_1fr_auto_auto]" data-testid="tool-row">
-            <Field label="Name in the skill" htmlFor={`tool-name-${i}`}>
-              <input id={`tool-name-${i}`} className={monoInputClass} value={t.name} onChange={(e) => setTool(i, { name: e.target.value })} />
-            </Field>
-            <Field label="Server" htmlFor={`tool-server-${i}`}>
-              <Select
-                id={`tool-server-${i}`}
-                className="w-full"
-                placeholder="Pick a server"
-                value={t.server}
-                onChange={(v) => setTool(i, { server: v })}
-                options={options.servers.map((x) => ({ value: x.id, label: x.name }))}
-              />
-            </Field>
-            <Field label="Tool on the server" htmlFor={`tool-tool-${i}`}>
-              <input id={`tool-tool-${i}`} className={monoInputClass} placeholder={t.name || "same name"} value={t.tool} onChange={(e) => setTool(i, { tool: e.target.value })} />
-            </Field>
-            <label className="flex min-h-9 items-center gap-2 text-sm text-zinc-300">
-              <input type="checkbox" checked={t.reads_only} onChange={(e) => setTool(i, { reads_only: e.target.checked })} />
-              Only reads
-            </label>
-            <button type="button" className={smallSecondaryButton} onClick={() => set({ tools: d.tools.filter((_, j) => j !== i) })}>
-              Remove
-            </button>
-          </div>
-        ))}
-        <button type="button" className={smallSecondaryButton} onClick={() => set({ tools: [...d.tools, { name: "", server: "", tool: "", reads_only: false }] })}>
-          Add a tool
-        </button>
-        {options.servers.length === 0 && (
-          <p className="text-xs text-zinc-400">
-            No MCP server is connected yet. <Link className={linkButton} href="/connections">Connect one</Link>.
-          </p>
-        )}
+        <ToolsFound
+          d={d}
+          resolution={resolution}
+          reading={reading}
+          onRisk={(name, risk) => set({ tools: d.tools.map((t) => (t.name === name ? { ...t, risk: risk || undefined, reads_only: false } : t)) })}
+        />
       </fieldset>
 
       <fieldset className="space-y-3">
@@ -215,11 +297,7 @@ function ScheduleForm({
             className="w-full"
             value={d.notify.chat}
             onChange={(v) => set({ notify: { ...d.notify, chat: v as ScheduleDraft["notify"]["chat"] } })}
-            options={[
-              { value: "off", label: "Never (the run page only)" },
-              { value: "always", label: "After every run" },
-              { value: "failure", label: "When a run fails" },
-            ]}
+            options={WHEN}
           />
         </Field>
         <div className="space-y-2 pt-6">
@@ -232,6 +310,41 @@ function ScheduleForm({
             Allow tools that change things (off: the run only reads)
           </label>
         </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Email" htmlFor="sched-emails" hint="Addresses, comma between several.">
+          <input
+            id="sched-emails"
+            className={inputClass}
+            value={d.notify.emails.join(", ")}
+            onChange={(e) => set({ notify: { ...d.notify, emails: e.target.value.split(",").map((x) => x.trim()) } })}
+          />
+        </Field>
+        <Field label="Email them" htmlFor="sched-email-on">
+          <Select
+            id="sched-email-on"
+            className="w-full"
+            value={d.notify.email_on}
+            onChange={(v) => set({ notify: { ...d.notify, email_on: v as ScheduleDraft["notify"]["email_on"] } })}
+            options={WHEN}
+          />
+        </Field>
+        <Field label="Jira ticket to comment on" htmlFor="sched-jira-ticket" hint="Through your Jira app, like OPS-12.">
+          <input id="sched-jira-ticket" className={monoInputClass} value={d.notify.jira_ticket} onChange={(e) => set({ notify: { ...d.notify, jira_ticket: e.target.value } })} />
+        </Field>
+        <Field label="Comment" htmlFor="sched-jira-on">
+          <Select
+            id="sched-jira-on"
+            className="w-full"
+            value={d.notify.jira_comment_on}
+            onChange={(v) => set({ notify: { ...d.notify, jira_comment_on: v as ScheduleDraft["notify"]["jira_comment_on"] } })}
+            options={WHEN}
+          />
+        </Field>
+        <Field label="Jira project for a failed scheduled run" htmlFor="sched-jira-project" hint="A ticket is filed there when a scheduled run fails. Empty: none.">
+          <input id="sched-jira-project" className={monoInputClass} value={d.notify.jira_project} onChange={(e) => set({ notify: { ...d.notify, jira_project: e.target.value } })} />
+        </Field>
       </div>
 
       <Field label="What to ask the skill" htmlFor="sched-instructions" hint="Optional. Without it the run is asked to do the skill end to end.">
@@ -295,7 +408,7 @@ export default function SkillSchedulesPage() {
   const { confirm } = useConfirm();
   const [schedules, setSchedules] = useState<SkillSchedule[] | null>(null);
   const [options, setOptions] = useState<ScheduleOptions>({ skills: [], servers: [], aws_accounts: [] });
-  const [editing, setEditing] = useState<{ id: string | null; draft: ScheduleDraft } | null>(null);
+  const [editing, setEditing] = useState<{ id: string | null; draft: ScheduleDraft; resolution: Resolution | null } | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [loadError, setLoadError] = useState("");
 
@@ -337,14 +450,14 @@ export default function SkillSchedulesPage() {
         lead="Run a team skill on a schedule, as written, with its scripts and only the tools you grant. Each run keeps its report on its run page and the skill's memory for the next run."
         actions={
           canManage && !editing ? (
-            <button type="button" className={primaryButton} onClick={() => setEditing({ id: null, draft: newDraft() })}>
+            <button type="button" className={primaryButton} onClick={() => setEditing({ id: null, draft: newDraft(), resolution: null })}>
               New schedule
             </button>
           ) : undefined
         }
       />
       <div className="mt-6 space-y-4">
-        {editing && <ScheduleForm initial={editing.draft} options={options} onSave={save} onCancel={() => setEditing(null)} />}
+        {editing && <ScheduleForm initial={editing.draft} initialResolution={editing.resolution} options={options} onSave={save} onCancel={() => setEditing(null)} />}
         {loadError && <p role="alert" className="text-sm text-red-400">{loadError}</p>}
         {schedules === null && !loadError && <ListSkeleton rows={3} label="Loading schedules" />}
         {schedules !== null && sorted.length === 0 && !editing && (
@@ -362,7 +475,7 @@ export default function SkillSchedulesPage() {
                   {s.paused ? " · Paused" : s.next_run ? ` · Next: ${s.next_run.label}` : ""}
                 </p>
                 <p className="text-xs text-zinc-400">
-                  {s.tools.length} tools{s.aws ? ", Athena" : ""} · {s.allow_writes ? "writes allowed" : "read-only"} · ${s.budget.max_usd} and {s.budget.max_minutes} min per run
+                  {(s.resolution?.tools.length ?? s.tools.length)} tools{s.stdio?.length ? ` (${s.stdio.length} started in its sandbox)` : ""}{s.aws ? ", Athena" : ""} · {s.allow_writes ? "writes allowed" : "read-only"} · ${s.budget.max_usd} and {s.budget.max_minutes} min per run
                   {s.state_dirs.length > 0 ? ` · memory: ${s.state_dirs.join(", ")}` : ""}
                 </p>
                 {s.last_run && (
@@ -379,7 +492,7 @@ export default function SkillSchedulesPage() {
                   <button type="button" className={primaryButton} onClick={() => runNow(s)}>
                     Run now
                   </button>
-                  <button type="button" className={smallSecondaryButton} onClick={() => setEditing({ id: s.id, draft: draftOf(s) })}>
+                  <button type="button" className={smallSecondaryButton} onClick={() => setEditing({ id: s.id, draft: draftOf(s), resolution: s.resolution ?? null })}>
                     Edit
                   </button>
                   <button
