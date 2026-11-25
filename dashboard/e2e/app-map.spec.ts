@@ -1,13 +1,15 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import fs from "node:fs";
 import { mockWideApi } from "./wide-data";
+import { v2MapNamed } from "./app-map-v2-data";
 import path from "node:path";
 
 // The App map page: Floorplan's viewer (vendor/floorplan, MIT) in a sandboxed
 // frame, fed the map of a made-up harbor app in two repositories (a web app
 // and an API, written by the platform's Floorplan driver test), with
-// Coderhelm's Recent work and Health in the map's own fields. Every API call
-// is answered here; nothing reaches a real backend.
+// Coderhelm's Recent work and Health in the map's own fields. Its System
+// cards are named by their repositories, as the platform's copy of a map
+// names them. Every API call is answered here; nothing reaches a real backend.
 
 const SHOTS_DIR = process.env.E2E_SHOTS_DIR || path.join("test-results", "shots");
 const HARBOR = JSON.parse(fs.readFileSync(path.join(__dirname, "app-map-harbor.json"), "utf8"));
@@ -567,9 +569,44 @@ test.describe("App map reading", () => {
     // Opening a part: its name and description follow above the map.
     const inner = page.frames().find((f) => f !== page.mainFrame() && f.url().includes("/app-map/frame.html"))!;
     await inner.evaluate(() => {
-      document.getElementById("context")!.innerHTML = '<div class="k">Service</div><h1>Booking service</h1><p class="cd">Takes every booking.</p>';
+      document.getElementById("context")!.innerHTML = '<div class="k">Service</div><h1>harbor-api</h1><p class="cd">Takes every booking.</p>';
     });
-    await expect(title.getByRole("heading")).toHaveText("Booking service");
+    await expect(title.getByRole("heading")).toHaveText("harbor-api");
     await expect(title).toContainText("Takes every booking.");
+  });
+
+  test("System cards are titled by their repositories, with their roles, and journeys read by repository", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await mockApi(page, { graph: v2MapNamed() });
+    await page.goto("/app-map");
+    const v = viewer(page);
+    const card = (name: string) => v.locator("svg .node .card").filter({ has: v.locator(".title", { hasText: new RegExp(`^${name}$`) }) });
+    // One repository: its name as the title, the plain role as a small label, the description kept.
+    for (const [repo, role] of [["site", "Website"], ["server", "Main server"], ["app", "Fitness mobile app"], ["app-cms", "Mobile app content editor"]]) {
+      await expect(card(repo).first()).toBeVisible();
+      await expect(card(repo).first().locator(".ch-role")).toHaveText(role);
+    }
+    await expect(card("server").first()).toContainText("Takes every booking");
+    // A cloud setup made from a repository is that repository too.
+    await expect(card("cloud").first().locator(".ch-role")).toHaveText("Cloud setup");
+    await expect(card("server").first()).toHaveAttribute("title", "server\nMain server");
+    // Not a repository: an outside service keeps its own name and has no role label.
+    await expect(v.locator("svg .node .card .title", { hasText: /^Main server$/ })).toHaveCount(0);
+    await expect(v.locator("svg .node .card", { hasText: "Member system" }).first().locator(".ch-role")).toHaveCount(0);
+    // Journeys say which repositories they pass through.
+    const row = v.locator("#ch-start [data-flow='web-sign-in']");
+    await expect(row).toContainText("then server");
+    await expect(row).not.toContainText("Main server");
+    await expect(row).not.toContainText("Website,");
+    fs.mkdirSync(SHOTS_DIR, { recursive: true });
+    await page.screenshot({ path: path.join(SHOTS_DIR, "app-map-system-repo-names.png"), fullPage: true });
+    // The side panel names the repository and the role.
+    await card("server").first().click();
+    await expect(v.locator("[data-ch-repos]")).toContainText("Main server");
+    await expect(v.locator("[data-ch-repos]")).toContainText("Repository");
+    // A journey's steps name the repository the step is in.
+    await row.click();
+    await expect(v.locator("#ch-start .js")).toContainText("server");
+    await expect(v.locator("#ch-start .js")).not.toContainText("Main server");
   });
 });

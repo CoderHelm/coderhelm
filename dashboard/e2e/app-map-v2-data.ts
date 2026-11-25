@@ -263,3 +263,18 @@ export function v2Map() {
     coderhelm: { repos: Object.fromEntries(REPOS.map((r) => [r, `riverside-example/${r}`])), floorplan: "floorplan--v0.11.0" },
   };
 }
+
+/**
+ * The same map as the platform hands it to the page: each System card and
+ * top-level part that is one repository titled by that repository's name, its old name kept as
+ * its role (common::app_map::name_by_repo), the way the page's copy holds it.
+ */
+export function v2MapNamed() {
+  const m = v2Map();
+  for (const n of m.nodes) {
+    const paths = (n.paths as string[]).map((p) => p.replace(/\/+$/, ""));
+    if ((n.level !== "system" && n.parent !== null) || n.kind === "external" || paths.length !== 1 || paths[0].includes("/")) continue;
+    Object.assign(n, { role: n.label, label: paths[0], repos: [paths[0]] });
+  }
+  return m;
+}
