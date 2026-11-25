@@ -89,23 +89,35 @@ const fullScreenElement = () => document.fullscreenElement ?? (document as FsDoc
 const fullScreenOffered = () => !!(document.fullscreenEnabled || (document as FsDoc).webkitFullscreenEnabled);
 
 /**
- * Puts `el` on the whole screen, or takes it off. Called in the person's
- * click (or the frame's, which reaches this page too): a browser grants full
- * screen only then, so nothing is awaited before the call.
+ * Asks the browser to put `el` on the whole screen, or take it off. Called in
+ * the person's click (or the frame's, which reaches this page too): a browser
+ * grants full screen only then, so nothing is awaited before the call.
+ * Resolves false when the browser refuses or offers no full screen at all
+ * (a setting, a policy, an embedding page), so the caller can cover the
+ * window instead.
  */
-function setFullScreen(el: HTMLElement | null, on: boolean) {
-  if (!el) return;
+function setFullScreen(el: HTMLElement | null, on: boolean): Promise<boolean> {
+  if (!el) return Promise.resolve(false);
   const d = document as FsDoc;
   if (!on) {
-    if (!fullScreenElement()) return;
-    if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
-    else d.webkitExitFullscreen?.();
-    return;
+    if (!fullScreenElement()) return Promise.resolve(true);
+    if (document.exitFullscreen) return document.exitFullscreen().then(() => true, () => false);
+    d.webkitExitFullscreen?.();
+    return Promise.resolve(true);
   }
-  if (fullScreenElement() === el) return;
+  if (fullScreenElement() === el) return Promise.resolve(true);
+  if (!fullScreenOffered()) return Promise.resolve(false);
   const e = el as FsEl;
-  if (e.requestFullscreen) e.requestFullscreen().catch(() => {});
-  else e.webkitRequestFullscreen?.();
+  try {
+    if (e.requestFullscreen) return e.requestFullscreen().then(() => true, () => false);
+    if (e.webkitRequestFullscreen) {
+      e.webkitRequestFullscreen();
+      return Promise.resolve(true);
+    }
+  } catch {
+    return Promise.resolve(false);
+  }
+  return Promise.resolve(false);
 }
 
 export function MapFrame({
@@ -137,20 +149,25 @@ export function MapFrame({
 }) {
   const ref = useRef<HTMLIFrameElement | null>(null);
   const box = useRef<HTMLDivElement | null>(null);
-  // Whether the map is on the whole screen; whether this browser offers it
-  // at all (read after the first paint, so the static page matches).
-  const [isFull, setIsFull] = useState(false);
-  const [offered, setOffered] = useState(false);
-  const toggleFull = useCallback((on: boolean) => setFullScreen(box.current, on), []);
+  // The map is on the whole screen either by the browser's full screen
+  // (`browserFull`) or, when the browser refuses it, by covering the window
+  // (`windowFull`): the button works in every browser either way.
+  const [browserFull, setBrowserFull] = useState(false);
+  const [windowFull, setWindowFull] = useState(false);
+  const isFull = browserFull || windowFull;
+  const toggleFull = useCallback((on: boolean) => {
+    if (!on) {
+      setWindowFull(false);
+      void setFullScreen(box.current, false);
+      return;
+    }
+    void setFullScreen(box.current, true).then((granted) => {
+      if (!granted) setWindowFull(true);
+    });
+  }, []);
 
   useEffect(() => {
-    setOffered(fullScreenOffered());
-    const changed = () => {
-      const on = !!box.current && fullScreenElement() === box.current;
-      setIsFull(on);
-      // The viewer's own button says the same.
-      ref.current?.contentWindow?.postMessage({ type: "coderhelm:app-map-fullscreen-state", on }, "*");
-    };
+    const changed = () => setBrowserFull(!!box.current && fullScreenElement() === box.current);
     document.addEventListener("fullscreenchange", changed);
     document.addEventListener("webkitfullscreenchange", changed);
     return () => {
@@ -158,6 +175,25 @@ export function MapFrame({
       document.removeEventListener("webkitfullscreenchange", changed);
     };
   }, []);
+  // The viewer's own button says the same, and the map fills its new size.
+  useEffect(() => {
+    ref.current?.contentWindow?.postMessage({ type: "coderhelm:app-map-fullscreen-state", on: isFull }, "*");
+  }, [isFull]);
+  // Covering the window: Esc leaves, as it does the browser's full screen, and
+  // the page behind doesn't scroll.
+  useEffect(() => {
+    if (!windowFull) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setWindowFull(false);
+    };
+    const overflow = document.documentElement.style.overflow;
+    document.documentElement.style.overflow = "hidden";
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.documentElement.style.overflow = overflow;
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [windowFull]);
   const json = useMemo(() => JSON.stringify(graph), [graph]);
   const [problem, setProblem] = useState("");
   const tooBig = json.length > MAX_MAP_BYTES;
@@ -199,8 +235,16 @@ export function MapFrame({
     return <p className="text-sm text-zinc-400">This map is too large to show here.</p>;
   }
   return (
-    <div ref={box} className={isFull ? "flex h-full w-full flex-col gap-2 bg-zinc-950 p-2" : "min-w-0"} data-testid={testId} data-fullscreen={isFull ? "on" : "off"}>
-      {full && offered && (
+    <div
+      ref={box}
+      className={windowFull ? "fixed inset-0 z-[1000] flex flex-col gap-2 bg-zinc-950 p-2" : browserFull ? "flex h-full w-full flex-col gap-2 bg-zinc-950 p-2" : "min-w-0"}
+      data-testid={testId}
+      data-fullscreen={browserFull ? "on" : windowFull ? "window" : "off"}
+      role={windowFull ? "dialog" : undefined}
+      aria-modal={windowFull ? true : undefined}
+      aria-label={windowFull ? title : undefined}
+    >
+      {full && (
         <div className="flex justify-end">
           <button
             type="button"
