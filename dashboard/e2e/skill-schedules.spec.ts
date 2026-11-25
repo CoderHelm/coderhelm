@@ -11,10 +11,26 @@ interface Backend {
   schedules: Record<string, unknown>[];
   posted: Record<string, unknown>[];
   ran: string[];
+  resolves: number;
+  polls: number;
 }
 
+const SERVER = { id: "traffic-mcp", source: { kind: "git", repo: "acme/traffic-mcp", commit: "0123456789abcdef0123456789abcdef01234567" }, command: ["python3", "server.py"], aws_account: "111122223333", env: {} };
+const RESOLUTION = {
+  at: "2026-11-30T12:00:00Z",
+  tools: [
+    { name: "traffic_counts", source: "sandbox:traffic-mcp", tool: "traffic_counts", risk: "read", basis: "model", why: "looks up visit counts" },
+    { name: "tag_page", source: "sandbox:traffic-mcp", tool: "tag_page", risk: "write", basis: "annotation", why: "" },
+    { name: "set_banner", source: "sandbox:traffic-mcp", tool: "set_banner", risk: "consequential", basis: "annotation", why: "" },
+  ],
+  missing: [],
+  servers: [SERVER],
+  problems: [],
+  memory: ["snapshots"],
+};
+
 async function mockApi(page: Page): Promise<Backend> {
-  const db: Backend = { schedules: [], posted: [], ran: [] };
+  const db: Backend = { schedules: [], posted: [], ran: [], resolves: 0, polls: 0 };
   const json = (route: Route, body: unknown, status = 200) =>
     route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
   await page.route((url) => url.hostname !== "localhost", (route) => route.abort());
@@ -33,6 +49,15 @@ async function mockApi(page: Page): Promise<Backend> {
         servers: [{ id: "acme-traffic", name: "Traffic", kind: "remote" }],
         aws_accounts: [],
       });
+    if (p === "/api/skill-runs/resolve" && method === "POST") {
+      db.resolves += 1;
+      return json(route, { id: "01DRAFT" });
+    }
+    // The worker answers on its second look, as it does after a moment.
+    if (p === "/api/skill-runs/resolve/01DRAFT") {
+      db.polls += 1;
+      return json(route, { draft: { id: "01DRAFT", skill_repo: "acme/skills", skill_path: "skills/visit-count/SKILL.md", skill_name: "visit-count", done: db.polls > 1, resolution: db.polls > 1 ? RESOLUTION : null } });
+    }
     if (p === "/api/skill-runs" && method === "GET") return json(route, { schedules: db.schedules, can_edit: true });
     if (p === "/api/skill-runs" && method === "POST") {
       const body = JSON.parse(req.postData() as string) as Record<string, unknown>;
@@ -61,7 +86,7 @@ async function mockApi(page: Page): Promise<Backend> {
   return db;
 }
 
-test("an admin schedules a skill, presses Run now and reads the run's report on its page", async ({ page }) => {
+test("an admin picks a skill and a time, presses Run now and reads the run's report on its page", async ({ page }) => {
   const db = await mockApi(page);
   await page.goto("/skills/schedules/");
   await expect(page.getByRole("heading", { name: "Scheduled skill runs" })).toBeVisible();
@@ -71,14 +96,20 @@ test("an admin schedules a skill, presses Run now and reads the run's report on 
   const form = page.getByRole("form", { name: "Schedule" });
   await form.getByRole("combobox", { name: "Skill" }).click();
   await page.getByRole("option", { name: "visit-count (acme/skills)" }).click();
-  await form.getByRole("textbox", { name: "Schedule" }).fill("23 7 * * MON");
+  await form.getByRole("textbox", { name: "Schedule", exact: true }).fill("23 7 * * MON");
   await form.getByRole("textbox", { name: "Time zone" }).fill("America/New_York");
-  await form.getByRole("button", { name: "Add a tool" }).click();
-  await form.getByRole("textbox", { name: "Name in the skill" }).fill("traffic_counts");
-  await form.getByRole("combobox", { name: "Server" }).click();
-  await page.getByRole("option", { name: "Traffic" }).click();
-  await form.getByTestId("tool-row").getByRole("checkbox", { name: "Only reads" }).check();
-  await form.getByRole("textbox", { name: "Memory folder" }).fill("snapshots");
+  // The skill's tools are found for it: nothing to name or tick.
+  const found = form.getByTestId("tools-found");
+  await expect(found.getByTestId("tool-found")).toHaveCount(3);
+  await expect(found.getByTestId("tool-found").nth(0)).toContainText("traffic_counts");
+  await expect(found.getByTestId("tool-found").nth(0)).toContainText("acme/traffic-mcp at 0123456, in the run's sandbox");
+  await expect(found.getByTestId("tool-found").nth(0)).toContainText("Reads");
+  await expect(found.getByTestId("tool-found").nth(0)).toContainText("read from its description: looks up visit counts");
+  await expect(found.getByTestId("tool-found").nth(1)).toContainText("Writes: refused");
+  await expect(found.getByTestId("tool-found").nth(2)).toContainText("Never runs");
+  await expect(found.getByTestId("tool-found").nth(2).getByRole("combobox")).toHaveCount(0);
+  expect(db.resolves).toBe(1);
+  await expect(form.getByRole("textbox", { name: "Memory folder" })).toHaveValue("snapshots");
   await form.getByRole("button", { name: "Save schedule" }).click();
 
   await expect(page.getByText("Schedule saved")).toBeVisible();
@@ -88,7 +119,13 @@ test("an admin schedules a skill, presses Run now and reads the run's report on 
     skill_path: "skills/visit-count/SKILL.md",
     cron: "23 7 * * MON",
     timezone: "America/New_York",
-    tools: [{ name: "traffic_counts", server: "acme-traffic", tool: "", reads_only: true }],
+    tools: [
+      { name: "traffic_counts", server: "sandbox:traffic-mcp", tool: "" },
+      { name: "tag_page", server: "sandbox:traffic-mcp", tool: "" },
+      { name: "set_banner", server: "sandbox:traffic-mcp", tool: "" },
+    ],
+    stdio: [SERVER],
+    auto_tools: true,
     state_dirs: ["snapshots"],
     allow_writes: false,
   });
