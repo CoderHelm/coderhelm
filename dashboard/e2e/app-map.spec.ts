@@ -477,6 +477,50 @@ test.describe("App map reading", () => {
     await expect(viewer(page).locator("#ch-fullscreen")).toHaveAttribute("aria-label", "Full screen");
   });
 
+  test("when the browser refuses full screen, the map covers the window and Esc or the button leaves", async ({ page }) => {
+    // A browser may refuse full screen even in a real click (a setting, a
+    // policy, an embedding page): the button must still work.
+    await page.addInitScript(() => {
+      Element.prototype.requestFullscreen = () => Promise.reject(new TypeError("not granted"));
+    });
+    await mockBucket(page);
+    await page.goto("/app-map");
+    await expect(viewer(page).getByText("Harbor website").first()).toBeVisible();
+    const button = page.getByTestId("app-map-fullscreen");
+    const box = page.getByTestId("app-map-frame");
+    const size = await page.evaluate(() => ({ w: window.innerWidth, h: window.innerHeight }));
+    const covers = async () => {
+      const b = (await box.locator("iframe").boundingBox())!;
+      return b.width > size.w - 40 && b.height > size.h - 100;
+    };
+    await button.click();
+    await expect(box).toHaveAttribute("data-fullscreen", "window");
+    await expect(button).toHaveText("Exit full screen");
+    await expect(button).toHaveAttribute("aria-pressed", "true");
+    await expect.poll(covers).toBe(true);
+    await expect(viewer(page).locator("#ch-fullscreen")).toHaveAttribute("aria-label", "Exit full screen");
+    await page.screenshot({ path: path.join(SHOTS_DIR, "app-map-window-full.png") });
+    await page.keyboard.press("Escape");
+    await expect(box).toHaveAttribute("data-fullscreen", "off");
+    await expect(button).toHaveText("Full screen");
+    await button.click();
+    await expect(box).toHaveAttribute("data-fullscreen", "window");
+    await button.click();
+    await expect(box).toHaveAttribute("data-fullscreen", "off");
+    await expect.poll(covers).toBe(false);
+    // The viewer's own button, refused in the frame and on the page: the
+    // window is covered too.
+    const inner = page.frames().find((f) => f !== page.mainFrame() && !f.isDetached() && f.url().includes("/app-map/frame.html"))!;
+    await inner.evaluate(() => {
+      Element.prototype.requestFullscreen = () => Promise.reject(new TypeError("not granted"));
+    });
+    await box.locator("iframe").evaluate((el) => el.scrollIntoView({ block: "end" }));
+    await viewer(page).locator("#ch-fullscreen").click();
+    await expect(box).toHaveAttribute("data-fullscreen", "window");
+    await viewer(page).locator("#ch-fullscreen").click();
+    await expect(box).toHaveAttribute("data-fullscreen", "off");
+  });
+
   test("the viewer's Full screen button works, and asks the page when the browser refuses the frame", async ({ page }) => {
     await mockBucket(page);
     await page.goto("/app-map");
