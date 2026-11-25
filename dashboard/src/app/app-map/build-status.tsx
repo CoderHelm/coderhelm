@@ -158,6 +158,12 @@ export function BuiltBar({
           ) : (
             `${builtLine(status, now)}.`
           )}
+          {status.journeys_note ? (
+            <>
+              {" "}
+              <span data-testid="app-map-journeys-note">{status.journeys_note}</span>
+            </>
+          ) : null}
         </p>
         {canRebuild && !updating && (
           <button type="button" onClick={onRebuild} disabled={busy} className={buttonClass("secondary", "sm")} data-testid="app-map-rebuild">

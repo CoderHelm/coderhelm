@@ -361,7 +361,7 @@ const OVERLAYS = {
   },
 };
 
-async function mockBucket(page: Page, opts: { bucket?: "ok" | "unreachable"; hang?: () => boolean } = {}) {
+async function mockBucket(page: Page, opts: { bucket?: "ok" | "unreachable"; hang?: () => boolean; status?: () => Status } = {}) {
   const calls: string[] = [];
   const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
   await page.route((url) => url.hostname !== "localhost", (route) => route.abort());
@@ -386,7 +386,7 @@ async function mockBucket(page: Page, opts: { bucket?: "ok" | "unreachable"; han
       const recent = url.searchParams.get("recent") === "1";
       const health = url.searchParams.get("health") === "1";
       const overlays = { ...(recent ? { recent: OVERLAYS.recent } : {}), ...(health ? { health: OVERLAYS.health } : {}) };
-      return json(route, { status: READY, graph: null, graph_url: `${url.origin}${VIEW_PATH}?X-Amz-Expires=900&X-Amz-Signature=abc`, graph_fallback: "/api/app-map/graph", graph_at: NOW - 180, overlays });
+      return json(route, { status: opts.status?.() ?? READY, graph: null, graph_url: `${url.origin}${VIEW_PATH}?X-Amz-Expires=900&X-Amz-Signature=abc`, graph_fallback: "/api/app-map/graph", graph_at: NOW - 180, overlays });
     }
     return json(route, {});
   });
@@ -421,6 +421,26 @@ test.describe("App map reading", () => {
     await expect(viewer(page).getByText("Harbor website").first()).toBeVisible();
     expect(calls.filter((c) => c.startsWith("BUCKET"))).toHaveLength(1);
     await expect.poll(async () => (await shownGraph(page).catch(() => null))?.tasks).toEqual([]);
+  });
+
+  test("a repository the journeys couldn't read is named beside when the map was built, until it can be read", async ({ page }) => {
+    const note = "harbor-etl couldn't be read from GitHub just now, so the journeys through it wait; they are traced once it can be read, and every other journey goes on.";
+    let status: Status = { ...READY, unread: ["harbor/harbor-etl"], journeys_note: note };
+    const calls = await mockBucket(page, { status: () => status });
+    await page.goto("/app-map");
+    await expect(viewer(page).getByText("Harbor website").first()).toBeVisible();
+    const built = page.getByTestId("app-map-built");
+    await expect(built).toContainText("Built 3 minutes ago from 12 repositories.");
+    await expect(page.getByTestId("app-map-journeys-note")).toHaveText(note);
+    // The same plain line as the status, inside it.
+    await expect(built.locator("p")).toContainText(`from 12 repositories. ${note}`);
+    await shot(page, "app-map-journeys-note-desktop");
+    // The platform clears it once the repository is read: the line goes.
+    status = { ...READY, unread: [], journeys_note: "" };
+    await page.getByTestId("app-map-recent-toggle").click();
+    await expect.poll(() => calls.includes("GET /api/app-map?recent=0&health=1")).toBe(true);
+    await expect(page.getByTestId("app-map-journeys-note")).toHaveCount(0);
+    await expect(built).toContainText("Built 3 minutes ago from 12 repositories.");
   });
 
   test("when the bucket can't be reached, the same map comes through the API", async ({ page }) => {

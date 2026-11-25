@@ -6597,6 +6597,10 @@ export interface AppMapStatus {
   floorplan: string;
   /** `release` while the map is built again because this release finds more than the one that made it. */
   reason?: "release" | "";
+  /** Repositories the journeys couldn't read from GitHub on their last pass (`owner/name`); empty once each can be read. */
+  unread?: string[];
+  /** That, in one plain line ("" when every repository could be read). */
+  journeys_note?: string;
 }
 
 /**
