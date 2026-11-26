@@ -22,6 +22,50 @@ function largeMap() {
   return { ...HARBOR, project: { name: "Marina" }, nodes, files, routes: [], links, flows: [], tour: [], screens: [], health: { summary: { high: 0, medium: 0, low: 0 }, issues: [] }, recent: undefined };
 }
 
+/**
+ * A made-up monorepo split into two cards, as the platform serves its copy:
+ * every screen under the card its file is in (`app` and `nav.app` the card's
+ * id, `app_name` its title, the folder kept as `nav.repo`). The web app has
+ * route screens and screens its catch-all route dispatches to; the studio
+ * has document kinds and a tool.
+ */
+function siteMapPlaced() {
+  const card = (id: string, label: string, role: string, path: string) => ({ id, parent: null, level: "system", label, role, repos: [label], kind: "ui", summary: `${role}.`, details: "", tags: [], paths: [path], packages: [], hosts: [], stats: { files: 3, loc: 90, langs: { typescript: 90 }, repos: ["site"] } });
+  const file = (p: string, n: string, name: string) => ({ p, n, r: "site", l: "typescript", loc: 30, name, d: `${name}.` });
+  const files = [
+    file("site/apps/web/app/page.tsx", "web", "Home page"),
+    file("site/apps/web/app/slips/page.tsx", "web", "Slips page"),
+    file("site/apps/web/app/[...slug]/page.tsx", "web", "Page by slug"),
+    file("site/apps/web/blocks/SlipList.tsx", "web", "Slip list block"),
+    file("site/apps/web/blocks/Hero.tsx", "web", "Hero block"),
+    file("site/apps/studio/schemas/slip.ts", "studio", "Slip document"),
+    file("site/apps/studio/schemas/offer.ts", "studio", "Offer document"),
+    file("site/apps/studio/tools/import.tsx", "studio", "Import tool"),
+  ];
+  const screen = (id: string, name: string, url: string, f: string, cardId: string, cardName: string, kind: string, extra: Record<string, unknown> = {}) =>
+    ({ id, name, url, file: f, kind, app: cardId, app_name: cardName, nav: { app: cardId, repo: "site", evidence: [{ file: f, line: 1 }], ...extra } });
+  const web = (id: string, name: string, url: string, f: string, extra: Record<string, unknown> = {}) => screen(id, name, url, f, "web", "site / web", extra.dispatcher ? "dispatch" : "route", extra);
+  const studio = (id: string, name: string, f: string, kind: string) => screen(id, name, `/studio/${id}`, f, "studio", "site / studio", kind);
+  const screens = [
+    web("screen:home", "Home", "/", "site/apps/web/app/page.tsx"),
+    web("screen:slips", "Slips", "/slips", "site/apps/web/app/slips/page.tsx"),
+    web("screen:slip-list", "Slip list", "/:slug", "site/apps/web/blocks/SlipList.tsx", { dispatcher: "site/apps/web/app/[...slug]/page.tsx", renderer: "SlipList" }),
+    web("screen:hero", "Hero", "/:slug", "site/apps/web/blocks/Hero.tsx", { dispatcher: "site/apps/web/app/[...slug]/page.tsx", renderer: "Hero" }),
+    studio("doc-slip", "Slip", "site/apps/studio/schemas/slip.ts", "page-kind"),
+    studio("doc-offer", "Offer", "site/apps/studio/schemas/offer.ts", "page-kind"),
+    studio("tool-import", "Import", "site/apps/studio/tools/import.tsx", "tool"),
+  ];
+  return {
+    ...HARBOR,
+    project: { name: "Site", summary: "A website and its content studio in one repository." },
+    meta: { ...HARBOR.meta, repos: [{ path: "site", name: "site", branch: "main", head: "a".repeat(40), remote: null }] },
+    nodes: [card("web", "site / web", "Website", "site/apps/web/**"), card("studio", "site / studio", "Content studio", "site/apps/studio/**")],
+    files, routes: [], links: [], flows: [], tour: [], screens,
+    health: { summary: { high: 0, medium: 0, low: 0 }, issues: [] }, recent: undefined,
+    coderhelm: { repos: { site: "harbor/site" }, floorplan: "floorplan--v0.11.0" },
+  };
+}
+
 type Status = Record<string, unknown>;
 const NOW = Math.floor(Date.now() / 1000);
 const BASE: Status = { updating: false, step: "", stage: "", last_build: "ready", note: "", started_at: 0, repos: 0, estimate: null, built_at: 0, built_repos: 0, now: NOW, floorplan: "floorplan--v0.11.0" };
@@ -628,5 +672,28 @@ test.describe("App map reading", () => {
     await row.click();
     await expect(v.locator("#ch-start .js")).toContainText("server");
     await expect(v.locator("#ch-start .js")).not.toContainText("Main server");
+  });
+
+  test("the screens list groups every screen under the card its file is in, with no bare repository group", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const map = siteMapPlaced();
+    await mockApi(page, { graph: map });
+    await page.goto("/app-map");
+    const v = viewer(page);
+    const groups = v.locator("#ch-start details[data-app]");
+    await expect(groups).toHaveCount(2);
+    const read = async () => groups.evaluateAll((ds) => ds.map((d) => { const sp = d.querySelectorAll(":scope > summary > span"); return [sp[0]?.textContent || "", Number(sp[1]?.textContent || 0)] as [string, number]; }));
+    const got = await read();
+    // the web app's route screens and the screens its catch-all route dispatches to, and the studio's documents and tool
+    expect(got).toEqual([["site / web", 4], ["site / studio", 3]]);
+    expect(got.some(([name]) => name === "site")).toBe(false);
+    expect(got.reduce((a, [, n]) => a + n, 0)).toBe(map.screens.length);
+    // Opened, each group lists its own screens.
+    const web = v.locator("#ch-start details[data-app='web']");
+    await web.evaluate((d) => { (d as HTMLDetailsElement).open = true; });
+    for (const name of ["Home", "Slips", "Slip list", "Hero"]) await expect(web.getByText(name, { exact: true }).first()).toBeVisible();
+    await expect(web.getByText("Offer", { exact: true })).toHaveCount(0);
+    fs.mkdirSync(SHOTS_DIR, { recursive: true });
+    await page.screenshot({ path: path.join(SHOTS_DIR, "app-map-screens-by-card.png"), fullPage: true });
   });
 });
