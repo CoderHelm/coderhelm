@@ -42,6 +42,10 @@ const DAYS: [string, string][] = [
   ["sun", "Sunday"],
 ];
 
+/** The beta channel's window: every hour, at least `gap_hours` after the last install. */
+const ANY_HOUR = "any";
+const GAP_HOURS = [1, 2, 3, 4, 6, 8, 12, 24];
+
 const STATUS: Record<UpdateEntry["status"], { label: string; tone: "success" | "danger" | "waiting" | "neutral" }> = {
   running: { label: "Running", tone: "waiting" },
   preparing: { label: "Preparing", tone: "waiting" },
@@ -230,6 +234,13 @@ function System() {
 
   const v = form.values;
   const set = <K extends keyof AutoUpdateSettings>(k: K, val: AutoUpdateSettings[K]) => form.set(k, val);
+  // Any hour is the beta channel's only, and only from an updater that has it (it returns gap_hours).
+  const anyHourOffered = data?.settings?.gap_hours !== undefined && v.channel === "beta";
+  const setChannel = (c: AutoUpdateSettings["channel"]) => {
+    set("channel", c);
+    // Stable installs in its window: Any hour goes back to the default day, as the updater does.
+    if (c !== "beta" && v.day === ANY_HOUR) set("day", DEFAULTS.day);
+  };
   const latest = data.latest;
   const history = data.history ?? [];
   const canRollBack = history.some((h) => h.status === "succeeded" && h.from_version);
@@ -330,21 +341,42 @@ function System() {
           <SettingsRow
             label="Install updates automatically"
             layout="toggle"
-            help="Updates install during the hour you pick below. If anything goes wrong, Coderhelm switches back to the previous version and emails the admins."
+            help={v.day === ANY_HOUR
+              ? "Each new beta installs within the hour it comes out, with the gap you pick below. If anything goes wrong, Coderhelm switches back to the previous version and emails the admins."
+              : "Updates install during the hour you pick below. If anything goes wrong, Coderhelm switches back to the previous version and emails the admins."}
             control={(ids) => <Switch id={ids.inputId} checked={v.auto} onChange={(c) => set("auto", c)} labelledBy={ids.labelId} describedBy={ids.helpId} />}
           />
           <SettingsRow
             label="Maintenance window"
-            help="The only hour an automatic update may start."
+            help={v.day === ANY_HOUR ? "Any hour: a new beta starts at the next hourly check, once the last install is far enough back." : "The only hour an automatic update may start."}
             control={(ids) => (
               <div className="flex flex-wrap gap-2">
-                <Select id={ids.inputId} aria-label="Day" value={v.day} onChange={(d) => set("day", d)} options={DAYS.map(([k, label]) => ({ value: k, label }))} />
                 <Select
-                  aria-label="Hour"
-                  value={String(v.hour)}
-                  onChange={(h) => set("hour", Number(h))}
-                  options={Array.from({ length: 24 }, (_, h) => ({ value: String(h), label: `${String(h).padStart(2, "0")}:00` }))}
+                  id={ids.inputId}
+                  aria-label="Day"
+                  value={v.day}
+                  onChange={(d) => set("day", d)}
+                  options={[
+                    ...(anyHourOffered || v.day === ANY_HOUR ? [{ value: ANY_HOUR, label: "Any hour (beta)" }] : []),
+                    ...DAYS.map(([k, label]) => ({ value: k, label })),
+                  ]}
                 />
+                {v.day === ANY_HOUR ? (
+                  <Select
+                    aria-label="Hours between installs"
+                    data-testid="update-gap"
+                    value={String(v.gap_hours ?? 2)}
+                    onChange={(g) => set("gap_hours", Number(g))}
+                    options={GAP_HOURS.map((g) => ({ value: String(g), label: g === 1 ? "At least 1 hour apart" : `At least ${g} hours apart` }))}
+                  />
+                ) : (
+                  <Select
+                    aria-label="Hour"
+                    value={String(v.hour)}
+                    onChange={(h) => set("hour", Number(h))}
+                    options={Array.from({ length: 24 }, (_, h) => ({ value: String(h), label: `${String(h).padStart(2, "0")}:00` }))}
+                  />
+                )}
               </div>
             )}
           />
@@ -384,7 +416,7 @@ function System() {
                       name="update-channel"
                       value={c.value}
                       checked={v.channel === c.value}
-                      onChange={() => set("channel", c.value)}
+                      onChange={() => setChannel(c.value)}
                       className="mt-1 h-4 w-4 shrink-0 accent-sky-500"
                     />
                     <span className="min-w-0">
@@ -530,6 +562,7 @@ function Working({ label }: { label: string }) {
 /** "Sundays at 03:00 UTC": when automatic updates may start, or null when they're off. */
 function windowText(s: AutoUpdateSettings | undefined): string | null {
   if (!s?.auto) return null;
+  if (s.day === ANY_HOUR) return `any hour, at least ${plural(s.gap_hours ?? 2, "hour")} after the last install`;
   const day = s.day === "daily" ? "every day" : `${DAYS.find(([k]) => k === s.day)?.[1] ?? s.day}s`;
   return `${day} at ${String(s.hour).padStart(2, "0")}:00 ${s.timezone.replace(/_/g, " ")}`;
 }

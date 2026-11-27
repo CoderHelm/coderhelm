@@ -531,6 +531,32 @@ test("System: the domain section at 1440 and 390, no sideways scroll", async ({ 
   }
 });
 
+test("System: the beta channel installs at any hour, a gap after the last install; stable keeps its window", async ({ page }) => {
+  const beta = { auto: true, channel: "beta", day: "sun", hour: 3, timezone: "UTC", majors: "ask", gap_hours: 2 };
+  const { systemCalls } = await setup(page, SELF, { signedIn: true, version: { settings: beta } });
+  await page.goto("/settings/system/");
+  const day = page.getByRole("combobox", { name: "Day" });
+  await pickOption(day, "any");
+  await expect(page.getByRole("combobox", { name: "Hour", exact: true })).toHaveCount(0);
+  await pickOption(page.getByRole("combobox", { name: "Hours between installs" }), "4");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect.poll(() => systemCalls.find((c) => c.path === "/api/system/auto-update")?.body).toMatchObject({ day: "any", gap_hours: 4, channel: "beta" });
+
+  // Stable has no Any hour: moving to it puts the window back on a day.
+  await page.getByTestId("channel-stable").click();
+  await expect(page.getByRole("combobox", { name: "Hour", exact: true })).toBeVisible();
+  await day.click();
+  await expect(page.getByRole("option", { name: "Any hour (beta)" })).toHaveCount(0);
+});
+
+test("System: an updater without Any hour never offers it", async ({ page }) => {
+  await setup(page, SELF, { signedIn: true, version: { settings: { auto: true, channel: "beta", day: "sun", hour: 3, timezone: "UTC", majors: "ask" } } });
+  await page.goto("/settings/system/");
+  await page.getByRole("combobox", { name: "Day" }).click();
+  await expect(page.getByRole("option", { name: "Monday" })).toBeVisible();
+  await expect(page.getByRole("option", { name: "Any hour (beta)" })).toHaveCount(0);
+});
+
 test("System: an update still being prepared shows that, before the change set has any details", async ({ page }) => {
   // While preparing, the install sends only status and version.
   await setup(page, SELF, {
