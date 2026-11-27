@@ -25,7 +25,7 @@ export const SITE = {
   // The one sentence that defines the product, used word for word in the home
   // page, the meta description, JSON-LD and llms.txt.
   entity:
-    "CoderHelm is an AI coding agent for GitHub and Jira. Assign it an issue or a ticket and it opens a pull request in your repository, then it stays on the code: it answers review comments, fixes its own failing CI, reviews your team's pull requests and turns production alerts into fixes that a person approves. Teams can also ask it about their code and documents in Chat, and run it hosted or in their own AWS account.",
+    "CoderHelm is an engineering platform for GitHub and Jira. Assign it an issue or a ticket and it opens a pull request in your repository, then it stays on the code: it answers review comments, fixes its own failing CI, reviews your team's pull requests and turns production alerts into fixes that a person approves. Teams can also ask it about their code and documents in Chat, and run it hosted or in their own AWS account.",
   llmsDetails: [
     "Status: the hosted service is in open beta. Anyone can sign up at https://app.coderhelm.com; a team's admins choose who may join that team.",
     "Self-hosting: runs in your own AWS account as one CloudFormation stack, installed from the browser at https://docs.coderhelm.com/self-host/install/ or from a terminal. Releases are published at https://github.com/CoderHelm/coderhelm-platform/releases. One press of Update installs the newest release, or it installs itself in a maintenance window, on the Stable channel or the nightly Beta channel. Updates never wait for an AWS admin: extra permissions a release can use are a separate, optional step. Admins are emailed only when they need to act or something went wrong, plus an optional weekly digest. A hybrid install makes one choice for the whole install: CoderHelm's apps (easiest, the default) or fully private. With CoderHelm's apps, Jira, Notion, Confluence, Google Drive, Figma and every app CoderHelm adds later work with no setup; a tool with its own app set up always uses it, and GitHub has its own choice. License: FSL-1.1-ALv2 (each release becomes Apache 2.0 two years after it ships).",
@@ -93,12 +93,12 @@ const home: Page = {
   slug: "",
   path: "/",
   navLabel: "Home",
-  title: "CoderHelm: AI coding agent for GitHub and Jira",
+  title: "CoderHelm: an engineering platform for GitHub and Jira",
   description:
     "Assign a GitHub issue or Jira ticket and get a pull request. Then CoderHelm keeps the code healthy: it fixes its CI, answers review comments, reviews PRs, turns alerts into fixes and answers questions about your code.",
-  h1: "Give it a ticket. It opens the pull request and stays on it until it merges.",
+  h1: "An engineering platform for your tickets, pull requests, alerts and releases.",
   lede:
-    "CoderHelm is a coding agent for GitHub and Jira. It reads your repository, runs your build and tests, and opens a pull request for a person to review. When CI fails or a reviewer asks for a change, it fixes that too. Run it on our cloud or in your own AWS account.",
+    "CoderHelm works on GitHub and Jira. It turns tickets into pull requests and stays on them through CI and review, reviews your team's pull requests, turns alerts into fixes, quarantines flaky tests, runs release steps and answers questions about your code and docs. Run it on our cloud or in your own AWS account.",
   sections: [
     {
       id: "how-it-works",
@@ -118,7 +118,7 @@ const home: Page = {
     },
     {
       id: "a-real-one",
-      heading: "Here is one you can check.",
+      heading: "An example pull request",
       blocks: [
         {
           type: "p",
@@ -154,7 +154,7 @@ const home: Page = {
     },
     {
       id: "after-the-pull-request",
-      heading: "Then it stays on the pull request.",
+      heading: "After the pull request opens",
       blocks: [
         {
           type: "table",
@@ -171,7 +171,7 @@ const home: Page = {
     },
     {
       id: "self-host",
-      heading: "It can run in your own AWS account.",
+      heading: "Run it in your own AWS account",
       blocks: [
         {
           type: "p",
@@ -225,7 +225,7 @@ const setup: Page = {
   title: "Set up every repository in one click, with the reason for each setting",
   description:
     "CoderHelm's Setup reads each repository, recommends a value for every setting with the evidence behind it, keeps the settings you already chose, starts anything that closes or merges as a preview, and can undo any change.",
-  h1: "Pick your repositories. Click Do it for me.",
+  h1: "Repository setup",
   lede:
     "CoderHelm reads each repository the way a new teammate would: its tests, workflows, labels, branch protection, agent notes and recent pull requests. Then it turns on the settings that fit how the repository already works, says why for each one, and leaves the ones you chose alone.",
   heroFrame: { id: "setup", caption: "A Setup run: what it turned on for a repository with the evidence for each, and a preview waiting to be switched on." },
@@ -246,7 +246,7 @@ const setup: Page = {
     },
     {
       id: "reasons",
-      heading: "Every recommendation says where it came from",
+      heading: "Where each recommendation comes from",
       blocks: [
         {
           type: "table",
@@ -262,7 +262,7 @@ const setup: Page = {
     },
     {
       id: "safe",
-      heading: "Nothing changes by surprise",
+      heading: "Changes you approve",
       blocks: [
         {
           type: "cards",
@@ -280,7 +280,7 @@ const setup: Page = {
     },
     {
       id: "new",
-      heading: "New recommendations, never switched on for you",
+      heading: "New recommendations",
       blocks: [
         {
           type: "p",
@@ -323,7 +323,7 @@ const pullRequests: Page = {
   title: "GitHub issue and Jira ticket to pull request",
   description:
     "Assign a GitHub issue or Jira ticket to CoderHelm and it plans the change, writes it on its own branch, runs your build and tests, reviews its own work and opens a pull request.",
-  h1: "From a GitHub issue or Jira ticket to a pull request.",
+  h1: "Tickets to pull requests",
   lede:
     "Assign the ticket to CoderHelm or add a label. It reads the repository, plans the change, writes it, runs your build and tests, reviews its own work and opens a pull request your team can review like any other.",
   heroFrame: { id: "run", caption: "A run in the CoderHelm dashboard: each stage from triage to the opened pull request, with the files it changed." },
@@ -395,7 +395,7 @@ const reviewer: Page = {
   title: "AI code review for GitHub pull requests",
   description:
     "Add a label to any GitHub pull request and CoderHelm reviews it with the context of the whole repository, comments on exact lines with suggested fixes, rates risk and reviews again on every push.",
-  h1: "AI code review on every GitHub pull request.",
+  h1: "Code review",
   lede:
     "Turn the reviewer on for a repository and add the review label (`ch-review` by default) to any pull request. CoderHelm reviews it like an engineer who knows the codebase, and keeps reviewing as you push.",
   heroFrame: { id: "review", caption: "A CoderHelm review on GitHub: a risk level with the reason, a line comment with a suggested fix, and earlier comments resolved after they were fixed." },
@@ -466,7 +466,7 @@ const stalePrs: Page = {
   title: "Close stale pull requests without losing work",
   description:
     "CoderHelm marks a pull request stale after 7 days with no activity from a person, warns on it, and closes it 7 days later if nothing happened. Bot comments never count, it starts in Preview only and the branch is kept.",
-  h1: "Close the pull requests nobody is working on. Warn first.",
+  h1: "Stale pull requests",
   lede:
     "Old pull requests pile up and hide the ones that matter. CoderHelm finds the ones no person has touched in weeks, warns on them, and closes them only if nothing happens, with a comment that says how to reopen.",
   heroFrame: { id: "stale", caption: "A quiet pull request: the stale label and the warning, a bot comment that does not count as activity, and the close a week later with the branch kept." },
@@ -488,7 +488,7 @@ const stalePrs: Page = {
     },
     {
       id: "activity",
-      heading: "Bot noise never keeps a pull request alive",
+      heading: "Bot comments are not activity",
       blocks: [
         {
           type: "p",
@@ -508,7 +508,7 @@ const stalePrs: Page = {
     },
     {
       id: "never",
-      heading: "Never marked, never closed",
+      heading: "Pull requests it leaves alone",
       blocks: [
         {
           type: "list",
@@ -525,7 +525,7 @@ const stalePrs: Page = {
     },
     {
       id: "safe",
-      heading: "Safe from the first day",
+      heading: "Defaults",
       blocks: [
         {
           type: "cards",
@@ -569,7 +569,7 @@ const maintenance: Page = {
   title: "AI that fixes failing CI and answers review comments",
   description:
     "CoderHelm stays on the code after the pull request: it answers review comments, fixes failing CI on its pull requests, resolves merge conflicts, checks deploys after merge and writes release notes.",
-  h1: "It doesn't hand off. It stays on the code.",
+  h1: "Maintenance",
   lede:
     "Opening a pull request is where most AI tools stop. CoderHelm keeps working on it until it is merged, and keeps watching the code after that.",
   heroFrame: { id: "maintain", caption: "The timeline of one CoderHelm pull request: a check it fixed, a review comment it answered, the merge and the deploy check after it." },
@@ -632,7 +632,7 @@ const alerts: Page = {
   title: "CloudWatch alarm to pull request",
   description:
     "Route CloudWatch alarms and EventBridge events to CoderHelm through SNS. Matching alerts become analyzed pull requests in the right repository, and recoveries are paired with the alert that raised them.",
-  h1: "From a CloudWatch alarm to a pull request.",
+  h1: "Alerts to pull requests",
   lede:
     "Subscribe CoderHelm to the SNS topic that carries your alerts and add rules. An alert a rule takes becomes a run in that rule's repository: CoderHelm analyzes it, makes the change and opens a pull request your team reviews.",
   heroFrame: { id: "alert", caption: "An alarm routed to a repository, the pull request CoderHelm opened for it, and the recovery paired with the original alert." },
@@ -663,7 +663,7 @@ const alerts: Page = {
     },
     {
       id: "limits",
-      heading: "Built to stay calm",
+      heading: "Noise control",
       blocks: [
         {
           type: "list",
@@ -702,7 +702,7 @@ const securityFixes: Page = {
   title: "Security fixes for what your code reaches",
   description:
     "CoderHelm checks each advisory that touches your dependencies against your code, opens one fix pull request per repository with CI green, gives each finding a deadline and posts the urgent ones to your alerts channel.",
-  h1: "Fix what your code reaches, not everything that is present.",
+  h1: "Security fixes",
   lede:
     "An alert for every package that is present, and a pull request for every alert, is noise. CoderHelm reads your code to see whether it calls the vulnerable part, shows you the lines, and spends its pull requests and your attention where they matter.",
   heroFrame: { id: "secfix", caption: "A finding marked reachable, with the lines that call the vulnerable code, its deadline and the fix pull request." },
@@ -802,7 +802,7 @@ const infraVulns: Page = {
   title: "Vulnerabilities in what you run on AWS, and who has to fix them",
   description:
     "CoderHelm checks the AMIs, kernels, container base images, EKS nodes, databases and caches in your AWS accounts against AWS's security bulletins, opens the fix pull request or shows the exact AWS step, and marks what AWS patches for you.",
-  h1: "Know which fixes are yours, and which ones AWS makes.",
+  h1: "AWS vulnerabilities",
   lede:
     "A security bulletin lists every service it touches. CoderHelm reads what actually runs in your AWS accounts, says for each resource whether you have to act, and hands you the fix: a pull request in the code that defines it, or the exact step to run in AWS.",
   heroFrame: { id: "infra", caption: "One AWS bulletin across a team's account: a fix pull request for the instances, one for the node group, a runbook for the database, and what AWS patches on its own." },
@@ -896,7 +896,7 @@ const tests: Page = {
   title: "Flaky test detection and quarantine",
   description:
     "CoderHelm reads the end to end results your CI produces, tells flaky tests from broken ones, keeps flaky tests from failing builds and opens fix pull requests that must pass twenty runs in a row.",
-  h1: "Flaky tests stop blocking you. Broken ones never hide.",
+  h1: "Flaky tests",
   lede:
     "CoderHelm reads every end to end run your CI already produces, tells a flaky test from a broken one, and acts on it.",
   heroFrame: { id: "tests", caption: "The Tests page: each test's history run by run, flaky and broken tests told apart, and the quarantine list." },
@@ -938,10 +938,10 @@ const dataSources: Page = {
   slug: "data-sources",
   path: "/data-sources/",
   navLabel: "Data sources",
-  title: "Read only data sources for an AI coding agent",
+  title: "Read only data sources for CoderHelm agents",
   description:
     "CoderHelm checks your GraphQL API, CloudWatch Logs, PostgreSQL and Redshift while it plans, writes and reviews, with every lookup read only, enforced in code and recorded.",
-  h1: "It looks before it guesses. Read only.",
+  h1: "Data sources",
   lede:
     "Connect your API, logs and databases. While CoderHelm plans, writes code and reviews, it checks what the running system really has: whether a field exists, what a setting is, what the service logged.",
   heroFrame: { id: "lookup", caption: "A bug ticket investigated with a database lookup and a log search, both read only and recorded, before any code is planned." },
@@ -991,7 +991,7 @@ const skills: Page = {
   title: "Team skills, agent briefs and MCP servers",
   description:
     "CoderHelm works your way: it reads your AGENTS.md, the skills and agent briefs your team keeps in a repository, the MCP servers you connect and what it learned on past runs.",
-  h1: "It runs on your skills, your rules and your tools.",
+  h1: "Skills, rules and MCP servers",
   lede:
     "Keep your team's skills and agent briefs in a repository and CoderHelm reads the ones that fit the work. Connect the MCP servers you use and it pulls context from them while it plans and builds.",
   heroFrame: { id: "skills", caption: "A connected skills repository: each skill and agent brief, its switch, and how often the agents read it." },
@@ -1057,7 +1057,7 @@ const security: Page = {
   title: "Security and data handling",
   description:
     "How CoderHelm handles your code and data: changes on its own branch, builds in a sandbox with no credentials, read only data access, KMS encrypted secrets, signed webhooks and team roles.",
-  h1: "Guarded in code, not in a prompt.",
+  h1: "Security and data handling",
   lede:
     "Every guard on this page is enforced by the platform itself, so it holds whatever the model writes.",
   heroNote:
@@ -1119,7 +1119,7 @@ const knowledge: Page = {
   title: "Knowledge bases your agents and Chat can search and cite",
   description:
     "Keep pages from Notion, Confluence, Google Drive, Sanity, GitHub, websites and files in sync, import the knowledge base you already have, or connect Amazon Bedrock or any MCP search tool in place. Ask a base on its own page and see which searches used it.",
-  h1: "Your team's docs, searchable by every agent, cited in every answer.",
+  h1: "Knowledge",
   lede:
     "A knowledge base holds your specs, runbooks and policies. CoderHelm keeps it in sync with the apps your team writes in, Chat answers from it with a citation on every claim, and the coder follows your runbook instead of guessing.",
   heroFrame: { id: "knowledge", caption: "A knowledge base fed by Notion, Confluence and an S3 import: its status, tiles, a cited answer from this base only, and how each source stands." },
@@ -1176,7 +1176,7 @@ const knowledge: Page = {
     },
     {
       id: "base",
-      heading: "One page answers: is it healthy, and does it answer well?",
+      heading: "Health and answer quality",
       blocks: [
         {
           type: "p",
@@ -1195,7 +1195,7 @@ const knowledge: Page = {
     },
     {
       id: "ask",
-      heading: "Ask it, right on its page",
+      heading: "Asking a knowledge base",
       blocks: [
         {
           type: "cards",
@@ -1210,7 +1210,7 @@ const knowledge: Page = {
     },
     {
       id: "usage",
-      heading: "See which searches used it",
+      heading: "Searches that used it",
       blocks: [
         {
           type: "p",
@@ -1221,7 +1221,7 @@ const knowledge: Page = {
     },
     {
       id: "limits",
-      heading: "No small cap. A cost you choose.",
+      heading: "Cost and limits",
       blocks: [
         {
           type: "list",
@@ -1261,13 +1261,13 @@ const chat: Page = {
   title: "Chat that reads your code and cites it",
   description:
     "Ask CoderHelm about your team's repositories and knowledge. Chat opens the code itself, searches it, follows the code graph and cites every claim with the real file path and lines.",
-  h1: "Ask about your code. Every claim comes with its source.",
+  h1: "Chat",
   lede:
     "Chat answers questions about your team's work from your own sources: your repositories, your knowledge, connected apps, memories, data sources and skills. It does the reading itself and shows exactly where each answer came from.",
   sections: [
     {
       id: "research",
-      heading: "It opens the code, like a teammate would",
+      heading: "How it reads your code",
       blocks: [
         {
           type: "p",
@@ -1330,7 +1330,7 @@ const selfHost: Page = {
   title: "Self-host CoderHelm in your own AWS account",
   description:
     "Run all of CoderHelm in your own AWS account, installed from your browser: AWS quick create, your GitHub App in one click, a model access check, your own domain and checks for every step.",
-  h1: "All of CoderHelm, in your own AWS account.",
+  h1: "Self-host",
   lede:
     "Your code, tickets, logs and model calls never pass through CoderHelm's account. The install guide sets it up from your browser, and the install keeps checking itself after that.",
   heroCta: { label: "Open the install guide", href: SITE.installUrl },
@@ -1380,7 +1380,7 @@ const selfHost: Page = {
     },
     {
       id: "after",
-      heading: "It keeps checking itself",
+      heading: "Health checks",
       blocks: [
         {
           type: "p",
