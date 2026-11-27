@@ -8,7 +8,7 @@
 <h1 align="center">CoderHelm: the AI coding agent for GitHub and Jira</h1>
 
 <p align="center">
-  <strong>Ship code, not tickets.</strong> Assign an issue, get a pull request. Then CoderHelm stays on the code.
+  <strong>Give it a ticket. It opens the pull request and stays on it until it merges.</strong>
 </p>
 
 <p align="center">

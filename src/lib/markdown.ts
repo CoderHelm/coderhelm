@@ -37,22 +37,14 @@ function block(b: Block): string {
       return b.items.map((a) => `- [${a.label}](${a.href.startsWith("/") ? SITE.url + a.href : a.href})`).join("\n");
     case "note":
       return `> ${absolutize(b.text)}`;
-    case "story": {
-      let n = 0;
-      return b.chapters
-        .map((c) =>
-          [
-            `### ${c.title}`,
-            ...c.steps.map(
-              (s) =>
-                `${++n}. **${s.title}.** ${s.heading} ${absolutize(s.text)} [${s.linkLabel}](${SITE.url}${s.href})\n\n   *Product view: ${s.caption}*`,
-            ),
-          ].join("\n\n"),
-        )
-        .join("\n\n");
+    case "pr": {
+      const pr = b.pr;
+      return [
+        `[${pr.repo}#${pr.number}: ${pr.title}](${pr.href}). ${absolutize(pr.facts)}`,
+        pr.thread.map((t) => `> **${t.who}** on \`${t.file}\`: ${t.text}`).join("\n>\n"),
+        pr.commits.map((c) => `- \`${c.sha}\` ${c.time} ${c.who}: ${c.text}`).join("\n"),
+      ].join("\n\n");
     }
-    case "bento":
-      return b.items.map((c) => `- **[${c.title}](${SITE.url}${c.href}):** ${absolutize(c.text)}`).join("\n");
   }
 }
 

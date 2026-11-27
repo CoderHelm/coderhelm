@@ -8,7 +8,7 @@ import type { FrameId } from "@/content/types";
 
 function Window({ url, children, label }: { url: string; children: ReactNode; label: string }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-line bg-panel shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_30px_80px_-30px_rgba(59,130,246,0.25)]">
+    <div className="screen overflow-hidden rounded-lg border border-line bg-panel">
       <div className="flex items-center gap-3 border-b border-line bg-white/[0.02] px-4 py-2.5">
         <div className="flex gap-1.5" aria-hidden="true">
           <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
@@ -268,142 +268,6 @@ function SkillsFrame() {
   );
 }
 
-function TicketFrame() {
-  const plan = [
-    "Read the ticket, AGENTS.md and the checkout module",
-    "Add `toIsoDate()` and send the start date with it",
-    "Cover the new path in the checkout test",
-  ];
-  return (
-    <Window url="example.atlassian.net/browse/WEB-412" label="Jira ticket">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="font-mono text-[11px] text-text-muted">WEB-412</span>
-        <Pill tone="info">coderhelm</Pill>
-        <Pill tone="muted">Story</Pill>
-      </div>
-      <p className="mt-2 text-[15px] font-semibold text-text-primary">Send start date at checkout</p>
-      <p className="mt-1.5 leading-relaxed text-text-secondary">The API now needs the membership start date. Send it from the checkout form.</p>
-      <dl className="mt-4 grid grid-cols-[88px_1fr] gap-y-2 text-[12px]">
-        <dt className="text-text-muted">Assignee</dt>
-        <dd className="flex items-center gap-2 text-text-primary"><Bot /> CoderHelm</dd>
-        <dt className="text-text-muted">Repository</dt>
-        <dd className="font-mono text-text-secondary">example/web</dd>
-      </dl>
-      <div className="mt-4 rounded-lg border border-line bg-white/[0.015] p-3">
-        <div className="flex flex-wrap items-center gap-2 text-[12px]">
-          <span className="font-medium text-text-primary">Plan</span>
-          <span className="text-text-muted">3 tasks · 3 files</span>
-        </div>
-        <ol className="mt-2 grid gap-1.5">
-          {plan.map((t, i) => (
-            <li key={i} className="flex gap-2.5 text-text-secondary">
-              <span className="font-mono text-[11px] leading-5 text-text-muted">{i + 1}</span>
-              <span className="leading-5">{t.split("`").map((part, j) => (j % 2 ? <code key={j} className="font-mono text-text-primary">{part}</code> : part))}</span>
-            </li>
-          ))}
-        </ol>
-      </div>
-    </Window>
-  );
-}
-
-function CiFixFrame() {
-  const checks: [string, "ok" | "bad", string][] = [
-    ["build", "ok", "passed"],
-    ["lint", "ok", "passed"],
-    ["unit-tests", "ok", "passed after fix"],
-  ];
-  return (
-    <Window url="github.com/example/web/pull/318/checks" label="Checks">
-      <div className="rounded-lg border border-bad/30 bg-bad/[0.05] p-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <Pill tone="bad">failed</Pill>
-          <span className="font-mono text-text-primary">unit-tests</span>
-          <span className="ml-auto font-mono text-[11px] text-text-muted">09:19</span>
-        </div>
-        <pre className="mt-2 whitespace-pre-wrap break-words font-mono text-[12px] leading-5 text-text-secondary">{`submit.test.ts › sends start date
-  expected "2026-11-01", received "11/01/2026"`}</pre>
-      </div>
-      <div className="mt-3 flex gap-3 rounded-lg border border-line p-3">
-        <Bot />
-        <div className="min-w-0">
-          <p className="text-text-secondary"><b className="text-text-primary">coderhelm</b> pushed <code className="font-mono text-text-primary">a41c9e2</code></p>
-          <p className="mt-1 text-text-secondary">Format the start date as an ISO date before sending it. The test expected ISO; the form gave a local date.</p>
-        </div>
-      </div>
-      <ul className="mt-3 grid gap-1.5">
-        {checks.map(([name, tone, note]) => (
-          <li key={name} className="flex items-center gap-2.5">
-            <Dot tone={tone} />
-            <span className="font-mono text-text-primary">{name}</span>
-            <span className="text-[12px] text-text-muted">{note}</span>
-          </li>
-        ))}
-      </ul>
-      <p className="mt-3 text-[12px] text-text-muted">Push 1 of at most 8 · stops if the same failure comes back</p>
-    </Window>
-  );
-}
-
-function ReplyFrame() {
-  return (
-    <Window url="github.com/example/web/pull/318#discussion" label="Review thread">
-      <div className="overflow-hidden rounded-lg border border-line">
-        <div className="border-b border-line bg-white/[0.02] px-3 py-2 font-mono text-[11px] text-text-muted">src/checkout/dates.ts · line 8</div>
-        <div className="grid gap-4 p-3">
-          <div className="flex gap-3">
-            <span className="inline-flex h-6 w-6 flex-none items-center justify-center rounded-full bg-warn/20 text-[10px] font-bold text-warn" aria-hidden="true">ML</span>
-            <div className="min-w-0">
-              <p className="text-[12px] text-text-muted"><b className="text-text-primary">maria</b> · reviewer</p>
-              <p className="mt-1 text-text-secondary">We already have a date helper in <code className="font-mono text-text-primary">lib/dates</code>. Can we reuse it instead of adding a new one?</p>
-            </div>
-          </div>
-          <div className="flex gap-3">
-            <Bot />
-            <div className="min-w-0">
-              <p className="text-[12px] text-text-muted"><b className="text-text-primary">coderhelm</b> · 7 minutes later</p>
-              <p className="mt-1 text-text-secondary">Done. Removed the new helper and switched checkout to <code className="font-mono text-text-primary">toIsoDate()</code> from <code className="font-mono text-text-primary">lib/dates</code>. Tests still pass.</p>
-              <p className="mt-2 font-mono text-[11px] text-accent-text">Pushed 1 commit · 2 files changed</p>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div className="mt-3 flex flex-wrap items-center gap-2 text-[12px] text-text-muted">
-        <Pill tone="ok">Up to date with main</Pill>
-        <span>Conflicts with the base branch resolved before the change</span>
-      </div>
-    </Window>
-  );
-}
-
-function MergeFrame() {
-  const rows: { tone: "ok" | "info"; text: ReactNode; when: string }[] = [
-    { tone: "ok", text: <><b className="text-text-primary">maria</b> approved these changes</>, when: "13:02" },
-    { tone: "ok", text: <>All checks passed on <code className="font-mono text-text-primary">c7d10f4</code>, the reviewed commit</>, when: "13:04" },
-    { tone: "info", text: <>Merged into <code className="font-mono text-text-primary">main</code></>, when: "13:05" },
-    { tone: "ok", text: <>Deploy checks finished. No new failures since the merge</>, when: "13:31" },
-  ];
-  return (
-    <Window url="github.com/example/web/pull/318" label="Merge">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[15px] font-semibold text-text-primary">Send start date at checkout</span>
-        <span className="font-mono text-text-muted">#318</span>
-        <Pill tone="ok">Merged</Pill>
-      </div>
-      <ol className="mt-5 grid gap-3.5 border-l border-line pl-4">
-        {rows.map((r, i) => (
-          <li key={i} className="relative flex gap-3">
-            <span className="absolute -left-[21px] top-0"><Dot tone={r.tone} /></span>
-            <span className="min-w-0 flex-1 leading-5 text-text-secondary">{r.text}</span>
-            <span className="flex-none font-mono text-[11px] leading-5 text-text-muted">{r.when}</span>
-          </li>
-        ))}
-      </ol>
-      <p className="mt-4 rounded-lg border border-line bg-white/[0.015] px-3 py-2.5 text-[12px] text-text-muted">Auto merge was turned on for this repository. It never merges without a person&rsquo;s approval and never rolls back a shared branch.</p>
-    </Window>
-  );
-}
-
 function SecFixFrame() {
   return (
     <Window url="app.coderhelm.com/security" label="Security">
@@ -628,42 +492,6 @@ function InfraFrame() {
   );
 }
 
-function ConnectFrame() {
-  const cites = [
-    { n: 1, what: "payments/src/refunds.ts, lines 40 to 88", base: "Code" },
-    { n: 2, what: "PAY-311 Partial refunds for split orders, in review", base: "Work" },
-    { n: 3, what: "refunds-worker Lambda, payments-prod, us-east-1, defined in infra/payments.ts", base: "Infrastructure" },
-  ];
-  return (
-    <Window url="Cursor · Chat" label="Any AI tool">
-      <div className="grid grid-cols-1 gap-3 [&>*]:min-w-0">
-        <div className="flex flex-wrap gap-2 text-[12px]">
-          <Pill tone="info">Cursor</Pill>
-          <Pill tone="muted">Claude</Pill>
-          <Pill tone="muted">ChatGPT</Pill>
-          <Pill tone="muted">VS Code</Pill>
-        </div>
-        <div className="ml-auto max-w-[85%] rounded-lg border border-line bg-white/[0.03] px-3 py-2 text-text-primary">Where are refunds handled, and what&apos;s open on them?</div>
-        <p className="text-[12px] text-text-muted">Used CoderHelm: code_search, find_tickets, infra_resources</p>
-        <p className="leading-relaxed text-text-secondary">
-          Refunds are worked out in the payments service <span className="font-mono text-[11px] text-accent-text">[1]</span>. Partial refunds for split orders are in review <span className="font-mono text-[11px] text-accent-text">[2]</span>. They run in the refunds worker in production <span className="font-mono text-[11px] text-accent-text">[3]</span>.
-        </p>
-        <div className="grid gap-1.5">
-          {cites.map((c) => (
-            <div key={c.n} className="flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-lg border border-line px-3 py-2 text-[12px]">
-              <span className="font-mono text-accent-text">[{c.n}]</span>
-              <span className="min-w-0 text-text-secondary">{c.what}</span>
-              <span className="ml-auto">
-                <Pill tone="muted">{c.base}</Pill>
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </Window>
-  );
-}
-
 const FRAMES: Record<FrameId, () => ReactNode> = {
   maintain: MaintainFrame,
   review: ReviewFrame,
@@ -672,16 +500,11 @@ const FRAMES: Record<FrameId, () => ReactNode> = {
   tests: TestsFrame,
   lookup: LookupFrame,
   skills: SkillsFrame,
-  ticket: TicketFrame,
-  cifix: CiFixFrame,
-  reply: ReplyFrame,
-  merge: MergeFrame,
   secfix: SecFixFrame,
   stale: StaleFrame,
   setup: SetupFrame,
   knowledge: KnowledgeFrame,
   infra: InfraFrame,
-  connect: ConnectFrame,
 };
 
 export function Frame({ id, caption, priority = false, hideCaption = false }: { id: FrameId; caption: string; priority?: boolean; hideCaption?: boolean }) {

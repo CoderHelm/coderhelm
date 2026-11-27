@@ -13,8 +13,8 @@ export default function Nav() {
   const links = navPages();
   const groups = featureMenu();
   return (
-    <header className="sticky top-0 z-50 border-b border-line bg-surface/85 backdrop-blur-md">
-      <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:rounded focus:bg-white focus:px-3 focus:py-1.5 focus:text-sm focus:text-black">
+    <header className="sticky top-0 z-50 border-b border-line bg-surface/95">
+      <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:rounded focus:bg-text-primary focus:px-3 focus:py-1.5 focus:text-sm focus:text-surface">
         Skip to content
       </a>
       <nav aria-label="Main" className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
@@ -32,10 +32,10 @@ export default function Nav() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 9l6 6 6-6" />
                 </svg>
               </summary>
-              <div className="absolute left-0 top-full mt-4 grid w-[600px] grid-cols-3 gap-6 rounded-xl border border-line bg-surface p-5 shadow-[0_30px_80px_-30px_rgba(0,0,0,0.8)]">
+              <div className="absolute left-0 top-full mt-4 grid w-[600px] grid-cols-3 gap-6 rounded-xl border border-line bg-surface p-5 shadow-[0_12px_32px_-16px_rgba(24,24,27,0.25)]">
                 {groups.map((g) => (
                   <div key={g.title}>
-                    <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-text-muted">{g.title}</p>
+                    <p className="text-[13px] font-medium text-text-primary">{g.title}</p>
                     <ul className="mt-3 grid gap-2.5">
                       {g.pages.map((p) => (
                         <li key={p.slug}>
@@ -66,7 +66,7 @@ export default function Nav() {
           <a href={SITE.appUrl} className="text-sm text-text-secondary transition-colors hover:text-text-primary">
             Sign in
           </a>
-          <a href={SITE.appUrl} className="rounded-md bg-white px-3.5 py-1.5 text-sm font-semibold text-black transition-opacity hover:opacity-90">
+          <a href={SITE.appUrl} className="rounded-md bg-text-primary px-3.5 py-1.5 text-sm font-medium text-surface transition-opacity hover:opacity-85">
             Get started
           </a>
         </div>
@@ -83,7 +83,7 @@ export default function Nav() {
           <div className="fixed inset-x-0 top-14 max-h-[calc(100dvh-3.5rem)] overflow-y-auto border-b border-line bg-surface px-4 pb-6 pt-2">
             {groups.map((g) => (
               <div key={g.title} className="mt-3">
-                <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-text-muted">{g.title}</p>
+                <p className="text-[13px] font-medium text-text-primary">{g.title}</p>
                 <ul className="mt-1 grid grid-cols-2 gap-x-4">
                   {g.pages.map((p) => (
                     <li key={p.slug}>
@@ -113,7 +113,7 @@ export default function Nav() {
               <a href={SITE.appUrl} className="rounded-md border border-line px-4 py-2.5 text-center text-sm text-text-primary">
                 Sign in
               </a>
-              <a href={SITE.appUrl} className="rounded-md bg-white px-4 py-2.5 text-center text-sm font-semibold text-black">
+              <a href={SITE.appUrl} className="rounded-md bg-text-primary px-4 py-2.5 text-center text-sm font-medium text-surface">
                 Get started
               </a>
             </div>

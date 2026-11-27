@@ -4,8 +4,7 @@ import { SITE, pageBySlug } from "@/content/site";
 import { pageJsonLd, jsonLdString } from "@/lib/seo";
 import { Inline } from "./Md";
 import { Frame } from "./Frames";
-import { Story } from "./Story";
-import { Bento } from "./Bento";
+import { PullRequestView } from "./PullRequest";
 import { Shot } from "./Shot";
 import Nav from "./Nav";
 import Footer from "./Footer";
@@ -23,7 +22,7 @@ function BlockView({ block }: { block: Block }) {
         <ul className="grid max-w-3xl gap-2.5">
           {block.items.map((t) => (
             <li key={t} className="flex gap-3 text-[15px] leading-relaxed text-text-secondary">
-              <svg className="mt-[5px] h-4 w-4 flex-none text-accent-text" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <svg className="mt-[5px] h-4 w-4 flex-none text-text-muted" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                 <path d="M3.5 8.5l3 3 6-7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
               <span><Inline text={t} /></span>
@@ -36,7 +35,7 @@ function BlockView({ block }: { block: Block }) {
         <ol className="grid gap-px overflow-hidden rounded-xl border border-line bg-line md:grid-cols-3">
           {block.items.map((s, i) => (
             <li key={s.title} className="bg-surface p-6">
-              <span className="font-mono text-xs text-accent-text">{String(i + 1).padStart(2, "0")}</span>
+              <span className="font-serif text-2xl text-text-muted">{i + 1}</span>
               <h3 className="mt-3 text-base font-semibold text-text-primary">{s.title}</h3>
               <p className="mt-2 text-[15px] leading-relaxed text-text-secondary"><Inline text={s.text} /></p>
             </li>
@@ -45,8 +44,9 @@ function BlockView({ block }: { block: Block }) {
       );
     case "cards":
       return (
-        // Pick columns that fill every row, so no empty cell shows.
-        <ul className={`grid gap-px overflow-hidden rounded-xl border border-line bg-line ${block.items.length % 3 === 0 ? (block.items.length === 3 ? "md:grid-cols-3" : "sm:grid-cols-2 lg:grid-cols-3") : "sm:grid-cols-2"}`}>
+        // Pick columns that fill every row; an odd last card spans the row,
+        // so no empty cell shows.
+        <ul className={`grid gap-px overflow-hidden rounded-xl border border-line bg-line ${block.items.length % 3 === 0 ? (block.items.length === 3 ? "md:grid-cols-3" : "sm:grid-cols-2 lg:grid-cols-3") : "sm:grid-cols-2 sm:[&>li:last-child:nth-child(odd)]:col-span-2"}`}>
           {block.items.map((c) => (
             <li key={c.title} className="relative bg-surface p-6 transition-colors has-[a]:hover:bg-surface-raised">
               <h3 className="text-[15px] font-semibold text-text-primary">
@@ -106,7 +106,7 @@ function BlockView({ block }: { block: Block }) {
           {block.items.map((a, i) => {
             const cls =
               i === 0
-                ? "rounded-md bg-white px-5 py-2.5 text-[15px] font-semibold text-black hover:opacity-90"
+                ? "rounded-md bg-text-primary px-5 py-2.5 text-[15px] font-medium text-surface hover:opacity-85"
                 : "rounded-md border border-line px-5 py-2.5 text-[15px] font-medium text-text-primary hover:bg-surface-raised";
             return a.href.startsWith("/") ? (
               <Link key={a.href} href={a.href} className={cls}>{a.label}</Link>
@@ -122,10 +122,8 @@ function BlockView({ block }: { block: Block }) {
           <Inline text={block.text} />
         </p>
       );
-    case "story":
-      return <Story chapters={block.chapters} />;
-    case "bento":
-      return <Bento items={block.items} />;
+    case "pr":
+      return <PullRequestView pr={block.pr} />;
   }
 }
 
@@ -137,8 +135,7 @@ export function SectionView({ section }: { section: Section }) {
   const text = section.blocks.filter((b) => !split || !isPicture(b));
   const heading = (
     <>
-      {section.eyebrow && <p className="font-mono text-xs uppercase tracking-[0.14em] text-accent-text">{section.eyebrow}</p>}
-      <h2 id={`${section.id}-h`} className="mt-3 max-w-3xl text-balance text-3xl font-semibold tracking-tight text-text-primary sm:text-4xl">
+      <h2 id={`${section.id}-h`} className="max-w-3xl text-balance font-serif text-3xl font-medium tracking-[-0.01em] text-text-primary sm:text-4xl">
         {section.heading}
       </h2>
     </>
@@ -177,10 +174,10 @@ export function Cta({ heading = "Put CoderHelm on your next ticket." }: { headin
   return (
     <section aria-labelledby="cta-h" className="border-t border-line">
       <div className="mx-auto max-w-6xl px-4 py-20 text-center sm:px-6 sm:py-28">
-        <h2 id="cta-h" className="mx-auto max-w-2xl text-balance text-3xl font-semibold tracking-tight sm:text-4xl">{heading}</h2>
+        <h2 id="cta-h" className="mx-auto max-w-2xl text-balance font-serif text-3xl font-medium sm:text-4xl">{heading}</h2>
         <p className="mx-auto mt-4 max-w-xl text-[17px] text-text-secondary">{SITE.ctaNote}</p>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
-          <a href={SITE.appUrl} className="rounded-md bg-white px-5 py-2.5 text-[15px] font-semibold text-black hover:opacity-90">Get started</a>
+          <a href={SITE.appUrl} className="rounded-md bg-text-primary px-5 py-2.5 text-[15px] font-medium text-surface hover:opacity-85">Get started</a>
           <Link href="/self-host/" className="rounded-md border border-line px-5 py-2.5 text-[15px] font-medium text-text-primary hover:bg-surface-raised">Self-host it</Link>
           <Link href="/contact/" className="rounded-md border border-line px-5 py-2.5 text-[15px] font-medium text-text-primary hover:bg-surface-raised">Talk to us</Link>
         </div>
@@ -213,16 +210,15 @@ export default function PageView({ page }: { page: Page }) {
             <li aria-current="page" className="text-text-secondary">{page.navLabel}</li>
           </ol>
         </nav>
-        {page.eyebrow && <p className="mt-8 font-mono text-xs uppercase tracking-[0.14em] text-accent-text">{page.eyebrow}</p>}
-        <h1 className="mt-3 max-w-4xl text-balance text-4xl font-semibold tracking-tight sm:text-6xl">{page.h1}</h1>
+        <h1 className="mt-8 max-w-4xl text-balance font-serif text-4xl font-medium tracking-[-0.015em] sm:text-6xl">{page.h1}</h1>
         <p className="mt-6 max-w-2xl text-lg leading-relaxed text-text-secondary"><Inline text={page.lede} /></p>
         {page.heroNote && (
-          <p className="mt-6 max-w-2xl rounded-lg border border-accent/40 bg-accent/10 px-4 py-3 text-[15px] leading-relaxed text-text-primary">
+          <p className="mt-6 max-w-2xl border-l-2 border-accent-text py-1 pl-4 text-[15px] leading-relaxed text-text-primary">
             <Inline text={page.heroNote} />
           </p>
         )}
         <div className="mt-8 flex flex-wrap gap-3">
-          <a href={page.heroCta?.href ?? SITE.appUrl} className="rounded-md bg-white px-5 py-2.5 text-[15px] font-semibold text-black hover:opacity-90">{page.heroCta?.label ?? "Get started"}</a>
+          <a href={page.heroCta?.href ?? SITE.appUrl} className="rounded-md bg-text-primary px-5 py-2.5 text-[15px] font-medium text-surface hover:opacity-85">{page.heroCta?.label ?? "Get started"}</a>
           <a href={`/${page.slug}.md`} className="rounded-md border border-line px-5 py-2.5 text-[15px] font-medium text-text-secondary hover:text-text-primary">Read as Markdown</a>
         </div>
         {page.heroFrame && (
@@ -237,7 +233,7 @@ export default function PageView({ page }: { page: Page }) {
       {related.length > 0 && (
         <section aria-labelledby="related-h" className="border-t border-line">
           <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-            <h2 id="related-h" className="text-xl font-semibold">Related</h2>
+            <h2 id="related-h" className="font-serif text-2xl font-medium">Related</h2>
             <ul className="mt-6 grid gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-2 lg:grid-cols-3">
               {related.map((p) => (
                 <li key={p.slug} className="relative bg-surface p-5 hover:bg-surface-raised">
