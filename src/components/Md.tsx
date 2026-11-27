@@ -15,7 +15,7 @@ export function Inline({ text }: { text: string }) {
         const link = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
         if (link) {
           const [, label, href] = link;
-          const cls = "text-accent-text underline decoration-accent-text/30 underline-offset-4 hover:decoration-accent-text";
+          const cls = "text-accent-text underline decoration-accent-text/35 underline-offset-4 hover:decoration-accent-text";
           return href.startsWith("/") ? (
             <Link key={i} href={href} className={cls}>
               {label}
@@ -28,7 +28,7 @@ export function Inline({ text }: { text: string }) {
         }
         if (part.startsWith("`")) {
           return (
-            <code key={i} className="rounded bg-white/[0.06] px-1.5 py-0.5 font-mono text-[0.9em] text-text-primary">
+            <code key={i} className="rounded bg-text-primary/[0.06] px-1.5 py-0.5 font-mono text-[0.9em] text-text-primary">
               {part.slice(1, -1)}
             </code>
           );
@@ -80,7 +80,7 @@ export function MarkdownDoc({ source }: { source: string }) {
       out.push(
         <div key={i} className="mt-4 overflow-x-auto rounded-lg border border-line">
           <table className="w-full text-left text-sm">
-            <thead className="bg-white/[0.03] text-text-primary">
+            <thead className="bg-surface-raised text-text-primary">
               <tr>{head.map((c, j) => <th key={j} scope="col" className="px-4 py-2.5 font-semibold"><Inline text={c} /></th>)}</tr>
             </thead>
             <tbody className="divide-y divide-line text-text-secondary">

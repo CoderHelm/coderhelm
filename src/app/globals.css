@@ -1,26 +1,57 @@
 @import "tailwindcss";
 
-/* Brand tokens (brand/BRAND.md): white on black, one blue accent. */
+/* Brand tokens (brand/BRAND.md): ink on paper, the /// mark's one blue.
+   Pictures of the product (.screen) keep the dashboard's own dark colors. */
 @theme {
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-serif: var(--font-newsreader), "Iowan Old Style", Georgia, serif;
   --font-mono: var(--font-geist-mono), "JetBrains Mono", "SF Mono", ui-monospace, monospace;
 
+  --color-surface: #f7f6f2;
+  --color-surface-raised: #efede7;
+  --color-panel: #ffffff;
+  --color-line: #dcd9d0;
+  --color-text-primary: #18181b; /* 16.4:1 on surface */
+  --color-text-secondary: #46464e; /* 8.6:1 on surface */
+  --color-text-muted: #64646c; /* 5.4:1 on surface */
+  --color-accent: #3b82f6;
+  --color-accent-text: #1d4ed8; /* accent for text, 6.2:1 on surface */
+  --color-ok: #15803d;
+  --color-warn: #a16207;
+  --color-bad: #b91c1c;
+}
+
+/* The dashboard is dark, so its pictures stay dark on the paper page. */
+.screen {
+  color-scheme: dark;
   --color-surface: #0a0a0a;
   --color-surface-raised: #121212;
   --color-panel: #0f0f10;
   --color-line: #232326;
   --color-text-primary: #fafafa;
-  --color-text-secondary: #a1a1aa; /* 7.6:1 on surface */
-  --color-text-muted: #8b8b93; /* 5.6:1 on surface */
-  --color-accent: #3b82f6;
-  --color-accent-text: #6ea8ff; /* accent for text, 7.4:1 on surface */
+  --color-text-secondary: #a1a1aa;
+  --color-text-muted: #8b8b93;
+  --color-accent-text: #6ea8ff;
   --color-ok: #4ade80;
   --color-warn: #fbbf24;
   --color-bad: #f87171;
+  color: var(--color-text-primary);
+}
+
+/* A band set in reverse, paper on ink. */
+.ink {
+  color-scheme: dark;
+  --color-surface: #18181b;
+  --color-surface-raised: #222226;
+  --color-line: #3a3a40;
+  --color-text-primary: #f7f6f2; /* 16.4:1 on ink */
+  --color-text-secondary: #c8c7c1; /* 10.5:1 on ink */
+  --color-text-muted: #a2a19b; /* 6.8:1 on ink */
+  --color-accent-text: #9dbcff; /* 9.3:1 on ink */
 }
 
 html {
-  color-scheme: dark;
+  color-scheme: light;
   background: var(--color-surface);
   -webkit-text-size-adjust: 100%;
 }
@@ -38,43 +69,5 @@ html {
 }
 
 ::selection {
-  background: rgb(59 130 246 / 0.35);
-}
-
-/* Faint grid behind the hero. Pure CSS, no image request. */
-.hero-grid {
-  background-image:
-    radial-gradient(ellipse 60% 50% at 50% 0%, rgb(59 130 246 / 0.12), transparent 70%),
-    linear-gradient(to right, rgb(255 255 255 / 0.035) 1px, transparent 1px),
-    linear-gradient(to bottom, rgb(255 255 255 / 0.035) 1px, transparent 1px);
-  background-size: 100% 100%, 56px 56px, 56px 56px;
-  mask-image: linear-gradient(to bottom, black 40%, transparent);
-}
-
-/* The story rail marks the step crossing the middle of the screen. Browsers
-   without scroll driven animations simply show plain links. It is a color
-   change, not motion, so it stays on with reduced motion. */
-@supports (animation-timeline: view()) {
-  .story-step {
-    view-timeline-inset: 45% 45%;
-  }
-  .story-link {
-    animation: story-on linear both;
-    animation-fill-mode: none;
-  }
-  @keyframes story-on {
-    from,
-    to {
-      color: var(--color-text-primary);
-      border-left-color: var(--color-accent-text);
-    }
-  }
-}
-
-/* The accent words in the home headline. */
-.hero-accent {
-  background: linear-gradient(100deg, #fafafa 0%, #9cc2ff 55%, var(--color-accent) 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  background: rgb(59 130 246 / 0.22);
 }

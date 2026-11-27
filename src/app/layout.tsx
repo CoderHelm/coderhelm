@@ -1,10 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Newsreader } from "next/font/google";
 import { SITE } from "@/content/site";
 import "./globals.css";
 
 const sans = Geist({ subsets: ["latin"], variable: "--font-geist-sans", display: "swap" });
 const mono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono", display: "swap", preload: false });
+// Headings are set in Newsreader, a text serif made for reading on screens.
+const serif = Newsreader({ subsets: ["latin"], variable: "--font-newsreader", display: "swap", axes: ["opsz"] });
 
 // Site-wide defaults. Every page sets its own title, description, canonical,
 // Markdown alternate and Open Graph data through pageMetadata().
@@ -31,8 +33,8 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0a0a0a",
-  colorScheme: "dark",
+  themeColor: "#f7f6f2",
+  colorScheme: "light",
 };
 
 const GA_ID = "G-T14Q1LDRC0";
@@ -47,7 +49,7 @@ const GA_CONFIG = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${sans.variable} ${mono.variable}`}>
+    <html lang="en" className={`${sans.variable} ${mono.variable} ${serif.variable}`}>
       <head>
         <link rel="alternate" type="text/plain" href="/llms.txt" title="llms.txt" />
         {/* Google tag, once per page. */}

@@ -13,36 +13,27 @@ export type FrameId =
   | "tests"
   | "lookup"
   | "skills"
-  | "ticket"
-  | "cifix"
-  | "reply"
-  | "merge"
   | "secfix"
   | "stale"
   | "setup"
   | "knowledge"
-  | "infra"
-  | "connect";
+  | "infra";
 
 // Screenshots of the dashboard in public/shots/, taken from its end to end
 // tests' made up data (see src/content/shots.ts).
 export type ShotId = "chat" | "knowledge" | "setup" | "kbBase" | "kbUsage" | "setupResults" | "infra";
 
-// Small pictures for the bento cells on the home page.
-export type MiniId = "lookup" | "skills" | "plans" | "security";
-
-export type StoryStep = {
-  id: string; // anchor, unique on the page
-  title: string; // short label in the step selector
-  heading: string; // one sentence shown with the picture
-  text: string;
-  frame: FrameId;
-  caption: string;
+// A real pull request CoderHelm opened in a public repository, quoted word
+// for word: the review thread and the commits, with links to check them.
+export type PullRequest = {
+  repo: string; // "owner/name"
+  number: number;
+  title: string;
   href: string;
-  linkLabel: string;
+  facts: string; // one line: when it opened, from which issue, how it ended
+  thread: { who: string; bot?: boolean; file: string; text: string }[];
+  commits: { sha: string; time: string; who: string; text: string }[];
 };
-
-export type Chapter = { title: string; steps: StoryStep[] };
 
 export type Block =
   | { type: "p"; text: string }
@@ -51,9 +42,7 @@ export type Block =
   | { type: "cards"; items: { title: string; text: string; href?: string }[] }
   | { type: "faq"; items: { q: string; a: string }[] }
   | { type: "table"; head: string[]; rows: string[][] }
-  // One ticket followed through its life, grouped by the job each step does.
-  | { type: "story"; chapters: Chapter[] }
-  | { type: "bento"; items: { title: string; text: string; href: string; mini: MiniId; wide?: boolean }[] }
+  | { type: "pr"; pr: PullRequest }
   // A picture of the product. The caption is what the Markdown twin keeps.
   | { type: "frame"; id: FrameId; caption: string }
   // A screenshot of the real dashboard, taken with made up example data.
@@ -65,7 +54,6 @@ export type Block =
 
 export type Section = {
   id: string;
-  eyebrow?: string;
   heading: string;
   blocks: Block[];
 };
@@ -76,7 +64,6 @@ export type Page = {
   navLabel: string;
   title: string; // <title>, without the site suffix
   description: string; // meta description, also the llms.txt note
-  eyebrow?: string;
   h1: string;
   lede: string;
   // A short pointer under the lede, for a page people often open while
