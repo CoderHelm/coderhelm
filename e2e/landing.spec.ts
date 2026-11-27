@@ -11,13 +11,13 @@ for (const width of widths) {
 
     test("shows each section in order with no sideways scroll", async ({ page }) => {
       await page.goto("/");
-      await expect(page.getByRole("heading", { level: 1 })).toHaveText(/Give it a ticket/);
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText(/An engineering platform/);
       const headings = await page.locator("main h2").allTextContents();
       expect(headings).toEqual([
         "From ticket to pull request",
-        "Here is one you can check.",
-        "Then it stays on the pull request.",
-        "It can run in your own AWS account.",
+        "An example pull request",
+        "After the pull request opens",
+        "Run it in your own AWS account",
         "What else it does",
       ]);
       const sideways = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
