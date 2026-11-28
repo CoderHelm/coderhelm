@@ -21,7 +21,23 @@ export type FrameId =
 
 // Screenshots of the dashboard in public/shots/, taken from its end to end
 // tests' made up data (see src/content/shots.ts).
-export type ShotId = "chat" | "knowledge" | "setup" | "kbBase" | "kbUsage" | "setupResults" | "infra";
+export type ShotId =
+  | "chat"
+  | "knowledge"
+  | "setup"
+  | "kbBase"
+  | "kbUsage"
+  | "setupResults"
+  | "infra"
+  // The home page's pictures: light versions in the site's colors, each in
+  // AVIF and WebP at two widths with a PNG fallback (public/shots/home).
+  | "homeHero"
+  | "homeRun"
+  | "homeReview"
+  | "homeAlert"
+  | "homeRelease"
+  | "homeChat"
+  | "homeAppMap";
 
 // A real pull request CoderHelm opened in a public repository, quoted word
 // for word: the review thread and the commits, with links to check them.
@@ -39,7 +55,7 @@ export type Block =
   | { type: "p"; text: string }
   | { type: "list"; items: string[] }
   | { type: "steps"; items: { title: string; text: string }[] }
-  | { type: "cards"; items: { title: string; text: string; href?: string }[] }
+  | { type: "cards"; items: { title: string; text: string; href?: string; shot?: ShotId }[] }
   | { type: "faq"; items: { q: string; a: string }[] }
   | { type: "table"; head: string[]; rows: string[][] }
   | { type: "pr"; pr: PullRequest }

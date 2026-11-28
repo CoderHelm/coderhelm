@@ -8,7 +8,15 @@ import type { ShotId } from "./types";
 
 type Img = { src: string; width: number; height: number };
 
-export const SHOTS: Record<ShotId, { alt: string; desktop: Img; phone?: Img }> = {
+// The home page's pictures (public/shots/home) are the light versions from
+// e2e/landing-shots-*.spec.ts, made by dashboard/scripts/home-shots.py into `<name>.png`
+// (1280 wide), `<name>-1280.{avif,webp}` and `<name>-2400.{avif,webp}`, the
+// larger one `large` pixels wide. Cropped ones leave out the dashboard's menu.
+type Shot = { alt: string; desktop: Img; phone?: Img; large?: number };
+
+const home = (name: string, alt: string, large = 2056): Shot => ({ alt, large, desktop: { src: `/shots/home/${name}.png`, width: 1280, height: 800 } });
+
+export const SHOTS: Record<ShotId, Shot> = {
   chat: {
     alt: "CoderHelm Chat answering how a web app is put together: a line saying it read two files and searched knowledge, the steps it took, and an answer with numbered citations to source files.",
     desktop: { src: "/shots/chat.webp", width: 760, height: 594 },
@@ -44,4 +52,11 @@ export const SHOTS: Record<ShotId, { alt: string; desktop: Img; phone?: Img }> =
     desktop: { src: "/shots/infra.webp", width: 1440, height: 900 },
     phone: { src: "/shots/infra-phone.webp", width: 390, height: 844 },
   },
+  homeHero: { ...home("hero", "A CoderHelm run for Jira ticket ACME-123 on acme/web: pull request #412 is ready for review, CoderHelm's reviewer approved it, and the step list shows it planned, built, tested, opened the pull request and fixed a failing check.", 2400), phone: { src: "/shots/home/hero-main.png", width: 1280, height: 800 } },
+  homeRun: home("run", "The Activity tab of a CoderHelm run: a failing lint check fixed by a pushed commit, a reviewer's comment answered with a new commit and a reply, then its review approved and all four checks passed."),
+  homeReview: home("review", "A CoderHelm review of acme/web pull request #921 requesting changes, with a summary and four findings ranked High, Medium and Low, each linked to its file and line."),
+  homeAlert: home("alert", "A checkout 5xx incident in acme/api on the Logs page: its cause, a payments timeout lowered to 2 seconds, the checks CoderHelm ran, and fix pull request #482 waiting for a person's review."),
+  homeRelease: home("release", "The Releases page with acme/api v3.8.0 open: published to GitHub, Confluence and email, and its release notes listing five pull requests."),
+  homeChat: home("chat", "CoderHelm Chat answering how checkout talks to the payments service in four numbered steps, each citing a file, above the list of cited source files from acme/web and acme/api."),
+  homeAppMap: home("app-map", "The App map of an online store: the website, API, payments service, background jobs, data stores and outside services as cards joined by lines, with its journeys and screens listed beside them.", 2400),
 };

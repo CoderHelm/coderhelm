@@ -1,7 +1,8 @@
 import { expect, test } from "@playwright/test";
 
-// The home page: three claims, the real pull request behind them, and links
-// that all lead somewhere. It has to read at phone and desktop width.
+// The home page: the headline beside the product itself, the parts of the
+// platform each with its own screen, the real pull request, and links that all
+// lead somewhere. It has to read at phone and desktop width.
 
 const widths = [390, 1440];
 
@@ -14,6 +15,7 @@ for (const width of widths) {
       await expect(page.getByRole("heading", { level: 1 })).toHaveText(/An engineering platform/);
       const headings = await page.locator("main h2").allTextContents();
       expect(headings).toEqual([
+        "What the platform does",
         "From ticket to pull request",
         "An example pull request",
         "After the pull request opens",
@@ -22,6 +24,19 @@ for (const width of widths) {
       ]);
       const sideways = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
       expect(sideways).toBeLessThanOrEqual(0);
+    });
+
+    test("shows the product in the hero, loaded first, with alt text", async ({ page }) => {
+      await page.goto("/");
+      const img = page.locator("section[aria-labelledby=hero-h] img");
+      await expect(img).toHaveCount(1);
+      await expect(img).toBeVisible();
+      expect((await img.getAttribute("alt"))?.length ?? 0).toBeGreaterThan(30);
+      await expect(img).toHaveAttribute("loading", "eager");
+      await expect.poll(() => img.evaluate((el) => (el as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+      const box = (await img.boundingBox())!;
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(width);
     });
 
     test("keeps the sign in and get started buttons", async ({ page }) => {
@@ -34,6 +49,45 @@ for (const width of widths) {
     });
   });
 }
+
+test("each part of the platform has its own screenshot, sized and lazy", async ({ page }) => {
+  await page.goto("/");
+  const parts = page.locator("#platform li");
+  await expect(parts).toHaveCount(6);
+  await expect(page.locator("#platform h3")).toHaveText(["Tickets to pull requests", "Code review", "Alerts", "Releases", "Chat and knowledge", "App map"]);
+  const imgs = await page.locator("#platform img").evaluateAll((els) =>
+    els.map((el) => ({ alt: el.getAttribute("alt") ?? "", loading: el.getAttribute("loading"), width: el.getAttribute("width"), height: el.getAttribute("height") })),
+  );
+  expect(imgs).toHaveLength(6);
+  for (const i of imgs) {
+    expect(i.alt.length).toBeGreaterThan(30);
+    expect(i.loading).toBe("lazy");
+    expect(Number(i.width)).toBeGreaterThan(0);
+    expect(Number(i.height)).toBeGreaterThan(0);
+  }
+  // Every picture loads, in AVIF or WebP where the browser takes them.
+  for (const img of await page.locator("main img").all()) {
+    await img.scrollIntoViewIfNeeded();
+    await expect.poll(() => img.evaluate((el) => (el as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+  }
+});
+
+test("every section shares one container width", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  const lefts = await page.locator("main > section > div").evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().left)));
+  expect(new Set(lefts).size, lefts.join(",")).toBe(1);
+});
+
+test("the footer and nav describe the platform", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  await expect(page.locator("footer")).toContainText("An engineering platform");
+  await expect(page.locator("footer")).not.toContainText("AI engineer");
+  const nav = page.locator("header nav > ul");
+  await expect(nav.getByRole("link", { name: "Trust" })).toHaveAttribute("href", "/security/");
+  await expect(nav.getByRole("link", { name: "Security", exact: true })).toHaveCount(0);
+});
 
 test("quotes the real pull request and links to it", async ({ page }) => {
   await page.goto("/");
