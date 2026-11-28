@@ -3,6 +3,7 @@ import "./globals.css";
 import { ClientShell } from "@/components/client-shell";
 import { RouteHead } from "@/components/route-head";
 import { THEME_COLOR } from "@/lib/link-preview";
+import { PRODUCT_NAME } from "@/lib/routes";
 import { GoogleAnalytics } from "@/components/google-analytics";
 import { BOOT_RECOVERY_SCRIPT, BOOT_STYLE } from "@/lib/boot-recovery";
 
@@ -10,7 +11,7 @@ export const metadata: Metadata = {
   // No title or description here: the shell names each tab after its page
   // (client-shell.tsx), and RouteHead writes each page's description and link
   // preview from lib/routes.ts.
-  applicationName: "Coderhelm",
+  applicationName: PRODUCT_NAME,
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "32x32" },

@@ -91,6 +91,8 @@ test("hosted: the list drives both buttons, and an older API keeps both", async 
   await page.goto("/");
   await expect(google(page)).toBeVisible();
   await expect(github(page)).toHaveAttribute("href", /\/auth\/github$/);
+  // The tab spells the product as everywhere else (lib/routes.ts PRODUCT_NAME).
+  await expect(page).toHaveTitle("Sign in · CoderHelm");
 
   await page.unrouteAll({ behavior: "ignoreErrors" });
   await mockApi(page, { selfHosted: false, methods: { password: true, google: true, github: false } });

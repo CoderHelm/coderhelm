@@ -44,8 +44,19 @@ export function imagePath(slugs: string[]): { segments: string[]; url: string } 
   return { segments, url: `${docsImageRoute}/${segments.join('/')}` };
 }
 
-/** "Edit this page" link: imported pages name their own source. */
+/**
+ * Folders of content/docs that scripts/import-platform.mjs writes (they are
+ * git-ignored), mapped to where this repo keeps the pages copied into them.
+ * Pages imported from the platform repo carry their own editUrl.
+ */
+export const COPIED_CONTENT: Record<string, string> = {
+  'self-host/': 'docs/content/self-host-site/',
+};
+
+/** "Edit this page" link: imported pages name their own source; copied pages point at the file they are copied from. */
 export function editUrl(pagePath: string, override?: string): string {
   if (override) return override;
-  return `https://github.com/${gitConfig.user}/${gitConfig.repo}/blob/${gitConfig.branch}/${gitConfig.contentDir}/${pagePath}`;
+  const prefix = Object.keys(COPIED_CONTENT).find((p) => pagePath.startsWith(p));
+  const file = prefix ? `${COPIED_CONTENT[prefix]}${pagePath.slice(prefix.length)}` : `${gitConfig.contentDir}/${pagePath}`;
+  return `https://github.com/${gitConfig.user}/${gitConfig.repo}/blob/${gitConfig.branch}/${file}`;
 }
