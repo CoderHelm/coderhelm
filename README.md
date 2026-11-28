@@ -5,7 +5,7 @@
   </picture>
 </p>
 
-<h1 align="center">CoderHelm: the AI coding agent for GitHub and Jira</h1>
+<h1 align="center">CoderHelm: an engineering platform for your tickets, pull requests, alerts and releases</h1>
 
 <p align="center">
   <strong>Give it a ticket. It opens the pull request and stays on it until it merges.</strong>
@@ -27,7 +27,7 @@
   <a href="https://docs.coderhelm.com/llms.txt"><img src="https://img.shields.io/badge/docs-llms.txt-555" alt="Docs index for LLMs: llms.txt"></a>
 </p>
 
-CoderHelm is a source-available, self-hostable AI coding agent for teams on GitHub and Jira. Assign it a GitHub issue or a Jira ticket and it turns the ticket into a pull request: it plans the change, writes it on its own branch, runs your build and tests in a sandbox with no credentials, reviews its own work and opens the pull request. After that it keeps the code healthy: it fixes failing CI, answers review comments, reviews your team's pull requests, turns CloudWatch alarms into fixes, opens fix pull requests for dependency vulnerabilities your code actually reaches and closes stale pull requests. It runs on Claude, hosted at [app.coderhelm.com](https://app.coderhelm.com) or in your own AWS account.
+CoderHelm is a source-available, self-hostable engineering platform for teams on GitHub and Jira. Assign it a GitHub issue or a Jira ticket and it turns the ticket into a pull request: it plans the change, writes it on its own branch, runs your build and tests in a sandbox with no credentials, reviews its own work and opens the pull request. After that it keeps the code healthy: it fixes failing CI, answers review comments, reviews your team's pull requests, turns CloudWatch alarms into fixes, opens fix pull requests for dependency vulnerabilities your code actually reaches, closes stale pull requests, keeps flaky tests from blocking builds and tags releases with notes. Chat answers questions about your code, knowledge syncs from your team's tools and the App map shows how your repositories fit together. It runs on Claude, hosted at [app.coderhelm.com](https://app.coderhelm.com) or in your own AWS account.
 
 This repository holds the dashboard, the docs site and the website. The agent, the AWS infrastructure and the self-host installer live in [CoderHelm/coderhelm-platform](https://github.com/CoderHelm/coderhelm-platform).
 
