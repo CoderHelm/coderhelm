@@ -89,6 +89,19 @@ test("the footer and nav describe the platform", async ({ page }) => {
   await expect(nav.getByRole("link", { name: "Security", exact: true })).toHaveCount(0);
 });
 
+test("the link preview shows the platform headline", async ({ page, request }) => {
+  await page.goto("/");
+  const meta = (key: string) => page.locator(`meta[property="${key}"], meta[name="${key}"]`).first().getAttribute("content");
+  for (const key of ["og:image:alt", "twitter:image:alt"]) {
+    expect(await meta(key), key).toContain("An engineering platform for your tickets, pull requests, alerts and releases.");
+  }
+  expect(await meta("og:image:width")).toBe("1200");
+  expect(await meta("og:image:height")).toBe("630");
+  const png = await (await request.get("/og-image.png")).body();
+  // PNG header: width and height as big-endian numbers at bytes 16 and 20.
+  expect([png.readUInt32BE(16), png.readUInt32BE(20)]).toEqual([1200, 630]);
+});
+
 test("the generated text versions name no account in the thread", async ({ request }) => {
   for (const path of ["/llms.txt", "/llms-full.txt", "/index.md"]) {
     const res = await request.get(path);

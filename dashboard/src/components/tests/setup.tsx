@@ -27,7 +27,7 @@ import { useToast } from "@/components/toast";
 import { fullWidthOnPhone, linkButton, primaryButton, secondaryButton, smallSecondaryButton } from "@/components/ui";
 import { LoadError, Loading } from "./common";
 
-// The Tests setup view. Per repo: one clear action (a pull request Coderhelm
+// The Tests setup view. Per repo: one clear action (a pull request CoderHelm
 // opens), a short checklist of what is really in place, read from the
 // workflow on the default branch and from the results that arrived, and the
 // YAML for people who would rather add it themselves, collapsed.
@@ -294,7 +294,7 @@ function Action({ r, canEdit, onAsk }: { r: TestRepoSetup; canEdit: boolean; onA
       <div className="space-y-3">
         {failed}
         <p className="text-sm text-zinc-300">
-          Coderhelm can&apos;t change this workflow by itself{r.can_auto.why ? `: ${r.can_auto.why}` : "."} Add the steps below by hand.
+          CoderHelm can&apos;t change this workflow by itself{r.can_auto.why ? `: ${r.can_auto.why}` : "."} Add the steps below by hand.
         </p>
       </div>
     );
@@ -559,7 +559,7 @@ function Checklist({ r, manual }: { r: TestRepoSetup; manual: boolean }) {
       ),
       manual: (
         <>
-          <p>The runner writes a report Coderhelm reads: Playwright JSON or HTML, Cucumber JSON, or JUnit XML.</p>
+          <p>The runner writes a report CoderHelm reads: Playwright JSON or HTML, Cucumber JSON, or JUnit XML.</p>
           {runnerTabs}
           <CodeBlock code={reporter.code} lang="ts" filename={reporter.file} />
         </>
@@ -586,7 +586,7 @@ function Checklist({ r, manual }: { r: TestRepoSetup; manual: boolean }) {
         ),
       manual: (
         <>
-          <p>Add it before the test step {where}, and pass the list to the test command. If Coderhelm can&apos;t be reached, every test runs.</p>
+          <p>Add it before the test step {where}, and pass the list to the test command. If CoderHelm can&apos;t be reached, every test runs.</p>
           <CodeBlock code={r.snippets.quarantine} lang="yaml" title="GitHub Actions step" filename={r.workflow?.path} />
           <Disclosure summary="Notes">
             <p>Skipped tests aren&apos;t recorded from that run. To keep recording them, run them in a separate job with <Code>continue-on-error: true</Code>.</p>

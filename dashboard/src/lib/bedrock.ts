@@ -151,7 +151,7 @@ const json = (method: string, body?: unknown): RequestInit => ({
 // A reply missing the parts the page reads (an older server, a proxy's error
 // page) is an error the page can show, never a crash.
 const SHAPE_ERROR =
-  "Coderhelm's server answered in a form this page can't read. Update the install, then reload.";
+  "CoderHelm's server answered in a form this page can't read. Update the install, then reload.";
 const isObj = (v: unknown): v is Record<string, unknown> =>
   typeof v === "object" && v !== null;
 export function checkKeyList(r: unknown): KeyList {

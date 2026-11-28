@@ -19,14 +19,14 @@ const USERS = [
   { user_id: "u_owner", email: EMAIL, name: "Olivia Owner-With-A-Very-Long-Double-Barrelled-Surname", github_login: "olivia-owner-with-a-long-github-login", github_id: null, avatar_url: null, role: "owner", status: "active", sign_in: "email", invited_by: null, last_active_at: iso(60), updated_at: iso(600), is_self: false },
   { user_id: "u_self", email: `dana.${EMAIL}`, name: "Dana Developer", github_login: "dana-developer-with-a-long-login", github_id: null, avatar_url: null, role: "owner", status: "active", sign_in: "github", invited_by: null, last_active_at: iso(5), updated_at: iso(600), is_self: true },
   { user_id: "u_inv", email: `invited.person.${EMAIL}`, name: null, github_login: null, github_id: null, avatar_url: null, role: "member", status: "invited", sign_in: "email", invited_by: EMAIL, last_active_at: null, updated_at: iso(60 * 24), is_self: false },
-  // Copied from another Coderhelm and never signed in here: the status, the old activity, the GitHub line and the row button.
+  // Copied from another CoderHelm and never signed in here: the status, the old activity, the GitHub line and the row button.
   { user_id: "u_moved", email: `moved.person.${EMAIL}`, name: "Moved Person-With-A-Very-Long-Double-Barrelled-Surname", github_login: "moved-person-with-a-long-github-login", github_id: "4242", avatar_url: null, role: "member", status: "active", sign_in: "email_and_github", invited_by: null, last_active_at: iso(60 * 24 * 5), updated_at: iso(600), needs_setup: true, setup_email_sent_at: iso(60 * 24), is_self: false },
   { user_id: "u_view", email: `viewer.${EMAIL}`, name: "Jo Viewer", github_login: null, github_id: null, avatar_url: null, role: "viewer", status: "active", sign_in: "email", invited_by: null, last_active_at: iso(60 * 24 * 9), updated_at: iso(60 * 24 * 9), is_self: false },
 ];
 
 const ROLES = [
   { key: "viewer", label: "Viewer", level: 0, summary: "Read-only: sees runs, plans, reviews and settings, changes nothing.", assignable: true },
-  { key: "member", label: "Member", level: 1, summary: "Works with Coderhelm: plans, runs, reviews and recommendations.", assignable: true },
+  { key: "member", label: "Member", level: 1, summary: "Works with CoderHelm: plans, runs, reviews and recommendations.", assignable: true },
   { key: "admin", label: "Admin", level: 3, summary: "Runs the workspace: repos, integrations, agent settings, the token limit and people.", assignable: true },
   { key: "owner", label: "Owner", level: 4, summary: "Everything, plus account-level changes and managing admins.", assignable: true },
 ];
@@ -143,7 +143,7 @@ const SOURCES = [
   },
   {
     ...SOURCE_BASE, id: "ds_rest", kind: "rest", name: "Class schedule service REST API", url: `${API_URL}/rest`, kinds: null, schema_available: false,
-    header_name: "X-Readonly-Api-Key-For-Coderhelm", paths: ["/v1/programs/{programId}/schedule-entries-for-the-selected-location"], instructions: NOTES,
+    header_name: "X-Readonly-Api-Key-For-CoderHelm", paths: ["/v1/programs/{programId}/schedule-entries-for-the-selected-location"], instructions: NOTES,
   },
 ];
 
@@ -266,12 +266,12 @@ export const settingsData: Handler = ({ method, path, url }) => {
       sso_options: [
         {
           provider: "okta", name: "Okta", set_up: true, enabled: true, domains_verified: true, session_from_provider: false, is_owner: true, ready: false,
-          unlinked: [], recovery: "If Okta is down or misconfigured, nobody can sign in until it's fixed. There is no way around it inside Coderhelm: to turn the rule off, someone with this install's AWS credentials runs scripts/sso-recovery.py from the Coderhelm platform repository, which writes the audit log and emails every owner.",
+          unlinked: [], recovery: "If Okta is down or misconfigured, nobody can sign in until it's fixed. There is no way around it inside CoderHelm: to turn the rule off, someone with this install's AWS credentials runs scripts/sso-recovery.py from the CoderHelm platform repository, which writes the audit log and emails every owner.",
         },
         {
           provider: "microsoft", name: "Microsoft Entra", set_up: true, enabled: true, domains_verified: true, session_from_provider: true, is_owner: true, ready: true,
           unlinked: [{ user_id: "u3", email: EMAIL, name: "Alexandria Montgomery-Fitzwilliam the Third", role: "member" }],
-          recovery: "If Microsoft Entra is down or misconfigured, nobody can sign in until it's fixed. There is no way around it inside Coderhelm: to turn the rule off, someone with this install's AWS credentials runs scripts/sso-recovery.py from the Coderhelm platform repository, which writes the audit log and emails every owner.",
+          recovery: "If Microsoft Entra is down or misconfigured, nobody can sign in until it's fixed. There is no way around it inside CoderHelm: to turn the rule off, someone with this install's AWS credentials runs scripts/sso-recovery.py from the CoderHelm platform repository, which writes the audit log and emails every owner.",
         },
       ],
       claim_links: [{ user_id: "u3", email: EMAIL, role: "member", provider: "microsoft", expires_at: iso(-60 * 24 * 3), used: false, used_at: null, issued_by: EMAIL, issued_at: iso(10) }],
@@ -411,14 +411,14 @@ export const settingsData: Handler = ({ method, path, url }) => {
     return { ready: true, secret_configured: true, configured_repos: { total: 2, enabled: 2 }, enabled_repos: [REPO, REPO_2], jira_events_seen: true, last_jira_event_at: iso(120), jira_event_count: 41, installation_id: 7, team_id: "t_1", forge_secret: `forge-secret-${SHA}${SHA}` };
   }
   if (p === "/api/integrations/jira/config") return JIRA_CONFIG;
-  // The site runs an older Coderhelm app: the longest notice and run-page line.
+  // The site runs an older CoderHelm app: the longest notice and run-page line.
   if (p === "/api/integrations/jira/app") {
     const missing = ["full comment reading", "mentions", "in-place edits", "extended issue fields", "threaded replies", "issue type"];
     return {
       behind: {
         version: "", latest: "6.11.0", missing, manage_url: "https://admin.atlassian.com/", seen_at: iso(30),
-        message: `Your Jira site runs an older Coderhelm app (a version from before the app reported its number, latest 6.11.0). Missing: ${missing.join(", ")}. An Atlassian site admin accepts the update in Atlassian Administration (admin.atlassian.com): Apps, Sites, choose the site, Connected apps, Coderhelm, View app details, Update. Jira's own Manage apps page doesn't list it.`,
-        run_note: `Comments on this ticket may be incomplete: its Jira site runs an older Coderhelm app (a version from before the app reported its number, latest 6.11.0) without ${missing.join(", ")}. An Atlassian site admin can accept the update in Atlassian Administration, Connected apps.`,
+        message: `Your Jira site runs an older CoderHelm app (a version from before the app reported its number, latest 6.11.0). Missing: ${missing.join(", ")}. An Atlassian site admin accepts the update in Atlassian Administration (admin.atlassian.com): Apps, Sites, choose the site, Connected apps, CoderHelm, View app details, Update. Jira's own Manage apps page doesn't list it.`,
+        run_note: `Comments on this ticket may be incomplete: its Jira site runs an older CoderHelm app (a version from before the app reported its number, latest 6.11.0) without ${missing.join(", ")}. An Atlassian site admin can accept the update in Atlassian Administration, Connected apps.`,
       },
     };
   }

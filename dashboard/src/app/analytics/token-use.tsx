@@ -78,7 +78,7 @@ function notCompared(why: TokenNotComparable | null, tu: AnalyticsTokenUse) {
 function whyNotCompared(why: TokenNotComparable, tu: AnalyticsTokenUse) {
   if (why === "counting_started_later") {
     return tu.metered_from
-      ? `Coderhelm has counted every model call one by one since ${shortDay(tu.metered_from)}. The period before starts earlier, so its total is incomplete and no change is shown.`
+      ? `CoderHelm has counted every model call one by one since ${shortDay(tu.metered_from)}. The period before starts earlier, so its total is incomplete and no change is shown.`
       : "The period before was not counted call by call, so its total is incomplete and no change is shown.";
   }
   return `Until ${shortDay(tu.run_records_from)} a run that continued later (a CI fix, a resume) kept only its last step's tokens, so older runs read lower than they were. The period before starts earlier, so numbers built on run records are not compared with it.`;
@@ -172,7 +172,7 @@ export function TokenUseSection({ tu, span, vs }: { tu: AnalyticsTokenUse | unde
   if (!tu) {
     return (
       <div className="mt-6" data-testid="token-use-unavailable">
-        <Callout title="This server doesn't report token use by kind of work yet">Update Coderhelm to see tokens by part, kind of work and model here. The Overview still shows the totals this server has.</Callout>
+        <Callout title="This server doesn't report token use by kind of work yet">Update CoderHelm to see tokens by part, kind of work and model here. The Overview still shows the totals this server has.</Callout>
       </div>
     );
   }
@@ -203,7 +203,7 @@ export function TokenUseSection({ tu, span, vs }: { tu: AnalyticsTokenUse | unde
         id="token-use"
         description={
           metered
-            ? `Every model call Coderhelm made for your team in ${span}, on the day it was made: runs, reviews, chat, log analysis and the rest.`
+            ? `Every model call CoderHelm made for your team in ${span}, on the day it was made: runs, reviews, chat, log analysis and the rest.`
             : `What the runs started in ${span} used. With one repository picked, reviews, chat and log analysis are left out: they are not kept per repository.`
         }
       >

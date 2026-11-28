@@ -184,7 +184,7 @@ function MemoryPage() {
   const forget = async (m: MemoryItem) => {
     const ok = await confirm({
       title: "Forget this memory?",
-      message: `Coderhelm will stop using it on ${repo}. This can't be undone.\n\n“${m.content.slice(0, 200)}${m.content.length > 200 ? "…" : ""}”`,
+      message: `CoderHelm will stop using it on ${repo}. This can't be undone.\n\n“${m.content.slice(0, 200)}${m.content.length > 200 ? "…" : ""}”`,
       confirmLabel: "Forget it",
       destructive: true,
     });
@@ -222,7 +222,7 @@ function MemoryPage() {
     <Page>
       <PageHeader
         title="Memory"
-        lead="What Coderhelm knows about each repository, where it learned it, and what each agent actually uses."
+        lead="What CoderHelm knows about each repository, where it learned it, and what each agent actually uses."
         actions={isAdmin && repo ? (
           <button type="button" onClick={() => setTeaching(true)} className={primaryButton}>
             Teach it something
@@ -242,7 +242,7 @@ function MemoryPage() {
       ) : repos.length === 0 ? (
         <div className="mt-6">
           <Callout variant="neutral" title="No repositories yet">
-            <p>Turn on a repository in Settings. Coderhelm starts remembering things about it after its first finished ticket.</p>
+            <p>Turn on a repository in Settings. CoderHelm starts remembering things about it after its first finished ticket.</p>
           </Callout>
         </div>
       ) : (
@@ -262,7 +262,7 @@ function MemoryPage() {
         <>
           {/* ── Test what it would remember ──────────────────── */}
           <div className="mt-6">
-            <SettingsDisclosure summary="Test it: see what Coderhelm would remember for a ticket">
+            <SettingsDisclosure summary="Test it: see what CoderHelm would remember for a ticket">
               <TryIt repo={repo} />
             </SettingsDisclosure>
           </div>
@@ -323,7 +323,7 @@ function MemoryPage() {
                     title={`Nothing remembered about ${repo} yet`}
                     action={isAdmin ? <button type="button" onClick={() => setTeaching(true)} className={secondaryButton}>Teach it something</button> : undefined}
                   >
-                    After each ticket it finishes here, Coderhelm saves up to five things it learned: conventions, mistakes to avoid,
+                    After each ticket it finishes here, CoderHelm saves up to five things it learned: conventions, mistakes to avoid,
                     where things live. You can also teach it directly, and pin what should always apply.
                   </ListEmpty>
                 )
@@ -698,7 +698,7 @@ function TeachDialog({ repo, onClose, onSaved }: { repo: string; onClose: () => 
     <Modal
       open
       onOpenChange={(v) => !v && onClose()}
-      title={`Teach Coderhelm something about ${repo}`}
+      title={`Teach CoderHelm something about ${repo}`}
       description="One fact or rule per memory works best, written the way you'd tell a new teammate."
       testId="teach-dialog"
       onSubmit={submit}

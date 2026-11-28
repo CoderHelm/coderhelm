@@ -4,12 +4,12 @@ import path from "node:path";
 
 // The app choice in the Knowledge add flow on a self-hosted install with
 // hybrid (Notion and Confluence):
-// - "Use Coderhelm's app" shows one "Sign in with <app>" button and the
+// - "Use CoderHelm's app" shows one "Sign in with <app>" button and the
 //   choice's one line: no token steps and no form fields;
 // - a key stays behind "Use a key instead";
 // - fully private, without the install's own app, shows the token steps;
 // - there is no per-tool switch: the one Other apps choice lives in Settings;
-// - when Coderhelm's app isn't ready yet, it says so, still with no form.
+// - when CoderHelm's app isn't ready yet, it says so, still with no form.
 // Every call is answered here; nothing reaches a real backend.
 
 const SHOTS_DIR = process.env.E2E_SHOTS_DIR || path.join("test-results", "shots");
@@ -17,15 +17,15 @@ const SELF = { apiUrl: "", streamUrl: "", selfHosted: true, version: "v1.2.0" };
 const LABEL: Record<string, string> = { notion: "Notion", confluence: "Confluence", google_drive: "Google Drive", sanity: "Sanity", github: "GitHub", web: "Website" };
 
 interface State {
-  /** Which tools use Coderhelm's app. */
+  /** Which tools use CoderHelm's app. */
   coderhelm: Set<string>;
-  /** Whether Coderhelm's app answers for a tool that uses it (the broker is ready). */
+  /** Whether CoderHelm's app answers for a tool that uses it (the broker is ready). */
   brokerReady: boolean;
   puts: Record<string, unknown>[];
 }
 
 function hybridStatus(s: State) {
-  const row = (id: string, name: string) => ({ id, name, mode: "hosted", through_coderhelm: "The sign-in only.", stays_with_you: "Every page Coderhelm reads.", uses_coderhelm: s.coderhelm.has(id) });
+  const row = (id: string, name: string) => ({ id, name, mode: "hosted", through_coderhelm: "The sign-in only.", stays_with_you: "Every page CoderHelm reads.", uses_coderhelm: s.coderhelm.has(id) });
   return {
     apps_mode: s.coderhelm.size > 0 ? "coderhelm" : "private",
     available: true,
@@ -76,7 +76,7 @@ async function mockApi(page: Page, s: State) {
           blurb: `Pick what to bring in from ${LABEL[k]}`,
           connected: k === "github" || k === "web",
           via: "",
-          // The install has no app of its own: sign-in only through Coderhelm's.
+          // The install has no app of its own: sign-in only through CoderHelm's.
           can_sign_in: s.coderhelm.has(k) && s.brokerReady,
           reconnect_reason: "",
           connected_by: "",
@@ -104,7 +104,7 @@ for (const kind of ["notion", "confluence"] as const) {
   const label = LABEL[kind];
 
   test.describe(`${label}: the install's Other apps choice decides what the dialog asks for`, () => {
-    test(`Coderhelm's app: one sign-in button, no token steps or fields`, async ({ page }) => {
+    test(`CoderHelm's app: one sign-in button, no token steps or fields`, async ({ page }) => {
       await mockApi(page, { coderhelm: new Set([kind]), brokerReady: true, puts: [] });
       await page.goto("/knowledge/");
       await page.getByTestId(`start-${kind}`).click();
@@ -144,13 +144,13 @@ for (const kind of ["notion", "confluence"] as const) {
       expect(s.puts).toEqual([]);
     });
 
-    test(`Coderhelm's app not ready yet: says so, still no form`, async ({ page }) => {
+    test(`CoderHelm's app not ready yet: says so, still no form`, async ({ page }) => {
       await mockApi(page, { coderhelm: new Set([kind]), brokerReady: false, puts: [] });
       await page.goto("/knowledge/");
       await page.getByTestId(`start-${kind}`).click();
       const step = page.getByTestId("connect-step");
       await expect(step).toHaveAttribute("data-state", "app-not-ready");
-      await expect(step.getByTestId("app-not-ready")).toContainText(`Coderhelm's ${label} app isn't ready on this install yet`);
+      await expect(step.getByTestId("app-not-ready")).toContainText(`CoderHelm's ${label} app isn't ready on this install yet`);
       await expect(step.getByTestId("connect-button")).toHaveCount(0);
       await expect(step.getByTestId("token-path")).toHaveCount(0);
     });
@@ -159,7 +159,7 @@ for (const kind of ["notion", "confluence"] as const) {
 
 test.describe("at phone width", () => {
   test.use({ viewport: { width: 375, height: 812 } });
-  test("Coderhelm's app fits with one button and no sideways scroll", async ({ page }) => {
+  test("CoderHelm's app fits with one button and no sideways scroll", async ({ page }) => {
     await mockApi(page, { coderhelm: new Set(["notion", "confluence"]), brokerReady: true, puts: [] });
     await page.goto("/knowledge/");
     await page.getByTestId("start-confluence").click();

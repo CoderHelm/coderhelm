@@ -3,8 +3,8 @@
 // Security › Infrastructure: what runs in the team's AWS accounts, matched
 // against AWS's bulletins and the Amazon Linux and Bottlerocket advisories,
 // one row per fix. A fix is a pull request in the code that defines the
-// resource, an action Coderhelm applies in AWS after one approval, a runbook
-// step, or nothing at all (AWS-managed). A row closes only when Coderhelm
+// resource, an action CoderHelm applies in AWS after one approval, a runbook
+// step, or nothing at all (AWS-managed). A row closes only when CoderHelm
 // reads the account again: fixed when the fix runs, removed when the
 // resource is gone. Opening the page refreshes a read older than a few
 // minutes; the list updates when that read is done.
@@ -179,7 +179,7 @@ function InfrastructureFindings() {
               </Link>
             }
           >
-            Switch on Infrastructure vulnerabilities for a connected AWS account. Coderhelm then reads, read-only, which AMIs, node groups,
+            Switch on Infrastructure vulnerabilities for a connected AWS account. CoderHelm then reads, read-only, which AMIs, node groups,
             databases and caches it runs, once a day, and tells you which ones you have to fix and which ones AWS patches for you.
           </EmptyState>
         </div>
@@ -258,7 +258,7 @@ function Tiles({ data }: { data: InfraOverview }) {
         label="Steps in AWS"
         value={steps}
         tone={steps > 0 ? "warning" : "neutral"}
-        note={(c.applies ?? 0) > 0 ? "Coderhelm applies them after your approval" : "Runbook cards"}
+        note={(c.applies ?? 0) > 0 ? "CoderHelm applies them after your approval" : "Runbook cards"}
         testId="infra-tile-runbooks"
       />
       <StatTile label="AWS-managed" value={c.aws_managed} note="Nothing to do, never counted open" testId="infra-tile-aws" />
@@ -383,8 +383,8 @@ function FindingRow({ f, admin, dryRun, defaultOpen }: { f: InfraFinding; admin:
       const words =
         r.status === "queued"
           ? when === "immediate"
-            ? "Approved: Coderhelm applies it in AWS now (non-production first) and reads it back."
-            : "Approved: Coderhelm applies it in the next maintenance window (non-production first) and reads it back."
+            ? "Approved: CoderHelm applies it in AWS now (non-production first) and reads it back."
+            : "Approved: CoderHelm applies it in the next maintenance window (non-production first) and reads it back."
           : (r.reason ?? "Nothing to apply.");
       setAsked(words);
       toast(words);
@@ -473,7 +473,7 @@ function FindingRow({ f, admin, dryRun, defaultOpen }: { f: InfraFinding; admin:
               onClick={() => approve("next-maintenance")}
               disabled={!!approving}
               data-testid="infra-apply"
-              title="Coderhelm applies it in AWS in the database's next maintenance window, non-production first"
+              title="CoderHelm applies it in AWS in the database's next maintenance window, non-production first"
             >
               {approving === "next-maintenance" ? "Approving…" : "Apply in next maintenance window"}
             </button>
@@ -483,7 +483,7 @@ function FindingRow({ f, admin, dryRun, defaultOpen }: { f: InfraFinding; admin:
               onClick={() => approve("immediate")}
               disabled={!!approving}
               data-testid="infra-apply-now"
-              title="Coderhelm applies it in AWS now, non-production first"
+              title="CoderHelm applies it in AWS now, non-production first"
             >
               {approving === "immediate" ? "Approving…" : "Apply now"}
             </button>
@@ -496,7 +496,7 @@ function FindingRow({ f, admin, dryRun, defaultOpen }: { f: InfraFinding; admin:
       {closed && f.pr && f.status === "open" && f.fix.kind === "pr" && !asked && (
         <p className="mt-1 text-xs text-zinc-300" data-testid="infra-pr-closed">
           PR #{f.pr.number} was {closedWords(f.pr)} without merging.{" "}
-          {admin ? "Open a new one when you want the fix; Coderhelm does not open one by itself for a week after a pull request is closed." : "An admin can open a new one."}
+          {admin ? "Open a new one when you want the fix; CoderHelm does not open one by itself for a week after a pull request is closed." : "An admin can open a new one."}
         </p>
       )}
       {asked && <p className="mt-1 text-xs text-sky-300">{asked}</p>}

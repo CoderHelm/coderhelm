@@ -1,4 +1,4 @@
-// Hybrid: a self-hosted install that uses Coderhelm's GitHub App, its other
+// Hybrid: a self-hosted install that uses CoderHelm's GitHub App, its other
 // apps and a name.coderhelm.com address, while the code and the work stay in
 // the install's own AWS account. The words for every outcome live here, so
 // the System page, the integration pages and the tests agree.
@@ -18,7 +18,7 @@ const isNameCheck = (c: HybridCheck) => c.id === "hybrid_name" || c.id.startsWit
 
 /**
  * The address's one line, from the latest checks. A passing check of the
- * address wins: an older install also sends Coderhelm's parked note as a
+ * address wins: an older install also sends CoderHelm's parked note as a
  * second line, and once the address answers as this install that note is out
  * of date. Otherwise the first line that needs a fix, then the first waiting.
  */
@@ -34,14 +34,14 @@ export function currentChecks(checks: HybridCheck[]): HybridCheck[] {
   return checks.filter((c) => !isNameCheck(c) || c === line);
 }
 
-/** "Recovered 15:52, Nov 11", from Coderhelm's check, when the address came back within the last week and works now. */
+/** "Recovered 15:52, Nov 11", from CoderHelm's check, when the address came back within the last week and works now. */
 export function recoveredNote(watch: HybridNameWatch | null | undefined, line: HybridCheck | null, now = Date.now()): string | null {
   const at = watch?.recovered_at ? Date.parse(watch.recovered_at) : NaN;
   if (!line || line.status !== "pass" || Number.isNaN(at) || now - at > 7 * 86_400_000) return null;
   const d = new Date(at);
   const time = d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
   const day = d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-  return `Recovered at ${time}, ${day}. Coderhelm had moved the address to its holding page while this install wasn't answering, and moved it back by itself.`;
+  return `Recovered at ${time}, ${day}. CoderHelm had moved the address to its holding page while this install wasn't answering, and moved it back by itself.`;
 }
 
 /** The Hybrid section on Settings, then System. */
@@ -49,7 +49,7 @@ export const HYBRID_HREF = "/settings/system/#hybrid";
 
 /** What came back from GitHub after "Install on GitHub" (?hybrid_github=…), in one sentence and its fix. */
 export const GITHUB_OUTCOMES: Record<string, { ok: boolean; title: string; fix: string }> = {
-  linked: { ok: true, title: "GitHub is linked.", fix: "Choose which repositories Coderhelm may use below." },
+  linked: { ok: true, title: "GitHub is linked.", fix: "Choose which repositories CoderHelm may use below." },
   not_yours: {
     ok: false,
     title: "That GitHub installation belongs to an account you don't manage.",
@@ -62,7 +62,7 @@ export const GITHUB_OUTCOMES: Record<string, { ok: boolean; title: string; fix: 
   },
   used_by_hosted_team: {
     ok: false,
-    title: "That GitHub installation is used by a team on Coderhelm's hosted service.",
+    title: "That GitHub installation is used by a team on CoderHelm's hosted service.",
     fix: "Remove it from that team, or install the app on a different account.",
   },
   signin_failed: {
@@ -72,7 +72,7 @@ export const GITHUB_OUTCOMES: Record<string, { ok: boolean; title: string; fix: 
   },
   github_unreachable: {
     ok: false,
-    title: "Coderhelm couldn't reach GitHub just now.",
+    title: "CoderHelm couldn't reach GitHub just now.",
     fix: "Wait a minute, then press Install on GitHub again.",
   },
   store_failed: {
@@ -88,17 +88,17 @@ export const GITHUB_OUTCOMES: Record<string, { ok: boolean; title: string; fix: 
   requested: {
     ok: true,
     title: "Request sent to your GitHub organization's owners.",
-    fix: "Once an owner approves the Coderhelm app, press Install on GitHub again to link it.",
+    fix: "Once an owner approves the CoderHelm app, press Install on GitHub again to link it.",
   },
   declined: {
     ok: false,
-    title: "Nothing was linked: you chose Cancel on Coderhelm's confirmation page.",
+    title: "Nothing was linked: you chose Cancel on CoderHelm's confirmation page.",
     fix: "If you meant to link it, press Install on GitHub again and choose Link.",
   },
   install_off: {
     ok: false,
-    title: "Coderhelm doesn't see this install as verified and active, so nothing was linked.",
-    fix: "Press Check again below. If it says Coderhelm turned off this install's access, contact support.",
+    title: "CoderHelm doesn't see this install as verified and active, so nothing was linked.",
+    fix: "Press Check again below. If it says CoderHelm turned off this install's access, contact support.",
   },
 };
 
@@ -106,7 +106,7 @@ export const GITHUB_OUTCOMES: Record<string, { ok: boolean; title: string; fix: 
 export const NAME_CODES: Record<string, string> = {
   ok: "Available.",
   taken: "Someone already uses this name.",
-  reserved: "This name is kept back by Coderhelm. Try another.",
+  reserved: "This name is kept back by CoderHelm. Try another.",
   too_short: "Use at least 3 characters.",
   too_long: "Use 40 characters or fewer.",
   bad_characters: "Use only lowercase letters, numbers and hyphens.",
@@ -122,7 +122,7 @@ export function cleanName(raw: string): string {
 
 // ── Hosted dashboard hand-offs ─────────────────────────────────────────
 //
-// A self-hosted install borrows Coderhelm's apps, whose callbacks land on the
+// A self-hosted install borrows CoderHelm's apps, whose callbacks land on the
 // hosted dashboard. The person there usually has no hosted account, so these
 // run before sign-in (components/client-shell.tsx) and pass the callback on
 // to the hosted API, which sends the browser back to the install.
@@ -256,7 +256,7 @@ export function integrationOf(list: HybridIntegration[] | undefined, id: string)
   return (list ?? []).find((i) => i.id === id || (i.parts ?? []).includes(id));
 }
 
-/** Can this integration use Coderhelm's app now? Hosted, and Coderhelm's app for it is set up. */
+/** Can this integration use CoderHelm's app now? Hosted, and CoderHelm's app for it is set up. */
 export function canUseCoderhelm(i: HybridIntegration | undefined): boolean {
   return i?.mode === "hosted" && i.offered !== false;
 }
@@ -266,7 +266,7 @@ export function appTools(s: Pick<HybridStatus, "integrations">): HybridIntegrati
   return (s.integrations ?? []).filter((i) => i.mode === "hosted" && i.id !== "github");
 }
 
-/** The install's Other apps choice. A gateway from before it says only which tools use Coderhelm's app. */
+/** The install's Other apps choice. A gateway from before it says only which tools use CoderHelm's app. */
 export function appsModeOf(s: Pick<HybridStatus, "integrations" | "apps_mode">): HybridAppsMode {
   if (s.apps_mode) return s.apps_mode;
   const tools = appTools(s);
@@ -283,6 +283,6 @@ export function appsModePatch(s: Pick<HybridStatus, "integrations">, mode: Hybri
 
 /** The two Other apps options, with their one line each. */
 export const APPS_MODES: { value: HybridAppsMode; label: string; line: string }[] = [
-  { value: "coderhelm", label: "Use Coderhelm's apps (easiest)", line: "Sign in with one click through Coderhelm's app for each tool below, and for any Coderhelm adds later." },
-  { value: "private", label: "Fully private", line: "Nothing goes through Coderhelm. Each tool uses your team's own app, set up on its card in Settings, Integrations." },
+  { value: "coderhelm", label: "Use CoderHelm's apps (easiest)", line: "Sign in with one click through CoderHelm's app for each tool below, and for any CoderHelm adds later." },
+  { value: "private", label: "Fully private", line: "Nothing goes through CoderHelm. Each tool uses your team's own app, set up on its card in Settings, Integrations." },
 ];

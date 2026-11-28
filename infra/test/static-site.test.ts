@@ -361,3 +361,16 @@ test("app: the App map frame may be framed by the app only, and reaches no netwo
   assert.notDeepEqual(cfg.DefaultCacheBehavior.ResponseHeadersPolicyId, { Ref: frameId });
   assert.equal(cfg.CacheBehaviors.length, 1);
 });
+
+// The error pages are served on every CoderHelm host, so they name the
+// product the way brand/BRAND.md spells it.
+test("error pages spell the product CoderHelm", () => {
+  const dir = path.join(process.cwd(), "error-pages");
+  const pages = fs.readdirSync(dir).filter((f) => f.endsWith(".html"));
+  assert.ok(pages.length > 0);
+  for (const f of pages) {
+    const html = fs.readFileSync(path.join(dir, f), "utf8");
+    assert.ok(!/Coderhelm|Coder Helm/.test(html), `${f} misspells CoderHelm`);
+    assert.ok(html.includes("CoderHelm"), `${f} names CoderHelm`);
+  }
+});

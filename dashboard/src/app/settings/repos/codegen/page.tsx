@@ -89,7 +89,7 @@ function CodegenEnvPage() {
     <Page>
       <PageHeader
         title="Codegen environment"
-        lead={`Public values ${repo}'s code generators read when Coderhelm regenerates generated files (types from a CMS schema, a GraphQL client) in its sandbox.`}
+        lead={`Public values ${repo}'s code generators read when CoderHelm regenerates generated files (types from a CMS schema, a GraphQL client) in its sandbox.`}
       />
       <div className="mt-6 max-w-2xl space-y-4">
         <Callout variant="warning" title="Public values only" live={false} testId="codegen-env-warning">

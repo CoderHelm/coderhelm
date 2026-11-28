@@ -29,14 +29,14 @@ function serverName(id: string): string {
 }
 
 /**
- * The card's headline in plain words: "Coderhelm wants to create an issue
+ * The card's headline in plain words: "CoderHelm wants to create an issue
  * in Linear". The exact tool and connection names stay under Show details.
  */
 export function plainHeadline(a: Pick<Approval, "kind" | "tool" | "server" | "command">): { lead: string; action: string; where?: string } {
-  if (a.kind === "command") return { lead: "Coderhelm wants to run a command", action: a.command ?? "" };
+  if (a.kind === "command") return { lead: "CoderHelm wants to run a command", action: a.command ?? "" };
   const bare = a.tool.includes("__") ? a.tool.split("__").slice(1).join("__") : a.tool;
-  if (a.kind === "mcp") return { lead: "Coderhelm wants to", action: words(bare), where: a.server ? serverName(a.server) : "a connected tool" };
-  return { lead: "Coderhelm wants to use", action: words(bare) };
+  if (a.kind === "mcp") return { lead: "CoderHelm wants to", action: words(bare), where: a.server ? serverName(a.server) : "a connected tool" };
+  return { lead: "CoderHelm wants to use", action: words(bare) };
 }
 
 export function ApprovalCard({
@@ -117,7 +117,7 @@ export function ApprovalCard({
         <summary className="cursor-pointer text-sm text-zinc-400 hover:text-zinc-200">Show details</summary>
         <div className="mt-2 space-y-2">
           <p className="text-sm text-zinc-400 [overflow-wrap:anywhere]">
-            {approvalHeadline(a)}. Coderhelm asked because {decidedByText(a.asked_because).replace(/^./, (c) => c.toLowerCase())}
+            {approvalHeadline(a)}. CoderHelm asked because {decidedByText(a.asked_because).replace(/^./, (c) => c.toLowerCase())}
           </p>
           <CodeBlock code={args} lang="json" label="Arguments" wrap maxHeightClass="max-h-64" />
         </div>
@@ -159,7 +159,7 @@ export function ApprovalCard({
               )}
             </div>
             <p className="text-xs text-zinc-400">
-              Answer {relativeTime(a.expires_at)}, or Coderhelm stops without doing it.
+              Answer {relativeTime(a.expires_at)}, or CoderHelm stops without doing it.
               {can.always ? " “Always allow” adds a rule you can see and remove on the Agent permissions page." : ""}
             </p>
           </div>

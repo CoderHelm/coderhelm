@@ -80,7 +80,7 @@ test.describe("Setup", () => {
   test("with no repos, one sentence says what Setup does", async ({ page }) => {
     await mockSetup(page, { home: { repos: [], new_recommendations: [], auto_setup_new_repos: false }, runs: { runs: [] } });
     await page.goto("/setup");
-    await expect(page.getByTestId("setup-empty")).toContainText("Coderhelm reads each repo you connect");
+    await expect(page.getByTestId("setup-empty")).toContainText("CoderHelm reads each repo you connect");
     await expect(page.getByTestId("main-nav").getByRole("link", { name: /^Setup/ }).getByTestId("count-badge")).toHaveCount(0);
   });
 

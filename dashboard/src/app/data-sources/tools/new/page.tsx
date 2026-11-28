@@ -188,7 +188,7 @@ function NewToolPage() {
           detail
           crumb={false}
           title={`${saved.name} is saved`}
-          lead="Coderhelm ran it once with your example inputs. Another admin now reviews this exact version and approves it; agents can't use it until then. Any later edit is a new version that needs approval again."
+          lead="CoderHelm ran it once with your example inputs. Another admin now reviews this exact version and approves it; agents can't use it until then. Any later edit is a new version that needs approval again."
         />
         <div className="mt-6">
           <RunResult run={saved.example} label="Example run" />
@@ -208,7 +208,7 @@ function NewToolPage() {
       <PageHeader
         title={from ? `Edit ${from}` : "New tool"}
         crumb={from ? `Edit ${from}` : undefined}
-        lead="A tool is one fixed read on a source you connected. Coderhelm fills in only the inputs you declare, and only with values that match their type. It is checked as you type, run once with your examples when you save, and then waits for another admin."
+        lead="A tool is one fixed read on a source you connected. CoderHelm fills in only the inputs you declare, and only with values that match their type. It is checked as you type, run once with your examples when you save, and then waits for another admin."
       />
 
       <div className="mt-6">
@@ -230,7 +230,7 @@ function NewToolPage() {
           <Field id="tool-name" label="Name" helper="Lowercase letters, digits and _. Agents see it as tool_<name>.">
             {(p) => <input {...p} value={name} onChange={(e) => setName(e.target.value)} placeholder="find_order_by_number" className={monoInputClass} />}
           </Field>
-          <Field id="tool-use" label="When to use it" helper="One sentence. Coderhelm reads this to decide when the tool helps.">
+          <Field id="tool-use" label="When to use it" helper="One sentence. CoderHelm reads this to decide when the tool helps.">
             {(p) => <input {...p} value={useWhen} onChange={(e) => setUseWhen(e.target.value)} placeholder="A ticket or PR mentions an order number and you need its status." className={inputClass} />}
           </Field>
           <Field id="tool-source" label="Source">
@@ -346,7 +346,7 @@ function NewToolPage() {
           <label className="flex items-start gap-3 text-sm text-zinc-300">
             <input type="checkbox" checked={askFirst} onChange={(e) => setAskFirst(e.target.checked)} className="mt-0.5 h-4 w-4 accent-emerald-500" />
             <span>
-              <span className="font-semibold text-zinc-100">Ask me first.</span> Each time Coderhelm wants to run it, an admin sees exactly what
+              <span className="font-semibold text-zinc-100">Ask me first.</span> Each time CoderHelm wants to run it, an admin sees exactly what
               will run and says yes or no. It waits up to 10 minutes.
             </span>
           </label>

@@ -379,8 +379,8 @@ function BaseView() {
     const ok = await confirm({
       title: `Delete ${base.name}?`,
       message: connectedInPlace(base)
-        ? "It is disconnected from Coderhelm: Chat and the agents stop searching it. Nothing changes in your AWS account."
-        : "Everything in it is removed from Coderhelm. Nothing changes in the apps it came from. This can't be undone.",
+        ? "It is disconnected from CoderHelm: Chat and the agents stop searching it. Nothing changes in your AWS account."
+        : "Everything in it is removed from CoderHelm. Nothing changes in the apps it came from. This can't be undone.",
       confirmLabel: "Delete knowledge base",
       destructive: true,
     });

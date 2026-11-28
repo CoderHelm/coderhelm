@@ -5,7 +5,7 @@
 // The map is made with Floorplan (vendor/floorplan in the platform, MIT): its
 // extractor reads every repository side by side and its viewer draws the
 // map, here in a sandboxed frame (map-frame.tsx) so its code never touches
-// this page. Coderhelm adds its own Recent work (its runs) and Health (its
+// this page. CoderHelm adds its own Recent work (its runs) and Health (its
 // security, infrastructure, log and alert findings) into the map's own
 // fields. Questions are Chat's: the Ask box asks Chat (the map's lookups
 // first) and the chat is kept with the person's others; a part's "Ask about
@@ -21,7 +21,7 @@
 // steps and time, and offers no way to start another.
 //
 // Loading (lib/app-map-load.ts): the API answers with the status, where to
-// read the map and Coderhelm's overlays; the map is read once per build and
+// read the map and CoderHelm's overlays; the map is read once per build and
 // the overlays laid over it here. Each read gives up after LOAD_TIMEOUT_MS
 // and shows Try again, so the page never waits on a request forever. The
 // map's own title and description show above it (the viewer drew them over
@@ -309,7 +309,7 @@ function AppMap() {
               <Toggle on={health} onChange={setHealth} testId="app-map-health-toggle">
                 Health
               </Toggle>
-              <span className="text-sm text-zinc-400">Coderhelm&apos;s runs and findings, shown on the parts they concern.</span>
+              <span className="text-sm text-zinc-400">CoderHelm&apos;s runs and findings, shown on the parts they concern.</span>
             </div>
             <AskBox question={question} setQuestion={setQuestion} />
           </>

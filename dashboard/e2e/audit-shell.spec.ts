@@ -156,7 +156,7 @@ test("runs list: plain status words, readable times, grouped attempts with a nam
   await toggle.click();
   await expect(page.getByRole("button", { name: /^Hide 1 earlier try of / })).toHaveAttribute("aria-expanded", "true");
   await expect(table.getByText("Failed").filter({ visible: true })).toBeVisible();
-  await expect(page).toHaveTitle("Runs · Coderhelm");
+  await expect(page).toHaveTitle("Runs · CoderHelm");
   await shot(page, "shell-runs");
   expect(errors).toEqual([]);
 });
@@ -245,9 +245,9 @@ test("menu: current page is marked, icon buttons have names, tab titles follow t
   await expect(nav.getByRole("link", { name: "Plans", exact: true })).toHaveAttribute("aria-current", "page");
   await expect(page.getByRole("navigation", { name: "Plans pages" }).getByRole("link", { name: "Templates" })).toHaveAttribute("aria-current", "page");
   await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
-  await expect(page).toHaveTitle("Templates · Coderhelm");
+  await expect(page).toHaveTitle("Templates · CoderHelm");
   await page.goto("/runs/detail?id=01RUN00000000000000000003");
-  await expect(page).toHaveTitle("Run · Coderhelm");
+  await expect(page).toHaveTitle("Run · CoderHelm");
 
   const switcher = page.getByRole("button", { name: /Team: your-team\. Switch team/ });
   await expect(switcher).toHaveAttribute("aria-expanded", "false");

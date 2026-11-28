@@ -1332,7 +1332,7 @@ const chat: Page = {
             ["Files", "PDF, Word, Markdown, text, CSV, Excel and HTML uploads"],
           ],
         },
-        { type: "shot", shot: "knowledge", caption: "A knowledge base fed by several apps, each card showing whether it is up to date. Example data." },
+        { type: "shot", shot: "knowledge", caption: "A knowledge base: what is searchable, how fresh it is, the one source that needs attention and how to fix it. Example data." },
         { type: "p", text: "CoderHelm only ever reads from these apps: nothing is changed, created or deleted there. Import the knowledge base you already have, connect Bedrock or any MCP search tool in place, and see what each base answers on [its own page](/knowledge/)." },
       ],
     },

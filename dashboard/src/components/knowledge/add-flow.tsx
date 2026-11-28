@@ -80,7 +80,7 @@ const OWN_STEP: Partial<Record<AddKind, Step>> = {
 
 export type FlowMode = { kind: "create" } | { kind: "add"; base: Base };
 
-/** Sources a self-hosted install can reach through Coderhelm's app or its own (lib/hybrid.ts). */
+/** Sources a self-hosted install can reach through CoderHelm's app or its own (lib/hybrid.ts). */
 const HYBRID_KINDS = new Set<SourceKind>(["notion", "confluence", "google_drive"]);
 
 const TILES: SourceKind[] = ["notion", "confluence", "google_drive", "sanity", "github", "web"];
@@ -951,7 +951,7 @@ function BedrockStep({ arn, onArn }: { arn: string; onArn: (arn: string, listedN
   return (
     <div className="space-y-5" data-testid="bedrock-step">
       <p className="text-sm leading-relaxed text-zinc-400">
-        Coderhelm searches the knowledge base live in your AWS account whenever Chat or an agent needs it. Nothing is copied, and Bedrock does its own search, so its embedding model and vector store don&apos;t matter.
+        CoderHelm searches the knowledge base live in your AWS account whenever Chat or an agent needs it. Nothing is copied, and Bedrock does its own search, so its embedding model and vector store don&apos;t matter.
       </p>
       {start?.install && (
         <div data-testid="bedrock-list">
@@ -1023,11 +1023,11 @@ function BedrockStep({ arn, onArn }: { arn: string; onArn: (arn: string, listedN
       )}
       {start && !reachable && (
         <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm leading-relaxed text-amber-200" data-testid="bedrock-account-missing">
-          AWS account {account} isn&apos;t connected to Coderhelm. Connect it on{" "}
+          AWS account {account} isn&apos;t connected to CoderHelm. Connect it on{" "}
           <Link href="/settings/integrations/aws" className={linkButton} target="_blank" rel="noopener noreferrer">
             Integrations, AWS
           </Link>{" "}
-          first: Coderhelm searches with that account&apos;s read-only CoderHelmLogReader role and your team&apos;s private ID.
+          first: CoderHelm searches with that account&apos;s read-only CoderHelmLogReader role and your team&apos;s private ID.
         </p>
       )}
       {loadError && <p className="text-sm text-amber-300">{loadError}</p>}
@@ -1088,7 +1088,7 @@ function SignInStep({
             <span className="min-w-0 wrap-anywhere">Connected as {conn.signed_in_as || "you"}</span>
           </p>
           <p className="mt-3 max-w-sm text-sm leading-relaxed text-zinc-400">
-            Coderhelm reads what you pick with this sign-in. Nothing is changed in {label}.
+            CoderHelm reads what you pick with this sign-in. Nothing is changed in {label}.
           </p>
           <button type="button" onClick={onContinue} className={`${buttonClass("primary", "lg")} mt-6`} data-testid="signin-continue" autoFocus>
             Continue
@@ -1098,7 +1098,7 @@ function SignInStep({
         <>
           <h3 className="mt-5 text-lg font-semibold text-zinc-100">Finish signing in to {label}</h3>
           <p className="mt-2 max-w-sm text-sm leading-relaxed text-zinc-400" role="status">
-            A {label} window is open. Sign in there and allow Coderhelm to read your content. This page carries on when you&apos;re done.
+            A {label} window is open. Sign in there and allow CoderHelm to read your content. This page carries on when you&apos;re done.
           </p>
           <div className="mt-6 flex items-center gap-3">
             <span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-600 border-t-sky-400 motion-reduce:animate-none" />
@@ -1180,14 +1180,14 @@ function ConnectStep({
   const [showToken, setShowToken] = useState(false);
   const fetchedChoice = useHybridChoice(kind);
   const [pickedChoice, setPickedChoice] = useState<Choice | null>(null);
-  // On a hybrid install: Coderhelm's app means one sign-in button and
+  // On a hybrid install: CoderHelm's app means one sign-in button and
   // nothing to fill in; token steps only under "Use my own app" or behind
   // "Use a key instead".
   const choice = HYBRID_KINDS.has(kind) ? (pickedChoice ?? fetchedChoice) : null;
   const viaCoderhelm = choice === "coderhelm";
   const signIn = !!conn?.can_sign_in;
   // Without sign-in, the token is the way in: shown at once (never under
-  // Coderhelm's app, where it stays behind "Use a key instead").
+  // CoderHelm's app, where it stays behind "Use a key instead").
   const tokenOpen = !!tokenKind && canSaveToken && (viaCoderhelm ? showToken : !signIn || showToken);
   const state = viaCoderhelm
     ? signIn
@@ -1204,7 +1204,7 @@ function ConnectStep({
     <div className="flex flex-col items-center py-4 text-center" data-testid="connect-step" data-state={state}>
       <SourceLogo kind={kind} size="lg" />
       <h3 className="mt-5 text-lg font-semibold text-zinc-100">
-        {conn?.reconnect_reason ? `Reconnect ${label}` : `Connect ${label} to Coderhelm`}
+        {conn?.reconnect_reason ? `Reconnect ${label}` : `Connect ${label} to CoderHelm`}
       </h3>
       {!viaCoderhelm && (
       <p className="mt-2 max-w-md text-sm leading-relaxed text-zinc-400">
@@ -1212,15 +1212,15 @@ function ConnectStep({
           ? `Your ${label} connection stopped working. ${signIn ? "Sign in again" : "Connect it again"} and everything picks up where it left off.`
           : signIn
             ? kind === "notion"
-              ? "You'll sign in to Notion and choose which pages Coderhelm can see. Nothing is changed in Notion."
-              : `You'll sign in to ${label} and allow Coderhelm to read it. Nothing is changed in ${label}.`
+              ? "You'll sign in to Notion and choose which pages CoderHelm can see. Nothing is changed in Notion."
+              : `You'll sign in to ${label} and allow CoderHelm to read it. Nothing is changed in ${label}.`
             : tokenKind && !canSaveToken
-              ? `${label} sign-in isn't set up on this Coderhelm, so ${label} connects with a token that an admin or owner saves.`
+              ? `${label} sign-in isn't set up on this CoderHelm, so ${label} connects with a token that an admin or owner saves.`
               : tokenKind
               ? kind === "notion"
                 ? "Create a read-only Notion connection, share the pages you want with it, and paste its token. It takes about two minutes, and nothing is changed in Notion."
                 : "Paste an Atlassian API token for an account that can read the spaces you want. Nothing is changed in Confluence."
-              : `Coderhelm reads the folders and files you pick. Nothing is changed in ${label}.`}
+              : `CoderHelm reads the folders and files you pick. Nothing is changed in ${label}.`}
       </p>
       )}
       {HYBRID_KINDS.has(kind) && (
@@ -1242,7 +1242,7 @@ function ConnectStep({
       )}
       {viaCoderhelm && !signIn && (
         <p className="mt-6 max-w-md text-sm leading-relaxed text-zinc-400" data-testid="app-not-ready">
-          Coderhelm&apos;s {label} app isn&apos;t ready on this install yet. Check it in Settings, Version and updates, Hybrid, or use a key instead.
+          CoderHelm&apos;s {label} app isn&apos;t ready on this install yet. Check it in Settings, Version and updates, Hybrid, or use a key instead.
         </p>
       )}
       {error && (

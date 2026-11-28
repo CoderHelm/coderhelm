@@ -31,7 +31,7 @@ export function SetupBanner() {
   if (hidden || !progress || progress.done >= progress.total || path.startsWith("/settings/setup")) return null;
   return (
     <div role="status" data-testid="setup-banner" className="mb-4 flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-900 bg-blue-950/40 px-4 py-3 text-sm text-blue-100">
-      <p className="min-w-0">Finish setting up Coderhelm: {progress.done} of {progress.total} steps done.</p>
+      <p className="min-w-0">Finish setting up CoderHelm: {progress.done} of {progress.total} steps done.</p>
       <div className="flex items-center gap-4">
         <Link href="/settings/setup" className={linkButton}>Open the checklist</Link>
         <button

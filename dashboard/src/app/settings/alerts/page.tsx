@@ -176,7 +176,7 @@ const topicName = (arn?: string | null) => (arn ?? "").split(":").pop() || "unkn
 
 function alarmsError(error?: string): string {
   if (error === "permission")
-    return "Coderhelm can't read this account's alarms yet. Update the Coderhelm stack in AWS to the latest template (it adds read only cloudwatch:DescribeAlarms).";
+    return "CoderHelm can't read this account's alarms yet. Update the CoderHelm stack in AWS to the latest template (it adds read only cloudwatch:DescribeAlarms).";
   if (error === "not_connected") return "Connect the topic's AWS account under Settings, AWS to list its alarms.";
   return error ? "Couldn't list the topic's alarms right now." : "";
 }
@@ -368,7 +368,7 @@ function AlertsPage() {
                   ) : undefined
                 }
               >
-                A route connects an SNS topic to Coderhelm. Open &ldquo;How to connect a topic&rdquo; below, then add the route.
+                A route connects an SNS topic to CoderHelm. Open &ldquo;How to connect a topic&rdquo; below, then add the route.
               </EmptyState>
             )}
             {load.state === "ready" && routes.length > 0 && (
@@ -410,7 +410,7 @@ function AlertsPage() {
       <Section
         id="recent"
         title="Recent alerts"
-        description="The latest alerts on every route and what Coderhelm did with each. A recovery shows the alert it resolves."
+        description="The latest alerts on every route and what CoderHelm did with each. A recovery shows the alert it resolves."
         actions={
           <Link href="/alerts" className={linkButton}>
             Open the full log
@@ -635,7 +635,7 @@ function SetupSteps({
       id: "subscription",
       label: "Subscription",
       state: lastEvent ? "done" : "missing",
-      detail: lastEvent ? `Working: the last alert arrived ${timeAgo(lastEvent)}.` : "No alert received yet. Save and turn on the route first, then subscribe this HTTPS endpoint to the topic: Coderhelm confirms the subscription by itself. Subscribed before the route was on? Press Request confirmation on the subscription in SNS.",
+      detail: lastEvent ? `Working: the last alert arrived ${timeAgo(lastEvent)}.` : "No alert received yet. Save and turn on the route first, then subscribe this HTTPS endpoint to the topic: CoderHelm confirms the subscription by itself. Subscribed before the route was on? Press Request confirmation on the subscription in SNS.",
     },
   ];
   const allDone = items.every((i) => i.state === "done");
@@ -1035,7 +1035,7 @@ function LogAutofixRow() {
       help={
         state
           ? `${autofixSentence(state.autofix, state.posts_to)} Each fix PR posts to this team channel unless the Logs page has its own.`
-          : "Coderhelm can open a fix pull request for critical log findings and post it to this team channel."
+          : "CoderHelm can open a fix pull request for critical log findings and post it to this team channel."
       }
       control={() => (
         <Link href="/logs/?auto=1" className={secondaryButton}>

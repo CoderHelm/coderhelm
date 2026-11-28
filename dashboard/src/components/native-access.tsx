@@ -156,7 +156,7 @@ export function NativeAccessCard({ access }: { access: NativeAccess | null | und
         <Callout variant="warning" title="More AWS access for what you use">
           <p>
             {access.version ?? "This release"} needs more AWS access for something you use, but a stack named <Code className="text-xs">{stack}</Code> already
-            exists and wasn&apos;t made by a Coderhelm release. Don&apos;t delete it: it may hold this install&apos;s permissions. Ask Coderhelm support how to apply
+            exists and wasn&apos;t made by a CoderHelm release. Don&apos;t delete it: it may hold this install&apos;s permissions. Ask CoderHelm support how to apply
             this release&apos;s permissions on your install.
           </p>
           <NewPermissions access={access} />
@@ -238,7 +238,7 @@ export function NativeAccessCard({ access }: { access: NativeAccess | null | und
   );
 }
 
-/** A rollback AWS couldn't finish (UPDATE_ROLLBACK_FAILED), and what Coderhelm did about it. */
+/** A rollback AWS couldn't finish (UPDATE_ROLLBACK_FAILED), and what CoderHelm did about it. */
 export function NativeRecoveryCard({ recovery }: { recovery: NativeRecovery | null | undefined }) {
   if (!recovery || recovery.status === "recovered" || recovery.status === "failed") return null;
   const stuck = recovery.status === "stuck";
@@ -247,12 +247,12 @@ export function NativeRecoveryCard({ recovery }: { recovery: NativeRecovery | nu
     <div data-testid="native-recovery" data-state={recovery.status}>
       <Callout
         variant={stuck ? "warning" : "info"}
-        title={stuck ? "The last update's rollback stopped, and Coderhelm couldn't finish it safely" : "Finishing the last update's rollback…"}
+        title={stuck ? "The last update's rollback stopped, and CoderHelm couldn't finish it safely" : "Finishing the last update's rollback…"}
       >
         <p>
           {recovery.at ? <>Since <Time iso={recovery.at} />. </> : null}
           {stuck
-            ? `Coderhelm keeps running, but no update can start until the rollback finishes. ${capital(recovery.reason)}.`
+            ? `CoderHelm keeps running, but no update can start until the rollback finishes. ${capital(recovery.reason)}.`
             : `${capital(recovery.reason)}. No update can start until it finishes; this page follows it by itself.`}
         </p>
         {stuck && link ? (

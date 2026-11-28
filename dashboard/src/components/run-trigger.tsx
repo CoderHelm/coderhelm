@@ -6,14 +6,14 @@ import { AtlassianIcon, BellIcon, ChatIcon, GitHubIcon, LayersIcon, PlanIcon } f
 import type { SelectOption } from "./select";
 
 // How a run was started and by whom: "Jira · ABC-123 · by Dana",
-// "Started by Coderhelm · flaky test". The gateway works the words and the
+// "Started by CoderHelm · flaky test". The gateway works the words and the
 // link out (`trigger` on a run); this only draws them.
 
 /** The "Started by" filter's choices, in the order they are offered. */
 export const STARTED_BY: { value: RunTriggerKind; label: string }[] = [
   { value: "jira", label: "Jira" },
   { value: "github", label: "GitHub" },
-  { value: "coderhelm", label: "Coderhelm" },
+  { value: "coderhelm", label: "CoderHelm" },
   { value: "alert", label: "Alerts" },
   { value: "plan", label: "Plans" },
   { value: "dashboard", label: "Dashboard" },
@@ -27,7 +27,7 @@ export function startedByValue(v: string): RunTriggerKind | "" {
   return isKind(v) ? v : "";
 }
 
-/** The Coderhelm mark (three slanted bars) in one colour, for its own work. */
+/** The CoderHelm mark (three slanted bars) in one colour, for its own work. */
 const CoderhelmMark = () => (
   <svg width="16" height="16" viewBox="0 0 512 512" fill="currentColor">
     <polygon points="106,416 158,416 226,96 174,96" />

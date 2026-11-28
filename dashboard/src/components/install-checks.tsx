@@ -16,7 +16,7 @@ export const STATUS: Record<CheckStatus, { label: string; tone: Tone; icon: Reac
   skip: { label: "Not set up", tone: "muted", icon: <InfoIcon />, ring: "border-zinc-600 text-zinc-500" },
 };
 
-/** The fix: plain words, a command to copy, a link out, a page in Coderhelm. */
+/** The fix: plain words, a command to copy, a link out, a page in CoderHelm. */
 export function FixBlock({ fix, testId }: { fix: CheckFix; testId?: string }) {
   const here = usePathname();
   // Never a link to the page it is on: the fix is already in front of you.
@@ -32,7 +32,7 @@ export function FixBlock({ fix, testId }: { fix: CheckFix; testId?: string }) {
       {fix.command && <CodeBlock code={fix.command} lang="bash" label="Command to copy" testId="fix-command" />}
       {(fix.url || href) && (
         <div className="flex flex-wrap gap-x-4 gap-y-1">
-          {href && <Link href={href} className={linkButton}>Open in Coderhelm</Link>}
+          {href && <Link href={href} className={linkButton}>Open in CoderHelm</Link>}
           {fix.url && (
             <a href={fix.url} target="_blank" rel="noopener noreferrer" className={linkButton}>
               <span className="wrap-anywhere">{linkLabel(fix.url)}</span>
@@ -44,7 +44,7 @@ export function FixBlock({ fix, testId }: { fix: CheckFix; testId?: string }) {
   );
 }
 
-/** Whether a Coderhelm link points at the page `here` (its hash and a trailing slash aside). */
+/** Whether a CoderHelm link points at the page `here` (its hash and a trailing slash aside). */
 export function samePage(href: string, here: string | null): boolean {
   if (!here) return false;
   const path = (p: string) => p.split(/[?#]/)[0].replace(/\/+$/, "") || "/";

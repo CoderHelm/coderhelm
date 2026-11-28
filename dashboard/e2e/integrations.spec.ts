@@ -39,7 +39,7 @@ interface Backend {
   jiraEvents: Record<string, unknown>[];
   assumeFails: boolean;
   calls: { method: string; path: string; body: Record<string, unknown> | null }[];
-  /** What the Coderhelm role can't read yet (metrics, airflow). */
+  /** What the CoderHelm role can't read yet (metrics, airflow). */
   roleMissing?: string[];
   /** IAM actions of this release the role lacks (the live permissions check). */
   permMissing?: string[];
@@ -286,8 +286,8 @@ test.describe("AWS", () => {
     await expect(card.getByLabel("Role")).toHaveValue(ROLE_ARN);
     await expect(card.getByText("1 chosen")).toBeVisible();
     await expect(card.getByText("40 minutes ago")).toBeVisible();
-    await expect(page.getByRole("heading", { name: "What Coderhelm can do with it" })).toBeVisible();
-    await expect(page.getByRole("complementary", { name: "What Coderhelm can do with it" }).getByText("Change, delete or write anything in your account")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "What CoderHelm can do with it" })).toBeVisible();
+    await expect(page.getByRole("complementary", { name: "What CoderHelm can do with it" }).getByText("Change, delete or write anything in your account")).toBeVisible();
     await shot(page, "aws-connected");
 
     await card.getByRole("button", { name: "Actions" }).click();
@@ -338,7 +338,7 @@ test.describe("AWS", () => {
     await page.getByLabel("Region of your logs").fill("eu-west-1");
     await expect(steps.locator('[aria-current="step"]')).toContainText("Check and connect");
     await connect.click();
-    await expect(page.getByText("Coderhelm could not use the role")).toBeVisible();
+    await expect(page.getByText("CoderHelm could not use the role")).toBeVisible();
     expect(callsTo(db, "POST", /\/api\/aws-connections$/)[0].body).toEqual({ role_arn: ROLE_ARN, region: "eu-west-1" });
 
     db.assumeFails = false;
@@ -724,7 +724,7 @@ test.describe("Jira", () => {
     await expect(page.getByText("2 of 3 repositories turned on")).toBeVisible();
 
     await page.getByRole("button", { name: "Check the connection" }).click();
-    await expect(page.getByText("Coderhelm reached your-team.atlassian.net and can see 3 projects.")).toBeVisible();
+    await expect(page.getByText("CoderHelm reached your-team.atlassian.net and can see 3 projects.")).toBeVisible();
 
     await page.getByRole("switch", { name: "Operations (OPS)" }).click();
     await pickOption(page.getByTestId("project-WEB").getByLabel("Repository"), "your-team/web");

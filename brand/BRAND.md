@@ -1,18 +1,16 @@
-# Coderhelm Brand Guidelines
+# CoderHelm Brand Guidelines
 
 ## The Name
-- **Product**: Coderhelm
-- **Pronunciation**: "deftly" (like the English adverb)
-- **Meaning**: "in a skillful, clever, and quick way"
-- **Bot name**: `Coderhelm[bot]`
-- **Domain**: Coderhelm.com
+- **Product**: CoderHelm, one word with a capital C and a capital H, everywhere people read it: the site, the dashboard, the docs, emails, the repositories and posts. The dashboard's UI lint (`dashboard/scripts/ui-lint.mjs`, rule `brand`) fails on any other spelling.
+- **Lowercase only in identifiers**: the bot login `coderhelm[bot]`, the `coderhelm` label, the `/coderhelm` command, package names and addresses.
+- **Domain**: coderhelm.com
 
 ## The Mark
 
 Three forward-leaning parallelogram slashes: **///**
 
 The mark represents:
-- **The "3"** in Coderhelm (three strokes)
+- **Three strokes**, the middle one in Accent Blue on the site and in marketing (`icon-accent.svg`)
 - **Forward momentum** (leaning right)
 - **Precision** (parallel, uniform, geometric)
 - **Code** (forward slashes are native to programming)

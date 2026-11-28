@@ -590,9 +590,9 @@ export function quietNote(kind: string, text: string): boolean {
 /** Plain words for a note the worker put in the conversation. */
 export function noteWords(kind: string, text: string): string {
   const m = text.match(/used (\d+) of (\d+)/i);
-  if (kind === "turn_budget") return m ? `Coderhelm told the agent it had used ${m[1]} of its ${m[2]} steps` : "Coderhelm reminded the agent of its step budget";
-  if (kind === "wrap_up") return "Time was nearly up: Coderhelm asked the agent to wrap up";
-  if (kind === "tools_off") return "Coderhelm turned the tools off and asked for the final answer";
+  if (kind === "turn_budget") return m ? `CoderHelm told the agent it had used ${m[1]} of its ${m[2]} steps` : "CoderHelm reminded the agent of its step budget";
+  if (kind === "wrap_up") return "Time was nearly up: CoderHelm asked the agent to wrap up";
+  if (kind === "tools_off") return "CoderHelm turned the tools off and asked for the final answer";
   return text.replace(/^\[SYSTEM NOTE\]\s*/i, "");
 }
 

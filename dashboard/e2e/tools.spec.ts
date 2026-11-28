@@ -248,7 +248,7 @@ test("approve a new version from a repo file: see the diff and the example, then
   await page.getByRole("button", { name: "Approve", exact: true }).click();
   await expect(page.getByText("Approved, on")).toBeVisible();
   expect(db.calls.find((c) => c.path.endsWith("/approve"))?.body?.hash).toBe(v2.hash);
-  await page.getByRole("switch", { name: `Let Coderhelm use ${ORDER_DEF.name}` }).click();
+  await page.getByRole("switch", { name: `Let CoderHelm use ${ORDER_DEF.name}` }).click();
   await expect(page.getByText("Approved, off")).toBeVisible();
 });
 

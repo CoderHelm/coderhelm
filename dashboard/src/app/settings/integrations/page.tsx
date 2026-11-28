@@ -41,7 +41,7 @@ import { CatalogPanel } from "@/components/mcp-server-panel";
 import { Attention, ConnectionFacts, DangerRow, OtherWays, PanelLink, PanelSection, SignInControl, UsesList, Way, type Fact } from "@/components/integration-panel";
 import { KnowledgeDisconnect, KnowledgeSignInControl, beginKnowledgeSignIn } from "@/components/knowledge-connection";
 
-// Settings → Integrations: every outside system Coderhelm connects to, as one
+// Settings → Integrations: every outside system CoderHelm connects to, as one
 // list per kind of tool. One row per integration with the same columns in the
 // same places (mark, name and a short line, status, one action), so the eye
 // runs down a column instead of zigzagging across cards. A row opens its
@@ -221,7 +221,7 @@ function IntegrationsPage() {
         title="Integrations"
         lead={
           <>
-            What Coderhelm is connected to and whether each one works. Databases, APIs and log searches are in{" "}
+            What CoderHelm is connected to and whether each one works. Databases, APIs and log searches are in{" "}
             <Link href="/data-sources" className={linkButton}>
               Data sources
             </Link>
@@ -287,7 +287,7 @@ function IntegrationsPage() {
               className="!mt-8"
               description={
                 mcp
-                  ? "Any remote MCP server, by its address. Coderhelm finds how it signs in (OAuth, a key, or nothing), and agents get only the tools you allow."
+                  ? "Any remote MCP server, by its address. CoderHelm finds how it signs in (OAuth, a key, or nothing), and agents get only the tools you allow."
                   : undefined
               }
               actions={
@@ -342,7 +342,7 @@ function IntegrationsPage() {
         <Section
           id="websites"
           title="Your websites"
-          description="Coderhelm can check that links and redirects on these sites work (status and page title only). Each domain covers its subdomains."
+          description="CoderHelm can check that links and redirects on these sites work (status and page title only). Each domain covers its subdomains."
         >
           <WebsitesCard canEdit={data.canEdit} />
         </Section>
@@ -570,7 +570,7 @@ function appUpdateOf(item: Integration): JiraAppUpdate | null {
 }
 
 /**
- * Under the Jira row: the site runs an older Coderhelm app, what it lacks
+ * Under the Jira row: the site runs an older CoderHelm app, what it lacks
  * and how its Jira admin accepts the update. Gone once the site catches up.
  */
 function JiraAppNotice({ update }: { update: JiraAppUpdate }) {
@@ -1044,7 +1044,7 @@ function WebsitesCard({ canEdit }: { canEdit: boolean }) {
       ) : (
         <>
           {domains.length === 0 ? (
-            <p className="text-sm text-zinc-400">No websites yet, so Coderhelm doesn&apos;t open any pages.</p>
+            <p className="text-sm text-zinc-400">No websites yet, so CoderHelm doesn&apos;t open any pages.</p>
           ) : (
             <ul aria-label="Your websites" className="flex flex-wrap gap-2">
               {domains.map((d) => (

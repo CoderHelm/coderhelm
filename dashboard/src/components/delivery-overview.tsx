@@ -231,7 +231,7 @@ export function DeliveryOverview({ filters, onFilters }: { filters: OverviewFilt
 const PROVIDER_NAME: Record<string, string> = { github: "GitHub", jira: "Jira" };
 const RELAY_SOURCE: Record<string, string> = { github: "relay", jira: "relay_jira" };
 
-/** Events Coderhelm's relay forwarded to this install, GitHub and Jira side by side (hybrid installs). */
+/** Events CoderHelm's relay forwarded to this install, GitHub and Jira side by side (hybrid installs). */
 function RelayPanel({ rows, span, whole }: { rows: DeliveryRelayRow[]; span: string; whole: { from: string; until: string } }) {
   const when = (t: string | null, none: string) =>
     t ? (
@@ -240,7 +240,7 @@ function RelayPanel({ rows, span, whole }: { rows: DeliveryRelayRow[]; span: str
       none
     );
   return (
-    <Section title="Relay" id="relay" description={`Events Coderhelm forwarded to this install in ${span}, by where they came from.`}>
+    <Section title="Relay" id="relay" description={`Events CoderHelm forwarded to this install in ${span}, by where they came from.`}>
       <div data-testid="overview-relay">
         <Table
           label="Relay by provider"
@@ -267,7 +267,7 @@ function RelayPanel({ rows, span, whole }: { rows: DeliveryRelayRow[]; span: str
 
 /** Email by kind, from Amazon SES's own events (self-hosted installs). */
 function EmailPanel({ email }: { email: DeliveryEmail }) {
-  const sender = email.sender === "relay" ? "through Coderhelm" : "through this install's Amazon SES";
+  const sender = email.sender === "relay" ? "through CoderHelm" : "through this install's Amazon SES";
   const t = email.totals;
   return (
     <Section
@@ -364,7 +364,7 @@ function Body({ data, filters, filtering, onClear }: { data: DeliveryAnalytics; 
               title={`No deliveries in ${span}`}
               action={<Link href="/settings/integrations" className={buttonClass("secondary")}>Check your integrations</Link>}
             >
-              This overview counts every webhook GitHub, Jira and your alerts send to Coderhelm, every event it relays, and every message it sends to your webhook endpoints, Slack, Teams or email. Counts appear as deliveries finish, and are kept for {data.kept_days} days.
+              This overview counts every webhook GitHub, Jira and your alerts send to CoderHelm, every event it relays, and every message it sends to your webhook endpoints, Slack, Teams or email. Counts appear as deliveries finish, and are kept for {data.kept_days} days.
             </EmptyState>
           )}
         </div>

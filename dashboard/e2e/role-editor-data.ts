@@ -36,7 +36,7 @@ export const CAPABILITY_TABLE: CapabilityRow[] = [
   { key: "repos", label: "Manage repositories: sync, turn on, roles, code graph (turn off, rebuild) and infrastructure scans", short_label: "Manage repositories", min_role: "admin" },
   { key: "agent_settings", label: "Edit instructions, rules, voice, agent context, workflow, git conventions and reviewer settings, and remove what the reviewer learned", short_label: "Edit agent settings", min_role: "admin" },
   { key: "agents.permissions", label: "Edit agent permissions: rules, presets, the autonomy limit, agent switches, pause all agents, sandbox allowlists, and approve \"always\"", short_label: "Edit agent permissions", min_role: "admin" },
-  { key: "learning", label: "Pin a prompt variant, revert or restore what Coderhelm learned, and tune the reward weights", short_label: "Manage what agents learned", min_role: "admin" },
+  { key: "learning", label: "Pin a prompt variant, revert or restore what CoderHelm learned, and tune the reward weights", short_label: "Manage what agents learned", min_role: "admin" },
   { key: "memory", label: "Add, edit and delete team memory", short_label: "Edit team memory", min_role: "admin" },
   { key: "integrations", label: "Connect GitHub, Jira, AWS accounts, monitoring and docs tools, Teams and MCP servers (and the tools agents get from each), and choose what each may do", short_label: "Connect integrations", min_role: "admin" },
   { key: "data_sources", label: "Manage data sources, team tools and skills", short_label: "Manage data sources and tools", min_role: "admin" },
@@ -47,7 +47,7 @@ export const CAPABILITY_TABLE: CapabilityRow[] = [
   { key: "webhooks", label: "Add, change and delete webhook endpoints, reveal and rotate their signing secrets, and send, resend and replay their events", short_label: "Manage webhooks", min_role: "admin" },
   { key: "deliveries", label: "See every event in and out (webhooks, relay forwards, notifications, email), how they went over time, and send failed ones again", short_label: "Resend event deliveries", min_role: "admin" },
   { key: "budget", label: "Set the monthly token limit", short_label: "Set the token limit", min_role: "admin" },
-  { key: "support", label: "Let Coderhelm support into the workspace, and manage every support ticket the team files", short_label: "Manage support access", min_role: "admin" },
+  { key: "support", label: "Let CoderHelm support into the workspace, and manage every support ticket the team files", short_label: "Manage support access", min_role: "admin" },
   { key: "system", label: "See this install's version, setup checks and update readiness, update it or roll it back, change its domain, use CoderHelm's address, apps and event relay (hybrid), and send a test email (self-hosted installs; install admins only)", short_label: "System health and updates", min_role: "admin" },
   { key: "system.models", label: "Change how this install calls Claude (Amazon Bedrock or Anthropic API keys), after every model it uses answers a test call (self-hosted installs; install admins only)", short_label: "Set how models are called", min_role: "admin" },
   { key: "emails", label: "Choose which optional emails this install sends and whether it sends through its own Amazon SES or CoderHelm (self-hosted installs; install admins only)", short_label: "Choose install emails", min_role: "admin" },
@@ -69,7 +69,7 @@ import type { Page, Route } from "@playwright/test";
 
 const ROLES = [
   { key: "viewer", label: "Viewer", level: 0, summary: "Read-only: sees runs, plans, reviews and settings, changes nothing.", assignable: true },
-  { key: "member", label: "Member", level: 1, summary: "Works with Coderhelm: plans, runs, reviews and recommendations.", assignable: true },
+  { key: "member", label: "Member", level: 1, summary: "Works with CoderHelm: plans, runs, reviews and recommendations.", assignable: true },
   { key: "billing", label: "Billing", level: 2, summary: "Older role with the same access as Member.", assignable: false },
   { key: "admin", label: "Admin", level: 3, summary: "Runs the workspace: repos, integrations, agent settings and people.", assignable: true },
   { key: "owner", label: "Owner", level: 4, summary: "Everything, plus budget, account-level changes and managing admins.", assignable: true },

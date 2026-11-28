@@ -91,7 +91,7 @@ export function Refusal({ code, message, title = "This can't be done" }: { code?
   );
 }
 
-const ACTOR_KIND: Record<AuditEvent["actor_kind"], string> = { person: "Person", agent: "Agent", schedule: "Schedule", system: "Coderhelm" };
+const ACTOR_KIND: Record<AuditEvent["actor_kind"], string> = { person: "Person", agent: "Agent", schedule: "Schedule", system: "CoderHelm" };
 
 /** "draft.approved" → "Draft approved". */
 export function actionWords(action: string): string {

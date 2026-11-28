@@ -130,7 +130,7 @@ function FeatureList({ view, admin, pending, onSwitchOn }: { view: RepoView; adm
               )}
             </>
           ) : (
-            "Setup hasn't read this repo yet, so these reasons come from Coderhelm's own defaults."
+            "Setup hasn't read this repo yet, so these reasons come from CoderHelm's own defaults."
           )}
         </p>
       </div>

@@ -84,8 +84,8 @@ export function RunQuestions({
       );
       toast(
         r.posted
-          ? `Sent. Your answer is on the ${where} and Coderhelm is continuing.`
-          : `Coderhelm is continuing with your answer. It couldn't post it on the ${where}.`,
+          ? `Sent. Your answer is on the ${where} and CoderHelm is continuing.`
+          : `CoderHelm is continuing with your answer. It couldn't post it on the ${where}.`,
       );
       onAnswered();
     } catch (err) {
@@ -101,7 +101,7 @@ export function RunQuestions({
   };
 
   return (
-    <form onSubmit={send} noValidate aria-label="Coderhelm's questions" className="space-y-3 pt-1" data-testid="run-questions">
+    <form onSubmit={send} noValidate aria-label="CoderHelm's questions" className="space-y-3 pt-1" data-testid="run-questions">
       <p>
         {many ? `It stopped to ask ${questions.length} questions.` : "It stopped to ask one question."}{" "}
         {canAnswer ? "Answer here and it carries on." : `Ask someone with member access to answer here, or reply on the ${where}.`}
@@ -135,7 +135,7 @@ export function RunQuestions({
                   {!!q.suggestions?.length && (
                     <div
                       className="mb-2 flex flex-wrap items-center gap-2"
-                      aria-label={q.decision ? "Choices" : "Possible answers Coderhelm found"}
+                      aria-label={q.decision ? "Choices" : "Possible answers CoderHelm found"}
                       role="group"
                     >
                       <span className="text-xs text-zinc-400">{q.decision ? "Choose:" : "Possible answers:"}</span>

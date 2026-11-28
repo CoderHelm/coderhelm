@@ -1,6 +1,6 @@
 "use client";
 
-// Scheduled skill runs: a team's synced skill, run by Coderhelm on a schedule
+// Scheduled skill runs: a team's synced skill, run by CoderHelm on a schedule
 // in the team's time zone, read-only unless the schedule allows writes. An
 // admin picks the skill, the schedule, the tools it may call and where the
 // result goes, and presses Run now to test it: the run page shows its

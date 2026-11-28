@@ -209,7 +209,7 @@ test("an optional read switches on the install's own stack: review of exactly wh
   await expect(panel.getByRole("heading", { name: /Update needed|arrive/ })).toHaveCount(0);
   const optional = panel.getByTestId(`aws-optional-${INSTALL}`);
   await optional.locator("summary").click();
-  await expect(optional.getByTestId("aws-optional-where")).toContainText("This install's own account: Coderhelm switches these on its own stack");
+  await expect(optional.getByTestId("aws-optional-where")).toContainText("This install's own account: CoderHelm switches these on its own stack");
   const inspector = optional.getByTestId("aws-optional-inspector");
   await expect(inspector).toContainText("billed by AWS");
   await expect(optional.getByTestId("aws-optional-health")).toContainText("Business Support");

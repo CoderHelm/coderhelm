@@ -193,7 +193,7 @@ function activity() {
   add(15, "Lena on #412: \"Can we also validate the postcode on the server? The form check alone can be skipped.\"", { actor: "person", who: "Lena", kind: "comment", link: `${PR}#discussion_r1` });
   add(11, "Pushed 7c3e91a: Validate the postcode on the server, with a test for a bad one", { kind: "push", link: "https://github.com/acme/web/commit/7c3e91a" });
   add(10, "Replied to Lena: \"Done in 7c3e91a: the route now rejects a malformed postcode with a 400, covered by addresses.test.ts.\"", { kind: "reply", tone: "good", link: `${PR}#discussion_r2` });
-  add(7, "Coderhelm's review of #412 approved 7c3e91a", { kind: "review", tone: "good", link: "/reviewer/detail?sk=REVIEW%23acme%2Fweb%23000412" });
+  add(7, "CoderHelm's review of #412 approved 7c3e91a", { kind: "review", tone: "good", link: "/reviewer/detail?sk=REVIEW%23acme%2Fweb%23000412" });
   add(6, "All 4 checks passed on 7c3e91a: build, lint, unit tests, e2e (chromium)", { actor: "github", kind: "checks", tone: "good" });
   return out;
 }

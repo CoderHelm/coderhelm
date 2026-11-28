@@ -2,7 +2,7 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 
-// Connecting an AI app (an MCP client) to Coderhelm: the consent page the app
+// Connecting an AI app (an MCP client) to CoderHelm: the consent page the app
 // sends someone to, and Settings, Connected AI apps. Every API call is
 // answered here; the app's own redirect address is caught too, so nothing
 // leaves the test.
@@ -143,7 +143,7 @@ async function shot(page: Page, name: string) {
 test("the consent page shows which app is asking, where it goes back to, and what it may do", async ({ page }) => {
   const db = await mockApi(page);
   await page.goto(`/authorize/?request=${REQUEST}`);
-  await expect(page.getByRole("heading", { level: 1, name: "Let Claude use Coderhelm as you?" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Let Claude use CoderHelm as you?" })).toBeVisible();
   await expect(page.getByTestId("consent-app")).toHaveText("Claude");
   await expect(page.getByTestId("consent-host")).toHaveText("claude.ai");
   await expect(page.getByTestId("page-header").getByText("ann@example.com", { exact: true })).toBeVisible();

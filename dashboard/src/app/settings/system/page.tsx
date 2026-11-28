@@ -205,7 +205,7 @@ function System() {
 
   const header = (
     <div className="mb-6">
-      <PageHeader title="Version and updates" lead="Which version of Coderhelm runs here, new releases and how they install, every update so far, and the health of the install." />
+      <PageHeader title="Version and updates" lead="Which version of CoderHelm runs here, new releases and how they install, every update so far, and the health of the install." />
     </div>
   );
 
@@ -342,8 +342,8 @@ function System() {
             label="Install updates automatically"
             layout="toggle"
             help={v.day === ANY_HOUR
-              ? "Each new beta installs within the hour it comes out, with the gap you pick below. If anything goes wrong, Coderhelm switches back to the previous version and emails the admins."
-              : "Updates install during the hour you pick below. If anything goes wrong, Coderhelm switches back to the previous version and emails the admins."}
+              ? "Each new beta installs within the hour it comes out, with the gap you pick below. If anything goes wrong, CoderHelm switches back to the previous version and emails the admins."
+              : "Updates install during the hour you pick below. If anything goes wrong, CoderHelm switches back to the previous version and emails the admins."}
             control={(ids) => <Switch id={ids.inputId} checked={v.auto} onChange={(c) => set("auto", c)} labelledBy={ids.labelId} describedBy={ids.helpId} />}
           />
           <SettingsRow
@@ -483,7 +483,7 @@ function System() {
                       <p className="mt-1 text-xs text-zinc-300" data-testid="history-next-step">
                         {h.status === "rolled_back"
                           ? `Back on ${h.from_version ?? "the previous version"}; your data is untouched. Fix what Install health lists, then update to ${h.version} again. Automatic updates skip it until then.`
-                          : "Coderhelm may not be fully working. Fix what Install health lists, or roll back below."}{" "}
+                          : "CoderHelm may not be fully working. Fix what Install health lists, or roll back below."}{" "}
                         <a href="#health" className={linkButton}>See install health</a>
                       </p>
                     )}
@@ -511,7 +511,7 @@ function System() {
           </div>
         </SettingsSection>
 
-        <SettingsSection id="health" title="Install health" description="The checks Coderhelm runs on itself: its address, GitHub, email, Claude and its queues. An update starts only while none fails.">
+        <SettingsSection id="health" title="Install health" description="The checks CoderHelm runs on itself: its address, GitHub, email, Claude and its queues. An update starts only while none fails.">
           <InstallHealth pre={pre} state={preState} blocking={blocking} onRecheck={loadPreflight} />
         </SettingsSection>
 
@@ -523,11 +523,11 @@ function System() {
           <DomainSection />
         </SettingsSection>
 
-        <SettingsSection id="hybrid" title="Hybrid" description="Use Coderhelm's GitHub App, its other apps and a coderhelm.com address, while your code and work stay in this AWS account.">
+        <SettingsSection id="hybrid" title="Hybrid" description="Use CoderHelm's GitHub App, its other apps and a coderhelm.com address, while your code and work stay in this AWS account.">
           <HybridSection />
         </SettingsSection>
 
-        <SettingsSection id="uninstall" title="Uninstall" description="Remove Coderhelm from your AWS account: delete its stack, keeping the data or not.">
+        <SettingsSection id="uninstall" title="Uninstall" description="Remove CoderHelm from your AWS account: delete its stack, keeping the data or not.">
           <UninstallSection version={data} />
         </SettingsSection>
       </div>
@@ -630,7 +630,7 @@ function UpdateStatus({
         <StatusCard state={id} variant="info" title={<>Updating to {state.version}…</>}>
           <p>
             {state.startedAt ? <>Started <Time iso={state.startedAt} />{state.startedBy ? <> by {state.startedBy}</> : null}. </> : null}
-            This takes 10 to 20 minutes. Coderhelm keeps running {on} until it finishes, and this page updates by itself.
+            This takes 10 to 20 minutes. CoderHelm keeps running {on} until it finishes, and this page updates by itself.
           </p>
           <Working label={`Updating to ${state.version}`} />
           {nextLine}
@@ -672,7 +672,7 @@ function UpdateStatus({
         <StatusCard state={id} variant="info" title={<>Checking {state.version} before it can be applied</>}>
           <p data-testid="update-checking">
             {state.startedAt ? <>Started <Time iso={state.startedAt} />. </> : null}
-            Coderhelm checks the release&apos;s signature and checksums, then tries each model it calls. It takes about 5 minutes; this page moves on by itself.
+            CoderHelm checks the release&apos;s signature and checksums, then tries each model it calls. It takes about 5 minutes; this page moves on by itself.
           </p>
           {req ? (
             <p data-testid="update-requested">
@@ -741,7 +741,7 @@ function UpdateStatus({
         >
           <p data-testid="update-failed-state">
             {failure.status === "failed"
-              ? <>Coderhelm may not be fully working: it reports {on}.</>
+              ? <>CoderHelm may not be fully working: it reports {on}.</>
               : <>Nothing changed: you&apos;re still on {on}, and your data is untouched.</>}
             {failure.startedAt ? <> Tried <Time iso={failure.startedAt} />.</> : null}
           </p>
@@ -812,7 +812,7 @@ function UpdateStatus({
           {l.prerelease && <p>A nightly beta: it reaches Stable after a day with no reported problem. You get these because the channel is Beta (nightly).</p>}
           {data.native?.can_apply ? (
             <p className="text-zinc-400" data-testid="update-consent">
-              One press prepares and applies it. That includes any change to what Coderhelm&apos;s own roles may do, always inside this install&apos;s permission limit. If it would replace or remove data, it stops and asks you first.
+              One press prepares and applies it. That includes any change to what CoderHelm&apos;s own roles may do, always inside this install&apos;s permission limit. If it would replace or remove data, it stops and asks you first.
             </p>
           ) : null}
           {state.ended?.reason ? (
@@ -869,7 +869,7 @@ function UpdateStatus({
           <p data-testid="update-detail">
             {done
               ? <>Finished <Time iso={done.finished_at ?? done.started_at} />. You&apos;re up to date{channel}.</>
-              : <>Coderhelm {current}{channel}{data.current.released_at ? <>, released <Time iso={data.current.released_at} mode="date" /></> : null}.</>}
+              : <>CoderHelm {current}{channel}{data.current.released_at ? <>, released <Time iso={data.current.released_at} mode="date" /></> : null}.</>}
             {auto ? <> New releases install by themselves {auto}.</> : null}
           </p>
         </StatusCard>
@@ -971,7 +971,7 @@ function VersionDetails({ version, autoUpdates, failure }: { version: SystemVers
     <div data-testid="version-details" className="space-y-2">
       <p>
         {c.version
-          ? <>This install runs Coderhelm {c.version}, a signed release built from the public Coderhelm source{c.commit ? " at the commit below" : ""}. Every service and this dashboard carry the same version.</>
+          ? <>This install runs CoderHelm {c.version}, a signed release built from the public CoderHelm source{c.commit ? " at the commit below" : ""}. Every service and this dashboard carry the same version.</>
           : "This install was deployed from a source checkout rather than a published release, so it has no release version."}{" "}
         {version.native ? "A new release shows at the top of this section; Update prepares the change to your stack first, then applies it." : "A new release shows at the top of this section with its notes; Update now installs it."}{" "}
         {autoUpdates ? "Automatic updates are on, so releases also install by themselves during your maintenance window." : "Automatic updates are off: nothing changes until an admin updates."}
@@ -1056,7 +1056,7 @@ function ReleaseNotes({ version, notes, url }: { version: string; notes: string;
 }
 
 /**
- * Install health: the checks Coderhelm runs on itself (its address, GitHub,
+ * Install health: the checks CoderHelm runs on itself (its address, GitHub,
  * email, Claude, its queues), apart from updates. All passing is one line;
  * a check that fails or warns is listed with its fix. An update only starts
  * while no check fails, and the Version status says so.

@@ -427,7 +427,7 @@ function TeamSettings({ settings, onSaved }: { settings: TeamPluginSettings; onS
         <ListSection
           id="chat"
           title="Briefs and approvals from chat"
-          description="Cards for new drafts post to your team's Slack or Teams channel. To also take briefs from chat, let Coderhelm check that requests really come from your workspace."
+          description="Cards for new drafts post to your team's Slack or Teams channel. To also take briefs from chat, let CoderHelm check that requests really come from your workspace."
         >
           <form
             data-testid="chat-settings"

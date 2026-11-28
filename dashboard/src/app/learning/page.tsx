@@ -29,7 +29,7 @@ import { useCan } from "@/hooks/use-can";
 import { cardClass, Page, PageHeader, Section } from "@/components/page";
 import { buttonClass, focusRing, inputClass, smallSecondaryButton } from "@/components/ui";
 
-// What Coderhelm learned from how its work was received (comments acted on
+// What CoderHelm learned from how its work was received (comments acted on
 // or dismissed, ratings, merges, reverts, CI), and every change in its
 // behavior that came from it, with the evidence and a way to turn it off.
 
@@ -283,7 +283,7 @@ function keyWords(key: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
-/** A change in plain sentences: what Coderhelm does now, and what it did before. */
+/** A change in plain sentences: what CoderHelm does now, and what it did before. */
 function changeSentence(change: LearningChange): { now: string; before: string } {
   const to = ADJUST[change.to];
   const from = ADJUST[change.from || "none"];
@@ -555,7 +555,7 @@ export default function LearningPage() {
       await load();
     } catch (e) {
       const msg = e instanceof Error ? e.message : "The request failed.";
-      setActionError(errorStatus(e) === 403 ? "Your role does not allow this. Only an admin or the owner can change what Coderhelm learned (error 403)." : msg);
+      setActionError(errorStatus(e) === 403 ? "Your role does not allow this. Only an admin or the owner can change what CoderHelm learned (error 403)." : msg);
     } finally {
       setBusy(false);
     }
@@ -573,7 +573,7 @@ export default function LearningPage() {
     if (!repo) return;
     const ok = await confirm({
       title: `Turn off every change for ${repo}?`,
-      message: `Coderhelm goes back to its default behavior on ${repo}: ${plural(active, "change")} stop applying. The outcomes are kept, and you can turn each change back on.`,
+      message: `CoderHelm goes back to its default behavior on ${repo}: ${plural(active, "change")} stop applying. The outcomes are kept, and you can turn each change back on.`,
       confirmLabel: "Turn off all",
       destructive: true,
     });
@@ -584,7 +584,7 @@ export default function LearningPage() {
     <Page>
       <PageHeader
         title="Learning"
-        lead="What Coderhelm learned from how its work was received: review comments acted on or dismissed, ratings, merges, reverts and CI. Every change it made because of that is listed with its evidence, and can be turned off."
+        lead="What CoderHelm learned from how its work was received: review comments acted on or dismissed, ratings, merges, reverts and CI. Every change it made because of that is listed with its evidence, and can be turned off."
       />
 
       <LearningHealthSection />
@@ -598,7 +598,7 @@ export default function LearningPage() {
 
       {error ? (
         <div className="mt-6">
-          <Problem title="Couldn't load what Coderhelm learned" onRetry={() => void load()} details={error}>
+          <Problem title="Couldn't load what CoderHelm learned" onRetry={() => void load()} details={error}>
             Nothing has changed. Check your connection and try again.
           </Problem>
         </div>
@@ -608,7 +608,7 @@ export default function LearningPage() {
             {Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} />)}
           </div>
           <ChartSkeleton />
-          <ListSkeleton rows={4} label="Loading what Coderhelm learned" />
+          <ListSkeleton rows={4} label="Loading what CoderHelm learned" />
         </div>
       ) : data ? (
         <div aria-busy={loading || busy}>
@@ -630,7 +630,7 @@ export default function LearningPage() {
             <div className="mt-6">
               <Callout variant="neutral" title="Nothing learned yet">
                 <p>
-                  Coderhelm learns from what happens to its reviews and pull requests. It needs {plural(data.min_samples, "outcome")} in a repository before anything changes how it works. Try a longer period, or another repository.
+                  CoderHelm learns from what happens to its reviews and pull requests. It needs {plural(data.min_samples, "outcome")} in a repository before anything changes how it works. Try a longer period, or another repository.
                 </p>
               </Callout>
             </div>
@@ -694,7 +694,7 @@ export default function LearningPage() {
                     onRevert={async (x) => {
                       const ok = await confirm({
                         title: "Undo this change?",
-                        message: `Coderhelm goes back to its default for ${keyWords(x.key).toLowerCase()} on ${x.repo || "all repositories"}. The outcomes are kept, and you can turn it back on.`,
+                        message: `CoderHelm goes back to its default for ${keyWords(x.key).toLowerCase()} on ${x.repo || "all repositories"}. The outcomes are kept, and you can turn it back on.`,
                         confirmLabel: "Undo change",
                         destructive: true,
                       });

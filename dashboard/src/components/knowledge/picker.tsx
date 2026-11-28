@@ -238,19 +238,19 @@ function Marked({ text, q }: { text: string; q: string }) {
 
 // ── Sharing more ─────────────────────────────────────────────────────
 
-/** How to let Coderhelm see more, in each app's own words. */
+/** How to let CoderHelm see more, in each app's own words. */
 const SHARE: Partial<Record<SourceKind, { lead: string; steps: string[]; note?: string }>> = {
   notion: {
-    lead: "Coderhelm sees only the Notion pages shared with it. To share one:",
+    lead: "CoderHelm sees only the Notion pages shared with it. To share one:",
     steps: [
       "Open the page in Notion.",
       "Select ••• at the top right, then Connections.",
-      "Select Add connection, choose Coderhelm (or the integration whose token your team saved) and confirm.",
+      "Select Add connection, choose CoderHelm (or the integration whose token your team saved) and confirm.",
     ],
     note: "Pages inside a shared page are shared with it.",
   },
   confluence: {
-    lead: "Coderhelm sees the spaces and pages the connected Atlassian account can see. To add one:",
+    lead: "CoderHelm sees the spaces and pages the connected Atlassian account can see. To add one:",
     steps: [
       "In Confluence, open the space and select Space settings.",
       "Under Permissions, give the connected account (or a group it is in) View.",
@@ -258,25 +258,25 @@ const SHARE: Partial<Record<SourceKind, { lead: string; steps: string[]; note?: 
     ],
   },
   google_drive: {
-    lead: "Coderhelm sees what the connected Google account can open. To add a folder or file:",
+    lead: "CoderHelm sees what the connected Google account can open. To add a folder or file:",
     steps: [
       "In Google Drive, right-click the folder or file and select Share.",
-      "Add the Google account connected to Coderhelm as a Viewer.",
+      "Add the Google account connected to CoderHelm as a Viewer.",
       "For a shared drive, add that account as a member of the drive.",
     ],
     note: "Images and videos aren't listed; documents, sheets, slides, PDFs and text files are.",
   },
   github: {
-    lead: "Coderhelm sees the repositories its GitHub App is installed on. To add one:",
+    lead: "CoderHelm sees the repositories its GitHub App is installed on. To add one:",
     steps: [
       "On GitHub, open the organization's Settings, then GitHub Apps (for a personal account: Settings, then Applications).",
-      "Select Configure next to Coderhelm.",
+      "Select Configure next to CoderHelm.",
       "Under Repository access, add the repository and save.",
     ],
     note: "Only Markdown and text files are listed.",
   },
   sanity: {
-    lead: "Coderhelm sees the Sanity projects your sign-in or the saved token can read. To add one:",
+    lead: "CoderHelm sees the Sanity projects your sign-in or the saved token can read. To add one:",
     steps: ["In Sanity, open the project's settings (sanity.io/manage).", "Under Members, add your account, or under API, give the saved token read access.", "Check the dataset under Datasets."],
   },
 };
@@ -611,14 +611,14 @@ function TreePicker({ kind, value, onChange, via }: { kind: SourceKind; value: S
       return (
         <div className="space-y-3 p-5" data-testid="picker-empty">
           <p className="text-sm text-zinc-300">Nothing in {label} matches &quot;{q.trim()}&quot;.</p>
-          <p className="text-sm text-zinc-400">Check the spelling, or share the page with Coderhelm if it isn&rsquo;t listed.</p>
+          <p className="text-sm text-zinc-400">Check the spelling, or share the page with CoderHelm if it isn&rsquo;t listed.</p>
         </div>
       );
     }
     if (!rows.length) {
       return (
         <div className="space-y-4 p-5" data-testid="picker-empty">
-          <p className="text-sm font-medium text-zinc-100">{label} hasn&rsquo;t shared anything with Coderhelm yet.</p>
+          <p className="text-sm font-medium text-zinc-100">{label} hasn&rsquo;t shared anything with CoderHelm yet.</p>
           <ShareSteps kind={kind} />
           <button type="button" className={smallSecondaryButton} onClick={loadRoots} data-testid="picker-recheck">
             Check again
@@ -662,7 +662,7 @@ function TreePicker({ kind, value, onChange, via }: { kind: SourceKind; value: S
             return (
               <div key={row.key} {...common}>
                 <div role="gridcell" className="flex min-h-9 items-center text-xs text-zinc-400" style={indent(row.depth + 1.4)}>
-                  Nothing inside that {label} shares with Coderhelm
+                  Nothing inside that {label} shares with CoderHelm
                 </div>
               </div>
             );

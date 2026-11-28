@@ -16,7 +16,7 @@ type Run = Record<string, unknown> & { run_id: string; status: string };
 
 const SECURITY = {
   what: "Security items are open under Open items",
-  todo: "Fix them on this branch (Coderhelm checks again on the next push), or delete each security line once a person has checked it.",
+  todo: "Fix them on this branch (CoderHelm checks again on the next push), or delete each security line once a person has checked it.",
 };
 const SANDBOX = {
   what: "The sandbox could not run the end-to-end tests",
@@ -153,12 +153,12 @@ test("a held run that also asked something shows its questions, not only the hol
 test("a run whose pull request's CI fails reads CI failing, with the check and the error, never Done", async ({ page }) => {
   const ci = {
     what: "CI is failing on this head: `Deploy Preview`",
-    todo: "Fix the failing checks on this branch (Coderhelm decides again on the push), or re-run them if the failure isn't the change's; the pull request leaves draft once CI is green.",
+    todo: "Fix the failing checks on this branch (CoderHelm decides again on the push), or re-run them if the failure isn't the change's; the pull request leaves draft once CI is green.",
   };
   await mockApi(page, run({
     waiting_on: {
       action: "Review pull request #318",
-      detail: "CI is failing: Deploy Preview: Error: expect(received).toBeLessThanOrEqual(expected). Coderhelm made 3 fix attempt(s) without getting it green. The pull request stays a draft until CI passes",
+      detail: "CI is failing: Deploy Preview: Error: expect(received).toBeLessThanOrEqual(expected). CoderHelm made 3 fix attempt(s) without getting it green. The pull request stays a draft until CI passes",
       url: "https://github.com/your-team/web/pull/318",
       since: iso(5),
     },
@@ -207,7 +207,7 @@ test("a run waiting for GitHub's hourly limit says when it goes on", async ({ pa
   await expect(outcome).toHaveAttribute("data-tone", "waiting");
   await expect(outcome).toContainText("Waiting for GitHub");
   await expect(page.getByTestId("github-wait")).toHaveText("Waiting for GitHub's hourly limit to reset at 21:05 UTC; continues by itself. Nothing is needed from you.");
-  await expect(page.getByText("Coderhelm is working on this")).toHaveCount(0);
+  await expect(page.getByText("CoderHelm is working on this")).toHaveCount(0);
 });
 
 test("a finished run ignores a stale GitHub wait", async ({ page }) => {

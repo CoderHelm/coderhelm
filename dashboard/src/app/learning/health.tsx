@@ -8,7 +8,7 @@ import { StatusPill } from "@/components/status-pill";
 import { cardClass, Section } from "@/components/page";
 import { smallSecondaryButton } from "@/components/ui";
 
-// "Is Coderhelm still learning?": one card per learning loop (GET
+// "Is CoderHelm still learning?": one card per learning loop (GET
 // /api/learning/health), saying what it learns from, when it last learned,
 // how much it learned this week against what should have fed it, and, for a
 // loop that went quiet, what to check (the gateway's words when it knows the
@@ -22,8 +22,8 @@ import { smallSecondaryButton } from "@/components/ui";
  */
 const LOOPS: Record<string, { title: string; from: string; check: string }> = {
   pr_outcomes: {
-    title: "What happens to Coderhelm's pull requests",
-    from: "Whether Coderhelm's pull requests were merged as written, merged after people's edits, or closed.",
+    title: "What happens to CoderHelm's pull requests",
+    from: "Whether CoderHelm's pull requests were merged as written, merged after people's edits, or closed.",
     check: "Pull requests closed this week were never scored. Look in the worker's log for \"Reward outcome\" on the pull requests named above.",
   },
   review_outcomes: {
@@ -62,8 +62,8 @@ const LOOPS: Record<string, { title: string; from: string; check: string }> = {
     check: "Pull requests with pushback have waited more than 2 hours to be judged. Look in the worker's log for the review lessons step.",
   },
   stop_outcomes: {
-    title: "What people do after Coderhelm asks or stops",
-    from: "What people did after Coderhelm asked a question, stopped, or blocked a merge.",
+    title: "What people do after CoderHelm asks or stops",
+    from: "What people did after CoderHelm asked a question, stopped, or blocked a merge.",
     check: "Asks, stops and blocks from this week have no recorded follow up. Check that pull request and ticket events still arrive.",
   },
 };
@@ -152,7 +152,7 @@ export function LearningHealthSection() {
     <Section
       title="Is it still learning?"
       id="health"
-      description={`Each way Coderhelm learns, what it learns from, and when it last did, over the last ${days} days whatever the period below.`}
+      description={`Each way CoderHelm learns, what it learns from, and when it last did, over the last ${days} days whatever the period below.`}
     >
       {error ? (
         <Callout

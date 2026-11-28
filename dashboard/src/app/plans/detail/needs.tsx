@@ -7,7 +7,7 @@ import { buttonClass } from "@/components/ui";
 
 // What waits on a person, at the top of the plan, each row the exact ask:
 // the run's question, the pull request to review or merge, the checks
-// Coderhelm could not fix, the task that failed and why, the drafts left.
+// CoderHelm could not fix, the task that failed and why, the drafts left.
 // A row goes away once it is handled: the list comes from the work itself.
 
 const small = buttonClass("secondary", "sm");

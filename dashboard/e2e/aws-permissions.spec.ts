@@ -240,7 +240,7 @@ test("a permissions boundary or an SCP is named, and a role CoderHelm can't take
   await pressUpdate(page, a);
   await comeBack(page);
   await expect(a.getByText(/organization policy \(SCP\) blocks 1/)).toBeVisible();
-  await expect(page.getByTestId(`aws-perms-${B}`).getByText("Coderhelm can't check this role")).toBeVisible();
+  await expect(page.getByTestId(`aws-perms-${B}`).getByText("CoderHelm can't check this role")).toBeVisible();
 });
 
 test("several accounts: one list with every account's state and an update link for each", async ({ page }) => {

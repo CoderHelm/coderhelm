@@ -265,7 +265,7 @@ function ReleasesPage() {
         title="Releases"
         lead={
           <>
-            Notes Coderhelm writes for each release tag, published to GitHub, Confluence and email. Turn them on in{" "}
+            Notes CoderHelm writes for each release tag, published to GitHub, Confluence and email. Turn them on in{" "}
             <Link href="/reviewer/config" className={linkButton}>Reviewer settings</Link>.
           </>
         }
@@ -281,7 +281,7 @@ function ReleasesPage() {
         onOpenChange={setWriting}
         returnFocus={writeButton}
         title="Write notes for a tag"
-        description="For a tag Coderhelm didn't cut, or an older release. Publishes wherever the repo is set up to."
+        description="For a tag CoderHelm didn't cut, or an older release. Publishes wherever the repo is set up to."
       >
         <WriteNotesForm
           onCancel={() => setWriting(false)}
@@ -308,7 +308,7 @@ function ReleasesPage() {
                 </button>
               }
             >
-              Coderhelm couldn&apos;t publish this release (tried {plural(b.attempts, "time")}
+              CoderHelm couldn&apos;t publish this release (tried {plural(b.attempts, "time")}
               {b.failed_at && (
                 <>
                   , last <Time iso={b.failed_at} />
@@ -404,7 +404,7 @@ function ReleasesPage() {
   );
 }
 
-/** Write notes for a tag Coderhelm didn't cut (or an older one). Sits in a small dialog. */
+/** Write notes for a tag CoderHelm didn't cut (or an older one). Sits in a small dialog. */
 function WriteNotesForm({
   repos,
   initialRepo,
@@ -503,7 +503,7 @@ function emailSetUp(cfg: ReviewerConfig | null | undefined, used: Used): boolean
 }
 
 /**
- * The state of each destination. Coderhelm publishes in order (GitHub, then
+ * The state of each destination. CoderHelm publishes in order (GitHub, then
  * Confluence, then email) and stops at the first error, so a failed run's
  * error belongs to the first set-up step that hasn't happened.
  */

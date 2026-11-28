@@ -170,7 +170,7 @@ function DataSourcesPage() {
         title="Data sources"
         lead={
           <>
-            Let Coderhelm check facts against your real systems. Connect a source and it can look things up while it plans, writes code and reviews, like
+            Let CoderHelm check facts against your real systems. Connect a source and it can look things up while it plans, writes code and reviews, like
             whether a field really exists or a setting is live.
             {anyOn && (
               <span className="mt-2 flex items-center gap-1.5 text-emerald-300" data-testid="fact-checking-on">
@@ -209,7 +209,7 @@ function DataSourcesPage() {
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <h2 id="add-source-heading" className="font-semibold text-zinc-100">What do you want to connect?</h2>
-              <p className="mt-0.5 text-sm text-zinc-400">Each one takes a few minutes and ends with a check that Coderhelm can only read.</p>
+              <p className="mt-0.5 text-sm text-zinc-400">Each one takes a few minutes and ends with a check that CoderHelm can only read.</p>
             </div>
             <button
               type="button"
@@ -229,7 +229,7 @@ function DataSourcesPage() {
         <div className="min-w-0">
           <p className="font-semibold text-zinc-100">Read only, always</p>
           <p className="mt-0.5 text-zinc-400">
-            Coderhelm can only read. Before a source is turned on it checks that writes are impossible, every lookup that would change data
+            CoderHelm can only read. Before a source is turned on it checks that writes are impossible, every lookup that would change data
             is refused, the fields you name stay hidden, and every lookup is logged.
           </p>
         </div>
@@ -317,7 +317,7 @@ function DataSourcesPage() {
           <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-5 sm:p-6">
             <p className="font-semibold text-zinc-100">No data sources yet</p>
             <p className="mt-1 max-w-prose text-sm text-zinc-400">
-              Connect the systems your code reads from. Each one takes a few minutes and ends with a check that Coderhelm can only read.
+              Connect the systems your code reads from. Each one takes a few minutes and ends with a check that CoderHelm can only read.
             </p>
             <div className="mt-5"><KindPicker /></div>
           </div>
@@ -549,7 +549,7 @@ function SourceRow({
     try {
       const res = await api.updateDataSource(source.id, { hidden_fields: hidden });
       onChange(res.source);
-      toast("Saved what Coderhelm can't see");
+      toast("Saved what CoderHelm can't see");
       setPanel(null);
     } catch (e) {
       setError({
@@ -582,7 +582,7 @@ function SourceRow({
     try {
       const res = await api.updateDataSource(source.id, { log_groups: groups });
       onChange(res.source);
-      toast("Saved which log groups Coderhelm may search");
+      toast("Saved which log groups CoderHelm may search");
       setPanel(null);
     } catch (e) {
       setError({
@@ -636,8 +636,8 @@ function SourceRow({
     const ok = await confirm({
       title: `Remove ${source.name}?`,
       message: keyed
-        ? "Coderhelm stops using it right away and we delete the saved key. This can't be undone."
-        : "Coderhelm stops using it right away. The read-only role stays in your AWS account until you delete it there.",
+        ? "CoderHelm stops using it right away and we delete the saved key. This can't be undone."
+        : "CoderHelm stops using it right away. The read-only role stays in your AWS account until you delete it there.",
       confirmLabel: "Remove",
       destructive: true,
     });
@@ -747,7 +747,7 @@ function SourceRow({
           </div>
         ) : (
           <div className="mt-1.5 flex shrink-0 items-center gap-2 sm:mt-0">
-            <Switch checked={source.enabled} label={`Let Coderhelm use ${source.name}`} disabled={busy === "toggle"} onChange={toggle} />
+            <Switch checked={source.enabled} label={`Let CoderHelm use ${source.name}`} disabled={busy === "toggle"} onChange={toggle} />
             <span aria-hidden="true" className="hidden whitespace-nowrap text-sm text-zinc-300 sm:inline sm:min-w-14">
               {busy === "toggle" ? "Saving…" : !source.enabled ? "Paused" : source.status === "error" ? "Paused until fixed" : "On"}
             </span>
@@ -758,7 +758,7 @@ function SourceRow({
       {source.status === "error" && (
         <div className="mx-3 mb-3 sm:mx-4">
           <Problem
-            title="Coderhelm is not using this source until the problem is fixed."
+            title="CoderHelm is not using this source until the problem is fixed."
             details={source.status_message && firstLine(source.status_message) !== source.status_message.trim() ? source.status_message : undefined}
             action={
               <button type="button" onClick={test} disabled={busy === "test"} aria-label={`Test ${source.name} again`} className={buttonClass("secondary", "sm")}>
@@ -803,7 +803,7 @@ function SourceRow({
                 <span title={source.hidden_fields.join(", ")}>{hiddenSummary(source.hidden_fields)}</span>
               </SourceFact>
               <SourceFact label="Used for">{source.repos.length === 0 ? "Every repository" : source.repos.length === 1 ? source.repos[0] : `${source.repos.length} repositories`}</SourceFact>
-              {isApi && <SourceFact label="Writes">{source.has_mutations ? "The API allows them; Coderhelm refuses every one" : "The API offers none"}</SourceFact>}
+              {isApi && <SourceFact label="Writes">{source.has_mutations ? "The API allows them; CoderHelm refuses every one" : "The API offers none"}</SourceFact>}
             </dl>
 
             <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label={`Manage ${source.name}`}>
@@ -857,7 +857,7 @@ function SourceRow({
                 onClick={() => { setHidden(source.hidden_fields); open("hidden"); }}
                 className={secondaryButton}
               >
-                What Coderhelm can&apos;t see
+                What CoderHelm can&apos;t see
               </button>
               <button
                 type="button"
@@ -873,7 +873,7 @@ function SourceRow({
             {panel === "test" && checks && (
               <div className="mt-4 flex flex-col gap-3 border-t border-zinc-800 pt-4">
                 <CheckList items={checks} label={`Checks for ${source.name}`} />
-                {testOk === true && <Callout variant="success"><p>All checks passed. Coderhelm can read from this source and cannot change it.</p></Callout>}
+                {testOk === true && <Callout variant="success"><p>All checks passed. CoderHelm can read from this source and cannot change it.</p></Callout>}
                 {testOk === false && (
                   <Callout variant="error" title={`${checks.find((c) => c.state === "failed")?.label ?? "A check"} failed`}>
                     <p>{checks.find((c) => c.state === "failed")?.fix ?? "See the failed check above for what to do."}</p>
@@ -962,7 +962,7 @@ function SourceRow({
                   </>
                 ) : (
                   <>
-                    <Field id={`user-${source.id}`} label="User" helper="A user with read-only access. Coderhelm sees what it can see.">
+                    <Field id={`user-${source.id}`} label="User" helper="A user with read-only access. CoderHelm sees what it can see.">
                       {(props) => <input {...props} value={user} onChange={(e) => setUser(e.target.value)} className={inputClass} />}
                     </Field>
                     <Field id={`indexes-${source.id}`} label="Indexes" helper="Index names or patterns agents may read, like orders or logs-*. Leave empty for every index the user sees.">
@@ -983,7 +983,7 @@ function SourceRow({
             {panel === "hidden" && (
               <div className="mt-4 flex flex-col gap-3 border-t border-zinc-800 pt-4">
                 <p className="text-sm text-zinc-400">
-                  {noun.many[0].toUpperCase() + noun.many.slice(1)} with these names are hidden from Coderhelm wherever they appear.
+                  {noun.many[0].toUpperCase() + noun.many.slice(1)} with these names are hidden from CoderHelm wherever they appear.
                 </p>
                 <HiddenFieldsEditor value={hidden} onChange={setHidden} idPrefix={`hub-${source.id}`} noun={noun.one as "field" | "column"} />
                 {source.kind === "database" && (
@@ -1008,7 +1008,7 @@ function SourceRow({
             )}
             {panel === "groups" && (
               <div className="mt-4 flex flex-col gap-3 border-t border-zinc-800 pt-4">
-                <p className="text-sm text-zinc-400">Coderhelm can search only the log groups chosen here.</p>
+                <p className="text-sm text-zinc-400">CoderHelm can search only the log groups chosen here.</p>
                 {groupsError && <Callout variant="warning" title="We couldn't list every log group"><p>{groupsError} You can still remove groups below.</p></Callout>}
                 {available === null ? (
                   <p role="status" className="text-sm text-zinc-500">Loading your log groups…</p>
@@ -1055,7 +1055,7 @@ function ProgressList({ sources, events }: { sources: DataSource[]; events: Data
   const rows: { title: string; text: string; action?: ReactNode }[] = [
     { title: "Connect a source", text: any ? "Add more any time." : "Pick a source above to start." },
     {
-      title: "Choose what Coderhelm may use",
+      title: "Choose what CoderHelm may use",
       text: "You decide which repositories use it and which fields stay hidden.",
       action: pending && (
         <Link href={`${CONNECT}?step=choose${q}`} className={now === 1 ? primaryButton : secondaryButton}>
@@ -1065,7 +1065,7 @@ function ProgressList({ sources, events }: { sources: DataSource[]; events: Data
     },
     {
       title: "Try it",
-      text: "Run a lookup and see exactly what Coderhelm would see.",
+      text: "Run a lookup and see exactly what CoderHelm would see.",
       action: pending && pendingChosen && (
         <Link href={`${CONNECT}?step=try${q}`} className={now === 2 ? primaryButton : secondaryButton}>Try it</Link>
       ),
@@ -1073,7 +1073,7 @@ function ProgressList({ sources, events }: { sources: DataSource[]; events: Data
     {
       title: "Turn it on",
       text: !any || pending
-        ? "One last check, then Coderhelm uses it."
+        ? "One last check, then CoderHelm uses it."
         : anyOn
           ? "On. Pause any source with its switch."
           : "Every source is paused. Turn one back on with its switch.",

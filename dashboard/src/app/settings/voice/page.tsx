@@ -68,7 +68,7 @@ function VoicePage() {
     if (!repo) return;
     const ok = await confirm({
       title: "Write the voice again?",
-      message: "Coderhelm reads this repository's pull requests and commits again and replaces this voice, including your edits.",
+      message: "CoderHelm reads this repository's pull requests and commits again and replaces this voice, including your edits.",
       confirmLabel: "Write it again",
       destructive: true,
     });
@@ -92,7 +92,7 @@ function VoicePage() {
       <div className="mb-6">
         <PageHeader
           title="Voice"
-          lead="How Coderhelm writes pull request descriptions, commit messages and code comments. A repository's own voice replaces the one for every repository."
+          lead="How CoderHelm writes pull request descriptions, commit messages and code comments. A repository's own voice replaces the one for every repository."
         />
       </div>
 
@@ -116,10 +116,10 @@ function VoicePage() {
           <div role="status" className="flex flex-col items-center justify-center rounded-lg border border-zinc-800 py-12 text-center">
             <div aria-hidden="true" className="mb-3 h-6 w-6 animate-spin rounded-full border-2 border-zinc-600 border-t-zinc-300 motion-reduce:animate-none" />
             <p className="text-sm text-zinc-300">Writing this repository&apos;s voice…</p>
-            <p className="mt-1 text-sm text-zinc-400">Coderhelm is reading its pull requests and commits.</p>
+            <p className="mt-1 text-sm text-zinc-400">CoderHelm is reading its pull requests and commits.</p>
           </div>
         ) : generationFailed ? (
-          <Problem title="Coderhelm couldn't write this voice" onRetry={regenerate} details={repoData?.onboard_error}>
+          <Problem title="CoderHelm couldn't write this voice" onRetry={regenerate} details={repoData?.onboard_error}>
             Try again. If it keeps failing, write the voice yourself below once the repository loads, or contact support.
           </Problem>
         ) : (
@@ -129,7 +129,7 @@ function VoicePage() {
               id="voice-editor"
               label="Voice"
               unsaved={form.dirty}
-              help={`Used for ${where} when Coderhelm writes pull request descriptions, commit messages and code comments. You can use headings and bullet lists.`}
+              help={`Used for ${where} when CoderHelm writes pull request descriptions, commit messages and code comments. You can use headings and bullet lists.`}
             >
               {(ids) => (
                 <MarkdownEditor
@@ -139,7 +139,7 @@ function VoicePage() {
                   onChange={(v) => form.set("content", v)}
                   minRows={14}
                   maxHeight="85vh"
-                  previewNote="Coderhelm reads this as written. This is how its headings and lists read."
+                  previewNote="CoderHelm reads this as written. This is how its headings and lists read."
                   placeholder={PLACEHOLDER}
                 />
               )}

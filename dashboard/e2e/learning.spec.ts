@@ -4,7 +4,7 @@ import path from "node:path";
 import { learningFixture, learningHealthFixture, outcomeLessonsFixture, reviewerAsksFixture, scorecardFixture } from "./wide-data/learning";
 import { pickOption } from "./select";
 
-// The Learning page: what Coderhelm learned from outcomes, the behavior it
+// The Learning page: what CoderHelm learned from outcomes, the behavior it
 // changed and why, and the admin controls (pin, turn off, turn back on).
 // Every API call is answered here. Nothing reaches a real backend.
 
@@ -284,7 +284,7 @@ test("a refused action is said in words and changes nothing", async ({ page }) =
   await page.getByRole("alertdialog").getByRole("button", { name: "Undo change" }).click();
   const alert = page.getByRole("main").getByRole("alert");
   await expect(alert).toContainText("That was not changed");
-  await expect(alert).toContainText("Only an admin or the owner can change what Coderhelm learned (error 403)");
+  await expect(alert).toContainText("Only an admin or the owner can change what CoderHelm learned (error 403)");
   await expect(page.getByTestId("change-chg_style")).toContainText("In use");
 });
 
@@ -307,7 +307,7 @@ test("a failed load offers a retry", async ({ page }) => {
     fail ? route.fulfill({ status: 500, contentType: "application/json", body: "{}" }) : route.fallback(),
   );
   await page.goto("/learning");
-  await expect(page.getByText("Couldn't load what Coderhelm learned")).toBeVisible();
+  await expect(page.getByText("Couldn't load what CoderHelm learned")).toBeVisible();
   fail = false;
   await page.getByRole("button", { name: "Try again" }).click();
   await expect(page.getByTestId("tile-events")).toBeVisible();
@@ -492,7 +492,7 @@ test("a quiet loop turns the health check red and says what to check", async ({ 
   await expect(health.locator("li[data-state]").first()).toHaveAttribute("data-testid", "loop-pr_outcomes");
   await expect(red).toHaveAttribute("data-state", "quiet");
   await expect(red).toContainText("Not learning");
-  await expect(red).toContainText("Learns from: Whether Coderhelm's pull requests were merged as written");
+  await expect(red).toContainText("Learns from: Whether CoderHelm's pull requests were merged as written");
   await expect(red).toContainText(/Last learned: .*ago/);
   await expect(red).toContainText("3 of 5 this week");
   await expect(red).toContainText(`2 closed pull request(s) were never scored: ${REPO}#12345`);
@@ -508,9 +508,9 @@ test("a quiet loop turns the health check red and says what to check", async ({ 
   await expect(page.getByTestId("loop-coder_lessons-check")).toHaveCount(0);
 
   // Titles are the dashboard's own words, never the API's names.
-  await expect(red.getByRole("heading")).toHaveText("What happens to Coderhelm's pull requests");
+  await expect(red.getByRole("heading")).toHaveText("What happens to CoderHelm's pull requests");
   await expect(health.getByText("Outcomes of CoderHelm's pull requests")).toHaveCount(0);
-  await expect(health.getByText(/CoderHelm/)).toHaveCount(0);
+  await expect(health.getByText(/Outcomes of/)).toHaveCount(0);
   await expect(page.getByTestId("loop-review_outcomes")).toContainText("4 of 6 this week");
   await expect(page.getByTestId("loop-review_outcomes").getByRole("heading")).toHaveText("What people do with review comments");
 
@@ -596,7 +596,7 @@ test("a loop this dashboard has no title for reads as its id in words", async ({
 
 // ── The scorecard, lessons from pull requests, and what reviewers ask for ──
 
-test("the scorecard says what became of Coderhelm's pull requests, for the team and each repository", async ({ page }) => {
+test("the scorecard says what became of CoderHelm's pull requests, for the team and each repository", async ({ page }) => {
   const db = await mockApi(page, { outcomes: "full" });
   await page.goto("/learning");
   const card = page.getByTestId("scorecard");

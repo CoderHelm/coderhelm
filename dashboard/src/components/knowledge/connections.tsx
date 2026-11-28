@@ -285,7 +285,7 @@ function ConnectionPanel({
         </Row>
         {(s.waiting_items ?? 0) > 0 && (
           <Row term="Waiting to retry" testId="conn-waiting">
-            {KIND_LABEL[s.kind]} slowed Coderhelm down for {itemWord(s.kind, s.waiting_items ?? 0)} (a rate limit or a busy server). They&apos;re read again on their own, {nextTryWords(s.next_retry_at)}.
+            {KIND_LABEL[s.kind]} slowed CoderHelm down for {itemWord(s.kind, s.waiting_items ?? 0)} (a rate limit or a busy server). They&apos;re read again on their own, {nextTryWords(s.next_retry_at)}.
           </Row>
         )}
         {s.failed_items > 0 && s.status !== "error" && (

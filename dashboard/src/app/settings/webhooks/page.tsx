@@ -94,7 +94,7 @@ function health(e: WebhookEndpoint, disableAfter: number): { tone: Tone; label: 
     return {
       tone: "danger",
       label: "Turned off: kept failing",
-      detail: `Coderhelm turned it off after ${disableAfter} days in a row with no delivery getting through. Fix the endpoint, then turn it back on and replay the events it missed.`,
+      detail: `CoderHelm turned it off after ${disableAfter} days in a row with no delivery getting through. Fix the endpoint, then turn it back on and replay the events it missed.`,
     };
   }
   if (!e.enabled) return { tone: "muted", label: "Off" };
@@ -102,7 +102,7 @@ function health(e: WebhookEndpoint, disableAfter: number): { tone: Tone; label: 
     return {
       tone: "waiting",
       label: `Failing since ${relativeTime(e.failing_since) ?? formatDate(e.failing_since)}`,
-      detail: `If nothing gets through for ${disableAfter} days in a row, Coderhelm turns it off and tells the team's admins.`,
+      detail: `If nothing gets through for ${disableAfter} days in a row, CoderHelm turns it off and tells the team's admins.`,
     };
   }
   return { tone: "success", label: "On" };
@@ -145,9 +145,9 @@ function EndpointsPage() {
         lead={
           <>
             <p>
-              Coderhelm tells your own systems what it did: a run started or finished, a pull request opened, a review
+              CoderHelm tells your own systems what it did: a run started or finished, a pull request opened, a review
               posted, an alert came in. Add an address and pick the events; each request is signed so you can check it
-              came from Coderhelm.
+              came from CoderHelm.
             </p>
             <p className="mt-2 flex flex-wrap gap-x-4">
               <a href={WEBHOOK_DOCS_URL} target="_blank" rel="noreferrer" className={linkButton}>
@@ -187,7 +187,7 @@ function EndpointsPage() {
             )}
             {data.endpoints.length === 0 ? (
               <EmptyState icon={<RepeatIcon />} title="No endpoints yet." action={addButton()}>
-                Add the address of a service that should hear about Coderhelm&apos;s work, such as a deploy bot or your
+                Add the address of a service that should hear about CoderHelm&apos;s work, such as a deploy bot or your
                 own dashboard.
               </EmptyState>
             ) : (
@@ -412,7 +412,7 @@ function CreateEndpointModal({
   }
 
   return (
-    <Modal open={open} onOpenChange={onOpenChange} title="Add a webhook endpoint" description="Coderhelm sends the events you pick to this address." wide>
+    <Modal open={open} onOpenChange={onOpenChange} title="Add a webhook endpoint" description="CoderHelm sends the events you pick to this address." wide>
       <form onSubmit={submit} className="space-y-5" noValidate>
         <Field id={`${ids}-url`} label="Address" helper="An https address on the public internet." error={errors.url}>
           {(p) => (
@@ -495,7 +495,7 @@ function EndpointPage({ id }: { id: string }) {
     if (!ep) return;
     const ok = await confirm({
       title: "Delete this endpoint?",
-      message: "Coderhelm stops sending to it at once, including retries already waiting. This can't be undone.",
+      message: "CoderHelm stops sending to it at once, including retries already waiting. This can't be undone.",
       confirmLabel: "Delete endpoint",
       destructive: true,
     });

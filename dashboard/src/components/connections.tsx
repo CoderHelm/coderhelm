@@ -14,18 +14,18 @@ import { useToast } from "./toast";
 import { inputClass, linkButton, primaryButton, secondaryButton } from "./ui";
 import { Select } from "@/components/select";
 
-/** `via` of a Confluence connection that goes through the team's Coderhelm Jira app. */
+/** `via` of a Confluence connection that goes through the team's CoderHelm Jira app. */
 export const JIRA_APP = "jira_app";
 /** `via` of a Confluence connection agents read with the Atlassian sign-in the team made for Knowledge. */
 export const SIGN_IN = "sign_in";
 
 /** What a key-based connection needs, shown above its form. */
 const NEEDS: Record<KeyConnectorKind, string> = {
-  newrelic: "A New Relic user key (starts with NRAK-). Coderhelm only sends read queries.",
+  newrelic: "A New Relic user key (starts with NRAK-). CoderHelm only sends read queries.",
   confluence: "Your Confluence address, the email of an Atlassian account and an API token from id.atlassian.com.",
   opensearch:
-    "Your cluster's https address and a user with read-only access to the indexes agents may search. Coderhelm only lists, searches and counts; scripts are refused.",
-  rest: "The API's base address, the header its key goes in and the key. Coderhelm only sends GET requests, and only under the paths you list.",
+    "Your cluster's https address and a user with read-only access to the indexes agents may search. CoderHelm only lists, searches and counts; scripts are refused.",
+  rest: "The API's base address, the header its key goes in and the key. CoderHelm only sends GET requests, and only under the paths you list.",
 };
 
 const list = (s: string) =>
@@ -70,7 +70,7 @@ export function ConnectorForm({
   // A saved key is never sent back: the form shows that one is saved and
   // offers to replace it, instead of an empty box that looks like nothing is.
   const [replacingKey, setReplacingKey] = useState(!item.key_hint);
-  // Confluence through the team's Coderhelm Jira app: no address, email or
+  // Confluence through the team's CoderHelm Jira app: no address, email or
   // token; only what agents may read and write. A team can still switch to
   // its own API token.
   const [useToken, setUseToken] = useState(false);
@@ -148,7 +148,7 @@ export function ConnectorForm({
       ) : viaApp ? (
         <div className="text-sm text-zinc-400" data-testid="confluence-via-jira-app">
           <p>
-            Connected through the Jira app{item.site ? ` on ${item.site}` : ""}. Agents read the pages the Coderhelm app can see there; no token
+            Connected through the Jira app{item.site ? ` on ${item.site}` : ""}. Agents read the pages the CoderHelm app can see there; no token
             is needed.
           </p>
           <button type="button" onClick={() => setUseToken(true)} className={`mt-1 ${linkButton}`}>
@@ -216,7 +216,7 @@ export function ConnectorForm({
           {!noKey && (
             <>
               {text("site", "Confluence address", site, setSite, undefined, "https://yourcompany.atlassian.net")}
-              {text("email", "Account email", email, setEmail, "The Atlassian account the token belongs to. Coderhelm sees what it can see.")}
+              {text("email", "Account email", email, setEmail, "The Atlassian account the token belongs to. CoderHelm sees what it can see.")}
             </>
           )}
           {text(
@@ -242,7 +242,7 @@ export function ConnectorForm({
       {k === "opensearch" && (
         <>
           {text("site", "Cluster address", site, setSite, undefined, "https://search.example.com")}
-          {text("email", "User", email, setEmail, "A user with read-only access. Coderhelm sees what it can see.")}
+          {text("email", "User", email, setEmail, "A user with read-only access. CoderHelm sees what it can see.")}
           {text("indexes", "Indexes", indexes, setIndexes, "Index names or patterns agents may search, like orders or logs-*. Leave empty for every index the user can see.", "orders, logs-*")}
           {text(
             "hidden",
@@ -319,7 +319,7 @@ export function AwsAbilitySummary({ a }: { a: AwsAccountAbilities }) {
     );
   };
   return (
-    <ul className="mt-3 space-y-1 text-sm" aria-label="What Coderhelm can do in this account" data-testid={`aws-abilities-${a.account}`}>
+    <ul className="mt-3 space-y-1 text-sm" aria-label="What CoderHelm can do in this account" data-testid={`aws-abilities-${a.account}`}>
       {row("Logs", a.logs.on, a.logs.available)}
       {row("Metrics", a.metrics.on, a.metrics.available, a.metrics.on ? `CloudWatch, ${a.region}` : undefined)}
       {row("Airflow", a.airflow.on, a.airflow.available, a.airflow.on ? a.airflow.environments.join(", ") : undefined)}
@@ -378,12 +378,12 @@ export function AwsAbilitiesPanel({
     <div className="mt-4 flex flex-col gap-4 border-t border-zinc-800 pt-4" data-testid={`aws-panel-${a.account}`}>
       <p className="text-sm text-zinc-400">
         {a.install_account
-          ? "This is the install's own AWS account: Coderhelm reads it with the install's own role, and each version update brings that role's read-only permissions. Coderhelm checks what it can do (one read of metrics, one list of Airflow environments) and turns each ability on when it can."
-          : "Coderhelm checks what the CoderHelmLogReader role can do (one read of metrics, one list of Airflow environments) and turns each ability on when the role allows it."}{" "}
+          ? "This is the install's own AWS account: CoderHelm reads it with the install's own role, and each version update brings that role's read-only permissions. CoderHelm checks what it can do (one read of metrics, one list of Airflow environments) and turns each ability on when it can."
+          : "CoderHelm checks what the CoderHelmLogReader role can do (one read of metrics, one list of Airflow environments) and turns each ability on when the role allows it."}{" "}
         {a.checked_at ? `Last checked ${timeAgo(a.checked_at)}.` : "Not checked yet."}
       </p>
       {a.check_error && (
-        <Callout variant="error" title="Coderhelm couldn't take on the role" live={false}>
+        <Callout variant="error" title="CoderHelm couldn't take on the role" live={false}>
           <p>{a.check_error}</p>
         </Callout>
       )}
@@ -447,7 +447,7 @@ export function AwsAbilitiesPanel({
           title={
             a.permissions?.status === "update_needed"
               ? `Update needed: ${a.permissions.missing_count} new read-only permission${a.permissions.missing_count === 1 ? "" : "s"}`
-              : `Add ${missing.join(" and ")} to your Coderhelm role`
+              : `Add ${missing.join(" and ")} to your CoderHelm role`
           }
           live={false}
         >

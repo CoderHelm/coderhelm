@@ -139,7 +139,7 @@ function AgentPermissions() {
   if (!view) {
     return (
       <Page>
-        <PageHeader title="Agent permissions" lead="What Coderhelm's agents may do on their own, and what waits for a person." />
+        <PageHeader title="Agent permissions" lead="What CoderHelm's agents may do on their own, and what waits for a person." />
         <div className="mt-6 space-y-4">
           <Skeleton className="h-24" />
           <Skeleton className="h-48" />

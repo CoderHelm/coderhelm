@@ -132,7 +132,7 @@ async function mockApi(context: BrowserContext, init: Partial<Backend> = {}): Pr
   await context.route((url) => url.hostname !== "localhost", (route) => route.abort());
   // Sanity's sign-in page, in the small window.
   await context.route((url) => url.hostname === "localhost" && url.pathname === "/__sanity", (route) =>
-    route.fulfill({ status: 200, contentType: "text/html", body: "<title>Sanity</title><h1>Sign in to Sanity</h1><p>Coderhelm wants to read your content.</p>" }),
+    route.fulfill({ status: 200, contentType: "text/html", body: "<title>Sanity</title><h1>Sign in to Sanity</h1><p>CoderHelm wants to read your content.</p>" }),
   );
   await context.route((url) => url.hostname === "localhost" && /^\/(api|auth)\//.test(url.pathname), async (route) => {
     const req = route.request();

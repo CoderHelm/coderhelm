@@ -40,7 +40,7 @@ function review(i: number) {
 }
 
 const CHECKLIST = [
-  { mark: "done", text: `Coderhelm approved commit ${SHA}` },
+  { mark: "done", text: `CoderHelm approved commit ${SHA}` },
   { mark: "done", text: `Approved by @${EMAIL}` },
   { mark: "waiting", text: `CI running: ${TOKEN}` },
   { mark: "blocked", text: `Branch protection on ${BRANCH} needs a review from a code owner of ${FILE}` },
@@ -127,7 +127,7 @@ function testRun(i: number) {
 }
 
 const WIDE_WORKFLOW = ".github/workflows/end-to-end-browser-tests-for-every-pull-request-and-nightly-on-main.yml";
-const WIDE_STEP = `- name: Upload E2E results for Coderhelm\n  uses: actions/upload-artifact@v4\n  with:\n    path: ${FILE}`;
+const WIDE_STEP = `- name: Upload E2E results for CoderHelm\n  uses: actions/upload-artifact@v4\n  with:\n    path: ${FILE}`;
 
 function testSetup(repo: string, status: string) {
   return {
@@ -217,8 +217,8 @@ const SUPPORT_DETAIL = {
   messages: [
     { id: "m1", kind: "message", author: "customer", author_email: EMAIL, author_name: "Dana Developer", body: MARKDOWN, created_at: iso(60),
       attachments: [{ kind: "run", id: "01RUNWIDE00000000000000001", label: TITLE, repo: REPO, status: "failed" }] },
-    { id: "m2", kind: "event", author: "support", author_email: EMAIL, author_name: "Coderhelm support", body: `Added ${EMAIL}`, created_at: iso(40) },
-    { id: "m3", kind: "message", author: "support", author_email: EMAIL, author_name: "Coderhelm support", body: `${SENTENCE}\n\n${LONG_URL}\n\n\`${TOKEN}\``, created_at: iso(20) },
+    { id: "m2", kind: "event", author: "support", author_email: EMAIL, author_name: "CoderHelm support", body: `Added ${EMAIL}`, created_at: iso(40) },
+    { id: "m3", kind: "message", author: "support", author_email: EMAIL, author_name: "CoderHelm support", body: `${SENTENCE}\n\n${LONG_URL}\n\n\`${TOKEN}\``, created_at: iso(20) },
   ],
   support_access: { until: iso(-3 * DAY) },
   avatars: {},
@@ -351,7 +351,7 @@ export const reviewData: Handler = ({ method, path, url }) => {
     return {
       plan: url.searchParams.get("repo") ? plans[0] : null,
       plans,
-      log: [0, 1, 2].map((i) => ({ at: iso(DAY * (i + 1)), repo: i % 2 ? REPO_2 : REPO, pr: 12300 + i, action: "closed", title: TITLE, url: `${PR_URL}${i}`, author: `${TOKEN}-author`, why: SENTENCE, by: "Coderhelm", run_id: i ? "" : "run-1" })),
+      log: [0, 1, 2].map((i) => ({ at: iso(DAY * (i + 1)), repo: i % 2 ? REPO_2 : REPO, pr: 12300 + i, action: "closed", title: TITLE, url: `${PR_URL}${i}`, author: `${TOKEN}-author`, why: SENTENCE, by: "CoderHelm", run_id: i ? "" : "run-1" })),
       kept_open: [{ repo: REPO, pr: 12399, title: TITLE, url: PR_URL, by: EMAIL, via: "comment", at: iso(DAY) }],
     };
   }

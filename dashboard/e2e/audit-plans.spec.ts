@@ -114,7 +114,7 @@ function runningTasks() {
 }
 
 const RUNNING_NEEDS = [
-  { task_id: "T3", kind: "approval", ask: "Approve pull request #53", detail: "This repo's auto-merge setting requires an approving review from a person before Coderhelm merges.", url: "https://github.com/your-team/web/pull/53", run_id: "RUN53", action: "open_pr" },
+  { task_id: "T3", kind: "approval", ask: "Approve pull request #53", detail: "This repo's auto-merge setting requires an approving review from a person before CoderHelm merges.", url: "https://github.com/your-team/web/pull/53", run_id: "RUN53", action: "open_pr" },
   { task_id: "T4", kind: "failed", ask: "Task \"Write the tests\" failed", detail: "Run timed out (exceeded execution time limit).", run_id: "RUN60", action: "retry" },
   { task_id: "", kind: "approve_rest", ask: "Approve or drop the 1 task still in draft", action: "approve" },
 ];

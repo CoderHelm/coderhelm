@@ -224,7 +224,7 @@ export interface Finding {
     /** Closed without merging: when, and who closed it (a GitHub login, or the person who closed its run). Absent while open, and on older servers. */
     closed_at?: string;
     closed_by?: string;
-    /** False when Coderhelm closed it itself. */
+    /** False when CoderHelm closed it itself. */
     closed_by_person?: boolean;
   } | null;
   dependabot_alert: { number: number; url: string } | null;
@@ -378,7 +378,7 @@ export interface FindingFilter {
 // A reply missing the parts a page reads (an older server, a proxy's error
 // page) is an error the page can show, never a crash.
 
-export const SHAPE_ERROR = "Coderhelm's server answered in a form this page can't read. Update the install, then reload.";
+export const SHAPE_ERROR = "CoderHelm's server answered in a form this page can't read. Update the install, then reload.";
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const fail = (): never => {
   throw new Error(SHAPE_ERROR);
@@ -552,7 +552,7 @@ export function runsHref(ticket: string): string {
 
 /** "closed by octo on Nov 13": a pull request that closed without merging, with who and when as far as the server knows. */
 export function closedWords(pr: { closed_at?: string; closed_by?: string; closed_by_person?: boolean }): string {
-  const who = pr.closed_by_person === false ? "Coderhelm" : pr.closed_by;
+  const who = pr.closed_by_person === false ? "CoderHelm" : pr.closed_by;
   const t = pr.closed_at ? new Date(pr.closed_at).getTime() : NaN;
   const on = Number.isNaN(t) ? "" : ` on ${new Date(t).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
   return `closed${who ? ` by ${who}` : ""}${on}`;
@@ -606,7 +606,7 @@ export function whyNoneSelectable(rows: FindingGroup[]): NoneSelectable | null {
   if (noFix.length === n)
     return {
       words: one ? "This has no fixed version yet" : `None of these ${n} has a fixed version yet`,
-      next: "Coderhelm opens the fix when a fixed version is published. There is nothing to select until then.",
+      next: "CoderHelm opens the fix when a fixed version is published. There is nothing to select until then.",
       link: null,
     };
   if (done === n)
@@ -662,8 +662,8 @@ export const VERDICT_LOOK: Record<Verdict, { tone: Tone; label: string; hover: s
   reachable: { tone: "danger", label: "Reachable", hover: "Your code calls the vulnerable part of the package." },
   not_reachable: { tone: "waiting", label: "Present, not reachable", hover: "The package is loaded, but nothing calls the vulnerable part." },
   not_loaded: { tone: "muted", label: "Not loaded", hover: "Only used in development or tests, never loaded in production." },
-  unknown: { tone: "info", label: "Unknown", hover: "Coderhelm couldn't tell from the code. An unknown verdict is at most P1, and only for a runtime dependency with a high score." },
-  pending: { tone: "queued", label: "Checking", hover: "Coderhelm is reading the code to decide." },
+  unknown: { tone: "info", label: "Unknown", hover: "CoderHelm couldn't tell from the code. An unknown verdict is at most P1, and only for a runtime dependency with a high score." },
+  pending: { tone: "queued", label: "Checking", hover: "CoderHelm is reading the code to decide." },
 };
 
 export const STATUS_LOOK: Record<FindingStatus, { tone: Tone; label: string }> = {

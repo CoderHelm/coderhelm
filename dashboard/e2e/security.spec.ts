@@ -890,7 +890,7 @@ test.describe("Security", () => {
     await page.goto("/security/detail?id=nofix_1");
     // No fixed version: no button to press, the card says why and what happens next.
     await expect(page.getByTestId("open-fix-pr")).toHaveCount(0);
-    await expect(page.getByTestId("fix")).toContainText("No fixed version is out yet. Coderhelm checks again when the advisory gets one.");
+    await expect(page.getByTestId("fix")).toContainText("No fixed version is out yet. CoderHelm checks again when the advisory gets one.");
   });
 
   test("the policy recommends opening PRs, and saves the daily limits", async ({ page }) => {
@@ -1108,7 +1108,7 @@ test.describe("Security", () => {
     await expect(req.getByTestId("fix-branch")).toHaveText("coderhelm/security-updates-2026-11-11-web-app");
     await expect(req.getByTestId("fix-label")).toHaveText(["security", "dependencies", "severity:high", "javascript"]);
     await expect(req.getByTestId("fix-bump")).toHaveCount(2);
-    await expect(req.getByTestId("warn-major")).toContainText("tar moves to a new major version. It may need code changes; Coderhelm fixes CI in the same PR");
+    await expect(req.getByTestId("warn-major")).toContainText("tar moves to a new major version. It may need code changes; CoderHelm fixes CI in the same PR");
     await expect(req.getByTestId("fix-budget")).toContainText("Uses 1 of today's 3 fix runs (1 used so far) · estimated 180k of 2M tokens (310k used today).");
     expect(call(db, "POST /api/security/fix/plan").at(-1)?.body).toEqual({ finding_ids: ["tar_1", "tar_2", "tar_3", "ws_1"], combine: "one_pr" });
     // Removing a row changes the request.
@@ -1488,7 +1488,7 @@ test.describe("Security", () => {
     const db = await mockApi(page, listOf(oneRepo(3, { fixed_version: null, no_fix: 1 })));
     await page.goto("/security");
     await expect(page.getByTestId("pick-none")).toContainText("None of these 3 has a fixed version yet.");
-    await expect(page.getByTestId("pick-none")).toContainText("Coderhelm opens the fix when a fixed version is published.");
+    await expect(page.getByTestId("pick-none")).toContainText("CoderHelm opens the fix when a fixed version is published.");
     await expect(page.getByTestId("pick-none-link")).toHaveCount(0);
     await expect(page.getByTestId("finding-row").getByTestId("pick-why").first()).toHaveText("Can't be selected: no fixed version yet.");
 

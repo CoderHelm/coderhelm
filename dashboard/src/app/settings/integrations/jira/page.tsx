@@ -41,7 +41,7 @@ const TRIGGER_LABEL = "coderhelm";
 const OWN_APP_DOCS = "https://docs.coderhelm.com/self-host/integrations/#jira";
 
 /**
- * Coderhelm's published Jira app's install page. It talks to Coderhelm's
+ * CoderHelm's published Jira app's install page. It talks to CoderHelm's
  * hosted API, so a self-hosted install offers it only through hybrid's Jira
  * relay (the install ID then stands in for the Team ID).
  */
@@ -90,7 +90,7 @@ function JiraPage() {
   const unlink = async () => {
     const ok = await confirm({
       title: "Disconnect the Jira app?",
-      message: "Tickets stop starting runs through the app, and Coderhelm stops posting to tickets. Your project choices are kept. Save the app's settings in Jira again to reconnect.",
+      message: "Tickets stop starting runs through the app, and CoderHelm stops posting to tickets. Your project choices are kept. Save the app's settings in Jira again to reconnect.",
       confirmLabel: "Disconnect",
       destructive: true,
     });
@@ -135,7 +135,7 @@ function JiraPage() {
         title="Jira"
         lead={
           <>
-            Add the <code className="text-zinc-200">{TRIGGER_LABEL}</code> label to a Jira ticket and assign it: Coderhelm picks the repository,
+            Add the <code className="text-zinc-200">{TRIGGER_LABEL}</code> label to a Jira ticket and assign it: CoderHelm picks the repository,
             opens a pull request and keeps the ticket in step.
           </>
         }
@@ -194,7 +194,7 @@ function JiraPage() {
           {appLinked && <ProjectsSection config={config} setConfig={setConfig} />}
 
           {connected && !appLinked && (
-            <Section id="webhook" title="Jira webhook" description="A native Jira webhook sends ticket updates to Coderhelm.">
+            <Section id="webhook" title="Jira webhook" description="A native Jira webhook sends ticket updates to CoderHelm.">
               <WebhookPanel check={check} onChanged={refresh} revealedSecret={revealedSecret} setRevealedSecret={setRevealedSecret} />
             </Section>
           )}
@@ -206,7 +206,7 @@ function JiraPage() {
             </Section>
           )}
 
-          <Section id="events" title="Recent Jira events" description="The last 20 ticket updates Coderhelm received and what it did with each.">
+          <Section id="events" title="Recent Jira events" description="The last 20 ticket updates CoderHelm received and what it did with each.">
             <EventsList />
           </Section>
 
@@ -216,7 +216,7 @@ function JiraPage() {
                 Where release notes are published, including the Confluence page they go under.
               </RelatedLink>
               <RelatedLink href="/settings/repos" title="Repositories">
-                Which repositories Coderhelm may work in, and their roles for routing tickets.
+                Which repositories CoderHelm may work in, and their roles for routing tickets.
               </RelatedLink>
             </div>
           </Section>
@@ -318,9 +318,9 @@ function StatusCard({
     setTest(null);
     try {
       const { projects } = await api.fetchJiraProjects();
-      setTest({ ok: true, text: `Coderhelm reached ${site || "your Jira site"} and can see ${projects.length} project${projects.length === 1 ? "" : "s"}.` });
+      setTest({ ok: true, text: `CoderHelm reached ${site || "your Jira site"} and can see ${projects.length} project${projects.length === 1 ? "" : "s"}.` });
     } catch (e) {
-      setTest({ ok: false, text: e instanceof Error && e.message ? e.message : "Coderhelm could not reach the Jira app." });
+      setTest({ ok: false, text: e instanceof Error && e.message ? e.message : "CoderHelm could not reach the Jira app." });
     } finally {
       setTesting(false);
     }
@@ -337,7 +337,7 @@ function StatusCard({
             {connected ? (site ? site : "Jira") : "Jira is not connected"}
           </h2>
           <p className="text-sm text-zinc-400">
-            {appLinked ? "Through the Coderhelm Jira app" : webhookOn ? "Through a Jira webhook" : "Follow the setup below to connect."}
+            {appLinked ? "Through the CoderHelm Jira app" : webhookOn ? "Through a Jira webhook" : "Follow the setup below to connect."}
           </p>
         </div>
         {problem ? (
@@ -408,7 +408,7 @@ function HowItWorks() {
           A ticket in a turned on project gets the <code className="text-zinc-200">{TRIGGER_LABEL}</code> label. The label is fixed.
         </li>
         <li>Someone assigns the ticket.</li>
-        <li>Coderhelm picks the repository (or uses the one set for the project), works on a branch and opens a pull request.</li>
+        <li>CoderHelm picks the repository (or uses the one set for the project), works on a branch and opens a pull request.</li>
         <li>Progress shows on the Runs page and, with the Jira app, as comments on the ticket.</li>
       </ol>
     </aside>
@@ -434,7 +434,7 @@ function SetupGuide({
   revealedSecret: string | null;
   setRevealedSecret: (s: string | null) => void;
 }) {
-  // A self-hosted install can only use Coderhelm's published app through
+  // A self-hosted install can only use CoderHelm's published app through
   // hybrid's Jira relay; otherwise the webhook comes first and "Jira app"
   // means the install's own copy.
   const self = isSelfHosted();
@@ -468,7 +468,7 @@ function SetupGuide({
         <div className="flex flex-col gap-3 rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 text-sm text-zinc-400" data-testid="jira-own-app">
           <h3 className="font-semibold text-zinc-100">Deploy your own copy of the Jira app</h3>
           <p>
-            Coderhelm&apos;s published Jira app sends events to Coderhelm&apos;s hosted service, not to this install. To get the settings page inside Jira and
+            CoderHelm&apos;s published Jira app sends events to CoderHelm&apos;s hosted service, not to this install. To get the settings page inside Jira and
             Confluence publishing, an install admin deploys the app from the <Code>coderhelm-jira</Code> folder pointed at this install, then installs it on
             your Jira site. The webhook works with nothing to install.
           </p>
@@ -504,12 +504,12 @@ function SetupGuide({
             <div className="flex flex-col gap-2">
               <h3 className="font-semibold text-zinc-100">2. Paste your Team ID and secret</h3>
               <p>
-                In Jira, open <span className="text-zinc-200">Apps, Manage your apps, Coderhelm</span>, paste both values and press Save. Coderhelm
+                In Jira, open <span className="text-zinc-200">Apps, Manage your apps, CoderHelm</span>, paste both values and press Save. CoderHelm
                 registers itself; this page then shows the app as linked.
               </p>
               {relayed && (
                 <p data-testid="jira-install-id-note">
-                  This install uses Coderhelm&apos;s Jira relay, so the Team ID is your install ID. Coderhelm passes the events on to this install.
+                  This install uses CoderHelm&apos;s Jira relay, so the Team ID is your install ID. CoderHelm passes the events on to this install.
                 </p>
               )}
               <CopyRow label={relayed ? "Team ID (your install ID)" : "Team ID"} value={teamId} />
@@ -636,7 +636,7 @@ function WebhookPanel({
               <li>Open <span className="text-zinc-200">your-site.atlassian.net/plugins/servlet/webhooks</span> and create a webhook.</li>
               <li>Paste the webhook address, and the secret in the secret field.</li>
               <li>Under events, choose Issue, updated. Save.</li>
-              <li>Jira signs each request with the secret, so Coderhelm can tell it came from your site.</li>
+              <li>Jira signs each request with the secret, so CoderHelm can tell it came from your site.</li>
             </ol>
           </Disclosure>
           <div className="flex flex-wrap gap-2">
@@ -769,7 +769,7 @@ function ProjectsSection({ config, setConfig }: { config: JiraConfig; setConfig:
     <Section
       id="projects"
       title={`Projects that start work (${enabledProjects.length} on)`}
-      description="Only tickets in projects that are on start runs. Set a repository to skip Coderhelm's own choice for that project."
+      description="Only tickets in projects that are on start runs. Set a repository to skip CoderHelm's own choice for that project."
       actions={
         <button type="button" onClick={fetchProjects} disabled={fetching || saving} className={secondaryButton}>
           {fetching ? "Listing…" : projects.length ? "Refresh from Jira" : "List projects from Jira"}
@@ -806,7 +806,7 @@ function ProjectsSection({ config, setConfig }: { config: JiraConfig; setConfig:
                     controlClassName="sm:w-72"
                     value={p.repo ?? ""}
                     onChange={(v) => setProject(p.key, { repo: v })}
-                    options={[{ value: "", label: "Coderhelm picks" }, ...repos.map((r) => ({ value: r.name, label: r.name }))]}
+                    options={[{ value: "", label: "CoderHelm picks" }, ...repos.map((r) => ({ value: r.name, label: r.name }))]}
                   />
                 ) : null}
               </SettingsRow>

@@ -7,7 +7,8 @@
 //
 // Errors (fail the run):
 //   model-name       a Claude model named in page text; names come from lib/models.ts
-//   brand            "CoderHelm" anywhere in src; the product is "Coderhelm"
+//   brand            "Coderhelm" anywhere in src; the product is "CoderHelm", as on the site,
+//                    the logo, the repositories and the docs
 //   jargon           openspec, "<something> pass", TOTP, HMAC, "Log Analyzer" in UI copy
 //   unlabeled-input  an <input>, <textarea> or <select> with no label, beyond the baseline
 //   page-route       a page (src/app/**/page.tsx) with no entry in lib/routes.ts, so the top bar can't name it
@@ -62,7 +63,7 @@ const GITHUB = !!process.env.GITHUB_ACTIONS;
 const REPO_PREFIX = path.relative(path.resolve(ROOT, ".."), ROOT);
 
 const MODEL_NAME = /\b(?:Claude\s+)?(?:Opus|Sonnet|Haiku|Fable)\s+\d+(?:\.\d+)?\b|\bClaude\s+\d+(?:\.\d+)?\b/;
-const BRAND = /\bCoderHelm\b/g;
+const BRAND = /\bCoderhelm\b/g;
 const JARGON = [
   { re: /\bopen\s?spec\b/i, say: "openspec: say \"spec\" or what the files are" },
   {
@@ -217,7 +218,7 @@ for (const file of walk(SRC)) {
     if (allowed("brand", rel, lineText)) continue;
     const before = source.slice(0, m.index);
     const line = before.split("\n").length;
-    errors.push({ rule: "brand", file: rel, line, col: m.index - before.lastIndexOf("\n"), message: "\"CoderHelm\": the product is spelled \"Coderhelm\"" });
+    errors.push({ rule: "brand", file: rel, line, col: m.index - before.lastIndexOf("\n"), message: "\"Coderhelm\": the product is spelled \"CoderHelm\"" });
   }
 
   // break-all: cuts words that would fit on the next line.

@@ -19,7 +19,7 @@ const DAY = 86_400_000;
 const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
 
 const FIGMA_DOES = "Extract design tokens, inspect components, and pull assets from Figma files.";
-const FIGMA_READS = "Coderhelm reads your Figma files and the name of the account that signs in. It can't change anything in Figma.";
+const FIGMA_READS = "CoderHelm reads your Figma files and the name of the account that signs in. It can't change anything in Figma.";
 const CONFLUENCE_DOES = "Searches and reads Confluence pages. Optionally adds text to the end of pages you list.";
 
 type Json = Record<string, unknown>;
@@ -98,7 +98,7 @@ function confluenceForKnowledge(over: Json = {}) {
   });
 }
 
-/** The report: Figma with a sign-in through Coderhelm's app never finished, an older record for Figma's own server, and the old switch. */
+/** The report: Figma with a sign-in through CoderHelm's app never finished, an older record for Figma's own server, and the old switch. */
 function figmaNotConnected() {
   return card("figma", "docs", "Figma", FIGMA_DOES, "not_connected", "connect", {
     uses: [usedFor("runs", "off")],
@@ -108,7 +108,7 @@ function figmaNotConnected() {
       own_app_redirect_uri: "https://coderhelm.example.com/settings/integrations/mcp-callback/",
       own_app: { id: "app-figma", source: "coderhelm", client_id: "", has_secret: false, status: "not_connected", status_reason: "", connected_by: "", connected_at: "", redirect_uri: "" },
       remote: null, knowledge: null,
-      unused: [{ id: "figma", name: "Figma", kind: "remote", note: "A sign-in through Figma's own server was started and never finished. Coderhelm doesn't use it." }],
+      unused: [{ id: "figma", name: "Figma", kind: "remote", note: "A sign-in through Figma's own server was started and never finished. CoderHelm doesn't use it." }],
     },
   });
 }
@@ -118,8 +118,8 @@ function figmaConnected(): Card {
   const d = c.detail as { own_app: Json };
   d.own_app = { ...d.own_app, status: "connected", connected_by: "ada@example.com", connected_at: new Date().toISOString() };
   return {
-    ...c, status: "connected", action: "manage", reason: "Signed in with Coderhelm's app.", how: "Coderhelm's Figma app",
-    connected_by: "ada@example.com", connected_at: new Date().toISOString(), uses: [usedFor("runs", "on", { how: "Coderhelm's Figma app" })],
+    ...c, status: "connected", action: "manage", reason: "Signed in with CoderHelm's app.", how: "CoderHelm's Figma app",
+    connected_by: "ada@example.com", connected_at: new Date().toISOString(), uses: [usedFor("runs", "on", { how: "CoderHelm's Figma app" })],
   };
 }
 
@@ -184,7 +184,7 @@ async function mockApi(context: BrowserContext, init: Partial<Backend> = {}): Pr
     if (p === "/api/mcp-servers/oauth/callback") {
       if (body?.error) {
         return json(r, {
-          error: "Figma answered access_denied: access wasn't granted. Either Cancel was chosen on its sign-in page, or Figma doesn't let this account use Coderhelm's app. Start again, and ask an admin of Figma if it keeps happening.",
+          error: "Figma answered access_denied: access wasn't granted. Either Cancel was chosen on its sign-in page, or Figma doesn't let this account use CoderHelm's app. Start again, and ask an admin of Figma if it keeps happening.",
           code: "access_denied", flow: "app", return_to: "", server_name: "Figma", catalog_id: "app:figma",
         }, 400);
       }
@@ -369,7 +369,7 @@ test("Figma not connected: one sentence, one action, what happens next, and noth
   await expect(other.getByTestId("way-own")).toContainText("Use your own Figma app");
   await expect(other.getByTestId("way-key")).toContainText("Use a key");
   // The older record is kept, said, and removed only by the person.
-  await expect(other.getByTestId("unused-record")).toContainText("A sign-in through Figma's own server was started and never finished. Coderhelm doesn't use it.");
+  await expect(other.getByTestId("unused-record")).toContainText("A sign-in through Figma's own server was started and never finished. CoderHelm doesn't use it.");
   await expect(other.getByTestId("unused-record").getByRole("button", { name: "Remove it" })).toBeVisible();
   await shot(page, "figma", "figma-other-ways");
 });
@@ -429,7 +429,7 @@ test("signing in opens a new tab, shows it is waiting, and the card becomes Conn
   // The sign-in finished in the other tab, which closes itself.
   await popup.waitForEvent("close");
   await expect(r).toHaveAttribute("data-status", "connected");
-  await expect(r.getByTestId("connection-facts")).toContainText("Connected withCoderhelm's Figma app");
+  await expect(r.getByTestId("connection-facts")).toContainText("Connected withCoderHelm's Figma app");
   await expect(r.getByTestId("connection-facts")).toContainText("Connected byada@example.com");
   await expect(r.getByTestId("connection-facts")).toContainText("Used forRuns and reviews");
   // This tab never left the page.

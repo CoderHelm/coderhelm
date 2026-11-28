@@ -294,7 +294,7 @@ export function Deliveries({
               title="No deliveries yet"
               action={<Link href="/settings/integrations" className={buttonClass("secondary")}>Check your integrations</Link>}
             >
-              Every webhook GitHub, Jira and your alerts send to Coderhelm shows up here, and every notice Coderhelm sends to Slack, Teams or email.
+              Every webhook GitHub, Jira and your alerts send to CoderHelm shows up here, and every notice CoderHelm sends to Slack, Teams or email.
               Failed ones say why and how to fix them. Each is kept for {retention} days.
             </EmptyState>
           )
@@ -358,7 +358,7 @@ function Health({ data }: { data: DeliveriesReply }) {
       </StatGrid>
       {data.hybrid && (
         <p className="mt-3 max-w-prose text-xs text-zinc-400" data-testid="relay-note">
-          This install is connected to Coderhelm. Events that reach it through Coderhelm&apos;s apps show as source Relay, with the time Coderhelm passed them on.
+          This install is connected to CoderHelm. Events that reach it through CoderHelm&apos;s apps show as source Relay, with the time CoderHelm passed them on.
         </p>
       )}
     </section>
@@ -384,14 +384,14 @@ export const SHARING_HREF = "/settings/system/#hybrid-sharing";
 
 /**
  * One line at the top: whether this install shares its failed deliveries with
- * Coderhelm support, and how much (the hybrid section's sharing row says
+ * CoderHelm support, and how much (the hybrid section's sharing row says
  * exactly what is sent). Left out where sharing doesn't apply.
  */
 export function sharingWords(enabled: boolean, payloads: boolean): string {
-  if (!enabled) return "Not shared with Coderhelm support";
+  if (!enabled) return "Not shared with CoderHelm support";
   return payloads
-    ? "Failed deliveries are shared with Coderhelm support (details and payload previews)"
-    : "Failed deliveries are shared with Coderhelm support (details only)";
+    ? "Failed deliveries are shared with CoderHelm support (details and payload previews)"
+    : "Failed deliveries are shared with CoderHelm support (details only)";
 }
 
 function SharingNote({ enabled, payloads }: { enabled: boolean; payloads: boolean }) {
@@ -401,7 +401,7 @@ function SharingNote({ enabled, payloads }: { enabled: boolean; payloads: boolea
         <StatusDot tone={enabled ? "success" : "muted"} />
         <span className="min-w-0">{sharingWords(enabled, payloads)}</span>
       </span>
-      <Link href={SHARING_HREF} className={`${linkButton} shrink-0`} aria-label="Change what is shared with Coderhelm support">
+      <Link href={SHARING_HREF} className={`${linkButton} shrink-0`} aria-label="Change what is shared with CoderHelm support">
         Change
       </Link>
     </p>
@@ -547,10 +547,10 @@ function httpTone(code?: number): Tone {
 }
 
 const REDELIVER_WORDS: Record<string, { label: string; confirm: string }> = {
-  github: { label: "Redeliver from GitHub", confirm: "GitHub sends this event again, and Coderhelm handles it as if it just arrived. This can start work again." },
-  relay: { label: "Redeliver", confirm: "Coderhelm sends this event to your install again. This can start work again." },
-  webhook: { label: "Resend", confirm: "Coderhelm sends the same event, with the same id, to your webhook endpoint again, signed now. Your endpoint may act on it again unless it skips event ids it has seen." },
-  notify_test: { label: "Send a test notice", confirm: "Coderhelm sends a test notice to the same place, so you can see that it arrives." },
+  github: { label: "Redeliver from GitHub", confirm: "GitHub sends this event again, and CoderHelm handles it as if it just arrived. This can start work again." },
+  relay: { label: "Redeliver", confirm: "CoderHelm sends this event to your install again. This can start work again." },
+  webhook: { label: "Resend", confirm: "CoderHelm sends the same event, with the same id, to your webhook endpoint again, signed now. Your endpoint may act on it again unless it skips event ids it has seen." },
+  notify_test: { label: "Send a test notice", confirm: "CoderHelm sends a test notice to the same place, so you can see that it arrives." },
 };
 
 function DeliveryDrawer({ id, onClose, onChanged }: { id: string; onClose: () => void; onChanged: () => void }) {
@@ -679,7 +679,7 @@ export function payloadFacts(preview: string): { sender?: string; title?: string
 
 /** The groups request headers are shown in; anything else is network detail. */
 const HEADER_GROUPS: { title: string; test: (k: string) => boolean }[] = [
-  { title: "Coderhelm", test: (k) => k.startsWith("x-coderhelm-") },
+  { title: "CoderHelm", test: (k) => k.startsWith("x-coderhelm-") },
   { title: "From the sender", test: (k) => k.startsWith("x-github-") || k.startsWith("x-hub-") || k.startsWith("x-atlassian-") || k.startsWith("x-amz-sns-") || k === "user-agent" },
   { title: "Content", test: (k) => k.startsWith("content-") || k.startsWith("accept") },
 ];
@@ -724,13 +724,13 @@ function DeliveryDetail({ detail, refusal }: { detail: DeliveryDetailReply; refu
   const verb = d.direction === "inbound" ? "Received" : "Sent";
   const outcome =
     d.status === "pending"
-      ? `Not through yet${d.next_retry_at ? `: Coderhelm tries again at ${clock(d.next_retry_at)}` : ""}.`
+      ? `Not through yet${d.next_retry_at ? `: CoderHelm tries again at ${clock(d.next_retry_at)}` : ""}.`
       : d.status === "failed"
-        ? "Failed, and Coderhelm stopped retrying it."
+        ? "Failed, and CoderHelm stopped retrying it."
         : d.status === "ignored"
-          ? "Received, and not an event Coderhelm acts on."
+          ? "Received, and not an event CoderHelm acts on."
           : d.status === "received"
-            ? "Received; Coderhelm is handling it."
+            ? "Received; CoderHelm is handling it."
             : "Went through.";
 
   const facts: [string, ReactNode][] = [
@@ -778,7 +778,7 @@ function DeliveryDetail({ detail, refusal }: { detail: DeliveryDetailReply; refu
           {d.outcome ? <span className="block text-xs text-zinc-400 wrap-anywhere">{d.outcome}</span> : null}
         </p>
         {d.status === "pending" && d.next_retry_at && (
-          <p className="sr-only" data-testid="delivery-next-retry">Coderhelm tries again at {clock(d.next_retry_at)}.</p>
+          <p className="sr-only" data-testid="delivery-next-retry">CoderHelm tries again at {clock(d.next_retry_at)}.</p>
         )}
       </section>
 

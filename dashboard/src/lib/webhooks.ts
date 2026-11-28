@@ -1,4 +1,4 @@
-// Webhooks (Settings, Webhooks): the endpoints Coderhelm sends the team's
+// Webhooks (Settings, Webhooks): the endpoints CoderHelm sends the team's
 // events to, their signing secrets, and their deliveries. The rules (signing,
 // retries, address checks, turning failing endpoints off) live in the
 // gateway (services/gateway/src/routes/webhooks.rs and common::webhooks).

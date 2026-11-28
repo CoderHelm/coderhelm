@@ -155,7 +155,7 @@ test("Settings, Emails: optional emails start off, essential ones are listed, th
   expect(puts).toEqual([{ optional: { weekly_summary: true } }]);
 });
 
-test("Settings, Emails: choosing Coderhelm's mail service, and the status it shows", async ({ page }) => {
+test("Settings, Emails: choosing CoderHelm's mail service, and the status it shows", async ({ page }) => {
   const { puts } = await selfHostInstall(page);
   await page.goto("/settings/emails");
   await page.getByTestId("transport-coderhelm").getByRole("radio").check();
@@ -165,7 +165,7 @@ test("Settings, Emails: choosing Coderhelm's mail service, and the status it sho
   await shot(page, "settings-emails-relay");
 });
 
-test("Settings, Emails: Coderhelm's mail service needs the install registered first", async ({ page }) => {
+test("Settings, Emails: CoderHelm's mail service needs the install registered first", async ({ page }) => {
   await selfHostInstall(page, { registered: false });
   await page.goto("/settings/emails");
   await expect(page.getByTestId("transport-coderhelm").getByRole("radio")).toBeDisabled();
@@ -205,9 +205,9 @@ test("Settings, Emails: the sender name, with a preview of the From line and a s
   expect(senderPuts).toEqual([{ sender_name: "Acme Robots", organization: "Acme" }]);
   await expect(from).toHaveText("Acme Robots <helm@example.org>");
 
-  // Through Coderhelm the name always ends in the product name, and the page says why.
+  // Through CoderHelm the name always ends in the product name, and the page says why.
   await page.getByTestId("transport-coderhelm").getByRole("radio").check();
-  await expect(page.getByTestId("sender-preview")).toContainText("through Coderhelm");
+  await expect(page.getByTestId("sender-preview")).toContainText("through CoderHelm");
   await expect(from).toHaveText("Acme CoderHelm <notifications@notify.coderhelm.com>");
   await expect(page.getByTestId("sender-relay-note")).toContainText("always ends in");
   await shot(page, "settings-emails-sender-relay");

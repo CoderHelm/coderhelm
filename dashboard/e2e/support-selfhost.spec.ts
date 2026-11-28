@@ -1,9 +1,9 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 
-// A self-hosted install's support tickets go to Coderhelm's support: the form
+// A self-hosted install's support tickets go to CoderHelm's support: the form
 // says exactly what leaves the install, and a ticket says whether it got
-// there ("Sending to Coderhelm…", sent, or why the install couldn't reach
-// Coderhelm and the address to write to). Every API call is answered here.
+// there ("Sending to CoderHelm…", sent, or why the install couldn't reach
+// CoderHelm and the address to write to). Every API call is answered here.
 
 const ME = {
   user_id: "u_1",
@@ -77,11 +77,11 @@ async function install(page: Page, selfHosted: boolean, coderhelm?: Record<strin
   });
 }
 
-test("a self-hosted install's form says what goes to Coderhelm support", async ({ page }) => {
+test("a self-hosted install's form says what goes to CoderHelm support", async ({ page }) => {
   await install(page, true);
   await page.goto("/support?new=1");
   const sent = page.getByTestId("ticket-attached");
-  await expect(sent.getByRole("heading", { name: "Sent to Coderhelm support" })).toBeVisible();
+  await expect(sent.getByRole("heading", { name: "Sent to CoderHelm support" })).toBeVisible();
   await expect(page.getByTestId("ticket-sent-to-coderhelm")).toContainText("Your message, your name and email");
   await expect(page.getByTestId("ticket-sent-to-coderhelm")).toContainText("a run's error and step");
 });
@@ -94,22 +94,22 @@ test("the hosted service's form keeps its own words", async ({ page }) => {
 });
 
 test("a ticket the install couldn't send says why, and where to write", async ({ page }) => {
-  await install(page, true, { state: "sending", error: "Coderhelm's servers didn't answer" });
+  await install(page, true, { state: "sending", error: "CoderHelm's servers didn't answer" });
   await page.goto("/support/ticket?id=01TICKET000000000000000001");
   const d = page.getByTestId("ticket-delivery");
   await expect(d).toHaveAttribute("data-state", "sending");
-  await expect(d).toContainText("Not sent to Coderhelm yet");
-  await expect(d).toContainText("Coderhelm's servers didn't answer");
+  await expect(d).toContainText("Not sent to CoderHelm yet");
+  await expect(d).toContainText("CoderHelm's servers didn't answer");
   await expect(d).toContainText("support@coderhelm.com");
 
   await page.goto("/support");
-  await expect(page.getByTestId("support-ticket-row")).toContainText("Sending to Coderhelm…");
+  await expect(page.getByTestId("support-ticket-row")).toContainText("Sending to CoderHelm…");
 });
 
-test("a ticket that reached Coderhelm says so; the hosted service shows nothing", async ({ page }) => {
+test("a ticket that reached CoderHelm says so; the hosted service shows nothing", async ({ page }) => {
   await install(page, true, { state: "sent", sent_at: iso(4) });
   await page.goto("/support/ticket?id=01TICKET000000000000000001");
-  await expect(page.getByTestId("ticket-delivery")).toHaveText("Sent to Coderhelm support. Its answers come here and by email.");
+  await expect(page.getByTestId("ticket-delivery")).toHaveText("Sent to CoderHelm support. Its answers come here and by email.");
 
   await page.unrouteAll({ behavior: "ignoreErrors" });
   await install(page, false);

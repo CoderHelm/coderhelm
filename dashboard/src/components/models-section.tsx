@@ -205,7 +205,7 @@ export function ModelsSection() {
             ))}
           </SettingsDisclosure>
           <p className="text-sm text-zinc-400">
-            Someone in your company turns on model access, submits the use case form and accepts Anthropic&apos;s terms in the AWS console. Coderhelm never does that for you; it checks the result.{" "}
+            Someone in your company turns on model access, submits the use case form and accepts Anthropic&apos;s terms in the AWS console. CoderHelm never does that for you; it checks the result.{" "}
             <a className={linkButton} href={`https://console.aws.amazon.com/bedrock/home?region=${current.region}#/modelaccess`} target="_blank" rel="noopener noreferrer">Open Model access</a>
           </p>
         </div>
@@ -265,7 +265,7 @@ export function UpdateNeedsAction({ check, onChecked, onSkip }: { check: ModelCh
         title={`Checking ${mc.version} before it can be applied`}
         actions={<button type="button" className={secondaryButton} onClick={() => api.checkUpdateModels().then((r) => { setMc(r.model_check); onChecked?.(r.model_check); }).catch(() => {})}>Re-run the model check</button>}
       >
-        <p>Coderhelm checks the release&apos;s signature, then tries each model it calls. This takes a few minutes.</p>
+        <p>CoderHelm checks the release&apos;s signature, then tries each model it calls. This takes a few minutes.</p>
       </Callout>
     );
   }
@@ -314,7 +314,7 @@ export function UpdateNeedsAction({ check, onChecked, onSkip }: { check: ModelCh
       <ul className="mt-2 space-y-2">
         {failing.map((r) => <ModelResult key={r.model} r={r} />)}
       </ul>
-      <p className="text-zinc-400">Accepting model terms and the Bedrock use case form are done by a person in the AWS console; Coderhelm only checks.</p>
+      <p className="text-zinc-400">Accepting model terms and the Bedrock use case form are done by a person in the AWS console; CoderHelm only checks.</p>
       <p className="text-xs text-zinc-400">Checked <Time iso={mc.checked_at} />.</p>
     </Callout>
   );

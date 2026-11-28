@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Disclosure } from "./disclosure";
 import { CheckIcon, WarningIcon } from "./icons";
 
-// A setup checklist: a few short steps, each with the state Coderhelm
+// A setup checklist: a few short steps, each with the state CoderHelm
 // actually detected. Done steps stay one quiet line; the rest can offer the
 // manual path ("Do it myself"), collapsed, with only that step's snippet.
 

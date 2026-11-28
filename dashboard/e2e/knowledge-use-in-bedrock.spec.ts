@@ -447,7 +447,7 @@ test("the page leads with the two goals and says why the gateway needs a connect
     "Not set up yet",
   );
   await expect(page.getByTestId("why-credential")).toContainText(
-    "signs in to Coderhelm as a program",
+    "signs in to CoderHelm as a program",
   );
   // The gateway setup is there before any connection, with blanks.
   await expect(page.getByTestId("gateway-console")).toContainText(
@@ -745,7 +745,7 @@ test("self-hosted: one button opens the stack and the page follows it to the fir
     { timeout: 20_000 },
   );
   await expect(progress).toContainText("First sync started");
-  await expect(progress).toContainText("Coderhelm is copying the documents");
+  await expect(progress).toContainText("CoderHelm is copying the documents");
   await expect(page.getByTestId("sync-state")).toHaveText("Syncing now");
   await expect(page.getByTestId("sync-status")).toContainText(
     "ABCDE12345 through s3://coderhelm-prod-kb-export-111122223333/coderhelm/",

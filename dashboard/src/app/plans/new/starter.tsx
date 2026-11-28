@@ -10,7 +10,7 @@ import { focusRing } from "@/components/ui";
 import { Composer } from "./composer";
 
 // A fresh plan asks one thing: what do you want to change? Below the box,
-// a line on what Coderhelm can read and what happens next. Templates and
+// a line on what CoderHelm can read and what happens next. Templates and
 // where tasks go are folded under "More options".
 
 const EXAMPLES = [
@@ -53,7 +53,7 @@ export function Starter({
     <div className="mx-auto w-full max-w-2xl" data-testid="plan-starter">
       <h1 className="mt-2 text-2xl font-bold text-zinc-100 sm:mt-10">What do you want to change?</h1>
       <p className="mt-1 max-w-prose text-sm text-zinc-400">
-        Describe it in your own words. Coderhelm reads your code and drafts a plan you can change before anything runs.
+        Describe it in your own words. CoderHelm reads your code and drafts a plan you can change before anything runs.
       </p>
 
       <div className="mt-5">
@@ -103,7 +103,7 @@ export function Starter({
         </h2>
         <ol className="mt-3 grid gap-3 sm:grid-cols-3">
           {[
-            ["Draft", "Coderhelm reads your repos and writes a plan of small tasks."],
+            ["Draft", "CoderHelm reads your repos and writes a plan of small tasks."],
             ["Refine", "Ask for changes here. Save it when it looks right."],
             ["Approve", `Approve the steps on the plan's page. Each step becomes ${where}, and a change your developers review before it goes live.`],
           ].map(([title, body], i) => (

@@ -105,7 +105,7 @@ function analytics(period: string, repo: string | null, deployState: DeployState
     people: [
       { person: "", kind: "not_recorded", runs: 30, merged: 9 },
       { person: "Ada Lovelace", kind: "person", runs: 25, merged: 14 },
-      { person: "Coderhelm (E2E tests)", kind: "coderhelm", runs: 4, merged: 2 },
+      { person: "CoderHelm (E2E tests)", kind: "coderhelm", runs: 4, merged: 2 },
     ],
     failures: [
       { reason: "Timed out after #s", count: 3, last_run_id: "01RUNFAILED00000000000000A", last_at: new Date().toISOString(), stage: "implement", retried: 2 },
@@ -254,8 +254,8 @@ test("the scorecard answers whether it is worth it, against the previous period"
   await views.getByRole("link", { name: "Lookups" }).click();
   await expect(page.getByRole("table", { name: "Lookups by source" })).toContainText("orders-db database");
   await views.getByRole("link", { name: "Teams and repos" }).click();
-  // People first, Coderhelm's own work next, runs that recorded nobody last.
-  await expect(page.getByRole("table", { name: "By person" }).locator("tbody tr td:first-child")).toHaveText(["Ada Lovelace", "Coderhelm (E2E tests)", "Not recorded"]);
+  // People first, CoderHelm's own work next, runs that recorded nobody last.
+  await expect(page.getByRole("table", { name: "By person" }).locator("tbody tr td:first-child")).toHaveText(["Ada Lovelace", "CoderHelm (E2E tests)", "Not recorded"]);
   // Drill-downs open the run behind a number.
   await expect(page.getByRole("link", { name: "Show the class schedule on the details page" })).toHaveAttribute("href", /^\/runs\/detail\/?\?id=01RUNMERGED00000000000000A$/);
   await expect(page.getByRole("link", { name: "#101" })).toHaveAttribute("href", "https://github.com/your-team/web/pull/101");
@@ -308,8 +308,8 @@ test("where it struggles places every red CI run in one outcome, base-branch fai
   await expect(page.getByTestId("ci-line")).toContainText("6 ended green after its fixes");
   const outcomes = page.getByRole("table", { name: "CI outcomes" });
   await expect(outcomes.locator("tbody tr td:first-child")).toHaveText([
-    "Green after a Coderhelm fix",
-    "Green without a Coderhelm fix",
+    "Green after a CoderHelm fix",
+    "Green without a CoderHelm fix",
     "Flaky: green on a re-run",
     "Red, not the change's: fails on the base branch or outside the change",
     "Gave up: Fix attempts used up",
@@ -356,7 +356,7 @@ test("period and repository filters reload, and a chart can be read as a table",
 test("time saved is shown only from the reader's own figure, with the formula", async ({ page }) => {
   await mockApi(page);
   await page.goto("/analytics");
-  await expect(page.getByText("Coderhelm doesn't guess how long work would have taken you")).toBeVisible();
+  await expect(page.getByText("CoderHelm doesn't guess how long work would have taken you")).toBeVisible();
   await page.getByLabel("Minutes a person would spend on one pull request").fill("90");
   await expect(page.getByTestId("time-saved")).toContainText("About 32 h");
   await expect(page.getByTestId("time-saved")).toContainText("21 merged PRs × 90 minutes ÷ 60");
@@ -415,11 +415,11 @@ test("this period is compared with the one before, each thing counted once", asy
   // The previous period was a day shorter: its last value is a gap, not a zero.
   await expect(days.locator("tbody tr").last().locator("td").nth(1)).toHaveText("—");
 
-  // Deploys Coderhelm started: by environment, with failures; a real 0
+  // Deploys CoderHelm started: by environment, with failures; a real 0
   // before is a change, not "Not comparable".
-  await expect(row("Deploys Coderhelm started").locator("td").nth(0)).toHaveText("0");
-  await expect(row("Deploys Coderhelm started").locator("td").nth(1)).toHaveText("14");
-  await expect(row("Deploys Coderhelm started").locator("td").nth(2)).toHaveText("↑ +14");
+  await expect(row("Deploys CoderHelm started").locator("td").nth(0)).toHaveText("0");
+  await expect(row("Deploys CoderHelm started").locator("td").nth(1)).toHaveText("14");
+  await expect(row("Deploys CoderHelm started").locator("td").nth(2)).toHaveText("↑ +14");
   await expect(row("To staging").locator("td").nth(1)).toHaveText("9");
   await expect(row("To production").locator("td").nth(1)).toHaveText("3 (1 failed)");
   await expect(row("Succeeded").locator("td").nth(1)).toHaveText("13");
@@ -431,7 +431,7 @@ test("this period is compared with the one before, each thing counted once", asy
   await expect(deploys).toHaveClass(/cursor-pointer/);
   // The table stays open from the Tickets check, and follows the metric.
   await deploys.click();
-  const deployDays = page.getByRole("table", { name: "Deploys Coderhelm started so far by day" });
+  const deployDays = page.getByRole("table", { name: "Deploys CoderHelm started so far by day" });
   await expect(deployDays.locator("tbody tr").first().locator("td").nth(2)).toHaveText("2");
   await expect(deployDays.locator("tbody tr").last().locator("td").nth(1)).toHaveText("—");
   await shot(page, "analytics-compare");
@@ -442,9 +442,9 @@ test("deploys still being read from GitHub say so instead of a fake 0", async ({
   await page.goto("/analytics?tab=trends");
   const table = page.getByRole("table", { name: "Compared with the period before" });
   const row = (name: string) => table.locator("tbody tr").filter({ has: page.getByRole("rowheader").filter({ hasText: name }) });
-  await expect(row("Deploys Coderhelm started").locator("td").nth(0)).toHaveText("Counting…");
-  await expect(row("Deploys Coderhelm started").locator("td").nth(1)).toHaveText("14 so far");
-  await expect(row("Deploys Coderhelm started").locator("td").nth(2)).toHaveText("Counting earlier deploys…");
+  await expect(row("Deploys CoderHelm started").locator("td").nth(0)).toHaveText("Counting…");
+  await expect(row("Deploys CoderHelm started").locator("td").nth(1)).toHaveText("14 so far");
+  await expect(row("Deploys CoderHelm started").locator("td").nth(2)).toHaveText("Counting earlier deploys…");
   await expect(row("To production").locator("td").nth(0)).toHaveText("Counting…");
   await expect(page.getByTestId("compare-notes")).toContainText("still being read from GitHub's run history");
   // The rest of the table compares as usual.
@@ -456,8 +456,8 @@ test("deploys being read say how many repositories are done, and keep this perio
   await page.goto("/analytics?tab=trends");
   const table = page.getByRole("table", { name: "Compared with the period before" });
   const row = (name: string) => table.locator("tbody tr").filter({ has: page.getByRole("rowheader").filter({ hasText: name }) });
-  await expect(row("Deploys Coderhelm started").locator("td").nth(2)).toHaveText("Counting earlier deploys: 12 of 40 repositories");
-  await expect(row("Deploys Coderhelm started").locator("td").nth(1)).toHaveText("14 so far");
+  await expect(row("Deploys CoderHelm started").locator("td").nth(2)).toHaveText("Counting earlier deploys: 12 of 40 repositories");
+  await expect(row("Deploys CoderHelm started").locator("td").nth(1)).toHaveText("14 so far");
   await expect(page.getByTestId("compare-notes")).toContainText("(12 of 40 repositories read so far)");
 });
 
@@ -466,7 +466,7 @@ test("deploys waiting out GitHub's hourly limit say when counting resumes", asyn
   await mockApi(page, { deployState: "counting", progress: { read: 9, total: 11, resumes_at: at.toISOString() } });
   await page.goto("/analytics?tab=trends");
   const table = page.getByRole("table", { name: "Compared with the period before" });
-  const cell = table.locator("tbody tr").filter({ has: page.getByRole("rowheader").filter({ hasText: "Deploys Coderhelm started" }) }).locator("td").nth(2);
+  const cell = table.locator("tbody tr").filter({ has: page.getByRole("rowheader").filter({ hasText: "Deploys CoderHelm started" }) }).locator("td").nth(2);
   const hhmm = await page.evaluate((iso) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }), at.toISOString());
   await expect(cell).toHaveText(`Counting earlier deploys: 9 of 11 repositories, resumes at ${hhmm} after GitHub's hourly limit`);
 });
@@ -478,7 +478,7 @@ test("repositories whose earlier deploys could not be read are named with why, n
   await expect(notes).toContainText("could not read earlier deploys in 1 repository (your-team/monorepo: GitHub answered 502 Bad Gateway)");
   const table = page.getByRole("table", { name: "Compared with the period before" });
   const row = (name: string) => table.locator("tbody tr").filter({ has: page.getByRole("rowheader").filter({ hasText: name }) });
-  await expect(row("Deploys Coderhelm started").locator("td").nth(2)).toHaveText("↑ +14");
+  await expect(row("Deploys CoderHelm started").locator("td").nth(2)).toHaveText("↑ +14");
 });
 
 test("deploys from before GitHub's history was read are not compared", async ({ page }) => {
@@ -486,12 +486,12 @@ test("deploys from before GitHub's history was read are not compared", async ({ 
   await page.goto("/analytics?tab=trends");
   const table = page.getByRole("table", { name: "Compared with the period before" });
   const row = (name: string) => table.locator("tbody tr").filter({ has: page.getByRole("rowheader").filter({ hasText: name }) });
-  await expect(row("Deploys Coderhelm started").locator("td").nth(0)).toHaveText("0");
-  await expect(row("Deploys Coderhelm started").locator("td").nth(2)).toHaveText("Not comparable");
+  await expect(row("Deploys CoderHelm started").locator("td").nth(0)).toHaveText("0");
+  await expect(row("Deploys CoderHelm started").locator("td").nth(2)).toHaveText("Not comparable");
   await expect(page.getByTestId("compare-notes")).toContainText("Deploys are known from");
 });
 
-test("repositories Coderhelm can't read runs in are named, with the permission to grant", async ({ page }) => {
+test("repositories CoderHelm can't read runs in are named, with the permission to grant", async ({ page }) => {
   await mockApi(page, { noAccess: ["your-team/infra"] });
   await page.goto("/analytics?tab=trends");
   const notes = page.getByTestId("compare-notes");

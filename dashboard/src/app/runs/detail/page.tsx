@@ -202,7 +202,7 @@ function RunDetailInner() {
   useEffect(() => { api.getUsage().then(setUsage).catch(() => {}); }, []);
   // Only the catalog is needed: it turns the run's server ids into names.
   useEffect(() => { api.getPluginCatalog().then((c) => setCatalog(c.plugins)).catch(() => {}); }, []);
-  // A ticket from a Jira site whose Coderhelm app is older than the latest
+  // A ticket from a Jira site whose CoderHelm app is older than the latest
   // release: one quiet line saying the run may have missed comments, and why.
   const fromJira = run?.ticket_source === "jira" || run?.trigger?.kind === "jira";
   const [jiraApp, setJiraApp] = useState<JiraAppUpdate | null>(null);
@@ -500,7 +500,7 @@ function RunDetailInner() {
     }
   };
   // Close the ticket's earlier pull request a covered run superseded: only on
-  // a person's click (the gateway closes only Coderhelm's own pull request).
+  // a person's click (the gateway closes only CoderHelm's own pull request).
   const closeSuperseded = async (n: number) => {
     const ok = await confirm({
       title: `Close #${n}?`,
@@ -582,7 +582,7 @@ function RunDetailInner() {
   const checks = run.checks && (run.checks.items?.length || run.checks.counts) ? run.checks : null;
   const reviewLine = run.pr_review?.review_sk ? (
     <p className="flex flex-wrap items-center gap-x-2 gap-y-1" data-testid="run-pr-review">
-      <span className="text-zinc-400">Coderhelm&apos;s reviewer:</span>
+      <span className="text-zinc-400">CoderHelm&apos;s reviewer:</span>
       <VerdictPill verdict={run.pr_review.verdict} />
       {run.pr_review.reviewed_sha && <span className="font-mono text-xs text-zinc-400">on {run.pr_review.reviewed_sha.slice(0, 7)}</span>}
       <Link href={reviewHref(run.pr_review.review_sk)} className="text-sky-300 underline-offset-2 hover:underline">
@@ -698,7 +698,7 @@ function RunDetailInner() {
       >
         <div className="space-y-2" data-testid="codegen-env-missing">
           <p className="[overflow-wrap:anywhere]">
-            The pull request didn&apos;t open: <Code>{missing.command}</Code> needs public values {missing.repo} doesn&apos;t set for Coderhelm&apos;s sandbox:
+            The pull request didn&apos;t open: <Code>{missing.command}</Code> needs public values {missing.repo} doesn&apos;t set for CoderHelm&apos;s sandbox:
           </p>
           <ul className="list-disc space-y-1 pl-5 text-sm">
             {missing.vars.map((v) => (
@@ -720,7 +720,7 @@ function RunDetailInner() {
     outcome = (
       <OutcomeCard
         tone="attention"
-        title="Tooling failure: Coderhelm's own environment failed"
+        title="Tooling failure: CoderHelm's own environment failed"
         testId="run-outcome"
         actions={
           <>
@@ -732,14 +732,14 @@ function RunDetailInner() {
         <div className="min-w-0 space-y-2" data-testid="tooling-failure">
           {tf.error.includes("blocked by the sandbox network allowlist") ? (
             <p data-testid="tooling-network-blocked">
-              This is not a problem with the change. A command Coderhelm ran couldn&apos;t reach a host the sandbox&apos;s network allowlist doesn&apos;t list. Add the host to the{" "}
+              This is not a problem with the change. A command CoderHelm ran couldn&apos;t reach a host the sandbox&apos;s network allowlist doesn&apos;t list. Add the host to the{" "}
               <Link href="/settings/agents?tab=advanced" className="underline underline-offset-2">
                 sandbox network list
               </Link>
               , then retry.
             </p>
           ) : (
-            <p>This is not a question for the ticket. A command Coderhelm ran failed for want of a dependency or a tool, and installing and trying again didn&apos;t fix it.</p>
+            <p>This is not a question for the ticket. A command CoderHelm ran failed for want of a dependency or a tool, and installing and trying again didn&apos;t fix it.</p>
           )}
           <CodeBlock code={tf.command} lang="bash" title="Command" wrap testId="tooling-command" />
           <CodeBlock code={tf.error} title="Error" wrap testId="tooling-error" />
@@ -873,13 +873,13 @@ function RunDetailInner() {
                 {sup.url ? <a href={sup.url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">#{sup.number}</a> : <>#{sup.number}</>}
                 {sup.closed
                   ? <> is closed{sup.closed_by ? <> by {sup.closed_by}</> : null}: superseded by #{cb?.number}.</>
-                  : <> is superseded by #{cb?.number}, which carries this ticket&apos;s change. It stays open until someone closes it: Coderhelm doesn&apos;t close a pull request by itself.</>}
+                  : <> is superseded by #{cb?.number}, which carries this ticket&apos;s change. It stays open until someone closes it: CoderHelm doesn&apos;t close a pull request by itself.</>}
               </p>
             )}
             <p className="text-zinc-400">
               {cb?.note
                 ? cb.note
-                : "Coderhelm built no second fix and linked this pull request on the ticket. If the ticket needs a separate change, say so on the ticket, then retry."}
+                : "CoderHelm built no second fix and linked this pull request on the ticket. If the ticket needs a separate change, say so on the ticket, then retry."}
             </p>
           </div>
         </OutcomeCard>
@@ -889,7 +889,7 @@ function RunDetailInner() {
     outcome = (
       <Problem
         testId="run-outcome"
-        title="Coderhelm couldn't ship this run"
+        title="CoderHelm couldn't ship this run"
         details={run.error ? sanitizeError(run.error) : undefined}
         action={
           <>
@@ -943,10 +943,10 @@ function RunDetailInner() {
             who: hold.kind === "waiting" ? "none" : "you",
             next:
               hold.kind === "waiting"
-                ? "Coderhelm marks it ready for review once the check passes."
+                ? "CoderHelm marks it ready for review once the check passes."
                 : hold.kind === "failed"
                   ? "Mark it ready on GitHub; nothing else is left."
-                  : "Once each item is dealt with, Coderhelm checks again and marks it ready for review.",
+                  : "Once each item is dealt with, CoderHelm checks again and marks it ready for review.",
             // The summary repeats the first reason word for word; it shows only when there are no reasons.
             body: hold.reasons.length === 0 ? <span className="whitespace-pre-wrap [overflow-wrap:anywhere]" data-testid="draft-hold-summary">{hold.summary}</span> : null,
             content: (hold.reasons.length > 0 || (run.status === "needs_input" && !!run.questions?.length)) && (
@@ -1026,7 +1026,7 @@ function RunDetailInner() {
               // An older gateway doesn't say where the pull request stands.
               tone: "success",
               title: prLinks.length ? `${prWords} is ready for review` : "Done.",
-              body: prLinks.length ? "Coderhelm finished the work on it, checked it, and named anything it deferred and why." : "Coderhelm finished this work.",
+              body: prLinks.length ? "CoderHelm finished the work on it, checked it, and named anything it deferred and why." : "CoderHelm finished this work.",
               who: prLinks.length ? "you" : "none",
               next: prLinks.length ? "Merging it is your team's call: review it and merge." : undefined,
               actions: (
@@ -1040,15 +1040,15 @@ function RunDetailInner() {
             ? {
                 tone: "waiting",
                 title: hasPr ? `${prWords} is open; waiting for its checks` : "Waiting for the checks",
-                body: checks ? <span data-testid="checks-line">{checksSentence(checks)}.</span> : "Coderhelm is watching the checks on GitHub.",
+                body: checks ? <span data-testid="checks-line">{checksSentence(checks)}.</span> : "CoderHelm is watching the checks on GitHub.",
                 who: "none",
-                next: "If a check fails, Coderhelm fixes it and pushes again. When they pass, it hands the pull request over for review.",
+                next: "If a check fails, CoderHelm fixes it and pushes again. When they pass, it hands the pull request over for review.",
                 actions: openPrButtons("secondary"),
               }
             : run.status === "needs_input" && run.questions?.length
               ? {
                   tone: "waiting",
-                  title: "Coderhelm needs your answer",
+                  title: "CoderHelm needs your answer",
                   who: "you",
                   body: null,
                   content: (
@@ -1093,7 +1093,7 @@ function RunDetailInner() {
               : run.status === "needs_input"
               ? {
                   tone: "waiting",
-                  title: "Coderhelm needs more detail",
+                  title: "CoderHelm needs more detail",
                   who: "you",
                   body: run.error ? <span className="whitespace-pre-wrap [overflow-wrap:anywhere]">{sanitizeError(run.error)}</span> : "Add the missing detail to the ticket, then retry.",
                   actions: retryButton,
@@ -1101,7 +1101,7 @@ function RunDetailInner() {
               : run.status === "retried" && run.answers?.length
               ? {
                   tone: "neutral",
-                  title: "Answered. Coderhelm is continuing in a new run.",
+                  title: "Answered. CoderHelm is continuing in a new run.",
                   body: null,
                   content: <RunAnswered run={run} />,
                   actions: undefined,
@@ -1115,7 +1115,7 @@ function RunDetailInner() {
                   : live
                     ? {
                         tone: "live",
-                        title: run.status === "running" ? "Coderhelm is working on this" : "About to start",
+                        title: run.status === "running" ? "CoderHelm is working on this" : "About to start",
                         body: run.status === "running" && currentStep ? `Now on the ${currentStep.toLowerCase()} step. This page updates by itself.` : "This page updates by itself.",
                         who: "none",
                         actions:
@@ -1258,7 +1258,7 @@ function RunDetailInner() {
                       ? "Waiting for the checks"
                       : run.status === "needs_input"
                         ? "Waiting on a person"
-                        : "What Coderhelm did"
+                        : "What CoderHelm did"
                 }
                 live={run.status === "running" || run.status === "queued"}
                 upcoming={upcoming}
@@ -1302,7 +1302,7 @@ function RunDetailInner() {
               )}
 
               {run.lesson && (
-                <Callout variant="info" title="Coderhelm learned" live={false}>
+                <Callout variant="info" title="CoderHelm learned" live={false}>
                   <p className="line-clamp-3 [overflow-wrap:anywhere]" title={run.lesson}>
                     {run.lesson}
                   </p>
@@ -1441,7 +1441,7 @@ function RunDetailInner() {
               round didn't finish, or whose PR is held, says so above. */}
           {done && run.error && !run.round_incomplete && !hold && (
             <Callout variant="neutral" title="A problem earlier in this run" live={false}>
-              <p>Coderhelm got past it and finished. The details are kept here for reference.</p>
+              <p>CoderHelm got past it and finished. The details are kept here for reference.</p>
               <TechnicalDetails text={sanitizeError(run.error)} />
             </Callout>
           )}
@@ -1519,7 +1519,7 @@ function RunDetailInner() {
               )}
               {run.ticket_id && (
                 <>
-                  {/* Coderhelm's own tickets (a flaky test, a log finding) have an internal id, not a ticket people know. */}
+                  {/* CoderHelm's own tickets (a flaky test, a log finding) have an internal id, not a ticket people know. */}
                   <dt className="text-zinc-400">{!run.trigger || ["jira", "github", "plan"].includes(run.trigger.kind) ? "Ticket" : "Internal ID"}</dt>
                   <dd className="min-w-0 [overflow-wrap:anywhere] text-zinc-200">{run.ticket_id}</dd>
                 </>
@@ -1562,8 +1562,8 @@ function finishedStanding(standing: RunMergeStanding): RunMergeStanding {
   return {
     ...standing,
     code: "review_changes_requested",
-    text: `Coderhelm's review asks for changes${sha ? ` on \`${sha.slice(0, 7)}\`` : ""} and no fix round is running on them.`,
-    next: "Coderhelm looks at the pull request again: it takes them in a fix round, or names on the pull request what only a person can do and why.",
+    text: `CoderHelm's review asks for changes${sha ? ` on \`${sha.slice(0, 7)}\`` : ""} and no fix round is running on them.`,
+    next: "CoderHelm looks at the pull request again: it takes them in a fix round, or names on the pull request what only a person can do and why.",
     needs_person: false,
   };
 }
@@ -1577,11 +1577,11 @@ function standingTitle(standing: RunMergeStanding, prWords: string): string {
     case "closed":
       return `${prWords} was closed without merging`;
     case "merging":
-      return `${prWords} is approved; Coderhelm merges it`;
+      return `${prWords} is approved; CoderHelm merges it`;
     case "review_changes_requested":
-      return `${prWords} is open; Coderhelm's review asks for changes`;
+      return `${prWords} is open; CoderHelm's review asks for changes`;
     case "reviewing":
-      return `${prWords} is open; Coderhelm is reviewing its newest commit`;
+      return `${prWords} is open; CoderHelm is reviewing its newest commit`;
     case "checks_running":
       return `${prWords} is open; its checks are running`;
     case "checks_failing":

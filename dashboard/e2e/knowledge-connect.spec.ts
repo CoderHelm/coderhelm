@@ -270,8 +270,8 @@ test.describe("connecting without the app's sign-in", () => {
     const step = page.getByTestId("connect-step");
     await expect(step).toHaveAttribute("data-state", "no-way");
     const box = step.getByTestId("no-token-path");
-    await expect(box).toContainText("Google Drive sign-in isn't set up on this Coderhelm yet.");
-    await expect(box).toContainText("Ask whoever runs Coderhelm to set up Google Drive sign-in.");
+    await expect(box).toContainText("Google Drive sign-in isn't set up on this CoderHelm yet.");
+    await expect(box).toContainText("Ask whoever runs CoderHelm to set up Google Drive sign-in.");
     // Not a platform admin: no steps, and never a sign-in button.
     await expect(box.getByTestId("sign-in-steps")).toHaveCount(0);
     await expect(step.getByTestId("connect-button")).toHaveCount(0);
@@ -287,7 +287,7 @@ test.describe("connecting without the app's sign-in", () => {
     await page.getByTestId("start-google_drive").click();
     const box = page.getByTestId("connect-step").getByTestId("no-token-path");
     await expect(box).toHaveAttribute("data-admin", "yes");
-    await expect(box).toContainText("Ask whoever runs Coderhelm to set up Google Drive sign-in.");
+    await expect(box).toContainText("Ask whoever runs CoderHelm to set up Google Drive sign-in.");
     const steps = box.getByTestId("sign-in-steps");
     await expect(steps.getByRole("link", { name: "Steps to set up Google Drive sign-in" })).toHaveAttribute(
       "href",

@@ -77,7 +77,7 @@ export function DomainSection() {
   };
 
   const remove = async () => {
-    if (!window.confirm("Go back to the AWS address? Coderhelm redeploys (about 10 minutes), and links to your domain stop working.")) return;
+    if (!window.confirm("Go back to the AWS address? CoderHelm redeploys (about 10 minutes), and links to your domain stop working.")) return;
     setBusy("remove");
     try {
       await api.removeSystemDomain();
@@ -141,7 +141,7 @@ export function DomainSection() {
         <div className="min-w-0 border-t border-zinc-800 px-4 py-4" data-testid="domain-records">
           <h3 className="text-sm font-medium text-zinc-100">Records to add where your domain&apos;s DNS is hosted</h3>
           <p className="mt-1 text-sm text-zinc-400">
-            Type CNAME for both. If your DNS provider adds the domain to the name for you, type only the part before it. Coderhelm never changes your DNS, so add both yourself.
+            Type CNAME for both. If your DNS provider adds the domain to the name for you, type only the part before it. CoderHelm never changes your DNS, so add both yourself.
           </p>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-zinc-400" data-testid="domain-providers">
             <li><span className="text-zinc-300">Route 53</span>: Hosted zones, your zone, Create record, record type CNAME. Do it for each record.</li>
@@ -205,7 +205,7 @@ export function DomainSection() {
         </form>
         {error && <p role="alert" className="mt-2 text-sm text-red-300" data-testid="domain-error">{error}</p>}
         <p id="domain-help" className="mt-2 text-sm text-zinc-400">
-          Coderhelm never changes your DNS: this page shows two records for you to add where your domain&apos;s DNS is hosted, and checks them until they work. Coderhelm keeps working on its current address until the domain is ready.
+          CoderHelm never changes your DNS: this page shows two records for you to add where your domain&apos;s DNS is hosted, and checks them until they work. CoderHelm keeps working on its current address until the domain is ready.
         </p>
         {(onDomain || d?.state === "failed" || d?.state === "validating") && (
           <div className="mt-4">
@@ -217,7 +217,7 @@ export function DomainSection() {
         <details className="mt-4 text-sm text-zinc-400">
           <summary className="cursor-pointer text-zinc-300">How it works</summary>
           <div className="mt-2 space-y-2">
-            <p>The install requests a certificate for the domain from AWS (in us-east-1, where CloudFront takes them). Once AWS sees the first record it issues it, and Coderhelm redeploys with the new address (about 10 minutes; Update history shows it).</p>
+            <p>The install requests a certificate for the domain from AWS (in us-east-1, where CloudFront takes them). Once AWS sees the first record it issues it, and CoderHelm redeploys with the new address (about 10 minutes; Update history shows it).</p>
             <p>Afterwards, update your GitHub App&apos;s URLs to the new address; Settings, then Setup names each value.</p>
           </div>
         </details>
@@ -266,7 +266,7 @@ function AddressChoices({
         {coderhelm && (
           <li className={card} data-choice="coderhelm">
             <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-zinc-100">
-              A Coderhelm address {coderhelm.hostname && <Chip tone="success">Claimed</Chip>}
+              A CoderHelm address {coderhelm.hostname && <Chip tone="success">Claimed</Chip>}
             </p>
             {coderhelm.hostname ? (
               <p className="mt-1 text-sm text-zinc-400"><span className="wrap-anywhere">{coderhelm.hostname}</span></p>

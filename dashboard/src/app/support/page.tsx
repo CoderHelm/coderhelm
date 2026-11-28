@@ -54,7 +54,7 @@ const BRING_OVER = [
   "Settings and instructions",
   "Repositories and their settings",
   "Knowledge and data sources",
-  "Memory and what Coderhelm learned",
+  "Memory and what CoderHelm learned",
   "Run and review history",
   "People and roles",
 ];
@@ -123,7 +123,7 @@ function Tickets() {
     <Page>
       <PageHeader
         title="Support"
-        lead="Ask Coderhelm for help. Everyone on your team can see these tickets and the answers."
+        lead="Ask CoderHelm for help. Everyone on your team can see these tickets and the answers."
         actions={
           <Link href="/support?new=1" className={primaryButton}>
             New ticket
@@ -188,7 +188,7 @@ function Tickets() {
                           : ticketItems(t).length > 1
                             ? `${ticketItems(t).length} items attached`
                             : null,
-                        t.coderhelm?.state === "sending" ? "Sending to Coderhelm…" : null,
+                        t.coderhelm?.state === "sending" ? "Sending to CoderHelm…" : null,
                         `${t.message_count} message${t.message_count === 1 ? "" : "s"}`,
                         t.participants?.length ? `${t.participants.length + 1} people` : null,
                       ]}
@@ -196,7 +196,7 @@ function Tickets() {
                         t.last_snippet
                           ? `${t.last_author_name || "Someone"}: ${t.last_snippet}`
                           : t.status === "waiting"
-                            ? "Coderhelm support answered. Reply when you can."
+                            ? "CoderHelm support answered. Reply when you can."
                             : undefined
                       }
                       summaryTone={undefined}
@@ -225,12 +225,12 @@ function NewTicket() {
   // Only the hosted service offers the move; on an install it is plain help.
   const isMove = type === "selfhost" && !isSelfHosted();
   const intro = isMove
-    ? { title: "Move to your own AWS account", lead: "Tell us a little about your team. A person from Coderhelm support will help you plan the move and bring your settings and data over.", placeholder: MOVE_TOPIC }
+    ? { title: "Move to your own AWS account", lead: "Tell us a little about your team. A person from CoderHelm support will help you plan the move and bring your settings and data over.", placeholder: MOVE_TOPIC }
     : type === "issue"
       ? { title: "Report an issue", lead: "Tell us what went wrong. The page you were on is attached; remove it below if it doesn't help.", placeholder: "A run stopped at the test step" }
       : type === "contact"
-        ? { title: "Contact us", lead: "Questions, feedback or anything else. Coderhelm support answers here and by email.", placeholder: "A question about auto-merge" }
-        : { title: "Get help", lead: "Tell us what happened. Coderhelm support answers here and by email.", placeholder: "A run stopped at the test step" };
+        ? { title: "Contact us", lead: "Questions, feedback or anything else. CoderHelm support answers here and by email.", placeholder: "A question about auto-merge" }
+        : { title: "Get help", lead: "Tell us what happened. CoderHelm support answers here and by email.", placeholder: "A run stopped at the test step" };
   const kindParam = params.get("kind") as SupportItemKind | null;
   const itemId = params.get("item") || "";
   const initialItem: SupportItemRef | null =
@@ -431,7 +431,7 @@ function NewTicket() {
         >
           <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
             <h2 id="attached-heading" className="text-xs font-medium uppercase tracking-wide text-zinc-400">
-              {isSelfHosted() ? "Sent to Coderhelm support" : "Sent with your ticket"}
+              {isSelfHosted() ? "Sent to CoderHelm support" : "Sent with your ticket"}
             </h2>
             <span className="text-zinc-400">Never your code, diffs or settings.</span>
           </div>
@@ -447,7 +447,7 @@ function NewTicket() {
             {isSelfHosted() ? (
               <li data-testid="ticket-sent-to-coderhelm">
                 {
-                  "Your message, your name and email (so Coderhelm can answer), this install's version and, for each item attached, its name and status and a run's error and step. It leaves this install for Coderhelm support; answers come back here and by email."
+                  "Your message, your name and email (so CoderHelm can answer), this install's version and, for each item attached, its name and status and a run's error and step. It leaves this install for CoderHelm support; answers come back here and by email."
                 }
               </li>
             ) : (

@@ -14,7 +14,7 @@ import { buttonClass, dangerButton, linkButton, primaryButton, secondaryButton }
 // The parts every opened card on Integrations is made of, so each one reads
 // the same way whatever it connects:
 //
-// - Not connected: what Coderhelm will be able to do, one primary action,
+// - Not connected: what CoderHelm will be able to do, one primary action,
 //   what happens next. Other ways to connect sit under one disclosure.
 //   Nothing about tools, instructions or history yet.
 // - Signing in: the same button shows progress, with Cancel, and always

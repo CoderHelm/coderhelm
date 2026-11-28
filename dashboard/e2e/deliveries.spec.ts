@@ -62,9 +62,9 @@ function detail(id: string) {
     },
     reason:
       row.status === "failed"
-        ? { code: "handler_error", message: "Coderhelm took too long to answer GitHub.", fix: "Check System health for a slow worker, then redeliver." }
+        ? { code: "handler_error", message: "CoderHelm took too long to answer GitHub.", fix: "Check System health for a slow worker, then redeliver." }
         : row.status === "pending"
-          ? { code: "relay_unreachable", message: "Your install didn't answer.", fix: "Make sure the install is running; Coderhelm keeps trying." }
+          ? { code: "relay_unreachable", message: "Your install didn't answer.", fix: "Make sure the install is running; CoderHelm keeps trying." }
           : null,
     can_redeliver: row.status !== "handled" && row.status !== "ignored",
   };
@@ -140,7 +140,7 @@ test("list: health summary, relay note, sharing note and every row", async ({ pa
   await expect(page.getByTestId("stat-pending")).toContainText("Oldest from 12 min ago");
   await expect(page.getByTestId("relay-note")).toBeVisible();
   await expect(page.getByTestId("sharing-note")).toHaveAttribute("data-enabled", "false");
-  await expect(page.getByTestId("sharing-note")).toHaveText(/Not shared with Coderhelm support/);
+  await expect(page.getByTestId("sharing-note")).toHaveText(/Not shared with CoderHelm support/);
   await expect(page.getByTestId("sharing-note").getByRole("link", { name: /Change/ })).toHaveAttribute("href", /\/settings\/system\/?#hybrid-sharing$/);
   const rows = page.getByTestId("delivery-row");
   await expect(rows).toHaveCount(4);
@@ -195,7 +195,7 @@ test("detail: reason and fix, attempts, headers, payload, copy id; Escape closes
   const drawer = page.getByTestId("delivery-drawer");
   await expect(drawer).toBeVisible();
   await expect(page).toHaveURL(/id=gh_01JD000000000000000000001/);
-  await expect(drawer.getByTestId("delivery-reason")).toContainText("Coderhelm took too long to answer GitHub.");
+  await expect(drawer.getByTestId("delivery-reason")).toContainText("CoderHelm took too long to answer GitHub.");
   await expect(drawer.getByTestId("delivery-fix")).toContainText("Check System health for a slow worker");
   await expect(drawer.getByTestId("delivery-attempt")).toHaveCount(2);
   await expect(drawer.getByTestId("delivery-attempts")).toContainText("HTTP 502");
@@ -305,9 +305,9 @@ for (const [label, viewport] of [["1440", { width: 1440, height: 1000 }], ["390"
 // The one line at the top: shared or not, and how much; left out on the hosted
 // product (sharing isn't available there, or the answer has no sharing at all).
 for (const [name, sharing, words] of [
-  ["details only", { available: true, enabled: true, payloads: false }, "Failed deliveries are shared with Coderhelm support (details only)"],
-  ["details and payloads", { available: true, enabled: true, payloads: true }, "Failed deliveries are shared with Coderhelm support (details and payload previews)"],
-  ["not shared", { available: true, enabled: false, payloads: false }, "Not shared with Coderhelm support"],
+  ["details only", { available: true, enabled: true, payloads: false }, "Failed deliveries are shared with CoderHelm support (details only)"],
+  ["details and payloads", { available: true, enabled: true, payloads: true }, "Failed deliveries are shared with CoderHelm support (details and payload previews)"],
+  ["not shared", { available: true, enabled: false, payloads: false }, "Not shared with CoderHelm support"],
 ] as const) {
   test(`sharing line: ${name}`, async ({ page }) => {
     await setup(page, { sharing: { ...sharing } });
@@ -363,7 +363,7 @@ test("detail reads as a summary first; payload and headers wait behind a click, 
     await expect(drawer.getByRole("table", { name: "From the sender headers" })).toBeHidden();
     await drawer.getByTestId("delivery-headers").getByText(/Request headers \(10\)/).click();
     await expect(drawer.getByRole("table", { name: "From the sender headers" })).toBeVisible();
-    await expect(drawer.getByRole("table", { name: "Coderhelm headers" })).toContainText("x-coderhelm-delivery");
+    await expect(drawer.getByRole("table", { name: "CoderHelm headers" })).toContainText("x-coderhelm-delivery");
     await expect(drawer.getByRole("table", { name: "Content headers" })).toContainText("content-length");
     // Proxy noise sits one more click away.
     await expect(drawer.getByRole("table", { name: "Network details" })).toBeHidden();

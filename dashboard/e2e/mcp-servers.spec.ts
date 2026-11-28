@@ -466,7 +466,7 @@ test("a server no key works for says why, with no key form", async ({ page }) =>
         migrated: 0,
         items: [
           card("hosting", "Hosting", "https://mcp.hosting.example.com", "Hosting's MCP server takes no key: use Sign in with Hosting."),
-          card("cache", "Cache", "", "Cache's MCP server runs with Python, which Coderhelm can't run yet."),
+          card("cache", "Cache", "", "Cache's MCP server runs with Python, which CoderHelm can't run yet."),
         ],
       }),
     }),

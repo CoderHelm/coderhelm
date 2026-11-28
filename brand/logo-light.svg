@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 512" fill="none">
   <!--
-    Coderhelm — Full Logo (light variant: black on white)
+    CoderHelm — Full Logo (light variant: black on white)
     Mark (three slashes) + wordmark
   -->
   <rect width="960" height="512" rx="0" fill="white"/>
@@ -12,14 +12,14 @@
     <polygon points="286,416 338,416 406,96 354,96" fill="#000000"/>
   </g>
 
-  <!-- Wordmark: Coderhelm -->
+  <!-- Wordmark: CoderHelm -->
   <text
-    x="520"
+    x="460"
     y="290"
     font-family="'Geist Mono', 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Cascadia Code', monospace"
-    font-size="120"
+    font-size="84"
     font-weight="600"
     fill="#000000"
     letter-spacing="-2"
-  >Coderhelm</text>
+  >CoderHelm</text>
 </svg>

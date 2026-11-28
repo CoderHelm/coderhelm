@@ -108,8 +108,8 @@ function ApiKeysPage() {
         lead={
           <>
             <p>
-              Only needed if someone on your team connects their own scripts to Coderhelm. Keys let those programs call the
-              Coderhelm API: list runs, retry or cancel them, make and run plans, read reviews and check usage. A key can do
+              Only needed if someone on your team connects their own scripts to CoderHelm. Keys let those programs call the
+              CoderHelm API: list runs, retry or cancel them, make and run plans, read reviews and check usage. A key can do
               only what its scopes allow, and never more than the person who made it.
             </p>
             <p className="mt-2">
@@ -225,7 +225,7 @@ function ApiKeysPage() {
               <li>
                 Send the key as <Code>Authorization: Bearer chk_...</Code> to <Code>{apiOrigin()}</Code>.
               </li>
-              <li>The key is shown once, when you create it. Coderhelm keeps only a fingerprint of it.</li>
+              <li>The key is shown once, when you create it. CoderHelm keeps only a fingerprint of it.</li>
               <li>
                 A key acts within the access of the person who made it. If their role changes, the key follows; if they
                 leave the team, it stops working.

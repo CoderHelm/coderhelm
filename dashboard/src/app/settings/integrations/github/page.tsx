@@ -37,8 +37,8 @@ function safeHttpUrl(url: string | undefined): string | null {
 const LINK_OUTCOMES: Record<string, { ok: boolean; text: string }> = {
   linked: { ok: true, text: "GitHub is connected and the installation is linked to this team." },
   not_admin: { ok: false, text: "GitHub is connected to your account, but only a team owner or admin can link the app's installation. Ask one of them to press Connect GitHub to link." },
-  owned_elsewhere: { ok: false, text: "That GitHub installation already belongs to another Coderhelm team, so it wasn't linked here. Remove it from that team first." },
-  none_visible: { ok: false, text: "GitHub showed your account no installation of the Coderhelm app. Press Install first, or ask an owner of the GitHub organization to install it." },
+  owned_elsewhere: { ok: false, text: "That GitHub installation already belongs to another CoderHelm team, so it wasn't linked here. Remove it from that team first." },
+  none_visible: { ok: false, text: "GitHub showed your account no installation of the CoderHelm app. Press Install first, or ask an owner of the GitHub organization to install it." },
 };
 
 export default function GitHubSettingsPageGuarded() {
@@ -146,7 +146,7 @@ function GitHubSettingsPage() {
         sessionStorage.removeItem(STATE_STORAGE_KEY);
         window.history.replaceState({}, "", "/settings/integrations/github/");
         setError(null);
-        setLinkResult("Request sent. Someone with admin rights on your GitHub organization needs to approve the Coderhelm app; it connects by itself once they do.");
+        setLinkResult("Request sent. Someone with admin rights on your GitHub organization needs to approve the CoderHelm app; it connects by itself once they do.");
         return;
       }
       if (!installationParam) return;
@@ -223,7 +223,7 @@ function GitHubSettingsPage() {
   };
 
   const header = (
-    <PageHeader title="GitHub" lead="Coderhelm reads your code, opens pull requests and follows CI through the Coderhelm GitHub App." />
+    <PageHeader title="GitHub" lead="CoderHelm reads your code, opens pull requests and follows CI through the CoderHelm GitHub App." />
   );
 
   if (loading) {
@@ -289,7 +289,7 @@ function GitHubSettingsPage() {
               )}
               {status === "not_connected" && (
                 <p className="mt-0.5 text-sm text-zinc-400">
-                  {canConnect ? "Install the app to give Coderhelm access to the repositories you choose." : "Ask an admin on your team to install the app."}
+                  {canConnect ? "Install the app to give CoderHelm access to the repositories you choose." : "Ask an admin on your team to install the app."}
                 </p>
               )}
             </div>
@@ -339,7 +339,7 @@ function GitHubSettingsPage() {
         >
           {enabledRepos.length === 0 ? (
             <EmptyState compact title="No repositories turned on yet">
-              {status === "connected" ? "Turn one on in Repositories and Coderhelm starts reading its code." : "Install the app first, then turn repositories on."}
+              {status === "connected" ? "Turn one on in Repositories and CoderHelm starts reading its code." : "Install the app first, then turn repositories on."}
             </EmptyState>
           ) : (
             <ul aria-label="Active repositories" className="divide-y divide-zinc-800">
@@ -351,7 +351,7 @@ function GitHubSettingsPage() {
                     {st && <StatusText look={{ label: st.label, tone: st.tone, live: repo.onboard_status === "pending" }} />}
                     {repo.onboard_status === "failed" && (
                       <p className="basis-full text-sm text-zinc-400">
-                        Coderhelm couldn&apos;t read this repository. Check the app has access to it on GitHub, then try again from{" "}
+                        CoderHelm couldn&apos;t read this repository. Check the app has access to it on GitHub, then try again from{" "}
                         <Link href="/settings/repos" className={linkButton}>
                           Repositories
                         </Link>

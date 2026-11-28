@@ -150,7 +150,7 @@ function AdminPage() {
   if (!authorized) {
     return (
       <Page>
-      <PageHeader detail crumb={false} title="Access denied" lead="This page is only for Coderhelm platform administrators." />
+      <PageHeader detail crumb={false} title="Access denied" lead="This page is only for CoderHelm platform administrators." />
       </Page>
     );
   }
@@ -164,7 +164,7 @@ function AdminPage() {
     <Page>
       <PageHeader
         title="Platform admin"
-        lead="Every organization using Coderhelm, new teams by day, and the waitlist from before the open beta."
+        lead="Every organization using CoderHelm, new teams by day, and the waitlist from before the open beta."
         actions={
           <div className="flex flex-wrap gap-2">
             <Link href="/admin/queue" className={secondaryButton}>
@@ -300,7 +300,7 @@ function UsageCheckPanel() {
         </span>
       }
       id="usage-check"
-      description="Once a day, the model usage Coderhelm recorded for each team is compared with Anthropic's own report."
+      description="Once a day, the model usage CoderHelm recorded for each team is compared with Anthropic's own report."
     >
       <div data-testid="usage-check" data-state={check ? (ok ? "ok" : check.state === "ran" ? "problems" : check.state) : error ? "error" : "loading"}>
         {error ? (

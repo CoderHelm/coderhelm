@@ -46,7 +46,7 @@ function emailOk(): boolean {
   }
 }
 
-/** Email through Coderhelm's mail service that is registered, answering and not paused. */
+/** Email through CoderHelm's mail service that is registered, answering and not paused. */
 function relayWorks(e: SystemEmails | null | undefined): boolean {
   if (!e || e.transport !== "coderhelm" || !e.relay?.registered || e.relay.turned_off) return false;
   const st = e.relay.status;
@@ -77,7 +77,7 @@ export async function loadSetupChecks(): Promise<SetupCheck[]> {
       key: "github",
       label: "GitHub App connected",
       done: integrations ? github?.status === "connected" : null,
-      detail: github?.status === "connected" ? "Coderhelm can read your repositories." : "Install your GitHub App on the repositories Coderhelm should work on.",
+      detail: github?.status === "connected" ? "CoderHelm can read your repositories." : "Install your GitHub App on the repositories CoderHelm should work on.",
       href: "/settings/github",
       action: "Connect GitHub",
     },
@@ -85,7 +85,7 @@ export async function loadSetupChecks(): Promise<SetupCheck[]> {
       key: "repos",
       label: "Repositories turned on",
       done: enabled === null ? null : enabled > 0,
-      detail: enabled ? `${enabled} on.` : "Turn Coderhelm on for at least one repository.",
+      detail: enabled ? `${enabled} on.` : "Turn CoderHelm on for at least one repository.",
       href: "/settings/repos",
       action: "Choose repositories",
     },
@@ -101,10 +101,10 @@ export async function loadSetupChecks(): Promise<SetupCheck[]> {
       key: "email",
       label: "Email working",
       // The install's own state first (any admin, any browser): mail through
-      // Coderhelm's mail service that is registered and not paused works.
+      // CoderHelm's mail service that is registered and not paused works.
       done: relayWorks(emails) || emailOk(),
       detail: relayWorks(emails)
-        ? "Email goes out through Coderhelm's mail service."
+        ? "Email goes out through CoderHelm's mail service."
         : emailOk()
           ? "A test email went out."
           : "Send yourself a test email. A new AWS account can only send to addresses it has confirmed until AWS lifts that limit.",
@@ -117,7 +117,7 @@ export async function loadSetupChecks(): Promise<SetupCheck[]> {
       optional: true,
       done: domain && !domain.available ? null : domainLive,
       detail: domainLive
-        ? `Coderhelm answers on ${domain?.domain?.hostname}.`
+        ? `CoderHelm answers on ${domain?.domain?.hostname}.`
         : domain?.domain?.hostname
           ? `${domain.domain.hostname}: ${domain.check?.detail ?? "waiting"}`
           : "Optional: an address that's easy to share; Google sign-in needs one.",
@@ -157,7 +157,7 @@ export async function loadSetupChecks(): Promise<SetupCheck[]> {
       key: "run",
       label: "First run tried",
       done: runs ? runs.runs.length > 0 : null,
-      detail: runs?.runs.length ? "Coderhelm has worked on a ticket." : 'Assign an issue to Coderhelm, or add the "coderhelm" label.',
+      detail: runs?.runs.length ? "CoderHelm has worked on a ticket." : 'Assign an issue to CoderHelm, or add the "coderhelm" label.',
       href: "/",
       action: "See runs",
     },

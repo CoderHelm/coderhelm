@@ -14,12 +14,12 @@ import type { RunMode } from "@/lib/setup";
 export const MODE_WORDS: Record<RunMode, { title: string; body: string; action: string }> = {
   auto: {
     title: "Do it for me",
-    body: "Coderhelm reads each repo and sets what fits it. Anything someone chose for a repo stays, and the ones the repo itself argues against are shown first. Anything that closes or merges starts as a preview. You can undo it.",
+    body: "CoderHelm reads each repo and sets what fits it. Anything someone chose for a repo stays, and the ones the repo itself argues against are shown first. Anything that closes or merges starts as a preview. You can undo it.",
     action: "Do it for me",
   },
   guided: {
     title: "Review each setting",
-    body: "Coderhelm reads each repo, then you see every recommendation next to your current value and choose Use, Keep or Edit before anything changes.",
+    body: "CoderHelm reads each repo, then you see every recommendation next to your current value and choose Use, Keep or Edit before anything changes.",
     action: "Review each setting",
   },
 };

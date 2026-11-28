@@ -1,8 +1,14 @@
 import type { Metadata } from "next";
 import type { Page } from "@/content/types";
-import { SITE, mdPath } from "@/content/site";
+import { SITE, mdPath, pageBySlug } from "@/content/site";
 
-const OG_IMAGE = { url: `${SITE.url}/og-image.png`, width: 1200, height: 630, alt: `${SITE.name}: ${SITE.tagline}` };
+// public/og-image.png, drawn by scripts/og-image.mjs from the home headline.
+const OG_IMAGE = {
+  url: `${SITE.url}/og-image.png`,
+  width: 1200,
+  height: 630,
+  alt: `${SITE.name}: ${pageBySlug("")!.h1} Beside it, a CoderHelm run page with a pull request ready for review.`,
+};
 
 export function pageMetadata(page: Page): Metadata {
   const url = `${SITE.url}${page.path}`;
@@ -28,7 +34,7 @@ export function pageMetadata(page: Page): Metadata {
       card: "summary_large_image",
       title: fullTitle,
       description: page.description,
-      images: [OG_IMAGE.url],
+      images: [{ url: OG_IMAGE.url, alt: OG_IMAGE.alt }],
     },
   };
 }

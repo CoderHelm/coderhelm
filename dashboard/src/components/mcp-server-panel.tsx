@@ -20,8 +20,8 @@ import { Attention, ConnectionFacts, DangerRow, OtherWays, PanelDetails, PanelLi
 // A catalog product (Figma, Sentry, Linear, Notion, Sanity…), opened in
 // place on Integrations. One pattern whatever it connects with:
 //
-// - Not connected: what Coderhelm will be able to do, the one default way
-//   to connect (Coderhelm's app, else the vendor's own sign-in, else the
+// - Not connected: what CoderHelm will be able to do, the one default way
+//   to connect (CoderHelm's app, else the vendor's own sign-in, else the
 //   team's own app, else a key), and every other way under "Other ways to
 //   connect".
 // - Connected: who connected it and when, what it is used for, then Manage
@@ -62,10 +62,10 @@ function hostOf(url: string): string {
   }
 }
 
-/** What Coderhelm will be able to do, in a sentence, for the way a card connects by default. */
+/** What CoderHelm will be able to do, in a sentence, for the way a card connects by default. */
 function accessOf(p: PluginDef, way: WayId): string {
   if (way === "ours" || way === "own") {
-    return p.own_app?.reads ?? `Coderhelm reads ${p.name} with this sign-in. It can't change anything in ${p.name}.`;
+    return p.own_app?.reads ?? `CoderHelm reads ${p.name} with this sign-in. It can't change anything in ${p.name}.`;
   }
   if (way === "remote") {
     return `You sign in at ${p.name}, then pick which of its tools agents may use. Agents get none until you do, and tools that only read are marked.`;
@@ -200,7 +200,7 @@ export function CatalogPanel({
       if (w === skip) continue;
       if (w === "ours") {
         parts.push(
-          <Way key="ours" title={`Sign in with ${p.name}`} when={`Coderhelm's own app with ${p.name}: nothing to create or paste.`} testId="way-ours">
+          <Way key="ours" title={`Sign in with ${p.name}`} when={`CoderHelm's own app with ${p.name}: nothing to create or paste.`} testId="way-ours">
             {signIn("ours", `Sign in with ${p.name}`, "secondary")}
           </Way>,
         );
@@ -212,7 +212,7 @@ export function CatalogPanel({
         );
       } else if (w === "own") {
         parts.push(
-          <Way key="own" title={`Use your own ${p.name} app`} when={`For a team that wants its own app with ${p.name}: the sign-in never passes through Coderhelm's app.`} testId="way-own">
+          <Way key="own" title={`Use your own ${p.name} app`} when={`For a team that wants its own app with ${p.name}: the sign-in never passes through CoderHelm's app.`} testId="way-own">
             {ownForm(true)}
           </Way>,
         );
@@ -294,7 +294,7 @@ export function CatalogPanel({
         const id = current === "remote" ? remote!.id : own!.id;
         const ok = await confirm({
           title: personalRemote && current === "remote" ? `Disconnect your ${p.name} account?` : `Disconnect ${p.name}?`,
-          message: `Coderhelm revokes the sign-in where ${p.name} allows it and forgets it. Agents stop using it until someone signs in again.`,
+          message: `CoderHelm revokes the sign-in where ${p.name} allows it and forgets it. Agents stop using it until someone signs in again.`,
           confirmLabel: "Disconnect",
           destructive: true,
         });

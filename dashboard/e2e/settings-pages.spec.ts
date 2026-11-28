@@ -64,7 +64,7 @@ test("guardrails: your rules come first and each add or remove saves the whole l
   await expect(page.getByRole("heading", { name: "Your rules" })).toBeVisible();
   await expect(page.getByText("Platform Security")).toHaveCount(0);
   await expect(page.getByText(/no shell/i)).toHaveCount(0);
-  // Coderhelm's own rules are a read-only "Always on" list above the team's.
+  // CoderHelm's own rules are a read-only "Always on" list above the team's.
   await expect(page.getByRole("heading", { name: "Always on" })).toBeVisible();
   await expect(page.getByTestId("built-in-rules").getByRole("listitem")).toHaveCount(3);
   await expect(page.getByTestId("built-in-rules")).toContainText("Never push to your default branch");
@@ -152,7 +152,7 @@ test("voice: a labelled editor, one save bar, and the same request for every rep
   expect(put.map((c) => [c.path, c.body])).toEqual([[`/api/voice/repo/${WEB}`, { content: "Explain UI changes with screenshots." }]]);
 });
 
-test("instructions: a labelled editor, what Coderhelm learned folded away, one save bar", async ({ page }) => {
+test("instructions: a labelled editor, what CoderHelm learned folded away, one save bar", async ({ page }) => {
   const db = await mockApi(page);
   await page.goto("/settings/instructions/");
   const editor = page.getByLabel("Custom instructions (optional)");
@@ -163,8 +163,8 @@ test("instructions: a labelled editor, what Coderhelm learned folded away, one s
   expect(callsTo(db, "PUT", /\/api\/instructions\/global$/).map((c) => c.body)).toEqual([{ content: "Prefer named exports.\n- Use kebab-case file names" }]);
 
   await page.getByRole("button", { name: "One repository" }).click();
-  await expect(page.getByText("What Coderhelm learned about this repository")).toBeVisible();
-  await page.getByText("What Coderhelm learned about this repository").click();
+  await expect(page.getByText("What CoderHelm learned about this repository")).toBeVisible();
+  await page.getByText("What CoderHelm learned about this repository").click();
   await expect(page.getByText("A Next.js app with Playwright tests.")).toBeVisible();
   await expect(page.getByTestId("agent-file-updated")).toHaveText("Updated automatically on November 9, 2026 after changes to package.json and CI.");
   await expect(page.getByText("Out of date")).toHaveCount(0);
@@ -180,7 +180,7 @@ test("instructions: an agent file saved by hand is marked out of date, never rep
   db.agentMeta[WEB] = { updated_at: "2026-11-02T10:00:00Z", edited: true, out_of_date: true, out_of_date_reasons: ["package.json", "CI"] };
   await page.goto("/settings/instructions/");
   await page.getByRole("button", { name: "One repository" }).click();
-  await page.getByText("What Coderhelm learned about this repository").click();
+  await page.getByText("What CoderHelm learned about this repository").click();
   await expect(page.getByTestId("agent-file-updated")).toHaveText("Saved by hand on November 2, 2026.");
   await expect(page.getByText("Out of date")).toBeVisible();
   await expect(page.getByText(/didn.t replace it after package.json and CI/)).toBeVisible();

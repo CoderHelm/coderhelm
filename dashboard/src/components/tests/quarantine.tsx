@@ -24,7 +24,7 @@ import { useLoad } from "./use-load";
 
 // A quarantined test is never a dead end: its row says where it stands (the
 // fix pull request, the run that is working, or nothing in flight), why
-// Coderhelm has not fixed it by itself, and what can be done about it now.
+// CoderHelm has not fixed it by itself, and what can be done about it now.
 // Servers from before this send no `quarantine` on a test; the row then
 // shows what it always did (the fix link and Release).
 
@@ -44,11 +44,11 @@ function resumesOn(iso: string): string {
 /** The week's automatic fixes for one repository, in a sentence. */
 export function budgetLine(b: AutoFixBudget, showRepo: boolean): string {
   const where = showRepo ? ` for ${b.repo}` : " for this repository";
-  if (!b.on) return `Automatic fix pull requests are turned off${showRepo ? ` (${b.repo})` : ""}, so Coderhelm fixes a test only when someone asks.`;
+  if (!b.on) return `Automatic fix pull requests are turned off${showRepo ? ` (${b.repo})` : ""}, so CoderHelm fixes a test only when someone asks.`;
   if (b.used >= b.cap) {
     return `Automatic fixes are at this week's limit of ${b.cap}${where}. They resume on ${resumesOn(b.resumes_at)}.`;
   }
-  return `Coderhelm has started ${b.used} of this week's ${b.cap} automatic fixes${where}.`;
+  return `CoderHelm has started ${b.used} of this week's ${b.cap} automatic fixes${where}.`;
 }
 
 const CAP_REASON = "Each automatic fix is a full coding run, so the limit bounds what they cost. A fix you ask for is never counted.";
@@ -136,7 +136,7 @@ const STATE_DOT: Record<string, string> = {
 /**
  * Where a quarantined test stands, under its row or on its page: the state
  * with its link, progress toward leaving by itself, an earlier attempt that
- * did not hold, and the one reason Coderhelm has not fixed it by itself.
+ * did not hold, and the one reason CoderHelm has not fixed it by itself.
  */
 export function Standing({ test }: { test: TestCase }) {
   const q = test.quarantine;
@@ -173,7 +173,7 @@ export function Standing({ test }: { test: TestCase }) {
 const FIX_CONFIRM =
   "It starts a fix run now: it reproduces the failure first, writes a fix, and opens a PR only after the test passes 20 runs in a row. It never skips the test or weakens a check to make it pass. A fix you ask for is not counted against the weekly limit of automatic fixes.";
 const REMOVE_CONFIRM =
-  "Coderhelm opens a pull request that deletes this one test and what only it used, and says why removal is reasonable: how long it has been quarantined, its history, and what still covers the behaviour. Nothing is deleted until your team approves and merges it. Coderhelm never merges it.";
+  "CoderHelm opens a pull request that deletes this one test and what only it used, and says why removal is reasonable: how long it has been quarantined, its history, and what still covers the behaviour. Nothing is deleted until your team approves and merges it. CoderHelm never merges it.";
 
 /** Up to four names, then how many more. */
 function names(tests: TestCase[]): string {
@@ -183,7 +183,7 @@ function names(tests: TestCase[]): string {
 }
 
 /**
- * Asking Coderhelm to fix or remove tests, one or several, each after a
+ * Asking CoderHelm to fix or remove tests, one or several, each after a
  * confirmation that says what will happen. `onChanged` gets each test as the
  * server returns it (or as it must now stand, from a server that returns
  * nothing).
@@ -198,7 +198,7 @@ export function useQuarantineActions(onChanged: (t: TestCase) => void) {
     const ok = await confirm(
       kind === "fix"
         ? {
-            title: many ? `Ask Coderhelm to fix ${tests.length} tests?` : "Ask Coderhelm to fix this test?",
+            title: many ? `Ask CoderHelm to fix ${tests.length} tests?` : "Ask CoderHelm to fix this test?",
             message: many
               ? `It starts ${tests.length} fix runs now, one per test: ${names(tests)}. Each opens its own pull request, which must pass 20 repeat runs. They are not counted against the weekly limit of automatic fixes.`
               : FIX_CONFIRM,
@@ -207,7 +207,7 @@ export function useQuarantineActions(onChanged: (t: TestCase) => void) {
         : {
             title: many ? `Open ${tests.length} pull requests that each remove one test?` : "Open a pull request that removes this test?",
             message: many
-              ? `One pull request per test: ${names(tests)}. Each deletes that one test and what only it used, and says why removal is reasonable. Nothing is deleted until your team approves and merges them. Coderhelm never merges them.`
+              ? `One pull request per test: ${names(tests)}. Each deletes that one test and what only it used, and says why removal is reasonable. Nothing is deleted until your team approves and merges them. CoderHelm never merges them.`
               : REMOVE_CONFIRM,
             confirmLabel: many ? `Open ${tests.length} removal PRs` : "Open removal PR",
           },
@@ -228,7 +228,7 @@ export function useQuarantineActions(onChanged: (t: TestCase) => void) {
     setBusy("");
     const what = kind === "fix" ? "fix" : "removal";
     if (started === tests.length) {
-      toast(many ? `Coderhelm started ${started} ${what}${kind === "fix" ? "es" : "s"}` : kind === "fix" ? "Coderhelm is on it" : "Coderhelm is writing the removal PR");
+      toast(many ? `CoderHelm started ${started} ${what}${kind === "fix" ? "es" : "s"}` : kind === "fix" ? "CoderHelm is on it" : "CoderHelm is writing the removal PR");
     } else {
       toast(
         many
@@ -310,7 +310,7 @@ export function QuarantineView({ repo, canEdit, ticketDays = 2 }: { repo: string
       count={tests.length || undefined}
       description={
         <>
-          Quarantined tests still run and are still recorded. When only quarantined tests fail, Coderhelm treats the run as passing. A test
+          Quarantined tests still run and are still recorded. When only quarantined tests fail, CoderHelm treats the run as passing. A test
           leaves quarantine by itself once it passes 20 runs in a row on more than one pull request or branch. When tickets are on, the
           owner gets one after {plural(ticketDays, "day")} without a fix.
         </>

@@ -169,7 +169,7 @@ export async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<
 
     // Security
     if (p === "/api/users/password") return json(r, { status: "ok" });
-    if (p === "/api/users/mfa/setup") return json(r, { secret: "JBSWY3DPEHPK3PXP", qr_uri: "otpauth://totp/Coderhelm:person@example.com?secret=JBSWY3DPEHPK3PXP", session: "sess_1" });
+    if (p === "/api/users/mfa/setup") return json(r, { secret: "JBSWY3DPEHPK3PXP", qr_uri: "otpauth://totp/CoderHelm:person@example.com?secret=JBSWY3DPEHPK3PXP", session: "sess_1" });
     if (p === "/api/users/mfa/verify") { db.mfa = true; return json(r, { status: "ok" }); }
     if (p === "/api/users/mfa" && method === "DELETE") { db.mfa = false; return json(r, { status: "ok" }); }
 

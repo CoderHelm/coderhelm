@@ -233,7 +233,7 @@ export function S3Step({
   return (
     <div className="space-y-5" data-testid="s3-step">
       <p className="text-sm leading-relaxed text-zinc-400">
-        Coderhelm reads the bucket with the CoderHelmLogReader role in that account. The bucket must be named in the role&apos;s update stack; if it isn&apos;t yet, the link Coderhelm
+        CoderHelm reads the bucket with the CoderHelmLogReader role in that account. The bucket must be named in the role&apos;s update stack; if it isn&apos;t yet, the link CoderHelm
         shows does it. Documents are indexed here and kept in sync: changed ones are read again and deleted ones removed.
       </p>
       {error && <p className="text-sm text-amber-300">{error}</p>}
@@ -402,7 +402,7 @@ export function BedrockImportStep({
   return (
     <div className="space-y-5" data-testid="bedrock-import-step">
       <p className="text-sm leading-relaxed text-zinc-400">
-        Coderhelm reads the documents in the knowledge base&apos;s S3 data source and indexes them itself. Nothing in Bedrock changes. To search it live instead, without copying, connect the
+        CoderHelm reads the documents in the knowledge base&apos;s S3 data source and indexes them itself. Nothing in Bedrock changes. To search it live instead, without copying, connect the
         Bedrock knowledge base in place.
       </p>
       {start?.install && !!start.bases?.length && (
@@ -551,7 +551,7 @@ export function ArchiveStep({ limits, file, onFile }: { limits: KnowledgeLimits 
         </p>
       )}
       <p className="text-xs leading-relaxed text-zinc-400">
-        Coderhelm unpacks it and reads every page. To bring in a newer export later, upload it to the same source: unchanged pages are kept, changed ones read again and missing ones
+        CoderHelm unpacks it and reads every page. To bring in a newer export later, upload it to the same source: unchanged pages are kept, changed ones read again and missing ones
         removed.
       </p>
     </div>

@@ -53,7 +53,7 @@ export function SpecDocument({
       <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 px-4 py-5" data-testid="spec-empty">
         <p className="text-sm font-medium text-zinc-100">No spec written yet.</p>
         <p className="mt-1 max-w-prose text-sm text-zinc-400">
-          Coderhelm can write a proposal, a design and a spec from this plan, to read here or commit with the work.
+          CoderHelm can write a proposal, a design and a spec from this plan, to read here or commit with the work.
         </p>
         <button type="button" onClick={onWrite} disabled={writing} className={`mt-3 ${secondaryButton}`}>
           {writing ? "Writing…" : "Write the spec"}

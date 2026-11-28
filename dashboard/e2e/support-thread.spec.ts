@@ -79,12 +79,12 @@ function longThread(n: number): Msg[] {
       msg({
         author: support ? "support" : "customer",
         author_email: support ? "" : i % 4 === 0 ? "pat.lee@example.com" : "sam.ortiz@example.com",
-        author_name: support ? "Coderhelm support" : "",
+        author_name: support ? "CoderHelm support" : "",
         body: support ? `Support answer number ${i + 1}. Try **again** now.` : `Team message number ${i + 1}.`,
         created_at: iso(mins),
       }),
     );
-    if (i === 5) out.push(msg({ kind: "event", author: "support", author_name: "Coderhelm support", author_email: "", body: "status:waiting", created_at: iso(mins - 1) }));
+    if (i === 5) out.push(msg({ kind: "event", author: "support", author_name: "CoderHelm support", author_email: "", body: "status:waiting", created_at: iso(mins - 1) }));
     if (i === 9) out.push(msg({ kind: "event", author: "customer", body: "added:Sam Ortiz", created_at: iso(mins - 1) }));
   }
   return out;
@@ -128,7 +128,7 @@ async function mockApi(page: Page, init: { me?: string; ticket?: Partial<Ticket>
     thread: init.thread ?? [
       msg({ body: "The run stops at the bank step.", created_at: iso(120) }),
       msg({ body: "It started after the last deploy.", created_at: iso(118) }),
-      msg({ author: "support", author_email: "", author_name: "Coderhelm support", body: "Which run? Attach it if you can.", created_at: iso(60) }),
+      msg({ author: "support", author_email: "", author_name: "CoderHelm support", body: "Which run? Attach it if you can.", created_at: iso(60) }),
     ],
     posts: [],
   };
@@ -251,7 +251,7 @@ test.describe("the ticket thread", () => {
     await page.getByTestId("thread-show-earlier").click();
     const events = page.getByTestId("support-event");
     await expect(events).toHaveCount(2);
-    await expect(events.nth(0)).toContainText("Coderhelm support marked this waiting on the team");
+    await expect(events.nth(0)).toContainText("CoderHelm support marked this waiting on the team");
     await expect(events.nth(1)).toContainText("Pat Lee added Sam Ortiz");
     await expect(events.nth(1)).toHaveAttribute("data-event", "people");
   });
@@ -261,7 +261,7 @@ test.describe("the ticket thread", () => {
       thread: [
         msg({ body: "First, with **bold** and `code`.", created_at: iso(30) }),
         msg({ body: "Second, a minute later.", created_at: iso(29) }),
-        msg({ author: "support", author_email: "", author_name: "Coderhelm support", body: "On it.", created_at: iso(10) }),
+        msg({ author: "support", author_email: "", author_name: "CoderHelm support", body: "On it.", created_at: iso(10) }),
       ],
     });
     await open(page, db);
@@ -275,13 +275,13 @@ test.describe("the ticket thread", () => {
     await expect(messages.nth(0).locator("code")).toHaveText("code");
     // The raw address never shows as a name.
     await expect(page.getByTestId("support-thread")).not.toContainText("pat.lee@example.com");
-    await expect(messages.nth(2)).toContainText("Coderhelm support");
+    await expect(messages.nth(2)).toContainText("CoderHelm support");
   });
 
   test("long messages clamp behind Show more and email-style quotes fold", async ({ page }) => {
     const long = Array.from({ length: 30 }, (_, i) => `Line ${i + 1} of the stack trace.`).join("\n\n");
     const db = await mockApi(page, {
-      thread: [msg({ body: long, created_at: iso(30) }), msg({ author: "support", author_email: "", author_name: "Coderhelm support", body: "Fixed.\n\nOn Mon, Pat Lee wrote:\n> the run fails\n> every time", created_at: iso(5) })],
+      thread: [msg({ body: long, created_at: iso(30) }), msg({ author: "support", author_email: "", author_name: "CoderHelm support", body: "Fixed.\n\nOn Mon, Pat Lee wrote:\n> the run fails\n> every time", created_at: iso(5) })],
     });
     await open(page, db);
     const first = page.getByTestId("support-message").first();
@@ -327,7 +327,7 @@ test.describe("the ticket thread", () => {
     await expect(send).toBeDisabled();
     await page.getByTestId("support-message").last().hover();
     await page.getByTestId("support-message").last().getByTestId("quote-message").click();
-    await expect(page.getByLabel("Reply", { exact: true })).toHaveValue(/^> Which run\? Attach it if you can\.\n> — Coderhelm support\n\n$/);
+    await expect(page.getByLabel("Reply", { exact: true })).toHaveValue(/^> Which run\? Attach it if you can\.\n> — CoderHelm support\n\n$/);
     await page.getByLabel("Reply", { exact: true }).fill("Run 42, attached.");
     await expect(send).toBeEnabled();
     await send.click();
@@ -416,13 +416,13 @@ test.describe("people on a ticket", () => {
       ticket: {
         participants: [{ user_id: "USER#u_2", email: "sam.ortiz@example.com", name: "Sam Ortiz", outside: false, added_by: "Pat Lee", added_at: iso(5) }],
         last_snippet: "Which run? Attach it if you can.",
-        last_author_name: "Coderhelm support",
+        last_author_name: "CoderHelm support",
       },
     });
     await page.goto("/support/");
     const row = page.getByTestId("support-ticket-row");
     await expect(row).toContainText("2 people");
-    await expect(row).toContainText("Coderhelm support: Which run? Attach it if you can.");
+    await expect(row).toContainText("CoderHelm support: Which run? Attach it if you can.");
   });
 });
 

@@ -103,7 +103,7 @@ function Consent() {
   return (
     <Page narrow testId="consent">
       <PageHeader
-        title={`Let ${req.client_name} use Coderhelm as you?`}
+        title={`Let ${req.client_name} use CoderHelm as you?`}
         lead={
           <p>
             It will act as <strong className="font-medium text-zinc-200">{req.email}</strong> in this team, and can do only what your role
@@ -128,7 +128,7 @@ function Consent() {
             </dd>
           </dl>
           <p className="mt-3 text-xs text-zinc-400">
-            The app chose its own name, so check the address it sends you back to. If you didn&apos;t just add Coderhelm to an app, choose
+            The app chose its own name, so check the address it sends you back to. If you didn&apos;t just add CoderHelm to an app, choose
             Don&apos;t allow.
           </p>
         </section>

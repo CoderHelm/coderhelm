@@ -48,9 +48,9 @@ const list = (s: string) =>
 /** One sentence: what the cleanup does with these settings, in the mode's own words. */
 export function staleSummary(c: StaleConfig): string {
   const mode = staleState(c);
-  if (mode === "off") return "Off: nothing happens. Coderhelm never labels, comments on or closes a pull request.";
+  if (mode === "off") return "Off: nothing happens. CoderHelm never labels, comments on or closes a pull request.";
   if (mode === "dry_run") return "Preview only: nothing changes on GitHub.";
-  const what = c.scope === "own" ? "Coderhelm's own pull requests" : "pull requests";
+  const what = c.scope === "own" ? "CoderHelm's own pull requests" : "pull requests";
   return `On: marks ${what} stale after ${plural(c.stale_days, "day")} with no activity and closes them ${plural(c.close_days, "day")} later.`;
 }
 
@@ -241,7 +241,7 @@ export function StaleSection({ repo, readOnly, onSaved, counts }: { repo: string
               <>
                   <SettingsRow
                     label="Mode"
-                    help="What Coderhelm does with pull requests nobody has worked on for a while."
+                    help="What CoderHelm does with pull requests nobody has worked on for a while."
                     unsaved={form.isDirty("enabled", "dry_run")}
                     layout="stacked"
                     control={({ labelId }) => (
@@ -279,14 +279,14 @@ export function StaleSection({ repo, readOnly, onSaved, counts }: { repo: string
                         onChange={(v) => set("scope", v as StaleConfig["scope"])}
                         options={[
                           { value: "all", label: "Every pull request" },
-                          { value: "own", label: "Only Coderhelm's own" },
+                          { value: "own", label: "Only CoderHelm's own" },
                         ]}
                       />
                     )}
                   />
                   <SettingsRow
                     label="Never mark"
-                    help="Pull requests with any of these labels, by these authors, or drafts. Also any pull request a Coderhelm run is working on."
+                    help="Pull requests with any of these labels, by these authors, or drafts. Also any pull request a CoderHelm run is working on."
                     layout="stacked"
                     control={() => (
                       <div className="grid min-w-0 gap-4 sm:grid-cols-2">

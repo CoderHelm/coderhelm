@@ -62,7 +62,7 @@ export function signInProblem(search: string): SignInProblem | null {
       return {
         code,
         provider,
-        sentence: `${provider ? NAMES[provider] : "That"} sign-in isn't set up on this Coderhelm. Sign in with your email and password.`,
+        sentence: `${provider ? NAMES[provider] : "That"} sign-in isn't set up on this CoderHelm. Sign in with your email and password.`,
         canRetry: false,
       };
     case "no_verified_email":
@@ -71,7 +71,7 @@ export function signInProblem(search: string): SignInProblem | null {
         provider,
         sentence:
           provider === "microsoft"
-            ? "Microsoft didn't share a verified email address for this account, so Coderhelm can't tell who you are. Ask your IT team to check the Coderhelm app's email claims, or sign in another way."
+            ? "Microsoft didn't share a verified email address for this account, so CoderHelm can't tell who you are. Ask your IT team to check the CoderHelm app's email claims, or sign in another way."
             : `${name} didn't share a verified email address for this account. Ask your IT team, or sign in another way.`,
         canRetry: false,
       };
@@ -93,7 +93,7 @@ export function signInProblem(search: string): SignInProblem | null {
       return {
         code,
         provider,
-        sentence: "Okta signed you in, but no Coderhelm account has linked that Okta account yet. Sign in another way first, then choose Link Okta in Settings, Security.",
+        sentence: "Okta signed you in, but no CoderHelm account has linked that Okta account yet. Sign in another way first, then choose Link Okta in Settings, Security.",
         canRetry: false,
       };
     case "okta_team_only":
@@ -129,7 +129,7 @@ export function signInProblem(search: string): SignInProblem | null {
       return {
         code,
         provider,
-        sentence: "Microsoft signed you in, but no Coderhelm account has linked that account yet. Sign in another way first, then choose Link Microsoft in Settings, Security.",
+        sentence: "Microsoft signed you in, but no CoderHelm account has linked that account yet. Sign in another way first, then choose Link Microsoft in Settings, Security.",
         canRetry: false,
       };
     case "sso_claim_invalid": {

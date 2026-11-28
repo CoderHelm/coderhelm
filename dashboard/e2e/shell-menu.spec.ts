@@ -69,13 +69,13 @@ test("settings pages show Settings' own menu in place of the app's, and destinat
   await expect(nav.getByRole("link", { name: /^Integrations/ })).toBeVisible();
   // One column of navigation: the app's menu gives way, with a way back.
   await expect(page.getByTestId("main-nav")).toHaveCount(0);
-  await expect(main.getByRole("link", { name: /Back to Coderhelm/ })).toHaveAttribute("href", "/");
+  await expect(main.getByRole("link", { name: /Back to CoderHelm/ })).toHaveAttribute("href", "/");
   await expect(page.getByTestId("settings-content").getByRole("navigation", { name: "Settings" })).toHaveCount(0);
   // Data sources lives under Settings too.
   await page.goto("/data-sources");
   await expect(page.getByRole("navigation", { name: "Settings" }).getByRole("link", { name: "Data sources" })).toHaveAttribute("aria-current", "page");
-  // Back to Coderhelm brings the app's menu back.
-  await page.getByRole("link", { name: /Back to Coderhelm/ }).click();
+  // Back to CoderHelm brings the app's menu back.
+  await page.getByRole("link", { name: /Back to CoderHelm/ }).click();
   await expect(page.getByTestId("main-nav")).toBeVisible();
 
   await page.goto("/tests");

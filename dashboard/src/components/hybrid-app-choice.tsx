@@ -12,7 +12,7 @@ export type Choice = "coderhelm" | "own";
 /**
  * Which app this install uses for `id` right now, when there is a choice:
  * "coderhelm" or "own". `null` on the hosted service, without hybrid, before
- * it's registered, or when Coderhelm's app isn't available for `id`.
+ * it's registered, or when CoderHelm's app isn't available for `id`.
  */
 export function useHybridChoice(id: string): Choice | null {
   const s = useHybrid().status;
@@ -28,7 +28,7 @@ export function useHybridChoice(id: string): Choice | null {
  * own choice, made here or in Settings, then System, Hybrid. Every other
  * tool follows the install's one Other apps choice, set in Hybrid, so it
  * shows nothing there. Nothing on the hosted service, on an install without
- * hybrid, or where Coderhelm has no app for it.
+ * hybrid, or where CoderHelm has no app for it.
  */
 export function HybridAppChoice({
   id,
@@ -54,7 +54,7 @@ export function HybridAppChoice({
     return (
       <div className={box} data-testid="hybrid-app-choice" data-state="unregistered">
         <p className="text-sm text-zinc-300">
-          Skip creating your own {name} app: use Coderhelm&apos;s instead, with your code still in your AWS account.{" "}
+          Skip creating your own {name} app: use CoderHelm&apos;s instead, with your code still in your AWS account.{" "}
           <Link href={HYBRID_HREF} className={linkButton}>Set it up in Settings, Version and updates, Hybrid</Link>
         </p>
       </div>
@@ -62,7 +62,7 @@ export function HybridAppChoice({
   }
 
   const integration = integrationOf(s.integrations, id);
-  // Not hosted, or Coderhelm's app for it isn't set up: there is no choice.
+  // Not hosted, or CoderHelm's app for it isn't set up: there is no choice.
   if (id !== "github" && !canUseCoderhelm(integration)) return null;
 
   // Every other tool follows the install's one choice, made in Settings,
@@ -75,7 +75,7 @@ export function HybridAppChoice({
     setBusy(true);
     try {
       await hybrid.save({ github_mode: next === "coderhelm" ? "hosted" : "own" });
-      toast(next === "coderhelm" ? `${name} now uses Coderhelm's app` : `${name} now uses your own app`);
+      toast(next === "coderhelm" ? `${name} now uses CoderHelm's app` : `${name} now uses your own app`);
       onChanged?.(next);
     } catch (e) {
       toast(e instanceof Error ? e.message : "Could not save", "error");
@@ -86,8 +86,8 @@ export function HybridAppChoice({
 
   const note =
     value === "coderhelm"
-      ? integration?.through_coderhelm || "Events reach your install through Coderhelm."
-      : "Everything goes straight to your install. Nothing passes through Coderhelm.";
+      ? integration?.through_coderhelm || "Events reach your install through CoderHelm."
+      : "Everything goes straight to your install. Nothing passes through CoderHelm.";
 
   return (
     <div className={box} data-testid="hybrid-app-choice" data-state={value}>
@@ -99,7 +99,7 @@ export function HybridAppChoice({
           disabled={busy}
           onChange={(v) => void change(v)}
           options={[
-            { value: "coderhelm", label: "Use Coderhelm's app (easiest)" },
+            { value: "coderhelm", label: "Use CoderHelm's app (easiest)" },
             { value: "own", label: "Use my own app (fully private)" },
           ]}
         />

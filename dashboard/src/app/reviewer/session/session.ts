@@ -34,7 +34,7 @@ export function sessionLook(status: string, kind = "review"): StatusLook {
 export function statusNote(status: string): string | null {
   switch (status) {
     case "retrying":
-      return "This try didn't finish, so Coderhelm sent the review again. The new try has its own session.";
+      return "This try didn't finish, so CoderHelm sent the review again. The new try has its own session.";
     case "stalled":
       return "The review stopped without saying how it ended. Ask for a review again on the pull request to start a new one.";
     case "failed":

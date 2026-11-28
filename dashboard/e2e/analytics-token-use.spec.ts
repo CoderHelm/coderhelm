@@ -234,7 +234,7 @@ test("periods counted differently are not compared, and the page says why", asyn
   await page.getByRole("navigation", { name: "Analytics views" }).getByRole("link", { name: "Token use" }).click();
   await expect(page).toHaveURL(/tab=tokens/);
   const why = page.getByTestId("token-use-not-compared");
-  await expect(why).toContainText("Coderhelm has counted every model call one by one since Jan 5.");
+  await expect(why).toContainText("CoderHelm has counted every model call one by one since Jan 5.");
   await expect(why).toContainText("Until Jan 12 a run that continued later (a CI fix, a resume) kept only its last step's tokens");
   await page.getByRole("button", { name: "Show table: Tokens by kind of work" }).click();
   await expect(page.getByRole("table", { name: "Tokens by kind of work" }).locator("tbody tr").first().locator("td").last()).toHaveText("—");

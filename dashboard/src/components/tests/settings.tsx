@@ -66,7 +66,7 @@ function ReportSourceRow({
           className={`${inputClass} mt-1 w-full`}
         />
         <p id={`loc-${slug}-help`} className="mt-1 text-xs text-zinc-400">
-          An S3 folder per CI run, read through your read-only AWS connection, or <Code>ci</Code> for the run&apos;s GitHub Actions artifacts. Empty: Coderhelm only reads artifacts of runs a ticket links to.
+          An S3 folder per CI run, read through your read-only AWS connection, or <Code>ci</Code> for the run&apos;s GitHub Actions artifacts. Empty: CoderHelm only reads artifacts of runs a ticket links to.
         </p>
         {!parsed.ok && <p role="alert" className="mt-1.5 text-xs text-red-400">{parsed.error}</p>}
       </div>
@@ -91,7 +91,7 @@ function ReportSourceRow({
             Read access for the AWS role
           </summary>
           <div className="space-y-2 border-t border-zinc-800 px-3 py-3 text-xs text-zinc-400">
-            <p>Add this statement to the CoderHelmLogReader role in the account that owns the bucket. Coderhelm only lists and reads reports there.</p>
+            <p>Add this statement to the CoderHelmLogReader role in the account that owns the bucket. CoderHelm only lists and reads reports there.</p>
             <CodeBlock code={statement} lang="json" title="IAM statement" testId="report-read-statement" />
           </div>
         </details>
@@ -229,7 +229,7 @@ export function SettingsView({
           label="Open fix PRs"
           layout="toggle"
           unsaved={form.isDirty("fix_prs")} setup={setupMarks.mark(["tests.fix_prs"], form.values.fix_prs)}
-          help="Coderhelm reproduces a flaky test, writes a fix and opens a PR only after 20 green runs. It never skips a test or weakens a check to make it pass."
+          help="CoderHelm reproduces a flaky test, writes a fix and opens a PR only after 20 green runs. It never skips a test or weakens a check to make it pass."
           control={(ids) => (
             <RowSwitch id={ids.inputId} checked={draft.fix_prs} onChange={(v) => form.set("fix_prs", v)} labelledBy={ids.labelId} describedBy={ids.helpId} disabled={off} />
           )}
@@ -240,7 +240,7 @@ export function SettingsView({
               label="Automatic fixes per week"
               controlClassName="sm:w-28"
               unsaved={form.isDirty("auto_fixes_per_week")}
-              help="How many fix or removal runs Coderhelm starts by itself for each repository in a week, oldest quarantined test first. Each is a full coding run, so this bounds what they cost. A fix you ask for is never counted. Between 1 and 10."
+              help="How many fix or removal runs CoderHelm starts by itself for each repository in a week, oldest quarantined test first. Each is a full coding run, so this bounds what they cost. A fix you ask for is never counted. Between 1 and 10."
               control={(ids) => (
                 <div>
                   <input
@@ -321,7 +321,7 @@ export function SettingsView({
         />
       </SettingsSection>
 
-      <SettingsSection id="test-repos" title="Repositories" description="Which repositories' E2E runs Coderhelm reads.">
+      <SettingsSection id="test-repos" title="Repositories" description="Which repositories' E2E runs CoderHelm reads.">
         <div className="px-4 py-4">
           {repos === null ? (
             <p role="status" className="text-sm text-zinc-500">Loading repositories…</p>
@@ -367,7 +367,7 @@ export function SettingsView({
       <SettingsSection
         id="test-reports"
         title="Test reports"
-        description="Where each repository's test reports are kept. When a ticket or pull request is about a failing or flaky test, Coderhelm reads the failing run's report first and counts passes across the reports kept."
+        description="Where each repository's test reports are kept. When a ticket or pull request is about a failing or flaky test, CoderHelm reads the failing run's report first and counts passes across the reports kept."
       >
         <div className="px-4 py-4">
           {repos === null ? (

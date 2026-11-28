@@ -127,14 +127,14 @@ test("Jira: without hybrid, the webhook comes first and the app means the instal
   await expect(page.getByRole("button", { name: "Jira webhook (recommended)" })).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Your own copy of the Jira app" }).click();
   const own = page.getByTestId("jira-own-app");
-  await expect(own).toContainText("sends events to Coderhelm's hosted service, not to this install");
+  await expect(own).toContainText("sends events to CoderHelm's hosted service, not to this install");
   await expect(own.getByRole("link", { name: /How to deploy your own copy/ })).toHaveAttribute("href", /docs\.coderhelm\.com\/self-host\/integrations/);
   await expect(page.locator('a[href*="developer.atlassian.com"]')).toHaveCount(0);
   expect(await hostedLinks(page)).toEqual([]);
   expect(outside.filter((u) => u.includes("coderhelm.com"))).toEqual([]);
 });
 
-test("Jira: with hybrid's Jira relay, Coderhelm's app and the install ID", async ({ page }) => {
+test("Jira: with hybrid's Jira relay, CoderHelm's app and the install ID", async ({ page }) => {
   await selfHosted(page, (p) =>
     p === "/api/integrations/jira/check" ? JIRA_CHECK : p === "/api/integrations/jira/config" ? JIRA_CONFIG : p === "/api/integrations/jira/events" ? { events: [], total: 0 } : p === "/api/system/hybrid" ? hybridWithJira(true) : undefined,
   );

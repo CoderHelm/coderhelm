@@ -97,7 +97,7 @@ test("the log is not fetched until its tab opens", async ({ page }) => {
 test("an empty log and a failed load show on the tab", async ({ page }) => {
   const db = await mockRunApi(page, { log: { passes: [], live_events: [] } });
   await page.goto(runUrl("&tab=log"));
-  await expect(page.getByTestId("run-tab-log")).toContainText("No agent log yet. It starts once Coderhelm runs its first tool.");
+  await expect(page.getByTestId("run-tab-log")).toContainText("No agent log yet. It starts once CoderHelm runs its first tool.");
   await noSidewaysScroll(page, "empty log", "run-log-tab-empty");
 
   db.logFail = true;

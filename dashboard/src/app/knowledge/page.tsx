@@ -158,7 +158,7 @@ function Empty({ canManage, onStart }: { canManage: boolean; onStart: (k?: AddKi
       </div>
       <h2 className="mt-6 text-2xl font-semibold tracking-tight text-zinc-100 sm:text-3xl">Bring in what your team already knows</h2>
       <p className="mx-auto mt-3 max-w-xl text-base leading-relaxed text-zinc-400">
-        Pick pages from Notion, Confluence, Google Drive or Sanity, or upload files. Coderhelm keeps them up to date, and Chat answers from them with a link to the page.
+        Pick pages from Notion, Confluence, Google Drive or Sanity, or upload files. CoderHelm keeps them up to date, and Chat answers from them with a link to the page.
       </p>
       {canManage ? (
         <>

@@ -167,7 +167,7 @@ function AlertDetail() {
 
       <Section title="Runs for this alert" className="!mt-8">
         {data.runs.length === 0 ? (
-          <p className="text-sm text-zinc-400">Coderhelm didn&apos;t start any work for this alert. {outcomeDetail(a.outcome)}</p>
+          <p className="text-sm text-zinc-400">CoderHelm didn&apos;t start any work for this alert. {outcomeDetail(a.outcome)}</p>
         ) : (
           <List label="Runs for this alert">
             {data.runs.map((r) => (

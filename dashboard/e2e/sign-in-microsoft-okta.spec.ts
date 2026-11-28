@@ -225,7 +225,7 @@ const SENTENCES: [string, string, string, boolean][] = [
   [
     "no_verified_email",
     "microsoft",
-    "Microsoft didn't share a verified email address for this account, so Coderhelm can't tell who you are. Ask your IT team to check the Coderhelm app's email claims, or sign in another way.",
+    "Microsoft didn't share a verified email address for this account, so CoderHelm can't tell who you are. Ask your IT team to check the CoderHelm app's email claims, or sign in another way.",
     false,
   ],
   ["no_verified_email", "okta", "Okta didn't share a verified email address for this account. Ask your IT team, or sign in another way.", false],
@@ -239,7 +239,7 @@ const SENTENCES: [string, string, string, boolean][] = [
   [
     "okta_not_linked",
     "okta",
-    "Okta signed you in, but no Coderhelm account has linked that Okta account yet. Sign in another way first, then choose Link Okta in Settings, Security.",
+    "Okta signed you in, but no CoderHelm account has linked that Okta account yet. Sign in another way first, then choose Link Okta in Settings, Security.",
     false,
   ],
   [
@@ -248,7 +248,7 @@ const SENTENCES: [string, string, string, boolean][] = [
     "You signed in with your team's Okta, which works for that team only, so it can't link another sign-in. Sign in with your password, Google, GitHub or Microsoft to do this.",
     false,
   ],
-  ["not_set_up", "microsoft", "Microsoft sign-in isn't set up on this Coderhelm. Sign in with your email and password.", false],
+  ["not_set_up", "microsoft", "Microsoft sign-in isn't set up on this CoderHelm. Sign in with your email and password.", false],
   ["cancelled", "microsoft", "Sign-in with Microsoft was cancelled before it finished.", true],
   ["provider", "okta", "Okta didn't confirm your sign-in.", true],
 ];

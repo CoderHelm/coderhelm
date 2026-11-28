@@ -476,8 +476,8 @@ for (const size of [
       await expect(answer.getByTestId("tool-step")).toHaveCount(4);
       await expect(answer.getByTestId("tool-step").filter({ hasText: "×2" })).toHaveCount(1);
       await expect(answer).not.toContainText("didn't work");
-      await f.text("PR #609 is open; Coderhelm's runs couldn't be read just now.");
-      saves("PR #609 is open; Coderhelm's runs couldn't be read just now.", SAVED_WORK);
+      await f.text("PR #609 is open; CoderHelm's runs couldn't be read just now.");
+      saves("PR #609 is open; CoderHelm's runs couldn't be read just now.", SAVED_WORK);
       await f.push("done", {});
       await f.end();
       await expect(answer.getByTestId("activity-summary")).toHaveText("Looked up tickets, runs and pull requests");

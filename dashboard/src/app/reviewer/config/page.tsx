@@ -631,10 +631,10 @@ function ReviewerConfigPage() {
                   help="Requests changes when new or changed behavior comes without tests."
                   more={
                     <p>
-                      New features need new tests; changed or fixed behavior needs its tests added or updated. Coderhelm writes those tests itself
+                      New features need new tests; changed or fixed behavior needs its tests added or updated. CoderHelm writes those tests itself
                       when it plans and codes a change (following your AGENTS.md / CLAUDE.md test conventions). The reviewer requests changes for a
                       missing or stale test and says what to test, where, and with which case. A package with no test runner is not exempt: the
-                      review says which runner, script and config to add, matching the rest of the repo, and on Coderhelm&apos;s own pull
+                      review says which runner, script and config to add, matching the rest of the repo, and on CoderHelm&apos;s own pull
                       requests its fix round adds them. Only these are exempt, checked against the changed files: docs only, config or
                       dependency versions only, generated files only, tests only, and a refactor with the existing test that covers it.
                     </p>
@@ -732,7 +732,7 @@ function ReviewerConfigPage() {
                         {...marks("deploy_label")}
                         help={
                           <>
-                            Added to Coderhelm&apos;s own pull requests when it opens them, and to people&apos;s once they are cleared to merge, so your
+                            Added to CoderHelm&apos;s own pull requests when it opens them, and to people&apos;s once they are cleared to merge, so your
                             deploy, preview or e2e CI runs. Auto-merge waits for that CI too. Comma separate several, for example{" "}
                             <Code>E2E:IOS,E2E:ANDROID</Code>. Empty: skip.
                           </>
@@ -906,8 +906,8 @@ function ReviewerConfigPage() {
                   more={
                     <>
                       <p>
-                        It runs when a release tag is created on the release branch, by Coderhelm (Tag after merge), a person or CI. It follows your
-                        repo&apos;s release notes guide when it has one. Coderhelm only tags after an approved, green merge, so the tag is the approval.
+                        It runs when a release tag is created on the release branch, by CoderHelm (Tag after merge), a person or CI. It follows your
+                        repo&apos;s release notes guide when it has one. CoderHelm only tags after an approved, green merge, so the tag is the approval.
                       </p>
                       <p>Changes it can&apos;t explain from the pull request or ticket are listed as written, never guessed.</p>
                     </>
@@ -934,7 +934,7 @@ function ReviewerConfigPage() {
                       >
                         <p className="text-sm text-zinc-400">
                           Entries go under the parent page, in a &ldquo;{cfg.release_notes_confluence_container || "Changelog"}&rdquo; page with one page per
-                          year, newest at the top, through the Coderhelm app in Jira (it needs Confluence access). Leave the parent empty to skip Confluence.
+                          year, newest at the top, through the CoderHelm app in Jira (it needs Confluence access). Leave the parent empty to skip Confluence.
                         </p>
                         <div className="grid min-w-0 gap-4 sm:grid-cols-3">
                           <Field label="Parent page id" {...marks("release_notes_confluence_parent_id")} mono inputMode="numeric" value={cfg.release_notes_confluence_parent_id} onChange={(e) => set("release_notes_confluence_parent_id", e.target.value.replace(/\D/g, ""))} placeholder="123456789" />
@@ -952,7 +952,7 @@ function ReviewerConfigPage() {
                           {...marks("release_notes_email_webhook_url")}
                           help={
                             <>
-                              After the Confluence entry, Coderhelm POSTs <Code>subject</Code>, <Code>summary_html</Code>, <Code>summary_markdown</Code>,{" "}
+                              After the Confluence entry, CoderHelm POSTs <Code>subject</Code>, <Code>summary_html</Code>, <Code>summary_markdown</Code>,{" "}
                               <Code>confluence_url</Code>, <Code>release_url</Code>, <Code>repo</Code>, <Code>tag</Code> and <Code>date</Code> here, for
                               example to an Atlassian Automation rule that emails your IT list. Failures post to the reminder channels below.
                             </>

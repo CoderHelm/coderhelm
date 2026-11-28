@@ -30,9 +30,9 @@ const EMPTY: Form = { commit_openspec: false, default_destination: "github", all
 const SAMPLE = tokens("ABC-123", "ABC-123", "Fix the login redirect after single sign-on");
 
 const GIT_FIELDS: { key: Kind; label: string; what: string }[] = [
-  { key: "branch", label: "Branch name", what: "The branch Coderhelm works on for a ticket." },
+  { key: "branch", label: "Branch name", what: "The branch CoderHelm works on for a ticket." },
   { key: "commit", label: "Commit message", what: "The first line of each commit." },
-  { key: "pr_title", label: "Pull request title", what: "The title of the pull request Coderhelm opens." },
+  { key: "pr_title", label: "Pull request title", what: "The title of the pull request CoderHelm opens." },
 ];
 
 /** Templates compare without their outer spaces; everything else as it is. */
@@ -139,7 +139,7 @@ function WorkflowPage() {
 
   const header = (
     <div className="mb-6">
-      <PageHeader title="Workflow" lead="How Coderhelm shapes the pull requests it opens and where plan tasks go." />
+      <PageHeader title="Workflow" lead="How CoderHelm shapes the pull requests it opens and where plan tasks go." />
       <ReviewInSetup available={setupMarks.available} />
     </div>
   );

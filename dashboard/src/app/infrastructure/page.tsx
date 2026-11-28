@@ -38,7 +38,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   reliability: "Reliability",
 };
 
-/** A plan prompt that asks Coderhelm to fix one finding. */
+/** A plan prompt that asks CoderHelm to fix one finding. */
 function fixPrompt(f: InfraFinding, repo: string | null): string {
   return [`Fix this infrastructure ${f.severity === "error" ? "issue" : "finding"}${repo ? ` in ${repo}` : ""}: ${f.title}.`, f.detail, f.file ? `File: ${f.file}` : ""]
     .filter(Boolean)
@@ -124,7 +124,7 @@ function AnalysisView({
             ) : undefined
           }
         >
-          Coderhelm reads the code that sets up your cloud servers, databases and storage, and points out security, cost and reliability problems.
+          CoderHelm reads the code that sets up your cloud servers, databases and storage, and points out security, cost and reliability problems.
           {!canScan && " Ask a team admin to run a scan."}
           {whichFiles}
         </EmptyState>
@@ -138,7 +138,7 @@ function AnalysisView({
         <EmptyState icon={<HexagonIcon />} title="No infrastructure code found">
           Nothing that sets up cloud resources was found
           {analysis.cached_at ? <> in the scan on {formatDate(analysis.cached_at)}</> : null}.{canScan ? " Scan again after adding some." : ""}
-          {analysis.suggested_prompt ? " To have Coderhelm write it, start a plan from the prompt below." : ""}
+          {analysis.suggested_prompt ? " To have CoderHelm write it, start a plan from the prompt below." : ""}
           {whichFiles}
         </EmptyState>
         {analysis.suggested_prompt && (
@@ -245,8 +245,8 @@ function parseInfraError(raw: string | undefined): { message: string; hint: stri
   const lower = (raw ?? "").toLowerCase();
   if (lower.includes("404"))
     return {
-      message: "Coderhelm can't open this repo",
-      hint: "Ask an admin to give the Coderhelm GitHub App access to it, then scan again.",
+      message: "CoderHelm can't open this repo",
+      hint: "Ask an admin to give the CoderHelm GitHub App access to it, then scan again.",
       action: (
         <Link href="/settings/repos" className={buttonClass("ghost")}>
           Open Repositories
@@ -254,7 +254,7 @@ function parseInfraError(raw: string | undefined): { message: string; hint: stri
       ),
     };
   if (lower.includes("rate limit"))
-    return { message: "GitHub is limiting how fast Coderhelm can read", hint: "Try again in a few minutes." };
+    return { message: "GitHub is limiting how fast CoderHelm can read", hint: "Try again in a few minutes." };
   if (lower.includes("timeout") || lower.includes("timed out"))
     return { message: "The scan timed out", hint: "It took too long to finish. Try again; a smaller scope (one repo) is quicker." };
   return { message: "The scan failed", hint: "Try again, or contact support if it keeps failing." };

@@ -31,11 +31,11 @@ import {
 /** Rows shown at first, and added by each "Load more". */
 const PAGE_SIZE = 25;
 
-/** Why Coderhelm couldn't read a repository, in a sentence, and whether Try again can help. */
+/** Why CoderHelm couldn't read a repository, in a sentence, and whether Try again can help. */
 function readProblem(raw: string | undefined): { text: string; fixInGitHub: boolean } {
   const lower = (raw ?? "").toLowerCase();
-  if (lower.includes("404")) return { text: "Coderhelm can't see this repository in GitHub.", fixInGitHub: true };
-  if (lower.includes("rate limit")) return { text: "GitHub is limiting how fast Coderhelm can read. It tries again by itself.", fixInGitHub: false };
+  if (lower.includes("404")) return { text: "CoderHelm can't see this repository in GitHub.", fixInGitHub: true };
+  if (lower.includes("rate limit")) return { text: "GitHub is limiting how fast CoderHelm can read. It tries again by itself.", fixInGitHub: false };
   if (lower.includes("timeout")) return { text: "Reading this repository took too long.", fixInGitHub: false };
   return { text: "Couldn't read this repository.", fixInGitHub: false };
 }
@@ -122,7 +122,7 @@ function ReposPage() {
       await api.toggleRepo(repo.name, on);
       setRepos((prev) => prev.map((r) => r.name === repo.name ? { ...r, enabled: on, onboard_status: on ? "pending" : undefined } : r));
       toast(
-        on ? `Coderhelm can work on ${repo.name}` : `${repo.name} turned off`,
+        on ? `CoderHelm can work on ${repo.name}` : `${repo.name} turned off`,
         "success",
         undo ? { action: { label: "Undo", onClick: () => void handleToggle({ ...repo, enabled: on }, false) } } : undefined,
       );
@@ -176,7 +176,7 @@ function ReposPage() {
     <Page>
       <PageHeader
         title="Repositories"
-        lead="Turn on the code projects Coderhelm should work in. Give each one a type (website, server, mobile app…) so new tickets go to the right place; with no type, Coderhelm picks."
+        lead="Turn on the code projects CoderHelm should work in. Give each one a type (website, server, mobile app…) so new tickets go to the right place; with no type, CoderHelm picks."
       />
       {ready && !canManage && (
         <div className="mt-6" data-testid="repos-read-only">
@@ -253,7 +253,7 @@ function ReposPage() {
                   leading={
                     <Switch
                       checked={repo.enabled}
-                      label={`Let Coderhelm work on ${repo.name}`}
+                      label={`Let CoderHelm work on ${repo.name}`}
                       onChange={() => handleToggle(repo)}
                       disabled={!canManage || toggling === repo.name}
                     />
@@ -301,7 +301,7 @@ function ReposPage() {
                           value={repo.role || ""}
                           onChange={(v) => handleRoleChange(repo, v)}
                           disabled={savingRole === repo.name}
-                          options={[{ value: "", label: "No type (Coderhelm picks)" }, ...Object.entries(ROLE_NAMES).map(([value, label]) => ({ value, label }))]}
+                          options={[{ value: "", label: "No type (CoderHelm picks)" }, ...Object.entries(ROLE_NAMES).map(([value, label]) => ({ value, label }))]}
                         />
                       ) : undefined}
                       {repo.enabled && canManage && (
@@ -310,7 +310,7 @@ function ReposPage() {
                           onClick={() => setStagingRepo(repo.name)}
                           className={buttonClass("secondary", "sm")}
                           aria-label={`Staging content connection for ${repo.name}`}
-                          title="Let Coderhelm update the staging CMS content your end-to-end tests read"
+                          title="Let CoderHelm update the staging CMS content your end-to-end tests read"
                         >
                           Staging content
                         </button>

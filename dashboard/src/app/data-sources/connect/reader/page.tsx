@@ -121,8 +121,8 @@ function ConnectReaderPage() {
     >
       <p className="text-sm text-zinc-400">
         {rest
-          ? "Coderhelm only sends GET requests, and only under the paths you list. What comes back has emails, phone numbers, addresses and keys hidden."
-          : "Coderhelm only lists, searches and counts; scripts are refused. Use a user with read-only access to the indexes agents may search."}
+          ? "CoderHelm only sends GET requests, and only under the paths you list. What comes back has emails, phone numbers, addresses and keys hidden."
+          : "CoderHelm only lists, searches and counts; scripts are refused. Use a user with read-only access to the indexes agents may search."}
       </p>
       <form
         className="flex max-w-2xl flex-col gap-4"
@@ -140,7 +140,7 @@ function ConnectReaderPage() {
           </>
         ) : (
           <>
-            {text("reader-user", "User", user, setUser, "A user with read-only access. Coderhelm sees what it can see.")}
+            {text("reader-user", "User", user, setUser, "A user with read-only access. CoderHelm sees what it can see.")}
             {text("reader-indexes", "Indexes", indexes, setIndexes, "Index names or patterns agents may read, like orders or logs-*. Leave empty for every index the user sees.", "orders, logs-*", true)}
             {networks.length > 0 && (
               <Field id="reader-network" label="Reach it through" helper="A cluster that is reachable only inside a VPC (a vpc-… endpoint) is read through the install's private network in that VPC.">

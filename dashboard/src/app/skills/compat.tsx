@@ -1,7 +1,7 @@
 "use client";
 
-// How Coderhelm runs a repository skill: the check of each item against what
-// the team has in Coderhelm, shown as a status badge, an overview for the
+// How CoderHelm runs a repository skill: the check of each item against what
+// the team has in CoderHelm, shown as a status badge, an overview for the
 // Skills page, and on an item's page a list of its steps with what each one
 // relies on, what to connect, and the original and translated text.
 
@@ -54,21 +54,21 @@ const PlugIcon = () => (
 export const STEP_STATUS: Record<RequirementStatus, { label: string; means: string; dot: string; text: string; icon: ReactNode }> = {
   available: {
     label: "Runs as written",
-    means: "Coderhelm has exactly what this step uses.",
+    means: "CoderHelm has exactly what this step uses.",
     dot: "border-emerald-500/50 bg-emerald-500/15 text-emerald-300",
     text: "text-emerald-300",
     icon: <CheckSmall />,
   },
   translated: {
     label: "Translated",
-    means: "Coderhelm does this with its own tool, named below.",
+    means: "CoderHelm does this with its own tool, named below.",
     dot: "border-blue-500/50 bg-blue-500/15 text-blue-300",
     text: "text-blue-300",
     icon: <SwapIcon />,
   },
   missing: {
     label: "Needs a tool",
-    means: "Nothing connected to Coderhelm does this yet.",
+    means: "Nothing connected to CoderHelm does this yet.",
     dot: "border-amber-500/50 bg-amber-500/15 text-amber-300",
     text: "text-amber-300",
     icon: <PlugIcon />,
@@ -88,10 +88,10 @@ type Badge = "ready" | "translated" | "needs_tools" | "partial" | "unchecked" | 
 // same colour as every other tag in the app.
 const BADGE: Record<Badge, { label: string; tone: Tone; title: string }> = {
   ready: { label: "Ready", tone: "success", title: "Every step runs as written." },
-  translated: { label: "Translated", tone: "info", title: "Some steps use Coderhelm's own tools instead." },
+  translated: { label: "Translated", tone: "info", title: "Some steps use CoderHelm's own tools instead." },
   needs_tools: { label: "Needs tools", tone: "waiting", title: "Some steps need a tool the team hasn't connected." },
   partial: { label: "Partly checked", tone: "neutral", title: "The check couldn't list its steps yet; it's read as written." },
-  unchecked: { label: "Not checked yet", tone: "muted", title: "Coderhelm checks each item after it syncs." },
+  unchecked: { label: "Not checked yet", tone: "muted", title: "CoderHelm checks each item after it syncs." },
   failed: { label: "Check failed", tone: "danger", title: "The last check didn't finish." },
   stale: { label: "Checking again", tone: "muted", title: "The text changed since the last check." },
 };
@@ -221,7 +221,7 @@ export function CompatOverview({
       <summary className={`flex min-h-11 cursor-pointer list-none flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-lg px-4 py-2.5 [&::-webkit-details-marker]:hidden ${focusRing}`}>
         <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
           <h2 id="compat-overview-heading" className="text-sm font-semibold text-zinc-100">
-            How Coderhelm runs your skills
+            How CoderHelm runs your skills
           </h2>
           <span className="text-sm text-zinc-400">
             {counts.needs_tools > 0 ? `${counts.needs_tools} need a tool you haven't connected` : `${checked} of ${items.length} checked`}
@@ -286,7 +286,7 @@ export function CompatOverview({
           <summary className={`cursor-pointer text-xs font-medium text-zinc-400 hover:text-zinc-300 rounded ${focusRing}`}>
             Assumes a local machine ({local.length})
           </summary>
-          <p className="mt-2 text-xs text-zinc-400">Nothing to connect: these only exist on a person&apos;s own computer. What Coderhelm does instead:</p>
+          <p className="mt-2 text-xs text-zinc-400">Nothing to connect: these only exist on a person&apos;s own computer. What CoderHelm does instead:</p>
           <ul className="mt-2 space-y-1.5">
             {local.map((n) => (
               <li key={n.name} className="text-sm text-zinc-300">
@@ -332,7 +332,7 @@ export function matchesCompatFilter(s: Skill, filter: string): boolean {
 // ─── An item's page ──────────────────────────────────────────
 
 /**
- * "How Coderhelm runs this": the summary, what to connect, the steps with
+ * "How CoderHelm runs this": the summary, what to connect, the steps with
  * what each relies on, the admin's choice of version, and the two texts.
  */
 export function CompatSection({
@@ -365,10 +365,10 @@ export function CompatSection({
       <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
           <h2 id="compat-heading" className="text-sm font-semibold text-zinc-100">
-            How Coderhelm runs this
+            How CoderHelm runs this
           </h2>
           <p className="mt-1 max-w-prose text-sm text-zinc-400">
-            Coderhelm read every step and checked each tool and command it relies on against what your team has connected.
+            CoderHelm read every step and checked each tool and command it relies on against what your team has connected.
             {agentNote && " For an agent, that is the read-only tools its own file lists: those are all it gets when asked."}
           </p>
         </div>
@@ -388,7 +388,7 @@ export function CompatSection({
             </div>
             <p className="mt-1.5 text-xs text-zinc-400">
               {!c
-                ? "Coderhelm checks each item after it syncs, or when an admin asks."
+                ? "CoderHelm checks each item after it syncs, or when an admin asks."
                 : badge === "stale"
                   ? `The text changed since the check ${ago(c.at)}. A new check runs on the next sync, or now with Re-check.`
                   : badge === "failed"
@@ -462,12 +462,12 @@ function NeedsList({ needs }: { needs: CompatNeed[] }) {
   );
 }
 
-/** Whether a step is left out on Coderhelm: it only set up a person's own
+/** Whether a step is left out on CoderHelm: it only set up a person's own
  * machine. An older check marks it `dropped` with another status. */
 export const notNeeded = (s: Pick<CompatStep, "status" | "dropped">) => s.status === "not_needed" || s.dropped;
 
 /** The steps that run, numbered as the item numbers them, then one quiet
- * line for the steps not needed on Coderhelm (closed until opened). */
+ * line for the steps not needed on CoderHelm (closed until opened). */
 function StepList({ steps }: { steps: CompatStep[] }) {
   const runs = steps.map((s, i) => ({ s, i })).filter(({ s }) => !notNeeded(s));
   const skipped = steps.map((s, i) => ({ s, i })).filter(({ s }) => notNeeded(s));
@@ -486,10 +486,10 @@ function StepList({ steps }: { steps: CompatStep[] }) {
             <span aria-hidden="true" className="transition-transform group-open:rotate-90 motion-reduce:transition-none">
               <ChevronRightIcon />
             </span>
-            Not needed on Coderhelm ({skipped.length})
+            Not needed on CoderHelm ({skipped.length})
           </summary>
           <p className="mt-1 text-xs text-zinc-400">
-            These only set up a person&apos;s own computer. Coderhelm already works through your GitHub installation and keeps files with the run.
+            These only set up a person&apos;s own computer. CoderHelm already works through your GitHub installation and keeps files with the run.
           </p>
           <ul className="mt-2 space-y-1">
             {skipped.map(({ s, i }) => (
@@ -550,7 +550,7 @@ function StepRow({ step, index, last }: { step: CompatStep; index: number; last:
                 <div className="hidden grid-cols-[minmax(0,1fr)_1.5rem_minmax(0,1fr)] gap-2 border-b border-zinc-800 bg-zinc-950/40 px-3 py-1.5 text-xs font-medium uppercase tracking-wider text-zinc-400 sm:grid">
                   <span>The skill asks for</span>
                   <span />
-                  <span>Coderhelm uses</span>
+                  <span>CoderHelm uses</span>
                 </div>
                 <ul className="divide-y divide-zinc-800">
                   {reqs.map((r, i) => (
@@ -593,7 +593,7 @@ function RequirementRow({ r }: { r: Requirement }) {
         uses
       </span>
       <div className="min-w-0">
-        <span className="sr-only">Coderhelm uses: </span>
+        <span className="sr-only">CoderHelm uses: </span>
         {(r.status === "available" || r.status === "translated") && r.uses.length === 0 && r.instead ? (
           <p className={`text-xs ${s.text}`}>{r.instead}</p>
         ) : r.status === "available" || r.status === "translated" ? (
@@ -608,7 +608,7 @@ function RequirementRow({ r }: { r: Requirement }) {
         ) : (
           <div>
             <p className={`text-xs font-medium ${s.text}`}>
-              {r.status === "blocked" ? "Can't write there" : link ? "Not connected in Coderhelm" : r.instead ? "Assumes a local machine" : "Not available in Coderhelm"}
+              {r.status === "blocked" ? "Can't write there" : link ? "Not connected in CoderHelm" : r.instead ? "Assumes a local machine" : "Not available in CoderHelm"}
             </p>
             {r.fix && <p className="mt-0.5 text-xs text-zinc-400">{r.fix}</p>}
             {r.instead && <p className="mt-0.5 text-xs text-zinc-400">Instead: {r.instead}</p>}
@@ -644,7 +644,7 @@ function VersionChoice({
       <div className="min-w-0 flex-1 basis-64">
         <p className="text-sm font-medium text-zinc-100">Use the translated version</p>
         <p className="mt-1 text-sm text-zinc-400">
-          Agents read the version rewritten for Coderhelm&apos;s own tools, with every gap marked so a run reports it instead of skipping
+          Agents read the version rewritten for CoderHelm&apos;s own tools, with every gap marked so a run reports it instead of skipping
           it. The repository file doesn&apos;t change, and the original stays here.
         </p>
         {on && !usable && (

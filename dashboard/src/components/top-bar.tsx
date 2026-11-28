@@ -168,7 +168,7 @@ function TopBarFrame({ teamName, menuButton, canGoBack }: { teamName?: string; m
       data-testid="topbar"
       className="sticky top-0 z-30 border-b border-zinc-800/60 bg-zinc-950/95 backdrop-blur supports-[backdrop-filter]:bg-zinc-950/80"
     >
-      <title>{tab ? `${tab} · Coderhelm` : "Coderhelm"}</title>
+      <title>{tab ? `${tab} · CoderHelm` : "CoderHelm"}</title>
       <div className="mx-auto box-content flex h-12 max-w-6xl min-w-0 items-center gap-2 px-4 md:px-8">
         {/* Phone: back one level, or home on a top-level page. */}
         <div className="flex shrink-0 md:hidden">
@@ -185,7 +185,7 @@ function TopBarFrame({ teamName, menuButton, canGoBack }: { teamName?: string; m
               </svg>
             </button>
           ) : (
-            <Link href="/" aria-label="Coderhelm home" className={`-ml-1 inline-flex h-9 w-9 items-center justify-center rounded-lg ${focusRing}`}>
+            <Link href="/" aria-label="CoderHelm home" className={`-ml-1 inline-flex h-9 w-9 items-center justify-center rounded-lg ${focusRing}`}>
               <Logo />
             </Link>
           )}

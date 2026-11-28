@@ -171,7 +171,7 @@ function changeWords(f: LogFinding): string | null {
 function cantTellWords(f: LogFinding): string | null {
   const a = f.activity;
   if (!a || a.state !== "unknown" || (f.status !== "new" && f.status !== "acknowledged")) return null;
-  return `No matching line in the last ${plural(a.quiet_checks, "log check")}, but the service itself wrote little or nothing then, so Coderhelm can't tell whether the error stopped. It stays open until the service logs again.`;
+  return `No matching line in the last ${plural(a.quiet_checks, "log check")}, but the service itself wrote little or nothing then, so CoderHelm can't tell whether the error stopped. It stays open until the service logs again.`;
 }
 
 function errorText(e: unknown, fallback: string): string {
@@ -326,7 +326,7 @@ function LogsPage() {
     }
   };
 
-  // One click on a repo Coderhelm offered: the fix starts there, and the
+  // One click on a repo CoderHelm offered: the fix starts there, and the
   // choice is saved for the log group when this person may save it.
   const fixIn = async (f: LogFinding, repo: string) => {
     setBusy(`fix:${f.rec_id}`);
@@ -351,8 +351,8 @@ function LogsPage() {
         title="Logs"
         lead={
           <>
-            Errors Coderhelm found in your AWS logs. It watches for new errors every few minutes and works out the cause:
-            findings with one cause are one incident. Create a fix PR from any finding, or let Coderhelm open one for
+            Errors CoderHelm found in your AWS logs. It watches for new errors every few minutes and works out the cause:
+            findings with one cause are one incident. Create a fix PR from any finding, or let CoderHelm open one for
             new findings.
           </>
         }
@@ -400,7 +400,7 @@ function LogsPage() {
               </Link>
             }
           >
-            Coderhelm reads the CloudWatch log groups you choose with a read-only role, finds errors worth fixing, and
+            CoderHelm reads the CloudWatch log groups you choose with a read-only role, finds errors worth fixing, and
             can open a fix PR for them.
           </ListEmpty>
         </div>
@@ -521,7 +521,7 @@ function LogsPage() {
         open={!!fixing}
         onOpenChange={(v) => !v && setFixing(null)}
         title="Create a fix PR"
-        description="Coderhelm starts a run with this finding, its log lines and the recommendation, and opens a pull request for review."
+        description="CoderHelm starts a run with this finding, its log lines and the recommendation, and opens a pull request for review."
       >
         {fixing && (
           <CreateFixForm
@@ -635,7 +635,7 @@ function IncidentDetail({ inc }: { inc: LogIncident }) {
         <p className="text-zinc-300">{d.summary}</p>
       </DetailBlock>
       {inc.action && (
-        <DetailBlock title="What Coderhelm did">
+        <DetailBlock title="What CoderHelm did">
           <p className="text-zinc-300" data-testid="incident-action">{inc.action}</p>
         </DetailBlock>
       )}
@@ -657,7 +657,7 @@ function IncidentDetail({ inc }: { inc: LogIncident }) {
         </DetailBlock>
       )}
       {!!d.facts.length && (
-        <DetailBlock title="What Coderhelm checked">
+        <DetailBlock title="What CoderHelm checked">
           <ul className="list-disc space-y-0.5 pl-5 text-zinc-400">
             {d.facts.map((s) => (
               <li key={s} className="break-words">{s}</li>
@@ -821,7 +821,7 @@ function FindingRow({
   const stopped = f.status === "stopped";
   const canFix = canAct && f.status !== "fixing" && f.status !== "fixed" && f.status !== "ignored";
   const link = fixLink(f);
-  // The repos Coderhelm couldn't choose between, best first: one click each.
+  // The repos CoderHelm couldn't choose between, best first: one click each.
   const offered = canFix && !stopped ? (f.repo_ask?.candidates ?? []).slice(0, 3) : [];
   const autoNote = offered.length
     ? `Which repo is this log group's code in? ${f.repo_ask?.reason ?? ""}`.trim()
@@ -1020,7 +1020,7 @@ function FindingDetail({
             </button>
           </div>
           <p className="mt-1 text-xs text-zinc-400">
-            Coderhelm saved this repo for {f.log_group} on {formatDate(f.repo_learned.at)}: {f.repo_learned.reason}
+            CoderHelm saved this repo for {f.log_group} on {formatDate(f.repo_learned.at)}: {f.repo_learned.reason}
           </p>
         </DetailBlock>
       )}
@@ -1162,7 +1162,7 @@ function CreateFixForm({
   onDone: () => void;
 }) {
   const { toast } = useToast();
-  // Coderhelm works the repo out (a saved mapping, or the evidence); a
+  // CoderHelm works the repo out (a saved mapping, or the evidence); a
   // person's own pick always stands.
   const [resolution, setResolution] = useState<RepoResolution | null>(null);
   const [resolving, setResolving] = useState(true);
@@ -1180,7 +1180,7 @@ function CreateFixForm({
         if (!live) return;
         setResolution(r);
         if (r.repo) setRepo((prev) => prev || r.repo!);
-        // Remembering defaults on only when Coderhelm is sure and nothing is saved yet.
+        // Remembering defaults on only when CoderHelm is sure and nothing is saved yet.
         setRemember(isSure(r) && r.source !== "saved");
       })
       .catch(() => live && setResolution(null))
@@ -1357,7 +1357,7 @@ function AutofixCard({
         Automatic fix PRs are off.
       </h2>
       <p className="mt-1 max-w-prose text-sm text-zinc-300">
-        Turn them on and Coderhelm opens a fix pull request for {everyFindingWord(a.min_severity)}, up to {a.daily_cap} a day
+        Turn them on and CoderHelm opens a fix pull request for {everyFindingWord(a.min_severity)}, up to {a.daily_cap} a day
         {where ? `, and posts it to ${where}${p?.mode === "team" ? ", where production alerts post" : ""}` : ""}. Nothing merges without a person&apos;s approval.
       </p>
       {!where && (
@@ -1464,7 +1464,7 @@ function AutofixPanel({
             Automatic fix PRs
           </h2>
           <p className="mt-1 max-w-prose text-sm text-zinc-400">
-            After each analysis, Coderhelm can start a fix run for new findings and open a PR for review. Each run says
+            After each analysis, CoderHelm can start a fix run for new findings and open a PR for review. Each run says
             it started automatically. Nothing merges without a person&apos;s approval.
           </p>
         </div>
@@ -1580,7 +1580,7 @@ function AutofixPanel({
       <div className="mt-6 min-w-0">
         <h3 className="text-sm font-medium text-zinc-300">Log groups</h3>
         <p className="mt-0.5 text-xs text-zinc-400">
-          The repo each log group&apos;s code lives in ({mapped} of {rows.length} saved). For a group without one, Coderhelm works the
+          The repo each log group&apos;s code lives in ({mapped} of {rows.length} saved). For a group without one, CoderHelm works the
           repo out from AWS and your code. When the evidence is clear it fixes there and saves the repo here as learned, so it
           never asks again; it asks you once only when the evidence is split.
         </p>

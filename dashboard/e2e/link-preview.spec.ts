@@ -59,7 +59,7 @@ test.describe("link previews", () => {
       const path = served(route);
       const h = await readHead(request, path);
       const name = info.tab ?? info.label;
-      const title = `${name} · Coderhelm`;
+      const title = `${name} · CoderHelm`;
 
       // The title and description are the table's, word for word: nothing
       // from a team's data (a run's title, a ticket, a team name) can be here.
@@ -71,7 +71,7 @@ test.describe("link previews", () => {
       expect(one(h, "og:description", path)).toBe(info.description);
       expect(one(h, "twitter:title", path)).toBe(title);
       expect(one(h, "twitter:description", path)).toBe(info.description);
-      expect(one(h, "og:site_name", path)).toBe("Coderhelm");
+      expect(one(h, "og:site_name", path)).toBe("CoderHelm");
       expect(one(h, "og:type", path)).toBe("website");
       expect(one(h, "twitter:card", path)).toBe("summary_large_image");
       expect(one(h, "theme-color", path)).toMatch(/^#[0-9a-f]{6}$/i);
@@ -88,7 +88,7 @@ test.describe("link previews", () => {
       expect(one(h, "og:image:width", path)).toBe("1200");
       expect(one(h, "og:image:height", path)).toBe("630");
       expect(one(h, "og:image:type", path)).toBe("image/png");
-      expect(one(h, "og:image:alt", path)).toMatch(/^Coderhelm: /);
+      expect(one(h, "og:image:alt", path)).toMatch(/^CoderHelm: /);
 
       // Icons, and no redirect an unfurler would follow before reading the tags.
       expect(h.links.some((l) => l.rel === "apple-touch-icon" && l.href === "/apple-touch-icon.png"), `${path}: apple-touch-icon`).toBe(true);
@@ -134,7 +134,7 @@ test.describe("link previews", () => {
       route.fulfill({ status: 401, contentType: "application/json", body: JSON.stringify({ error: "unauthorized" }) }),
     );
     await page.goto("/releases/");
-    await expect(page).toHaveTitle(/Coderhelm/);
+    await expect(page).toHaveTitle(/CoderHelm/);
     const image = await page.locator('head meta[property="og:image"]').first().getAttribute("content");
     expect(image).toMatch(/\/og\/releases\.png$/);
   });

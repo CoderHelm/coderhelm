@@ -122,7 +122,7 @@ export function AddMcpServerDialog({
       setRedirectUri(r.redirect_uri);
       setName((n) => n || hostOf(r.url));
     } catch (e) {
-      setError(errorMessage(e, "Coderhelm couldn't reach that address."));
+      setError(errorMessage(e, "CoderHelm couldn't reach that address."));
     } finally {
       setBusy(false);
     }
@@ -166,7 +166,7 @@ export function AddMcpServerDialog({
       onOpenChange={onOpenChange}
       testId="add-mcp-server"
       title="Add an MCP server"
-      description="Coderhelm asks the server how it signs in. Agents get none of its tools until you allow them."
+      description="CoderHelm asks the server how it signs in. Agents get none of its tools until you allow them."
     >
       <form
         id="add-mcp-server-form"
@@ -202,7 +202,7 @@ export function AddMcpServerDialog({
               {detected.auth === "oauth" && (
                 <>
                   <span className="font-medium text-zinc-100">Signs in with OAuth</span> through {hostOf(detected.issuer ?? "")}. You approve access on its page, and
-                  Coderhelm keeps the sign-in sealed, renews it and never shows it to a model.
+                  CoderHelm keeps the sign-in sealed, renews it and never shows it to a model.
                 </>
               )}
               {detected.auth === "header" && (
@@ -242,7 +242,7 @@ export function AddMcpServerDialog({
             {manual && (
               <div className="flex flex-col gap-3" data-testid="mcp-manual-client">
                 <p className="text-sm text-amber-300">
-                  This sign-in server can&apos;t register Coderhelm on its own. Register an OAuth app with the vendor using this redirect address, then paste its client id.
+                  This sign-in server can&apos;t register CoderHelm on its own. Register an OAuth app with the vendor using this redirect address, then paste its client id.
                 </p>
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <Code className="min-w-0 text-xs">{redirectUri}</Code>
@@ -353,8 +353,8 @@ export function McpServerPanel({
       const ok = await confirm({
         title: personal ? `Disconnect your ${s.name} account?` : `Disconnect ${s.name}?`,
         message: personal
-          ? "Coderhelm revokes your sign-in with the server and forgets it. Agents stop using your account."
-          : "Coderhelm revokes the team's sign-in with the server and forgets it. Agents stop using it until someone connects again.",
+          ? "CoderHelm revokes your sign-in with the server and forgets it. Agents stop using your account."
+          : "CoderHelm revokes the team's sign-in with the server and forgets it. Agents stop using it until someone connects again.",
         confirmLabel: "Disconnect",
         destructive: true,
       });
@@ -548,7 +548,7 @@ function ClientForm({ server, onSaved }: { server: McpServer; onSaved: (s: McpSe
       }}
     >
       <p className="text-sm text-amber-200">
-        This sign-in server can&apos;t register Coderhelm on its own. Register an OAuth app with the vendor using this redirect address, then paste its client id.
+        This sign-in server can&apos;t register CoderHelm on its own. Register an OAuth app with the vendor using this redirect address, then paste its client id.
       </p>
       {redirect && (
         <div className="flex min-w-0 flex-wrap items-center gap-2">

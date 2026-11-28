@@ -23,7 +23,7 @@ export const SHOTS: Record<ShotId, Shot> = {
     phone: { src: "/shots/chat-phone.webp", width: 390, height: 844 },
   },
   knowledge: {
-    alt: "A CoderHelm knowledge base fed by Notion, Google Drive, Confluence, Sanity and uploaded files, each with its sync state.",
+    alt: "A CoderHelm knowledge base page: pages searchable, freshness, one source that needs signing in again with its fix, Ask this knowledge base, and the start of its connections.",
     desktop: { src: "/shots/knowledge.webp", width: 1440, height: 900 },
     phone: { src: "/shots/knowledge-phone.webp", width: 390, height: 844 },
   },
@@ -40,7 +40,7 @@ export const SHOTS: Record<ShotId, Shot> = {
   kbUsage: {
     alt: "The Usage section of a knowledge base: searches this week by Chat, coder runs, MCP and API keys and the page itself, the most cited pages, the runs and chats that used it, questions with no good answer, and pages no search found in 90 days.",
     desktop: { src: "/shots/kb-usage.webp", width: 1116, height: 504 },
-    phone: { src: "/shots/kb-usage-phone.webp", width: 354, height: 985 },
+    phone: { src: "/shots/kb-usage-phone.webp", width: 354, height: 986 },
   },
   setupResults: {
     alt: "The results of a Do it for me Setup run: 9 settings turned on, 4 kept, two previews to switch on with what each would have done in the last 14 days, and each change with its evidence and Undo.",

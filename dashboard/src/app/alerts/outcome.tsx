@@ -1,6 +1,6 @@
 import { Chip, type StatusLook, type Tone } from "@/components/list/status";
 
-/** What Coderhelm did with an alert, in four groups for the list's toggles. */
+/** What CoderHelm did with an alert, in four groups for the list's toggles. */
 export type OutcomeGroup = "started" | "handled" | "ignored" | "problem";
 
 /** The outcome toggles on the alerts list, in order. */
@@ -18,7 +18,7 @@ export const OUTCOMES: Record<
 > = {
   run_started: {
     label: "Run started",
-    detail: "Coderhelm started a run on the mapped repo to act on this alert.",
+    detail: "CoderHelm started a run on the mapped repo to act on this alert.",
     tone: "success",
     group: "started",
   },

@@ -343,7 +343,7 @@ test.describe("Install health: only the install's own problems", () => {
     await expect(health).not.toContainText("needs a look");
     // Each line under the summary is exactly what it says: the optional item, by name.
     await expect(page.getByTestId("health-optional").locator("li")).toHaveText(["Optional: Slack. Run results and questions in your Slack channels."]);
-    await expect(health.getByRole("link", { name: "Open in Coderhelm" })).toHaveCount(0);
+    await expect(health.getByRole("link", { name: "Open in CoderHelm" })).toHaveCount(0);
   });
 
   test("a fix never links to the page it is on", async ({ page }) => {
@@ -351,9 +351,9 @@ test.describe("Install health: only the install's own problems", () => {
     const elsewhere = { key: "github_app", group: "GitHub", label: "GitHub accepts the app's keys", status: "fail", detail: "GitHub refused the keys.", fix: { text: "Add new keys.", href: "/settings/integrations" } };
     await setup(page, { v: {}, checks: [refused, elsewhere] });
     await page.goto("/settings/system/");
-    await expect(page.locator("#check-update_models").getByRole("link", { name: "Open in Coderhelm" })).toHaveCount(0);
+    await expect(page.locator("#check-update_models").getByRole("link", { name: "Open in CoderHelm" })).toHaveCount(0);
     await expect(page.locator("#check-update_models").getByRole("link", { name: "Open the AWS console" })).toBeVisible();
-    await expect(page.locator("#check-github_app").getByRole("link", { name: "Open in Coderhelm" })).toHaveAttribute("href", /^\/settings\/integrations\/?$/);
+    await expect(page.locator("#check-github_app").getByRole("link", { name: "Open in CoderHelm" })).toHaveAttribute("href", /^\/settings\/integrations\/?$/);
     await expect(page.getByTestId("health-summary")).toHaveText("2 checks fail");
   });
 });
@@ -368,7 +368,7 @@ test.describe("Update: one decision", () => {
   const prepared = (extra: Record<string, unknown>) => ({ version: "v0.8.46", status: "review", id: "UPDATE#2", counts: { add: 0, modify: 3, remove: 0 }, parts: ["LogAnalyzer", "Worker"], link: CS_LINK, can_apply: true, admin_changes: [], ...extra });
   const applying = (extra: Record<string, unknown> = {}) => ({ ...NATIVE, pending: prepared({ status: "running", execution: "EXECUTE_IN_PROGRESS", executed_at: ago(0), applied_by: "admin@acme.example", ...extra }) });
 
-  test("an update that only changes what Coderhelm's roles may do: from Update available to Applying in one click", async ({ page }) => {
+  test("an update that only changes what CoderHelm's roles may do: from Update available to Applying in one click", async ({ page }) => {
     const bodies: V[] = [];
     const w: World = {
       v: { latest: rel("v0.8.46"), update_available: true, native: { ...NATIVE, pending: null }, model_check: { version: "v0.8.46", checked_at: ago(5), ok: true, results: [] } },
@@ -384,7 +384,7 @@ test.describe("Update: one decision", () => {
     await page.goto("/settings/system/");
     // What one press does is said next to the button, before pressing.
     await expect(page.getByTestId("update-consent")).toHaveText(
-      "One press prepares and applies it. That includes any change to what Coderhelm's own roles may do, always inside this install's permission limit. If it would replace or remove data, it stops and asks you first.",
+      "One press prepares and applies it. That includes any change to what CoderHelm's own roles may do, always inside this install's permission limit. If it would replace or remove data, it stops and asks you first.",
     );
     await page.getByRole("button", { name: "Update to v0.8.46" }).click();
     await expect(status(page)).toHaveAttribute("data-state", "updating");
@@ -402,7 +402,7 @@ test.describe("Update: one decision", () => {
     });
     await page.goto("/settings/system/");
     await expect(status(page)).toContainText("v0.8.46 is ready to apply");
-    await expect(page.getByTestId("native-update-permissions")).toHaveText("It changes what 2 of Coderhelm's own roles may do, all inside this install's permission limit.");
+    await expect(page.getByTestId("native-update-permissions")).toHaveText("It changes what 2 of CoderHelm's own roles may do, all inside this install's permission limit.");
     await expect(page.getByTestId("native-update-permission-changes")).toBeHidden();
     await status(page).getByText("Technical details").click();
     await expect(page.getByTestId("native-update-permission-changes")).toBeVisible();

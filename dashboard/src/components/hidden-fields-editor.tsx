@@ -27,7 +27,7 @@ export function hiddenEntryProblem(entry: string): string {
 }
 
 /**
- * Editor for the list of names hidden from Coderhelm: words matched wherever
+ * Editor for the list of names hidden from CoderHelm: words matched wherever
  * they appear, exact names, and single tables' columns.
  */
 export function HiddenFieldsEditor({
@@ -70,7 +70,7 @@ export function HiddenFieldsEditor({
       {value.length === 0 ? (
         <p className="text-sm text-amber-200">
           {noun === "column"
-            ? "Nothing is hidden. Coderhelm can read every column."
+            ? "Nothing is hidden. CoderHelm can read every column."
             : "Nothing is hidden. The reviewer can see every field the key can read."}
         </p>
       ) : (

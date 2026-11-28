@@ -1,8 +1,8 @@
 "use client";
 
-// One Setup run. Guided: four named steps, pick the repos, let Coderhelm
+// One Setup run. Guided: four named steps, pick the repos, let CoderHelm
 // read them, review what it recommends, apply. "Do it for me": pick, then
-// Coderhelm reads and applies on its own, and the results are the review.
+// CoderHelm reads and applies on its own, and the results are the review.
 // The address holds the run (?id=), so a person can leave while it works and
 // come back to the same place.
 
@@ -96,7 +96,7 @@ function SetupRunPage() {
   const [problem, setProblem] = useState<string | null>(null);
   const seeded = useRef<string | null>(null);
 
-  // Load the run, then keep reading it while Coderhelm works on it. The last
+  // Load the run, then keep reading it while CoderHelm works on it. The last
   // answer stays on screen between reads, so nothing jumps.
   const live = run?.state === "analyzing" || run?.state === "applying" || (run?.mode === "auto" && run?.state === "ready");
   useEffect(() => {
@@ -314,12 +314,12 @@ function SetupRunPage() {
   const lead = {
     repos:
       params.get("mode") === "guided"
-        ? "Pick the repos. Coderhelm reads each one and recommends a value for every setting, with the reason for each."
-        : "Pick the repos and how. Coderhelm reads each one and recommends a value for every setting, with the reason for each.",
-    analyze: "Coderhelm is reading each repo. You can leave this page; the run keeps going.",
-    review: "Check what Coderhelm recommends next to what you have now. Nothing changes until you apply.",
+        ? "Pick the repos. CoderHelm reads each one and recommends a value for every setting, with the reason for each."
+        : "Pick the repos and how. CoderHelm reads each one and recommends a value for every setting, with the reason for each.",
+    analyze: "CoderHelm is reading each repo. You can leave this page; the run keeps going.",
+    review: "Check what CoderHelm recommends next to what you have now. Nothing changes until you apply.",
     apply: run?.state === "undone" ? "This run was undone. Every setting it changed is back the way it was." : "What changed on each repo.",
-    results: "What Coderhelm turned on, what is worth a look, what someone chose that it kept, and what waits for you to switch on. Undo any one of them, or the whole run.",
+    results: "What CoderHelm turned on, what is worth a look, what someone chose that it kept, and what waits for you to switch on. Undo any one of them, or the whole run.",
   }[step];
   const auto = run ? run.mode === "auto" : params.get("mode") !== "guided";
 
@@ -598,7 +598,7 @@ function ReposStep({ onStart, busy, problem }: { onStart: (repos: RepoPick, opts
               </p>
               <p id="keep-mine-help" className="mt-0.5 text-sm text-zinc-400">
                 {keepMine
-                  ? "A value someone chose for a repo stays, and if the repo argues against it, it's listed first as worth a look. Defaults, values Coderhelm set before, and repos missing from a team list take the recommendation."
+                  ? "A value someone chose for a repo stays, and if the repo argues against it, it's listed first as worth a look. Defaults, values CoderHelm set before, and repos missing from a team list take the recommendation."
                   : "Every setting takes the recommendation, including values someone chose. Undo puts them back."}
               </p>
             </div>
@@ -633,7 +633,7 @@ function ReposStep({ onStart, busy, problem }: { onStart: (repos: RepoPick, opts
           </p>
         )}
         <p className="mt-1 text-sm text-zinc-400">
-          Coderhelm reads each repo&apos;s files, workflows and last 50 merged pull requests, once.
+          CoderHelm reads each repo&apos;s files, workflows and last 50 merged pull requests, once.
         </p>
         <p className="mt-1 text-sm text-zinc-400">
           {mode === "auto"

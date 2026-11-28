@@ -26,11 +26,11 @@ export function oktaTestFailure(reason: string | null): string {
     case "expired":
       return "The test took longer than 10 minutes, or finished in another browser. Run it again.";
     case "discovery":
-      return "Coderhelm couldn't read your Okta's sign-in settings. Check the Okta domain or issuer.";
+      return "CoderHelm couldn't read your Okta's sign-in settings. Check the Okta domain or issuer.";
     case "token_exchange":
       return "Okta didn't accept the client ID and secret. Check both, and that the app's sign-in redirect URI is the address above.";
     case "id_token":
-      return "Okta's answer didn't pass Coderhelm's checks (issuer, client ID, signature). Check the issuer: use the one in your Okta app's sign-in settings.";
+      return "Okta's answer didn't pass CoderHelm's checks (issuer, client ID, signature). Check the issuer: use the one in your Okta app's sign-in settings.";
     case "no_verified_email":
       return "Okta didn't share a verified email address. Give the app the email scope, and check the person's email is verified in Okta.";
     case "domain":

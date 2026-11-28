@@ -47,9 +47,9 @@ function readableName(name: string): string {
 function ItemChip({ item }: { item: Skill }) {
   const missing = item.missing_tools ?? [];
   if (!item.compat && missing.length > 0) {
-    const why = item.kind === "agent" ? "Lists tools it won't get" : "Asks for tools Coderhelm doesn't have";
+    const why = item.kind === "agent" ? "Lists tools it won't get" : "Asks for tools CoderHelm doesn't have";
     return (
-      <span data-testid="missing-tools" title={`${why}: ${missing.join(", ")}. Coderhelm runs it without them.`}>
+      <span data-testid="missing-tools" title={`${why}: ${missing.join(", ")}. CoderHelm runs it without them.`}>
         <StatusPill tone="warning">Needs tools</StatusPill>
       </span>
     );
@@ -270,7 +270,7 @@ function SkillsPage() {
   const disconnect = async (repo: string) => {
     const ok = await confirm({
       title: `Disconnect ${repo}?`,
-      message: "Coderhelm forgets every skill, agent and command read from it. You can connect it again any time.",
+      message: "CoderHelm forgets every skill, agent and command read from it. You can connect it again any time.",
       confirmLabel: "Disconnect",
       destructive: true,
     });
@@ -329,7 +329,7 @@ function SkillsPage() {
     <Page>
       <PageHeader
         title="Skills"
-        lead="Write down how your team works, in skills, agent briefs and commands kept in a repository, and Coderhelm follows them on every task."
+        lead="Write down how your team works, in skills, agent briefs and commands kept in a repository, and CoderHelm follows them on every task."
         actions={
           <div className="flex flex-wrap gap-2">
             <a href="/skills/schedules" className={secondaryButton}>
@@ -357,7 +357,7 @@ function SkillsPage() {
       {tab === "activity" ? (
         <div role="tabpanel" id="panel-activity" aria-labelledby="tab-activity">
           <p className="mt-4 max-w-prose text-sm text-zinc-400">
-            Every time Coderhelm&apos;s planner, coder or reviewer reads a skill, a brief or a command, or asks one of your agents a
+            Every time CoderHelm&apos;s planner, coder or reviewer reads a skill, a brief or a command, or asks one of your agents a
             question: who, during which pull request or ticket, the reason it gave, and how it went. Only that is kept, never the text
             read or the answer, for 180 days.
           </p>
@@ -370,12 +370,12 @@ function SkillsPage() {
         <div className="mt-4 max-w-prose">
           <Disclosure summary="How it works">
             <p>
-              Coderhelm reads the default branch, so only merged changes count, and reads it again on every push. It looks for{" "}
+              CoderHelm reads the default branch, so only merged changes count, and reads it again on every push. It looks for{" "}
               <Code>skills/&lt;name&gt;/SKILL.md</Code>, <Code>agents/&lt;name&gt;.md</Code> and <Code>commands/&lt;name&gt;.md</Code>, also under <Code>.claude/</Code>.
             </p>
             <p>
-              Nothing in them is ever run, and they can&apos;t give Coderhelm any access it doesn&apos;t already have: an agent that&apos;s asked gets
-              only the read-only tools its own file lists, its brief and what it&apos;s sent. Coderhelm uses up to 20 per task; ones set to always
+              Nothing in them is ever run, and they can&apos;t give CoderHelm any access it doesn&apos;t already have: an agent that&apos;s asked gets
+              only the read-only tools its own file lists, its brief and what it&apos;s sent. CoderHelm uses up to 20 per task; ones set to always
               apply are given in full to matching work.
             </p>
           </Disclosure>
@@ -457,7 +457,7 @@ function SkillsPage() {
                       }
                       actions={
                         canManage ? (
-                          <Switch checked={s.enabled} label={`Let Coderhelm read ${s.name}`} disabled={busy === key} onChange={() => toggle(s)} />
+                          <Switch checked={s.enabled} label={`Let CoderHelm read ${s.name}`} disabled={busy === key} onChange={() => toggle(s)} />
                         ) : (
                           <StatusPill tone={s.enabled ? "success" : "neutral"}>{s.enabled ? "On" : "Off"}</StatusPill>
                         )
@@ -560,7 +560,7 @@ function SkillsPage() {
         open={connectOpen}
         onOpenChange={setConnectOpen}
         title="Connect a repository"
-        description="Pick the repository where your team keeps its skills. Coderhelm's GitHub App must be installed on it. Every item starts switched on; switch off any you don't want used."
+        description="Pick the repository where your team keeps its skills. CoderHelm's GitHub App must be installed on it. Every item starts switched on; switch off any you don't want used."
         onSubmit={connect}
         testId="connect-skills-repo"
         footer={

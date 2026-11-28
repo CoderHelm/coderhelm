@@ -140,7 +140,7 @@ async function mockApi(page: Page, init: Partial<Mock> = {}): Promise<Mock> {
             bucket_account: "",
             importable: false,
             use_instead: "confluence",
-            note: "Bedrock reads this from Confluence. Coderhelm's Confluence connector reads the original pages instead.",
+            note: "Bedrock reads this from Confluence. CoderHelm's Confluence connector reads the original pages instead.",
           },
         ],
       });
@@ -311,7 +311,7 @@ test.describe("bringing in an existing knowledge base", () => {
     await expect(page.getByTestId("progress-step")).toBeVisible();
   });
 
-  test("a Bedrock knowledge base's data sources: the S3 one is imported, Confluence points at Coderhelm's own connector", async ({ page }) => {
+  test("a Bedrock knowledge base's data sources: the S3 one is imported, Confluence points at CoderHelm's own connector", async ({ page }) => {
     const db = await mockApi(page);
     await page.goto("/knowledge/");
     await page.getByTestId("start-knowledge").click();
@@ -323,7 +323,7 @@ test.describe("bringing in an existing knowledge base", () => {
     const rows = step.getByTestId("bedrock-data-source");
     await expect(rows).toHaveCount(2);
     await expect(rows.nth(0)).toContainText("s3://help-center/articles/");
-    await expect(rows.nth(1)).toContainText("Coderhelm's Confluence connector reads the original pages instead.");
+    await expect(rows.nth(1)).toContainText("CoderHelm's Confluence connector reads the original pages instead.");
     await expect(rows.nth(1).getByTestId("bedrock-use-instead")).toHaveText("Use Confluence instead");
     await page.getByTestId("flow-continue").click();
     await expect(page.getByTestId("flow-name")).toHaveValue("Support answers");
@@ -339,7 +339,7 @@ test.describe("bringing in an existing knowledge base", () => {
     expect(db.calls.some((c) => c.startsWith("GET /api/knowledge/bedrock/import?arn="))).toBe(true);
   });
 
-  test("the Confluence data source opens Coderhelm's Confluence connector", async ({ page }) => {
+  test("the Confluence data source opens CoderHelm's Confluence connector", async ({ page }) => {
     await mockApi(page);
     await page.goto("/knowledge/");
     await page.getByTestId("start-knowledge").click();

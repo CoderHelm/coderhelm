@@ -37,7 +37,7 @@ export const KNOWN_SCOPES: ScopeInfo[] = [
   {
     key: "code:read",
     title: "Code and docs",
-    covers: "The repositories your team turned on in Coderhelm: files, search, and who calls what.",
+    covers: "The repositories your team turned on in CoderHelm: files, search, and who calls what.",
     examples: ["How does the refunds flow work, and which files should I read first?", "Who calls the function that sends invoice emails?"],
   },
   {
@@ -55,14 +55,14 @@ export const KNOWN_SCOPES: ScopeInfo[] = [
   {
     key: "runs:read",
     title: "Runs and reviews",
-    covers: "Coderhelm's runs and code reviews: their status, findings and verdicts.",
+    covers: "CoderHelm's runs and code reviews: their status, findings and verdicts.",
     examples: ["Which of my runs are waiting on me?", "What did the reviewer find on my last pull request?"],
   },
   {
     key: "runs:write",
     title: "Start runs and reviews",
     covers: "Start and retry runs, and ask for reviews. Only if your role can, and only if you tick it when you connect.",
-    examples: ["Start a run for WEB-57.", "Ask Coderhelm to review pull request 318."],
+    examples: ["Start a run for WEB-57.", "Ask CoderHelm to review pull request 318."],
     acts: true,
   },
 ];

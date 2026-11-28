@@ -61,7 +61,7 @@ export interface SearchToolServer {
   sharing: "shared" | "personal";
   /** The team's connection works (shared), or yours does (personal). */
   connected: boolean;
-  /** Coderhelm's best guess at the tool that searches. */
+  /** CoderHelm's best guess at the tool that searches. */
   search_tool: string | null;
   fetch_tool: string | null;
   tools: { name: string; description: string }[];
@@ -79,7 +79,7 @@ export interface BedrockDataSource {
   /** The account the bucket is in. */
   bucket_account: string;
   importable: boolean;
-  /** A Coderhelm connector that reads the originals instead. */
+  /** A CoderHelm connector that reads the originals instead. */
   use_instead: "confluence" | "web" | "";
   note: string;
 }

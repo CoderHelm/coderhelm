@@ -118,7 +118,7 @@ export default function SecurityPolicyPage() {
     <Page narrow>
       <PageHeader
         title="Security policy"
-        lead="What Coderhelm does when an advisory touches your dependencies: which findings get a pull request and when, what is posted to your alerts channel, and the deadlines."
+        lead="What CoderHelm does when an advisory touches your dependencies: which findings get a pull request and when, what is posted to your alerts channel, and the deadlines."
       />
       <ReviewInSetup available={setupMarks.available} />
 
@@ -311,7 +311,7 @@ export default function SecurityPolicyPage() {
               />
               <SettingsRow
                 label="Adopt Dependabot and Renovate pull requests"
-                help="When one already exists for the fix, Coderhelm adopts it instead of opening a duplicate."
+                help="When one already exists for the fix, CoderHelm adopts it instead of opening a duplicate."
                 unsaved={form.isDirty("adopt_bot_prs")}
                 layout="toggle"
                 control={({ labelId, helpId, inputId }) => (
@@ -320,7 +320,7 @@ export default function SecurityPolicyPage() {
               />
             </SettingsSection>
 
-            <SettingsSection id="deadlines" title="Deadlines" description="Days from when Coderhelm first sees a finding until it should be fixed.">
+            <SettingsSection id="deadlines" title="Deadlines" description="Days from when CoderHelm first sees a finding until it should be fixed.">
               <SettingsRow
                 label="Days to fix"
                 unsaved={form.isDirty("due_days")}
@@ -675,7 +675,7 @@ function PreviewPanel({ readOnly }: { readOnly: boolean }) {
           <h2 id="preview-heading" className="text-sm font-semibold text-zinc-100">
             Preview
           </h2>
-          <p className="mt-0.5 text-sm text-zinc-400">What Coderhelm would open and post with the saved policy. It changes nothing.</p>
+          <p className="mt-0.5 text-sm text-zinc-400">What CoderHelm would open and post with the saved policy. It changes nothing.</p>
         </div>
         {!readOnly && (
           <button type="button" className={secondaryButton} onClick={load} disabled={state === "loading"} data-testid="preview-load">

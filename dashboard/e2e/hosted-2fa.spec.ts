@@ -111,7 +111,7 @@ async function mock(page: Page, over: Partial<State> = {}): Promise<State> {
       return json(route, { status: "reset" });
     }
     if (p === "/api/users/2fa/app/setup") {
-      return json(route, { secret: "JBSWY3DPEHPK3PXP", qr_uri: "otpauth://totp/Coderhelm:bo%40example.org?secret=JBSWY3DPEHPK3PXP&issuer=Coderhelm" });
+      return json(route, { secret: "JBSWY3DPEHPK3PXP", qr_uri: "otpauth://totp/CoderHelm:bo%40example.org?secret=JBSWY3DPEHPK3PXP&issuer=CoderHelm" });
     }
     if (p === "/api/users/2fa/app/verify") {
       state.verified.push(body().code);

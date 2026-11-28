@@ -1,4 +1,4 @@
-// Apps people connect to Coderhelm's MCP server (Claude, Cursor, VS Code and
+// Apps people connect to CoderHelm's MCP server (Claude, Cursor, VS Code and
 // other MCP clients): the consent page an app sends someone to, and the list
 // of apps connected in Settings. The gateway keeps the rules
 // (services/gateway/src/mcp_oauth.rs); every call an app makes runs as the
@@ -6,7 +6,7 @@
 
 import { apiBase } from "./runtime-config";
 
-/** Where the docs explain adding Coderhelm to an app. */
+/** Where the docs explain adding CoderHelm to an app. */
 export const MCP_DOCS_URL = "https://docs.coderhelm.com/mcp";
 
 export interface ConsentScope {
@@ -35,7 +35,7 @@ export interface LookupScope {
 
 export interface ConsentRequest {
   client_id: string;
-  /** The name the app gave itself. Coderhelm can't check it. */
+  /** The name the app gave itself. CoderHelm can't check it. */
   client_name: string;
   client_uri: string | null;
   /** Where the browser goes back to after the answer. */
@@ -145,7 +145,7 @@ export function rememberConsentReturn(loc: Pick<Location, "pathname" | "search">
 /**
  * The consent page's own path and query, when this is one: where a GitHub
  * sign-in started from it comes back to (`/auth/github?return_to=...`), so
- * someone without a Coderhelm account can sign in as a reader and answer.
+ * someone without a CoderHelm account can sign in as a reader and answer.
  */
 export function consentReturnTo(loc: Pick<Location, "pathname" | "search">): string | null {
   if (!loc.pathname.replace(/\/+$/, "").endsWith("/authorize") || !isConsentQuery(loc.search)) return null;

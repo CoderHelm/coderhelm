@@ -2,7 +2,7 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 
-// Hybrid: a self-hosted install that uses Coderhelm's apps and a
+// Hybrid: a self-hosted install that uses CoderHelm's apps and a
 // name.coderhelm.com address (Settings, then System, Hybrid), the app choice
 // on the integration pages, and the hosted dashboard's hand-offs for GitHub's
 // setup page and OAuth callbacks. Every call is answered here; names are made up.
@@ -26,13 +26,13 @@ interface State {
   /** Catalog entries a later release adds, appended as the gateway would list them. */
   added?: { id: string; name: string }[];
   sharing: { enabled: boolean; payloads: boolean };
-  /** Whether Coderhelm's own Google Drive app is set up (the hosted side's `offered`). */
+  /** Whether CoderHelm's own Google Drive app is set up (the hosted side's `offered`). */
   driveOffered?: boolean;
   /** A native install's uninstall choice (Settings, System, Uninstall); absent on an older release. */
   uninstall?: { delete_data: boolean; changed_by: string | null; changed_at: string | null };
   /** The address's checks as the gateway sends them, in place of the default "Certificate for" line. */
   nameChecks?: { id: string; status: string; code: string; title: string; fix: string | null }[];
-  /** Coderhelm's 15-minute check of the address (`name.check`). */
+  /** CoderHelm's 15-minute check of the address (`name.check`). */
   nameWatch?: Record<string, unknown> | null;
 }
 
@@ -44,12 +44,12 @@ interface Call {
 
 function status(s: State) {
   const uses = (id: string, offered = true) => s.appsMode === "coderhelm" && offered && !s.ownApps?.has(id);
-  const tool = (id: string, name: string, offered = true) => ({ id, name, mode: "hosted", through_coderhelm: "The sign-in only.", stays_with_you: "Every page Coderhelm reads.", uses_coderhelm: uses(id, offered), offered, own_app: !!s.ownApps?.has(id) });
+  const tool = (id: string, name: string, offered = true) => ({ id, name, mode: "hosted", through_coderhelm: "The sign-in only.", stays_with_you: "Every page CoderHelm reads.", uses_coderhelm: uses(id, offered), offered, own_app: !!s.ownApps?.has(id) });
   const checks = [
-    { id: "hybrid_registered", status: s.registered ? "pass" : "todo", code: s.registered ? "ok" : "not_registered", title: "Registered with Coderhelm", fix: s.registered ? null : "Press Register with Coderhelm." },
-    ...(s.registered ? [{ id: "hybrid_relay", status: s.verified ? "pass" : "fail", code: s.verified ? "ok" : "signature_mismatch", title: "Events from Coderhelm are signed for this install", fix: s.verified ? null : "Register again so this install and Coderhelm share the same signing key." }] : []),
-    ...(s.registered ? [{ id: "hybrid_github", status: s.links.length ? "pass" : "todo", code: s.links.length ? "ok" : "no_link", title: "Coderhelm's GitHub App is linked", fix: s.links.length ? null : "Press Install on GitHub, or use your own GitHub App." }] : []),
-    ...(s.name ? s.nameChecks ?? [{ id: "hybrid_name", status: "wait", code: "cert_pending", title: `Certificate for ${s.name.hostname}`, fix: "Coderhelm is issuing it. This takes a few minutes." }] : []),
+    { id: "hybrid_registered", status: s.registered ? "pass" : "todo", code: s.registered ? "ok" : "not_registered", title: "Registered with CoderHelm", fix: s.registered ? null : "Press Register with CoderHelm." },
+    ...(s.registered ? [{ id: "hybrid_relay", status: s.verified ? "pass" : "fail", code: s.verified ? "ok" : "signature_mismatch", title: "Events from CoderHelm are signed for this install", fix: s.verified ? null : "Register again so this install and CoderHelm share the same signing key." }] : []),
+    ...(s.registered ? [{ id: "hybrid_github", status: s.links.length ? "pass" : "todo", code: s.links.length ? "ok" : "no_link", title: "CoderHelm's GitHub App is linked", fix: s.links.length ? null : "Press Install on GitHub, or use your own GitHub App." }] : []),
+    ...(s.name ? s.nameChecks ?? [{ id: "hybrid_name", status: "wait", code: "cert_pending", title: `Certificate for ${s.name.hostname}`, fix: "CoderHelm is issuing it. This takes a few minutes." }] : []),
   ];
   return {
     available: true,
@@ -123,7 +123,7 @@ async function setup(page: Page, cfg: Record<string, unknown> | null = SELF, ini
       return json(route, {
         available: true, status: "skip", code: "none",
         domain: { hostname: null, state: "none", mode: null, current: "d111test.cloudfront.net", target: "d111test.cloudfront.net", records: [] },
-        check: { key: "domain", group: "Domain", label: "Your own domain", status: "skip", detail: "Coderhelm uses its AWS address d111test.cloudfront.net.", fix: { text: "Add it in Settings, then System.", href: "/settings/system#domain" } },
+        check: { key: "domain", group: "Domain", label: "Your own domain", status: "skip", detail: "CoderHelm uses its AWS address d111test.cloudfront.net.", fix: { text: "Add it in Settings, then System.", href: "/settings/system#domain" } },
       });
     }
 
@@ -192,7 +192,7 @@ async function setup(page: Page, cfg: Record<string, unknown> | null = SELF, ini
   return { s, calls, puts };
 }
 
-test("not registered: the three setups, what Coderhelm sees, then register", async ({ page }) => {
+test("not registered: the three setups, what CoderHelm sees, then register", async ({ page }) => {
   const { calls } = await setup(page);
   await page.goto("/settings/system/#hybrid");
   const section = page.getByTestId("hybrid-section");
@@ -226,7 +226,7 @@ test("name: taken, reserved and too short say why; a free one is claimed with it
 
   await input.fill("coderhelm");
   await expect(state).toHaveAttribute("data-code", "reserved");
-  await expect(state).toContainText("kept back by Coderhelm");
+  await expect(state).toContainText("kept back by CoderHelm");
 
   await input.fill("ab");
   await expect(state).toContainText("at least 3 characters");
@@ -247,12 +247,12 @@ test("name: taken, reserved and too short say why; a free one is claimed with it
   expect(calls.some((c) => c.method === "DELETE" && c.path === "/api/system/hybrid/name")).toBe(true);
 });
 
-test("GitHub: switch to Coderhelm's app, install on GitHub, edit repositories, unlink", async ({ page }) => {
+test("GitHub: switch to CoderHelm's app, install on GitHub, edit repositories, unlink", async ({ page }) => {
   const { puts, calls, s } = await setup(page, SELF, { registered: true, verified: true });
   await page.goto("/settings/system/");
   const row = page.getByTestId("hybrid-github");
   await expect(row).toHaveAttribute("data-mode", "own");
-  await row.getByRole("radio", { name: /Use Coderhelm's GitHub App \(easiest\)/ }).check();
+  await row.getByRole("radio", { name: /Use CoderHelm's GitHub App \(easiest\)/ }).check();
   await expect(row).toHaveAttribute("data-mode", "hosted");
   expect(puts()).toContainEqual({ github_mode: "hosted" });
 
@@ -327,7 +327,7 @@ test("GitHub links: a link from before the push list was recorded says to link i
 for (const [outcome, words, tone] of [
   ["linked", "GitHub is linked.", "success"],
   ["linked_elsewhere", "already linked to another install", "error"],
-  ["used_by_hosted_team", "used by a team on Coderhelm's hosted service", "error"],
+  ["used_by_hosted_team", "used by a team on CoderHelm's hosted service", "error"],
   ["signin_failed", "didn't confirm who you are", "error"],
   ["no_write_access", "can't push to any repository", "error"],
   ["declined", "you chose Cancel", "error"],
@@ -348,18 +348,18 @@ for (const [outcome, words, tone] of [
 const ALL_TOOLS = { jira: "coderhelm", notion: "coderhelm", confluence: "coderhelm", google_drive: "coderhelm", figma: "coderhelm" };
 const ALL_OWN = { jira: "own", notion: "own", confluence: "own", google_drive: "own", figma: "own" };
 
-test("other apps: one choice, Coderhelm's apps by default, for every tool the catalog lists", async ({ page }) => {
+test("other apps: one choice, CoderHelm's apps by default, for every tool the catalog lists", async ({ page }) => {
   const { puts } = await setup(page, SELF, { registered: true, verified: true });
   await page.goto("/settings/system/");
   const row = page.getByTestId("hybrid-integrations");
   await expect(row).toHaveAttribute("data-apps-mode", "coderhelm");
-  await expect(row.getByRole("button", { name: "Use Coderhelm's apps (easiest)" })).toHaveAttribute("aria-pressed", "true");
+  await expect(row.getByRole("button", { name: "Use CoderHelm's apps (easiest)" })).toHaveAttribute("aria-pressed", "true");
   await expect(row.getByRole("button", { name: "Fully private" })).toHaveAttribute("aria-pressed", "false");
   // One choice: no per-tool switches and no per-tool paragraphs.
   await expect(row.getByRole("button")).toHaveCount(2);
-  await expect(row).not.toContainText("Through Coderhelm");
+  await expect(row).not.toContainText("Through CoderHelm");
   await expect(row).not.toContainText("Stays with you");
-  await expect(row.getByTestId("hybrid-apps-line")).toContainText("and for any Coderhelm adds later");
+  await expect(row.getByTestId("hybrid-apps-line")).toContainText("and for any CoderHelm adds later");
   // The tools come from the gateway's catalog, Figma among them.
   const tools = row.getByTestId("hybrid-apps-tools");
   for (const id of ["jira", "notion", "confluence", "google_drive", "figma"]) {
@@ -394,9 +394,9 @@ test("other apps: fully private sends one choice (and the per-tool copy for an o
   await row.getByRole("button", { name: "Fully private" }).click();
   await expect.poll(() => puts().at(-1)).toEqual({ apps_mode: "private", apps: ALL_OWN });
   await expect(row).toHaveAttribute("data-apps-mode", "private");
-  await expect(row.getByTestId("hybrid-apps-line")).toContainText("Nothing goes through Coderhelm");
+  await expect(row.getByTestId("hybrid-apps-line")).toContainText("Nothing goes through CoderHelm");
   await expect(row.getByTestId("hybrid-integration-notion")).toHaveAttribute("data-uses-coderhelm", "false");
-  await row.getByRole("button", { name: "Use Coderhelm's apps (easiest)" }).click();
+  await row.getByRole("button", { name: "Use CoderHelm's apps (easiest)" }).click();
   await expect.poll(() => puts().at(-1)).toEqual({ apps_mode: "coderhelm", apps: ALL_TOOLS });
   await expect(row).toHaveAttribute("data-apps-mode", "coderhelm");
 });
@@ -406,12 +406,12 @@ test("other apps: an older gateway (no apps_mode) still shows and takes the choi
   await page.goto("/settings/system/");
   const row = page.getByTestId("hybrid-integrations");
   await expect(row).toHaveAttribute("data-apps-mode", "private");
-  await row.getByRole("button", { name: "Use Coderhelm's apps (easiest)" }).click();
+  await row.getByRole("button", { name: "Use CoderHelm's apps (easiest)" }).click();
   await expect.poll(() => puts().at(-1)).toEqual({ apps_mode: "coderhelm", apps: ALL_TOOLS });
   await expect(row).toHaveAttribute("data-apps-mode", "coderhelm");
 });
 
-test("other apps: a tool with its own app keeps it, and one Coderhelm can't offer yet says so", async ({ page }) => {
+test("other apps: a tool with its own app keeps it, and one CoderHelm can't offer yet says so", async ({ page }) => {
   await setup(page, SELF, { registered: true, verified: true, driveOffered: false, ownApps: new Set(["notion"]) });
   await page.goto("/settings/system/");
   const tools = page.getByTestId("hybrid-apps-tools");
@@ -429,12 +429,12 @@ test("sharing with support: off by default, exactly what is sent, payloads only 
   await expect(row).toContainText("Never headers");
   await expect(row).toContainText("source, event type, status, reason code, attempts and timings");
   await expect(row.getByTestId("hybrid-payloads-switch")).toHaveCount(0);
-  await row.getByRole("switch", { name: "Share failed deliveries with Coderhelm support" }).click();
+  await row.getByRole("switch", { name: "Share failed deliveries with CoderHelm support" }).click();
   await expect(row).toHaveAttribute("data-enabled", "true");
   expect(puts().at(-1)).toEqual({ sharing: { enabled: true, payloads: false } });
   await row.getByRole("switch", { name: "Include payload previews" }).click();
   await expect.poll(() => puts().at(-1)).toEqual({ sharing: { enabled: true, payloads: true } });
-  await row.getByRole("switch", { name: "Share failed deliveries with Coderhelm support" }).click();
+  await row.getByRole("switch", { name: "Share failed deliveries with CoderHelm support" }).click();
   await expect.poll(() => puts().at(-1)).toEqual({ sharing: { enabled: false, payloads: false } });
 });
 
@@ -462,7 +462,7 @@ test("leave hybrid asks first, then goes back to fully private", async ({ page }
   expect(calls.some((c) => c.method === "DELETE" && c.path === "/api/system/hybrid")).toBe(true);
 });
 
-test("domain: a Coderhelm address is the third choice and leads to the name picker", async ({ page }) => {
+test("domain: a CoderHelm address is the third choice and leads to the name picker", async ({ page }) => {
   await setup(page, SELF, { registered: true, verified: true });
   await page.goto("/settings/system/");
   const choices = page.getByTestId("address-choices");
@@ -480,7 +480,7 @@ test("integration pages: GitHub keeps its own choice; other tools say which app 
   await page.goto("/settings/integrations/github/");
   const choice = page.getByTestId("hybrid-app-choice");
   await expect(choice).toHaveAttribute("data-state", "own");
-  await choice.getByRole("button", { name: "Use Coderhelm's app (easiest)" }).click();
+  await choice.getByRole("button", { name: "Use CoderHelm's app (easiest)" }).click();
   await expect(choice).toHaveAttribute("data-state", "coderhelm");
   expect(puts().at(-1)).toEqual({ github_mode: "hosted" });
 
@@ -546,7 +546,7 @@ for (const [label, viewport] of [["1440", { width: 1440, height: 1000 }], ["390"
     await expect(page.getByTestId("hybrid-github")).toContainText("only the repositories you can push to");
     for (const [outcome, title, fix] of [
       ["no_write_access", "can't push to any repository in that installation", "get write access on GitHub"],
-      ["declined", "you chose Cancel on Coderhelm's confirmation page", "choose Link"],
+      ["declined", "you chose Cancel on CoderHelm's confirmation page", "choose Link"],
       ["install_off", "verified and active, so nothing was linked", "Press Check again"],
     ] as const) {
       await page.goto(`/settings/system/?hybrid_github=${outcome}#hybrid`);
@@ -644,16 +644,16 @@ test("uninstall: an install without the switch (an older release) shows no choic
   await expect(page.getByTestId("uninstall-data")).toHaveCount(0);
 });
 
-test("uninstall, hybrid: a plain warning that the forwarded GitHub installations and Jira site go back to Coderhelm hosted", async ({ page }) => {
+test("uninstall, hybrid: a plain warning that the forwarded GitHub installations and Jira site go back to CoderHelm hosted", async ({ page }) => {
   await setup(page, SELF, { registered: true, verified: true, mode: "hosted", links: [{ installation_id: 1, account: "example-org", repositories: [] }, { installation_id: 2, account: "example-two", repositories: [] }] });
   await page.goto("/settings/system/");
   await expect(page.getByTestId("uninstall-hybrid")).toContainText("2 GitHub installations");
-  await expect(page.getByTestId("uninstall-hybrid")).toContainText("back to Coderhelm hosted");
+  await expect(page.getByTestId("uninstall-hybrid")).toContainText("back to CoderHelm hosted");
   await expect(page.getByTestId("uninstall-link")).toHaveAttribute("href", "https://docs.coderhelm.com/self-host/uninstall/?stage=acme&region=eu-west-1");
   if (process.env.E2E_SHOTS_DIR) await page.getByTestId("uninstall-section").screenshot({ path: path.join(SHOTS_DIR, "system-uninstall.png") });
 });
 
-// ── The Coderhelm address card: one state, from the latest check ─────────
+// ── The CoderHelm address card: one state, from the latest check ─────────
 
 const ADDR = { name: "example-org", hostname: "example-org.coderhelm.com", code: "ok" };
 const LIVE = { id: "hybrid_name", status: "pass", code: "ok", title: "example-org.coderhelm.com is live", fix: null };

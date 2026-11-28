@@ -129,7 +129,7 @@ test.describe("Version and updates: every state", () => {
     await page.goto("/settings/system/");
     await expect(status(page)).toHaveAttribute("data-state", "current");
     await expect(status(page)).toContainText("You're up to date");
-    await expect(status(page)).toContainText("Coderhelm v0.8.32, released");
+    await expect(status(page)).toContainText("CoderHelm v0.8.32, released");
     await expect(page.getByTestId("release-check")).toContainText("Checked 2 min ago");
     await expect(page.getByRole("button", { name: "Check for updates" })).toBeVisible();
     // Nothing on the page reads like an update state but the status.
@@ -348,7 +348,7 @@ test.describe("Version and updates: every state", () => {
     await setup(page, { version: { latest: LATEST, update_available: true, running: true, history: [{ id: "UPDATE#2", version: "v0.9.0", from_version: "v0.8.32", actor: "admin@acme.example", mode: "update", status: "running", started_at: ago(2) }, ...OK_HISTORY] } });
     await page.goto("/settings/system/");
     await expect(status(page)).toContainText("Updating to v0.9.0");
-    await expect(status(page)).toContainText("Coderhelm keeps running v0.8.32 until it finishes");
+    await expect(status(page)).toContainText("CoderHelm keeps running v0.8.32 until it finishes");
     await expect(status(page).getByRole("progressbar")).toBeVisible();
   });
 
@@ -377,7 +377,7 @@ test.describe("Version and updates: every state", () => {
     await setup(page, { version: { latest: LATEST, update_available: true, history: [{ id: "UPDATE#2", version: "v0.9.0", from_version: "v0.8.32", actor: "auto", mode: "update", status: "failed", started_at: ago(50), reason: RAW }, ...OK_HISTORY] } });
     await page.goto("/settings/system/");
     await expect(status(page)).toContainText("The update to v0.9.0 stopped partway");
-    await expect(status(page)).toContainText("Coderhelm may not be fully working");
+    await expect(status(page)).toContainText("CoderHelm may not be fully working");
     await expect(status(page)).not.toContainText("arn:aws");
     await expect(status(page).getByRole("link", { name: "Roll back" })).toHaveAttribute("href", "#history");
     await page.locator("#version").getByText("Technical details", { exact: true }).click();

@@ -69,7 +69,7 @@ const RUNS: Record<string, unknown> = {
       reason: "It selects the card by its name, which is the ticket's fix.",
     },
   },
-  // Coderhelm's own pull request covered the ticket and lacked part of it:
+  // CoderHelm's own pull request covered the ticket and lacked part of it:
   // the run carried its work there; the ticket's earlier pull request is
   // superseded.
   "01CONT": {
@@ -88,7 +88,7 @@ const RUNS: Record<string, unknown> = {
       carried: { branch: "coderhelm/abc-13", head: "9f2c1e0", commits: 3, files: ["src/register.ts", "src/helpers/a.ts"], rebuilt: false },
       open_items: ["Register the two extra helper files"],
       superseded: { repo: "your-team/web", number: 41, url: "https://github.com/your-team/web/pull/41", title: "Cards list fix", closed: false },
-      note: "Continued in #52, Coderhelm's own open pull request that already covered this ticket.",
+      note: "Continued in #52, CoderHelm's own open pull request that already covered this ticket.",
     },
   },
   "01DONE": {
@@ -191,7 +191,7 @@ for (const [label, width, height] of [
     await mockApi(page);
     await page.goto("/runs/detail?id=01TOOL");
     const outcome = page.getByTestId("run-outcome");
-    await expect(outcome).toContainText("Tooling failure: Coderhelm's own environment failed");
+    await expect(outcome).toContainText("Tooling failure: CoderHelm's own environment failed");
     await expect(outcome).toContainText("This is not a question for the ticket.");
     await expect(page.getByTestId("tooling-command").locator("pre")).toContainText("cd 'e2e' && pnpm exec tsc --noEmit -p tsconfig.json");
     await expect(page.getByTestId("tooling-error").locator("pre")).toContainText("sh: 1: tsc: not found");
@@ -244,7 +244,7 @@ test("a covered run can be retried when the ticket needs its own change", async 
   await expect.poll(() => calls).toContain("POST /api/runs/01COVR/retry");
 });
 
-test("a covered run that continued in Coderhelm's own pull request shows what was carried and offers to close the earlier one", async ({ page }) => {
+test("a covered run that continued in CoderHelm's own pull request shows what was carried and offers to close the earlier one", async ({ page }) => {
   const calls = await mockApi(page);
   await page.goto("/runs/detail?id=01CONT");
   const outcome = page.getByTestId("run-outcome");

@@ -62,7 +62,7 @@ import {
 
 // Use in Bedrock: two ways for Amazon Bedrock to use the team's knowledge,
 // laid out by what the admin wants, not how it works.
-// - Live: an AgentCore Gateway signs in to Coderhelm's MCP server with a
+// - Live: an AgentCore Gateway signs in to CoderHelm's MCP server with a
 //   connection (a client ID and secret made here; the gateway calls them a
 //   credential provider) and searches what the connection's maker can read.
 // - Copied: chosen knowledge bases are kept in a Bedrock knowledge base in
@@ -99,7 +99,7 @@ export default function BedrockPage() {
         <GoalCard
           href="#live"
           title="Let Bedrock agents search your knowledge live"
-          body="Your AgentCore Gateway calls Coderhelm's knowledge_search tool. Nothing is copied, so agents always read the latest version, and only what the connection's maker can read in Chat."
+          body="Your AgentCore Gateway calls CoderHelm's knowledge_search tool. Nothing is copied, so agents always read the latest version, and only what the connection's maker can read in Chat."
           best="Agents built on AgentCore."
           status={
             liveCount === null
@@ -358,7 +358,7 @@ function expiryWords(
 // ── Live search through AgentCore Gateway ───────────────────────────
 
 const WHY_CREDENTIAL =
-  "AgentCore Gateway signs in to Coderhelm as a program, with a client ID and secret it keeps, so it needs a connection made here; signing in as yourself is for apps like Claude and Cursor, which open a browser for you.";
+  "AgentCore Gateway signs in to CoderHelm as a program, with a client ID and secret it keeps, so it needs a connection made here; signing in as yourself is for apps like Claude and Cursor, which open a browser for you.";
 
 function LiveSection({
   details,
@@ -430,7 +430,7 @@ function LiveSection({
       title="Let Bedrock agents search your knowledge live"
       description={
         <>
-          Add Coderhelm to your Amazon Bedrock AgentCore Gateway as an MCP
+          Add CoderHelm to your Amazon Bedrock AgentCore Gateway as an MCP
           server target. Your agents get two tools, knowledge_search and
           knowledge_list, and read the knowledge bases you pick, live.
         </>
@@ -508,7 +508,7 @@ function LiveSection({
             </li>
           </ol>
 
-          <Disclosure summary="Coderhelm's addresses, for other MCP clients">
+          <Disclosure summary="CoderHelm's addresses, for other MCP clients">
             <div className="space-y-3 pt-1" data-testid="connect-info">
               <Row
                 label="MCP server address"
@@ -526,7 +526,7 @@ function LiveSection({
                 key: header Authorization, value Bearer and the secret. Gateway
                 can sign in as each person (OAuth authorization code) only with
                 a client secret registered ahead of time, and the agent&apos;s
-                own app then has to sign every person in; Coderhelm&apos;s
+                own app then has to sign every person in; CoderHelm&apos;s
                 sign-in for apps registers them without a secret, so a
                 connection is the way for Gateway today.
               </p>
@@ -634,7 +634,7 @@ function StatusChip({ status }: { status: KnowledgeKey["status"] }) {
 
 type SetupTab = "console" | "cli" | "json";
 
-/** How to add Coderhelm to a gateway: console steps, AWS CLI, or JSON. */
+/** How to add CoderHelm to a gateway: console steps, AWS CLI, or JSON. */
 function GatewaySetup({
   connect,
   clientId,
@@ -821,7 +821,7 @@ function NewConnection({
             id: b.id,
             name: b.name,
             warn: b.named_readers
-              ? "Only named people read it in Coderhelm. The gateway's agents will read it too."
+              ? "Only named people read it in CoderHelm. The gateway's agents will read it too."
               : undefined,
           }))}
         />
@@ -894,7 +894,7 @@ function ConnectionMade({
       open
       onOpenChange={(o) => !o && onClose()}
       title="Copy the secret now"
-      description="Coderhelm keeps only a hash of it, so this is the one time you can see it."
+      description="CoderHelm keeps only a hash of it, so this is the one time you can see it."
       wide
       testId="key-made"
       footer={
@@ -1201,7 +1201,7 @@ function CopySection({
               tone: "success",
               text: enabled
                 ? "Saved. The first sync has started."
-                : "Copying is off. Coderhelm is removing its copies from Bedrock.",
+                : "Copying is off. CoderHelm is removing its copies from Bedrock.",
             },
       );
     } catch (e) {
@@ -1355,7 +1355,7 @@ function CopySection({
                       : "Connected in place, so it isn't copied.",
                     warn:
                       b.can_copy && b.named_readers
-                        ? "Only named people read it in Coderhelm."
+                        ? "Only named people read it in CoderHelm."
                         : undefined,
                   }))}
                 />
@@ -1440,7 +1440,7 @@ function CopySection({
                       region <Code>{oneClick.region}</Code> makes the bucket
                       only this install can write, a Bedrock knowledge base that
                       reads it, and a schedule that syncs it every 15 minutes.
-                      It tells Coderhelm when it is ready: nothing to copy by
+                      It tells CoderHelm when it is ready: nothing to copy by
                       hand.
                     </p>
                     <p>
@@ -1467,7 +1467,7 @@ function CopySection({
                   <div className="space-y-3">
                     <p className="text-sm text-zinc-400">
                       Add a data source of type Custom to the knowledge base in
-                      the Bedrock console, then paste both here. Coderhelm adds
+                      the Bedrock console, then paste both here. CoderHelm adds
                       and removes documents in it directly
                       {data.self_hosted
                         ? ""
@@ -1555,7 +1555,7 @@ function CopySection({
                     testId="role-update"
                   >
                     <p>
-                      Coderhelm writes to this knowledge base with your
+                      CoderHelm writes to this knowledge base with your
                       account&apos;s CoderHelmLogReader role. Its stack needs
                       the knowledge base in SyncKnowledgeBases once.
                     </p>
@@ -1710,8 +1710,8 @@ function SetupProgress({
           : "";
     return at > 3
       ? syncStarted
-        ? "Coderhelm is copying the documents. Bedrock reads them on its next sync, within 15 minutes."
-        : "Coderhelm queued the first copy."
+        ? "CoderHelm is copying the documents. Bedrock reads them on its next sync, within 15 minutes."
+        : "CoderHelm queued the first copy."
       : "";
   };
   const failed = setup.state === "failed" || setup.state === "expired";

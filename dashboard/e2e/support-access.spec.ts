@@ -271,7 +271,7 @@ test.describe("support access", () => {
     await page.getByLabel(/Note for support/).fill("Look at the failed run");
     await page.getByTestId("support-access-grant").click();
     await expect(control).toHaveAttribute("data-active", "true");
-    await expect(control).toContainText("Coderhelm support can see your workspace, read only, until");
+    await expect(control).toContainText("CoderHelm support can see your workspace, read only, until");
     expect(db.posts.find((x) => x.path === "/api/support/access" && x.method === "POST")!.body).toEqual({ hours: 24, note: "Look at the failed run" });
     await expect(page.getByTestId("support-access-log").locator('[data-kind="granted"]')).toHaveCount(1);
     await shot(page, "support-access-on");

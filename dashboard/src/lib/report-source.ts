@@ -21,7 +21,7 @@ export function parseLocation(raw: string): { ok: true; location: ParsedLocation
   if (!/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(bucket) || bucket.includes("..")) return { ok: false, error: `${bucket || "The bucket"} isn't a valid S3 bucket name.` };
   if (/[\s'"\\]/.test(s)) return { ok: false, error: "The location can't contain spaces, quotes or backslashes." };
   for (const m of pattern.match(/\{[^}]*\}?/g) ?? []) {
-    if (!PLACEHOLDERS.includes(m)) return { ok: false, error: `${m} isn't a placeholder Coderhelm fills in; use {run_id} and {attempt}.` };
+    if (!PLACEHOLDERS.includes(m)) return { ok: false, error: `${m} isn't a placeholder CoderHelm fills in; use {run_id} and {attempt}.` };
   }
   if (!pattern.includes("{run_id}")) return { ok: false, error: "The location needs {run_id}, so each run's report can be found." };
   return { ok: true, location: { kind: "s3", bucket, pattern: pattern.replace(/^\/+/, "") } };

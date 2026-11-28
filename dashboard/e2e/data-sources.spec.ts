@@ -7,7 +7,7 @@ import { expectSelectValue, pickOption } from "./select";
 
 const API_URL = "https://api.yourcompany.com/graphql";
 const GOOD_KEY = "key_readonly_example_9x2k";
-const REFUSAL = "This lookup would change data, so it was refused before it left Coderhelm. Ask for something to read instead.";
+const REFUSAL = "This lookup would change data, so it was refused before it left CoderHelm. Ask for something to read instead.";
 const KEY_REJECTED = "The new key was not accepted. The old key is still in place.";
 const SHOTS_DIR = process.env.E2E_SHOTS_DIR || path.join("test-results", "shots");
 
@@ -62,7 +62,7 @@ const LOG_GROUPS = [
   { name: "/ecs/worker", stored_mb: 310, retention_days: 30 },
   { name: "/aws/lambda/orders-sync", stored_mb: 0.4, retention_days: null },
 ];
-const ROLE_CHECK = { id: "role", label: "Use the role in your AWS account", ok: true, detail: "Coderhelm can use the role, and only with your private ID." };
+const ROLE_CHECK = { id: "role", label: "Use the role in your AWS account", ok: true, detail: "CoderHelm can use the role, and only with your private ID." };
 const AWS_CONNECT_CHECKS = [ROLE_CHECK, { id: "logs", label: "See your log groups", ok: true, detail: "It can see 3 log groups." }];
 const DB_PASSED = [
   ROLE_CHECK,
@@ -90,7 +90,7 @@ const PASSED_CHECKS = [
   { id: "reach", label: "Reach the address", ok: true, detail: "Your API answered." },
   { id: "sign_in", label: "The key is accepted", ok: true, detail: "Your API accepted the key." },
   { id: "read", label: "Read the list of data", ok: true, detail: "Found 14 kinds of data." },
-  { id: "read_only", label: "Only reads are possible", ok: true, detail: "A test write was refused before it left Coderhelm." },
+  { id: "read_only", label: "Only reads are possible", ok: true, detail: "A test write was refused before it left CoderHelm." },
 ];
 const REJECTED_CHECKS = [
   PASSED_CHECKS[0],
@@ -470,7 +470,7 @@ test("hub: empty state", async ({ page }) => {
   await expect(page.getByRole("link", { name: /Your own tools/ })).toHaveAttribute("href", /^\/data-sources\/tools\/?$/);
   await expect(page.getByRole("link", { name: /Logs in your AWS account/ })).toHaveAttribute("href", /^\/data-sources\/connect\/aws\/?\?for=logs$/);
   await expect(page.getByRole("link", { name: /A database in your AWS account/ })).toHaveAttribute("href", /^\/data-sources\/connect\/aws\/?\?for=database$/);
-  await expect(page.getByText("No lookups yet. They appear here the moment Coderhelm or a teammate runs one.")).toBeVisible();
+  await expect(page.getByText("No lookups yet. They appear here the moment CoderHelm or a teammate runs one.")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Connected" })).toHaveCount(0);
   await expect(page.locator('li[aria-current="step"]')).toContainText("Connect a source");
   await expect(page.getByRole("navigation").getByRole("link", { name: "Data sources" })).toBeVisible();
@@ -497,7 +497,7 @@ test("connect an API: happy path through Turn on fact-checking", async ({ page }
   await page.getByRole("button", { name: "Continue" }).click();
 
   // Key
-  await expect(page.getByRole("heading", { level: 1, name: "Paste a key Coderhelm can use" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Paste a key CoderHelm can use" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Connect" })).toBeDisabled();
   await page.getByLabel("API key").fill(GOOD_KEY);
   const checks = page.getByRole("list", { name: "Checks for this key" });
@@ -505,14 +505,14 @@ test("connect an API: happy path through Turn on fact-checking", async ({ page }
     await expect(checks.locator('li[data-state="passed"]', { hasText: label })).toBeVisible();
   }
   await expect(page.getByText("This API can also change data.")).toBeVisible();
-  await expect(page.getByText("every lookup is checked before it leaves Coderhelm and anything that isn't a pure read is refused.")).toBeVisible();
+  await expect(page.getByText("every lookup is checked before it leaves CoderHelm and anything that isn't a pure read is refused.")).toBeVisible();
   await page.getByText("Technical details").click();
   await expect(page.getByText("Only POST requests to this exact address are sent")).toBeVisible();
   await shot(page, "connect-2-key");
   await page.getByRole("button", { name: "Connect" }).click();
 
   // Choose
-  await expect(page.getByRole("heading", { level: 1, name: "Choose what Coderhelm may use" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Choose what CoderHelm may use" })).toBeVisible();
   expect(callsTo(db, "POST", /\/api\/data-sources\/api$/)[0].body).toEqual({ url: API_URL, key: GOOD_KEY });
   expect(page.url()).toContain("id=ds_1");
   expect(page.url()).not.toContain(GOOD_KEY);
@@ -528,7 +528,7 @@ test("connect an API: happy path through Turn on fact-checking", async ({ page }
   await page.getByRole("button", { name: "Continue" }).click();
 
   // Try
-  await expect(page.getByRole("heading", { level: 1, name: "Run a lookup the way Coderhelm would" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Run a lookup the way CoderHelm would" })).toBeVisible();
   const put = callsTo(db, "PUT", /\/api\/data-sources\/ds_1$/)[0].body!;
   expect(put.repos).toEqual(["your-team/backend"]);
   expect(put.hidden_fields).toContain("salary");
@@ -546,7 +546,7 @@ test("connect an API: happy path through Turn on fact-checking", async ({ page }
 
   // Review
   await expect(page.getByRole("heading", { level: 1, name: "Check before you turn it on" })).toBeVisible();
-  for (const k of ["Connected", "Coderhelm can", "Coderhelm cannot", "We store", "Turning it off"]) {
+  for (const k of ["Connected", "CoderHelm can", "CoderHelm cannot", "We store", "Turning it off"]) {
     await expect(page.getByRole("term").filter({ hasText: new RegExp(`^${k}$`) })).toBeVisible();
   }
   await expect(page.getByText("your-team/backend")).toBeVisible();
@@ -555,7 +555,7 @@ test("connect an API: happy path through Turn on fact-checking", async ({ page }
 
   // Done
   await expect(page.getByRole("heading", { level: 1, name: "Fact-checking is on" })).toBeVisible();
-  await expect(page.getByText("Coderhelm uses it from now on")).toBeVisible();
+  await expect(page.getByText("CoderHelm uses it from now on")).toBeVisible();
   expect(callsTo(db, "PUT", /\/api\/data-sources\/ds_1$/).at(-1)!.body).toEqual({ enabled: true });
   await shot(page, "connect-6-done");
   await page.getByRole("link", { name: "Back to data sources" }).click();
@@ -622,7 +622,7 @@ test("the address step can be completed with the keyboard alone", async ({ page 
   await expect(page.getByText("Found a GraphQL API at that address.")).toBeVisible();
   await page.keyboard.press("Enter");
 
-  const heading = page.getByRole("heading", { level: 1, name: "Paste a key Coderhelm can use" });
+  const heading = page.getByRole("heading", { level: 1, name: "Paste a key CoderHelm can use" });
   await expect(heading).toBeVisible();
   await expect(heading).toBeFocused();
   await page.keyboard.press("Tab");
@@ -649,10 +649,10 @@ test("an unfinished setup can be resumed from the hub", async ({ page }) => {
   const card = page.getByRole("article", { name: "api.yourcompany.com" });
   await expect(card.getByText("Paused — finish setup")).toBeVisible();
   await expect(card.getByRole("switch")).toHaveCount(0);
-  await expect(page.locator('li[aria-current="step"]')).toContainText("Choose what Coderhelm may use");
+  await expect(page.locator('li[aria-current="step"]')).toContainText("Choose what CoderHelm may use");
   await shot(page, "hub-unfinished");
   await card.getByRole("link", { name: "Continue setup" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Choose what Coderhelm may use" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Choose what CoderHelm may use" })).toBeVisible();
   await expect(page.getByRole("list", { name: "Hidden field names" }).getByRole("listitem")).toHaveCount(2);
 });
 
@@ -690,12 +690,12 @@ test("replace key: a rejected key keeps the old one and says so", async ({ page 
   await shot(page, "hub-replace-key-rejected");
 });
 
-test("hub: editing what Coderhelm can't see sends the new list", async ({ page }) => {
+test("hub: editing what CoderHelm can't see sends the new list", async ({ page }) => {
   const db = await mockApi(page, { sources: [makeSource({ enabled: true, setup_complete: true, hidden_fields: ["password", "token"] })] });
   await page.goto("/data-sources");
   const card = await openSource(page, "api.yourcompany.com");
 
-  await card.getByRole("button", { name: "What Coderhelm can't see" }).click();
+  await card.getByRole("button", { name: "What CoderHelm can't see" }).click();
   await expect(card.getByRole("button", { name: "Save" })).toBeDisabled();
   await card.getByRole("button", { name: "Stop hiding token" }).click();
   await card.getByLabel("Hide another field name").fill("salary");
@@ -725,7 +725,7 @@ test("remove: confirm, delete, and the card is gone", async ({ page }) => {
   expect(callsTo(db, "DELETE", /\/api\/data-sources\/ds_1$/)).toHaveLength(1);
 });
 
-test("a source in error status says Coderhelm is not using it, and activity explains refusals", async ({ page }) => {
+test("a source in error status says CoderHelm is not using it, and activity explains refusals", async ({ page }) => {
   const now = new Date().toISOString();
   await mockApi(page, {
     sources: [makeSource({ enabled: true, setup_complete: true, status: "error", status_message: "Your API stopped accepting the key.", key_hint: "" })],
@@ -740,7 +740,7 @@ test("a source in error status says Coderhelm is not using it, and activity expl
   const card = page.getByRole("article", { name: "api.yourcompany.com" });
 
   await expect(card.getByText("Needs attention", { exact: true })).toBeVisible();
-  await expect(card.getByText("Coderhelm is not using this source until the problem is fixed.")).toBeVisible();
+  await expect(card.getByText("CoderHelm is not using this source until the problem is fixed.")).toBeVisible();
   await expect(card.getByText("Your API stopped accepting the key.")).toBeVisible();
   // The problem shows on the closed row; the key is in the details.
   await openSource(page, "api.yourcompany.com");
@@ -759,7 +759,7 @@ test("a source in error status says Coderhelm is not using it, and activity expl
   // Test again returns the fixed source; the card updates without a reload.
   await card.getByRole("button", { name: "Test again" }).click();
   await expect(card.getByText("Ready", { exact: true })).toBeVisible();
-  await expect(card.getByText("Coderhelm is not using this source until the problem is fixed.")).toHaveCount(0);
+  await expect(card.getByText("CoderHelm is not using this source until the problem is fixed.")).toHaveCount(0);
 });
 
 test("step ids from the server are shown as their labels, never raw", async ({ page }) => {
@@ -839,7 +839,7 @@ test("hub: lists APIs, logs and databases, each with its own details", async ({ 
   await expect(db.getByText(`orders-db / orders · AWS account ${ACCOUNT}, us-east-1`)).toBeVisible();
   await expect(db.getByText("42 tables")).toBeVisible();
   await expect(db.getByRole("button", { name: "Replace key" })).toHaveCount(0);
-  await db.getByRole("button", { name: "What Coderhelm can't see" }).click();
+  await db.getByRole("button", { name: "What CoderHelm can't see" }).click();
   await expect(db.getByRole("list", { name: "Hidden column names" })).toBeVisible();
   await expect(db.getByLabel("Hide another column name")).toBeVisible();
   await shot(page, "hub-mixed-sources");
@@ -868,7 +868,7 @@ test("connect logs: reuse the AWS connection the team already has", async ({ pag
   await page.goto("/data-sources");
   await page.getByRole("link", { name: /Logs in your AWS account/ }).click();
 
-  await expect(page.getByRole("heading", { level: 1, name: "Give Coderhelm read-only access" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Give CoderHelm read-only access" })).toBeVisible();
   await expect(page.locator('li[aria-current="step"]')).toContainText("Give read-only access");
   const existing = page.getByRole("region", { name: `AWS account ${ACCOUNT}` });
   await expect(existing.getByText("It can only read logs, so there's nothing to run.")).toBeVisible();
@@ -877,7 +877,7 @@ test("connect logs: reuse the AWS connection the team already has", async ({ pag
   await shot(page, "connect-aws-logs-existing");
   await existing.getByRole("button", { name: "Use this connection" }).click();
 
-  await expect(page.getByRole("heading", { level: 1, name: "Choose which logs Coderhelm may search" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Choose which logs CoderHelm may search" })).toBeVisible();
   await expect(page.locator('li[aria-current="step"]')).toContainText("Choose what to share");
   expect(callsTo(db, "POST", /\/aws\/connect$/)[0].body).toEqual({ role_arn: `arn:aws:iam::${ACCOUNT}:role/CoderHelmLogReader`, region: "us-east-1" });
   await expect(page.getByLabel("/ecs/api")).toBeChecked();
@@ -889,7 +889,7 @@ test("connect logs: reuse the AWS connection the team already has", async ({ pag
   await shot(page, "connect-aws-logs-pick");
   await page.getByRole("button", { name: "Connect these 2 log groups" }).click();
 
-  await expect(page.getByRole("heading", { level: 1, name: "Choose what Coderhelm may use" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Choose what CoderHelm may use" })).toBeVisible();
   expect(page.url()).toContain("id=ds_logs");
   await expect(page.locator('li[aria-current="step"]')).toContainText("Choose what it may use");
   expect(callsTo(db, "POST", /\/api\/data-sources\/logs$/)[0].body).toEqual({
@@ -903,7 +903,7 @@ test("connect a database: script, pasted line, and a failed read-only check expl
   await page.goto("/data-sources");
   await page.getByRole("link", { name: /A database in your AWS account/ }).click();
 
-  await expect(page.getByRole("heading", { level: 1, name: "Give Coderhelm read-only access" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Give CoderHelm read-only access" })).toBeVisible();
   await expect(page.getByRole("link", { name: /Open AWS CloudShell/ })).toHaveAttribute("href", "https://console.aws.amazon.com/cloudshell/home");
   await expect(page.getByRole("link", { name: /Open AWS CloudShell/ })).toHaveAttribute("target", "_blank");
   await expect(page.getByRole("button", { name: "Copy Setup script" })).toBeVisible();
@@ -938,7 +938,7 @@ test("connect a database: script, pasted line, and a failed read-only check expl
 
   db.dbWritable = false;
   await page.getByRole("button", { name: "Check again" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Choose what Coderhelm may use" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Choose what CoderHelm may use" })).toBeVisible();
   expect(page.url()).toContain("id=ds_db");
   expect(callsTo(db, "POST", /\/api\/data-sources\/database$/).at(-1)!.body).toEqual({ code: DB_CODE, engine: "postgres" });
   await expect(page.getByRole("list", { name: "Hidden column names" })).toBeVisible();
@@ -1121,7 +1121,7 @@ test("connect a warehouse and a database from one pasted line", async ({ page })
   await expect(page.getByRole("button", { name: "Check and connect the database" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Check and connect the warehouse" })).toHaveCount(0);
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Choose what Coderhelm may use" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Choose what CoderHelm may use" })).toBeVisible();
   expect(page.url()).toContain("id=ds_wh");
 });
 
@@ -1203,7 +1203,7 @@ test("hub: a database's suggested hidden columns can be hidden or dismissed, nev
   });
   await page.goto("/data-sources");
   const card = await openSource(page, "orders-db database");
-  await card.getByRole("button", { name: "What Coderhelm can't see" }).click();
+  await card.getByRole("button", { name: "What CoderHelm can't see" }).click();
   const box = card.getByRole("region", { name: "Suggested hidden fields" });
   await expect(box.getByText("public.member.name")).toBeVisible();
   expect(callsTo(db, "POST", /hidden-suggestions$/)).toHaveLength(0);
@@ -1223,7 +1223,7 @@ test("hub: a column can be hidden in one table only, and a malformed entry is re
   const db = await mockApi(page, { sources: [awsSource("database", { enabled: true, setup_complete: true, hidden_fields: ["email"] })] });
   await page.goto("/data-sources");
   const card = await openSource(page, "orders-db database");
-  await card.getByRole("button", { name: "What Coderhelm can't see" }).click();
+  await card.getByRole("button", { name: "What CoderHelm can't see" }).click();
   const input = card.getByLabel("Hide another column name");
   await input.fill("a.b.c.d");
   await input.press("Enter");
@@ -1299,7 +1299,7 @@ test("hub: many sources are grouped by kind into rows, with health on each row",
   await expect(connected.getByRole("button", { name: "Test again" })).toHaveCount(0);
   const staging = page.getByRole("article", { name: "Storefront API staging" });
   await expect(staging.getByText("Needs attention", { exact: true })).toBeVisible();
-  await expect(staging.getByText("Coderhelm is not using this source until the problem is fixed.")).toBeVisible();
+  await expect(staging.getByText("CoderHelm is not using this source until the problem is fixed.")).toBeVisible();
   await expect(page.getByRole("article", { name: "App database staging" }).getByText("PostgreSQL", { exact: true })).toBeVisible();
   await expect(page.getByRole("article", { name: "analytics-dw warehouse" }).getByText("Redshift", { exact: true })).toBeVisible();
   const logsRow = page.getByRole("article", { name: `Logs in AWS account ${ACCOUNT}` });
@@ -1320,7 +1320,7 @@ test("hub: many sources are grouped by kind into rows, with health on each row",
   await toggle.focus();
   await page.keyboard.press("Enter");
   await expect(toggle).toHaveAttribute("aria-expanded", "true");
-  for (const name of ["Test again", "Replace key", "Guide for agents", "What Coderhelm can't see", "Remove"]) {
+  for (const name of ["Test again", "Replace key", "Guide for agents", "What CoderHelm can't see", "Remove"]) {
     await expect(staging.getByRole("button", { name })).toBeVisible();
   }
   await expect(staging.getByText("Key ending 9x2k")).toBeVisible();
@@ -1420,7 +1420,7 @@ test("a broken source offers Test again right on its closed row", async ({ page 
   await expect(card.getByText("Your API stopped accepting the key.")).toBeVisible();
   await card.getByRole("button", { name: "Test api.yourcompany.com again" }).click();
   await expect(card.getByText("Ready", { exact: true })).toBeVisible();
-  await expect(card.getByText("Coderhelm is not using this source until the problem is fixed.")).toHaveCount(0);
+  await expect(card.getByText("CoderHelm is not using this source until the problem is fixed.")).toHaveCount(0);
 });
 
 // ── Private networks ───────────────────────────────────────────────
@@ -1507,7 +1507,7 @@ test("private network: a VPC-only domain gets a network through the reviewed upd
 
 test("private network: hosted teams are told plainly it needs a self-hosted install", async ({ page }) => {
   const db = await mockApi(page, { sources: [searchSource({ status: "ready", status_message: "" })] });
-  db.plans.ds_os = { available: false, why: "This Coderhelm runs outside your AWS account, so it can't reach inside your VPC. Give the cluster a read-only https address on the internet, or run Coderhelm self-hosted in the cluster's AWS account and add a private network there." };
+  db.plans.ds_os = { available: false, why: "This CoderHelm runs outside your AWS account, so it can't reach inside your VPC. Give the cluster a read-only https address on the internet, or run CoderHelm self-hosted in the cluster's AWS account and add a private network there." };
   await page.goto("/data-sources");
   const row = await openSource(page, "Orders search");
   await row.getByRole("button", { name: "Private network" }).click();

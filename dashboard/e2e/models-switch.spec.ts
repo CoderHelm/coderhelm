@@ -199,7 +199,7 @@ for (const width of [1440, 390]) {
       await expect(banner).toContainText("Update to v1.3.0 needs your action");
       await expect(banner.getByTestId("model-result-claude-sonnet-5-5")).toContainText("terms for this model haven't been accepted");
       await expect(banner.getByRole("link", { name: "Open the AWS console" })).toHaveAttribute("href", MODEL_ACCESS);
-      await expect(banner).toContainText("Coderhelm only checks");
+      await expect(banner).toContainText("CoderHelm only checks");
       // No override for a model the release calls.
       await expect(banner.getByRole("button", { name: "Skip this check" })).toHaveCount(0);
       await expect(page.getByRole("button", { name: /^Update to/ })).toHaveCount(0);

@@ -8,8 +8,8 @@ import { isSelfHosted } from "@/lib/runtime-config";
 // (`GET /auth/methods`): the sign-in screen shows these and no others, so it
 // never offers a button that ends on someone else's error page. A
 // self-hosted install has GitHub with an OAuth client of its own, or, on
-// Coderhelm's GitHub App (hybrid), once it is registered with Coderhelm: the
-// same /auth/github then goes through Coderhelm's app and the install still
+// CoderHelm's GitHub App (hybrid), once it is registered with CoderHelm: the
+// same /auth/github then goes through CoderHelm's app and the install still
 // decides who signs in. Microsoft shows with the deployment's own Entra app
 // registration, Okta once a team (hosted) or the organization (self-hosted)
 // has turned on an Okta sign-in that passed its test.

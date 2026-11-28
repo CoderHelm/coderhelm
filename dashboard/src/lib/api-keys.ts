@@ -1,4 +1,4 @@
-// The API keys page: the team's keys for calling the Coderhelm API from its
+// The API keys page: the team's keys for calling the CoderHelm API from its
 // own programs. The gateway keeps only a hash of each key; the key itself is
 // in the create answer and nowhere else.
 

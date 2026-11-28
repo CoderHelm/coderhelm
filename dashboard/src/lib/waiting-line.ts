@@ -30,7 +30,7 @@ export function previewWords(stage: string): string {
     case "checked":
       return "Preview checked: deployed, end-to-end passed, pages captured";
     case "failed":
-      return "Preview checks failed; Coderhelm fixes them like any failing check";
+      return "Preview checks failed; CoderHelm fixes them like any failing check";
     case "blocked":
       return "Preview not run";
     default:
@@ -42,17 +42,17 @@ export function previewWords(stage: string): string {
 function fromStanding(s: RunMergeStanding, pr: string): string {
   switch (s.code) {
     case "needs_person_approval":
-      return `Waiting on: an approving review from a person on ${pr} (this repo requires one before Coderhelm merges).`;
+      return `Waiting on: an approving review from a person on ${pr} (this repo requires one before CoderHelm merges).`;
     case "auto_merge_off":
       return `Waiting on: a person on your team to merge ${pr} (auto-merge is off for this repo).`;
     case "repo_requires_person_review":
       return `Waiting on: the branch rules on GitHub for ${pr} (they require an approving review from a person, or another rule GitHub enforces).`;
     case "reviewing":
-      return `Waiting on: Coderhelm's review of the newest commit on ${pr}.`;
+      return `Waiting on: CoderHelm's review of the newest commit on ${pr}.`;
     case "fixing_review":
-      return `Waiting on: Coderhelm's fix round for its review's findings on ${pr}.`;
+      return `Waiting on: CoderHelm's fix round for its review's findings on ${pr}.`;
     case "review_changes_requested":
-      return `Waiting on: the changes Coderhelm's review asked for on ${pr}.`;
+      return `Waiting on: the changes CoderHelm's review asked for on ${pr}.`;
     case "checks_running":
       return `Waiting on: the checks still running on ${pr}.`;
     case "checks_failing":
@@ -62,7 +62,7 @@ function fromStanding(s: RunMergeStanding, pr: string): string {
     case "draft":
       return `Waiting on: what keeps ${pr} a draft (its description says why at the top).`;
     case "merging":
-      return `Waiting on: nothing; Coderhelm merges ${pr}.`;
+      return `Waiting on: nothing; CoderHelm merges ${pr}.`;
     case "merged":
       return `Nothing: ${pr} is merged.`;
     case "closed":
@@ -91,7 +91,7 @@ export function waitingLine(input: WaitingInput): string {
   const hold = input.draft_hold;
   if (hold) {
     const first = hold.reasons?.[0]?.what?.trim();
-    if (hold.kind === "waiting") return `Waiting on: ${lower(clean(first || hold.summary))} (Coderhelm checks again by itself).`;
+    if (hold.kind === "waiting") return `Waiting on: ${lower(clean(first || hold.summary))} (CoderHelm checks again by itself).`;
     if (first) return `Waiting on: ${lower(clean(first))}, on ${pr}${hold.reasons.length > 1 ? ` (and ${hold.reasons.length - 1} more)` : ""}.`;
     if (hold.summary) return `Waiting on: ${lower(clean(hold.summary))}.`;
   }

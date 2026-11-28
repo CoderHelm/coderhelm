@@ -1,7 +1,7 @@
 // The one OAuth callback page (/settings/integrations/mcp-callback/) serves
 // every sign-in that returns to the dashboard: MCP servers, catalog apps,
 // knowledge sources, and a self-hosted install's sign-ins through
-// Coderhelm's app. Each provider app has one registered redirect, so the
+// CoderHelm's app. Each provider app has one registered redirect, so the
 // kind of sign-in travels in the `state` ("<tag>.<random>") and comes back
 // from the API with where to go next. These helpers decide the words and
 // the destination; the page only shows them.

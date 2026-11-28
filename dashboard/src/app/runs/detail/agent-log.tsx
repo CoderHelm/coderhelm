@@ -836,7 +836,7 @@ export function AgentLogPanel({ log, traces, runId, diffUrl, live, failed = fals
   ];
 
   if (model.passes.length === 0) {
-    return <p className="p-4 text-sm text-zinc-400">No agent log yet. It starts once Coderhelm runs its first tool.</p>;
+    return <p className="p-4 text-sm text-zinc-400">No agent log yet. It starts once CoderHelm runs its first tool.</p>;
   }
 
   return (

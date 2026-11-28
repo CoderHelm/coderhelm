@@ -120,7 +120,7 @@ const GREETING: StreamMessage = {
     {
       type: "text",
       content:
-        "Hi! Tell me what you want to build and I'll help you break it into an ordered plan of GitHub issues that Coderhelm can implement one by one.",
+        "Hi! Tell me what you want to build and I'll help you break it into an ordered plan of GitHub issues that CoderHelm can implement one by one.",
     },
   ],
 };
