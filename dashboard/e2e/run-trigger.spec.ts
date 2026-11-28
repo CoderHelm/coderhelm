@@ -45,13 +45,13 @@ const RUNS: Run[] = [
     ticket_source: "alert",
     ticket_id: "E2E-FIX-a7f51433483adf820849",
     title: "Fix flaky test: checkout keeps the cart after sign in",
-    trigger: { kind: "coderhelm", label: "Started by Coderhelm · flaky test", ref: null, ref_url: "/tests/test?id=a7f51433483adf820849", by: null },
+    trigger: { kind: "coderhelm", label: "Started by CoderHelm · flaky test", ref: null, ref_url: "/tests/test?id=a7f51433483adf820849", by: null },
   }),
   run("01LOGAUTO", 4, {
     ticket_source: "alert",
     ticket_id: "LOG-1A2B3C4D",
     title: "Null user id in the session refresh handler",
-    trigger: { kind: "coderhelm", label: "Started by Coderhelm · log finding", ref: "/aws/lambda/api", ref_url: "/logs?finding=rec-9", by: null },
+    trigger: { kind: "coderhelm", label: "Started by CoderHelm · log finding", ref: "/aws/lambda/api", ref_url: "/logs?finding=rec-9", by: null },
   }),
   run("01ALERT", 5, {
     status: "failed",
@@ -173,14 +173,14 @@ test("each row says how its run was started, by whom, and links to what started 
   await expect(gh).toHaveText("GitHub issue·#42 (opens in a new tab)·by octocat");
   await expect(gh.getByRole("link", { name: /#42/ })).toHaveAttribute("href", "https://github.com/your-team/web/issues/42");
 
-  // Coderhelm's own work: the label, linked to the test; never the internal id.
+  // CoderHelm's own work: the label, linked to the test; never the internal id.
   const flaky = rowOf(page, "Fix flaky test");
-  await expect(flaky.getByTestId("run-trigger")).toHaveText("Started by Coderhelm · flaky test");
-  await expect(flaky.getByRole("link", { name: "Started by Coderhelm · flaky test" })).toHaveAttribute("href", local("/tests/test?id=a7f51433483adf820849"));
+  await expect(flaky.getByTestId("run-trigger")).toHaveText("Started by CoderHelm · flaky test");
+  await expect(flaky.getByRole("link", { name: "Started by CoderHelm · flaky test" })).toHaveAttribute("href", local("/tests/test?id=a7f51433483adf820849"));
   await expect(flaky).not.toContainText("E2E-FIX");
 
   const log = rowOf(page, "Null user id").getByTestId("run-trigger");
-  await expect(log).toHaveText("Started by Coderhelm · log finding·/aws/lambda/api");
+  await expect(log).toHaveText("Started by CoderHelm · log finding·/aws/lambda/api");
   await expect(log.getByRole("link", { name: "/aws/lambda/api" })).toHaveAttribute("href", local("/logs?finding=rec-9"));
   await expect(rowOf(page, "Null user id")).not.toContainText("LOG-1A2B3C4D");
 
@@ -220,7 +220,7 @@ test("Started by filters on the server and stays in the address", async ({ page 
     "Started by anyone",
     "Started by Jira",
     "Started by GitHub",
-    "Started by Coderhelm",
+    "Started by CoderHelm",
     "Started by Alerts",
     "Started by Plans",
     "Started by Dashboard",
@@ -228,7 +228,7 @@ test("Started by filters on the server and stays in the address", async ({ page 
   ]);
 
   await pickOption(filter, "coderhelm");
-  await expect(filter).toHaveText("Started by Coderhelm");
+  await expect(filter).toHaveText("Started by CoderHelm");
   await expect(page).toHaveURL(/[?&]started_by=coderhelm/);
   await expect(page.getByTestId("run-row")).toHaveCount(2);
   expect(db.calls.some((c) => c.startsWith("GET /api/runs?") && c.includes("started_by=coderhelm"))).toBe(true);
@@ -272,7 +272,7 @@ test("the run page's header says how the run was started", async ({ page }) => {
   await expect(page.getByRole("heading", { name: /Fix flaky test/ })).toBeVisible();
   const header = page.getByTestId("run-trigger");
   await expect(header).toHaveAttribute("data-kind", "coderhelm");
-  await expect(header).toHaveText("Started by Coderhelm · flaky test");
+  await expect(header).toHaveText("Started by CoderHelm · flaky test");
   await expect(header.getByRole("link")).toHaveAttribute("href", local("/tests/test?id=a7f51433483adf820849"));
   // The internal id is only in the technical details, named as such.
   await expect(page.getByText("E2E-FIX-a7f51433483adf820849")).toHaveCount(0);

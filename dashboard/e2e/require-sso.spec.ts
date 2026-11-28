@@ -30,7 +30,7 @@ interface Option {
 }
 const READY = { set_up: true, enabled: true, domains_verified: true, session_from_provider: true, is_owner: true };
 const RECOVERY = (name: string) =>
-  `If ${name} is down or misconfigured, nobody can sign in until it's fixed. There is no way around it inside Coderhelm: an owner contacts Coderhelm support from outside the product, support verifies them out of band, and turns only this rule off.`;
+  `If ${name} is down or misconfigured, nobody can sign in until it's fixed. There is no way around it inside CoderHelm: an owner contacts CoderHelm support from outside the product, support verifies them out of band, and turns only this rule off.`;
 
 interface State {
   signedIn: boolean;

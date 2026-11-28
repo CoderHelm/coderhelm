@@ -66,7 +66,7 @@ const PROFILES = [
     activity_label: "pull requests merged in the last 30 days", activity_count: 6, recent: [],
   },
   {
-    id: "feedback", name: "Feedback agent", role: "Answers review comments on Coderhelm's pull requests and fixes the CI it broke.",
+    id: "feedback", name: "Feedback agent", role: "Answers review comments on CoderHelm's pull requests and fixes the CI it broke.",
     uses_repo_memory: true, memory_uses: 4, memory_reads: 2,
     knows: [{ label: "The pull request's conversation", detail: "Every comment and review thread on the PR, and the CI results." }, { label: "Memories about this repo", detail: "3 in all" }],
     learned: [{ text: "Use the shared retry helper for calls to the pricing service; never a hand-written loop.", source: "Learned from a change asked for on “Fix the checkout total after a coupon”", at: iso(2) }],
@@ -290,7 +290,7 @@ test("teach it something adds a pinned memory", async ({ page }) => {
   const db = await mockApi(page);
   await page.goto("/memory");
   await page.getByRole("button", { name: "Teach it something" }).first().click();
-  const dialog = page.getByRole("dialog", { name: /Teach Coderhelm something/ });
+  const dialog = page.getByRole("dialog", { name: /Teach CoderHelm something/ });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole("button", { name: "Remember this" })).toBeDisabled();
   await dialog.getByLabel("What should it remember?").fill("Feature flags live in LaunchDarkly; never read env vars for them.");
@@ -308,7 +308,7 @@ test("try it shows what a ticket would bring along", async ({ page }) => {
   await page.goto("/memory");
   // The preview folds away under the list.
   await expect(page.getByLabel("Describe a ticket, the way someone would write it")).toBeHidden();
-  await page.getByText("Test it: see what Coderhelm would remember for a ticket").click();
+  await page.getByText("Test it: see what CoderHelm would remember for a ticket").click();
   await page.getByLabel("Describe a ticket, the way someone would write it").fill("The checkout total is wrong after a coupon");
   await page.getByRole("button", { name: "Show what it would remember" }).click();
   const section = page.getByRole("region", { name: "What would it remember for a ticket?" }).or(page.locator("section[aria-labelledby=try-heading]"));

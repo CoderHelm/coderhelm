@@ -92,7 +92,7 @@ export async function mockPickerApi(page: Page, opts: PickerMockOptions = {}) {
       return json(route, {
         roles: [
           { key: "viewer", label: "Viewer", level: 0, summary: "Read-only.", assignable: true },
-          { key: "member", label: "Member", level: 1, summary: "Works with Coderhelm.", assignable: true },
+          { key: "member", label: "Member", level: 1, summary: "Works with CoderHelm.", assignable: true },
           { key: "admin", label: "Admin", level: 3, summary: "Runs the workspace.", assignable: true },
           { key: "owner", label: "Owner", level: 4, summary: "Everything.", assignable: true },
         ],

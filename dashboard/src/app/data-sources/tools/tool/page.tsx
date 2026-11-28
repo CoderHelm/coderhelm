@@ -152,7 +152,7 @@ function ToolPage() {
           </div>
           {live && <p className="mt-2 max-w-prose text-sm text-zinc-400">{live.def.use_when}</p>}
         </div>
-        {tool.approved && <ToolSwitch on={tool.enabled} label={`Let Coderhelm use ${tool.name}`} busy={busy === "toggle"} onToggle={toggle} />}
+        {tool.approved && <ToolSwitch on={tool.enabled} label={`Let CoderHelm use ${tool.name}`} busy={busy === "toggle"} onToggle={toggle} />}
       </div>
 
       {waiting && (

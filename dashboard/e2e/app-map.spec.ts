@@ -7,7 +7,7 @@ import path from "node:path";
 // The App map page: Floorplan's viewer (vendor/floorplan, MIT) in a sandboxed
 // frame, fed the map of a made-up harbor app in two repositories (a web app
 // and an API, written by the platform's Floorplan driver test), with
-// Coderhelm's Recent work and Health in the map's own fields. Its System
+// CoderHelm's Recent work and Health in the map's own fields. Its System
 // cards are named by their repositories, as the platform's copy of a map
 // names them. Every API call is answered here; nothing reaches a real backend.
 
@@ -123,13 +123,13 @@ async function bothSizes(page: Page, name: string, ready: () => Promise<void>) {
 const viewer = (page: Page, testId = "app-map-frame") => page.getByTestId(testId).frameLocator("iframe");
 
 test.describe("App map", () => {
-  test("shows Floorplan's viewer in a sandboxed frame with Coderhelm's overlays", async ({ page }) => {
+  test("shows Floorplan's viewer in a sandboxed frame with CoderHelm's overlays", async ({ page }) => {
     const calls = await mockApi(page);
     await page.goto("/app-map");
     await expect(page.getByRole("heading", { name: "App map" })).toBeVisible();
     const frame = page.getByTestId("app-map-frame").locator("iframe");
     await expect(frame).toHaveAttribute("sandbox", "allow-scripts");
-    // The App map page's frame: Coderhelm's levels, journeys and screens, no tour.
+    // The App map page's frame: CoderHelm's levels, journeys and screens, no tour.
     await expect(frame).toHaveAttribute("src", "/app-map/frame.html#ask=host&tour=0&full=1");
     // The viewer drew the harbor map: its parts are on the board.
     await expect(viewer(page).getByText("Harbor website").first()).toBeVisible();
@@ -186,7 +186,7 @@ test.describe("App map", () => {
     expect(facts).toEqual({ origin: "null", fetched: "blocked", storage: "none", parent: "hidden" });
   });
 
-  test("Recent work and Health toggles ask for Coderhelm's overlays", async ({ page }) => {
+  test("Recent work and Health toggles ask for CoderHelm's overlays", async ({ page }) => {
     const calls = await mockApi(page);
     await page.goto("/app-map");
     await expect(viewer(page).getByText("Harbor website").first()).toBeVisible();
@@ -387,7 +387,7 @@ test.describe("App map", () => {
 });
 
 // The map read from where the API says it is (a signed address of the
-// bucket, or the same bytes through the API), Coderhelm's overlays laid over
+// bucket, or the same bytes through the API), CoderHelm's overlays laid over
 // it on the page, a read that never answers, and the viewer's full screen.
 const VIEW_PATH = "/bucket/app-map/t_1/view.json.gz";
 /** The page's copy as the server writes it: the map without Recent work. */
@@ -397,9 +397,9 @@ const VIEW = (() => {
   return g;
 })();
 const OVERLAYS = {
-  recent: { updatedAt: "2026-11-21T00:00:00Z", source: "coderhelm", tasks: [{ title: "DOCK-42: Stop double bookings", request: "", summary: "Two boaters could book one slip.", status: "completed" }], items: [{ id: "f:harbor-api/src/bookings.js", task: 0, change: "changed", note: "Changed by Coderhelm's run for DOCK-42" }] },
+  recent: { updatedAt: "2026-11-21T00:00:00Z", source: "coderhelm", tasks: [{ title: "DOCK-42: Stop double bookings", request: "", summary: "Two boaters could book one slip.", status: "completed" }], items: [{ id: "f:harbor-api/src/bookings.js", task: 0, change: "changed", note: "Changed by CoderHelm's run for DOCK-42" }] },
   health: {
-    add: [{ id: "coderhelm:security:f1", kind: "coderhelm-security", severity: "high", title: "Coderhelm security: Prototype pollution in a parser", detail: "Found by Coderhelm.", items: ["f:harbor-api/src/bookings.js"], notes: {}, locations: [{ file: "harbor-api/src/bookings.js", line: 5 }], fix: "", source: "coderhelm", link: "/security/detail?id=f1" }],
+    add: [{ id: "coderhelm:security:f1", kind: "coderhelm-security", severity: "high", title: "CoderHelm security: Prototype pollution in a parser", detail: "Found by CoderHelm.", items: ["f:harbor-api/src/bookings.js"], notes: {}, locations: [{ file: "harbor-api/src/bookings.js", line: 5 }], fix: "", source: "coderhelm", link: "/security/detail?id=f1" }],
     drop: ["no-auth:harbor-api"],
     summary: { high: 2, medium: 0, low: 0 },
   },
@@ -447,7 +447,7 @@ async function shownGraph(page: Page) {
 }
 
 test.describe("App map reading", () => {
-  test("reads the map from the bucket once and lays Coderhelm's overlays over it", async ({ page }) => {
+  test("reads the map from the bucket once and lays CoderHelm's overlays over it", async ({ page }) => {
     const calls = await mockBucket(page);
     await page.goto("/app-map");
     await expect(viewer(page).getByText("Harbor website").first()).toBeVisible();

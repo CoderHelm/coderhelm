@@ -116,7 +116,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     tickets: [mine, waiting, other],
     threads: {
       [mine.id]: [msg()],
-      [waiting.id]: [msg({ body: "The review stopped.", created_at: iso(30) }), msg({ author: "support", author_email: "", author_name: "Coderhelm support", body: "Which pull request?", created_at: iso(5) })],
+      [waiting.id]: [msg({ body: "The review stopped.", created_at: iso(30) }), msg({ author: "support", author_email: "", author_name: "CoderHelm support", body: "Which pull request?", created_at: iso(5) })],
       [other.id]: [msg({ body: "The Jira link says unauthorized.", author_email: "someone@example.org", author_name: "" })],
     },
     ...init,
@@ -124,7 +124,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
   const json = (route: Route, body: unknown, status = 200) =>
     route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
   const isAdmin = () => db.email === ADMIN_EMAIL;
-  const customerView = (m: Msg) => (m.author === "support" ? { ...m, author_email: "", author_name: "Coderhelm support" } : m);
+  const customerView = (m: Msg) => (m.author === "support" ? { ...m, author_email: "", author_name: "CoderHelm support" } : m);
   const detail = (t: Ticket, admin: boolean) => ({
     ticket: admin ? t : { ...t, context: { ...t.context, user_agent: "" } },
     messages: (db.threads[t.id] ?? []).map((m) => (admin ? m : customerView(m))),
@@ -189,7 +189,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
 
     // Platform admin routes.
     if (p.startsWith("/api/admin/support/")) {
-      if (!isAdmin()) return json(route, { error: "Only Coderhelm platform admins can do this." }, 403);
+      if (!isAdmin()) return json(route, { error: "Only CoderHelm platform admins can do this." }, 403);
       if (p === "/api/admin/support/tickets") return json(route, { tickets: db.tickets });
       const a = /^\/api\/admin\/support\/tickets\/([^/]+)(\/reply|\/status)?$/.exec(p);
       const t = a && db.tickets.find((x) => x.id === decodeURIComponent(a[1]));
@@ -287,12 +287,12 @@ test.describe("support tickets for a team", () => {
     await expect(page.getByLabel("Reply")).toHaveValue("");
   });
 
-  test("the thread shows support as Coderhelm support, never a staff address", async ({ page }) => {
+  test("the thread shows support as CoderHelm support, never a staff address", async ({ page }) => {
     const db = await mockApi(page);
     const waiting = db.tickets.find((t) => t.status === "waiting")!;
     await page.goto(`/support/ticket/?id=${waiting.id}`);
     const answer = page.locator('[data-testid="support-message"][data-author="support"]');
-    await expect(answer).toContainText("Coderhelm support");
+    await expect(answer).toContainText("CoderHelm support");
     await expect(answer).toContainText("Which pull request?");
     await expect(page.getByText("Waiting on you").first()).toBeVisible();
   });

@@ -2,7 +2,7 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 
-// Settings, Webhooks: the endpoints Coderhelm sends the team's events to.
+// Settings, Webhooks: the endpoints CoderHelm sends the team's events to.
 // List, add (the secret is shown once), an address the gateway refuses, a
 // test that fails with its reason, reveal and rotate the secret, resend a
 // delivery and replay a range. Every API call is answered here.
@@ -41,7 +41,7 @@ function endpoint(id: string, over: Partial<Endpoint> = {}): Endpoint {
 
 const TYPES = [
   ["run.created", "Runs", "A run started"], ["run.completed", "Runs", "A run finished"], ["run.failed", "Runs", "A run failed"],
-  ["run.needs_input", "Runs", "A run is waiting for a person"], ["pull_request.opened", "Pull requests", "Coderhelm opened a pull request"],
+  ["run.needs_input", "Runs", "A run is waiting for a person"], ["pull_request.opened", "Pull requests", "CoderHelm opened a pull request"],
   ["review.completed", "Reviews", "A review was posted"], ["ci_fix.started", "CI fixes", "A CI fix started"], ["ci_fix.completed", "CI fixes", "A CI fix finished"],
   ["alert.received", "Alerts", "An alert arrived"], ["log_finding.created", "Logs", "A new log finding"], ["log_finding.resolved", "Logs", "A log finding went away"],
   ["release_notes.published", "Releases", "Release notes went out"], ["plan.approved", "Plans", "A plan was approved"],

@@ -68,7 +68,7 @@ const LOOKUPS: Lookup[] = [
   lookup(5, { outcome: "failed", ok: false, detail: TIMEOUT, ms: 10000 }),
   lookup(6, { outcome: "failed", ok: false, detail: TIMEOUT, ms: 10000 }),
   lookup(7, { outcome: "failed", ok: false, detail: TIMEOUT, ms: 10000 }),
-  lookup(12, { actor: "admin@example.com", repo: undefined, pr: undefined, run_id: "", origin: "", summary: "DELETE FROM orders", query: "DELETE FROM orders", outcome: "refused", ok: false, detail: "That lookup would change something, so it was refused before it left Coderhelm." }),
+  lookup(12, { actor: "admin@example.com", repo: undefined, pr: undefined, run_id: "", origin: "", summary: "DELETE FROM orders", query: "DELETE FROM orders", outcome: "refused", ok: false, detail: "That lookup would change something, so it was refused before it left CoderHelm." }),
   lookup(40),
 ];
 

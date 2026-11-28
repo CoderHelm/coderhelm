@@ -16,7 +16,7 @@ import { useCan } from "@/hooks/use-can";
 import { isSessionId, reviewHref, SESSION_POLL_MS, sessionLook } from "./session";
 import { SessionActivity, SessionFacts, SessionNotice, SessionOutcome, SessionOverview } from "./sections";
 
-// One review job, step by step (`?id=<job id>`). A PR's "Coderhelm review"
+// One review job, step by step (`?id=<job id>`). A PR's "CoderHelm review"
 // check links here from its Details link. Each job has its own session, so an
 // older check keeps showing its own review. The page refreshes while the
 // review runs and the tab is visible.

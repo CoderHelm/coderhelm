@@ -41,7 +41,7 @@ function atlassian(p: Parts) {
     detail: {
       app_update: null,
       parts: [
-        { id: "jira", name: "Jira", what: "Coderhelm's Jira app (Forge): tickets start work.", item: jira },
+        { id: "jira", name: "Jira", what: "CoderHelm's Jira app (Forge): tickets start work.", item: jira },
         { id: "confluence", name: "Confluence", what: "Agents read pages and Knowledge syncs them.", item: confluence },
         { id: "agent_tools", name: "Agent tools", what: "Atlassian's own server (Rovo MCP).", item: tools },
       ],
@@ -117,7 +117,7 @@ test("old links to the Jira or Confluence row open the Atlassian row", async ({ 
 });
 
 test("Atlassian's sign-in failing on its side is said in plain words", async ({ page }) => {
-  const words = "Confluence's sign-in page is failing on Confluence's side (HTTP 500), so Coderhelm didn't send you there. Nothing on your side needs changing. Try again in a few minutes.";
+  const words = "Confluence's sign-in page is failing on Confluence's side (HTTP 500), so CoderHelm didn't send you there. Nothing on your side needs changing. Try again in a few minutes.";
   await mockApi(page, [github, atlassian({ jira: "not_connected", confluence: "not_connected", tools: "not_connected" })], (r) =>
     r.fulfill({ status: 400, contentType: "application/json", body: JSON.stringify({ error: words }) }),
   );

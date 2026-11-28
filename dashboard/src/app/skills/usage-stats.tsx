@@ -98,7 +98,7 @@ export function UsageStats({ stats }: { stats: SkillStats }) {
       </h2>
       {nothing ? (
         <p className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 text-sm text-zinc-400">
-          Coderhelm hasn&apos;t read a skill or asked an agent yet. Its planner, coder and reviewer pick the ones whose description
+          CoderHelm hasn&apos;t read a skill or asked an agent yet. Its planner, coder and reviewer pick the ones whose description
           fits the work, so a clear description is what gets an item used.
         </p>
       ) : (

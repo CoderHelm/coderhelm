@@ -460,7 +460,7 @@ test("connecting a server that is off asks for credentials first, then switches 
   expect(order.slice(0, 2)).toEqual(["/api/plugins/notion/enable", "/api/plugins/notion/credentials"]);
 });
 
-test("every row says in a short line what Coderhelm does with it, never a placeholder", async ({ page }) => {
+test("every row says in a short line what CoderHelm does with it, never a placeholder", async ({ page }) => {
   await mockApi(page);
   await page.goto("/settings/integrations");
   const rows = page.locator('[data-testid^="integration-"][data-status]');
@@ -580,7 +580,7 @@ test("your websites: an admin adds and removes domains, and a bad entry says why
   await page.goto("/settings/integrations");
   const card = page.getByTestId("websites-card");
   await expect(page.getByRole("heading", { name: "Your websites", level: 2 })).toBeVisible();
-  await expect(page.getByText("Coderhelm can check that links and redirects on these sites work (status and page title only).")).toBeVisible();
+  await expect(page.getByText("CoderHelm can check that links and redirects on these sites work (status and page title only).")).toBeVisible();
   await expect(card.getByRole("list", { name: "Your websites" }).getByTestId("website-name")).toHaveText(["example.com"]);
 
   await card.getByLabel("Add a domain").fill("https://Docs.Example.org/, shop.example.net");
@@ -679,7 +679,7 @@ test("Figma signs in with the team's own app, its redirect URL and scopes shown,
     guide: "https://developers.figma.com/docs/rest-api/oauth-apps/",
   };
   await page.goto("/settings/integrations#integration-figma");
-  // Where Coderhelm has no app of its own, the team's own app is the default way.
+  // Where CoderHelm has no app of its own, the team's own app is the default way.
   const panel = row(page, "figma").getByTestId("own-app");
   await expect(panel).toBeVisible();
   await expect(panel.getByTestId("own-app-redirect")).toHaveText("https://coderhelm.example.com/settings/integrations/mcp-callback/");
@@ -703,7 +703,7 @@ test("Figma signs in with the team's own app, its redirect URL and scopes shown,
   await expect(page).toHaveURL(/\/settings\/integrations\/?#integration-figma$/);
 });
 
-test("Figma signs in with Coderhelm's app in one click; my own app and a key are the other choices", async ({ page, context }) => {
+test("Figma signs in with CoderHelm's app in one click; my own app and a key are the other choices", async ({ page, context }) => {
   const db = await mockApi(page);
   db.items = db.items.map((i) => (i.id === "figma" ? pluginCard("figma", "Figma", "docs", false, false) : i));
   const figma = db.items.find((i) => i.id === "figma")!;
@@ -721,7 +721,7 @@ test("Figma signs in with Coderhelm's app in one click; my own app and a key are
   await page.goto("/settings/integrations#integration-figma");
   const card = row(page, "figma");
   // What it will do in plain words; the scope names wait behind Details.
-  await expect(card.getByTestId("access")).toHaveText("Coderhelm reads Figma with this sign-in. It can't change anything in Figma.");
+  await expect(card.getByTestId("access")).toHaveText("CoderHelm reads Figma with this sign-in. It can't change anything in Figma.");
   await expect(card.getByTestId("scopes")).toBeHidden();
   // The own app's steps and the key wait together, behind one disclosure.
   await expect(card.getByTestId("other-ways").locator("summary")).toHaveText("Other ways to connect");

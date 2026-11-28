@@ -125,7 +125,7 @@ export function FilterSelect({
 const subtleLink = `text-zinc-400 underline underline-offset-2 hover:text-zinc-200 rounded ${focusRing}`;
 
 /**
- * A live feed of every lookup Coderhelm and teammates run against connected
+ * A live feed of every lookup CoderHelm and teammates run against connected
  * sources. Follows new lookups while the tab is visible, can be paused,
  * filtered (the server filters, so older matches are found too), and paged
  * back. The same failure repeated in a row shows once, with a count.
@@ -368,7 +368,7 @@ export function ActivityFeed({
         filtering ? (
           <ListEmpty title="No lookups match these filters." onClear={clear} />
         ) : (
-          <ListEmpty title="No lookups yet. They appear here the moment Coderhelm or a teammate runs one." />
+          <ListEmpty title="No lookups yet. They appear here the moment CoderHelm or a teammate runs one." />
         )
       ) : (
         <List label="Lookups">

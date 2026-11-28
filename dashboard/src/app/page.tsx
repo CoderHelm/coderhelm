@@ -73,7 +73,7 @@ function groupRunsByTicket(runs: Run[]): RunGroup[] {
 
 export default function RunsPageWithParams() {
   return (
-    <Suspense fallback={<Page><PageHeader title="Runs" lead="Everything Coderhelm is working on or has finished, across your projects." /><div className="mt-6"><ListSkeleton /></div></Page>}>
+    <Suspense fallback={<Page><PageHeader title="Runs" lead="Everything CoderHelm is working on or has finished, across your projects." /><div className="mt-6"><ListSkeleton /></div></Page>}>
       <RunsPage />
     </Suspense>
   );
@@ -175,7 +175,7 @@ function RunsPage() {
     <Page>
       <PageHeader
         title="Runs"
-        lead="Everything Coderhelm is working on or has finished, across your projects."
+        lead="Everything CoderHelm is working on or has finished, across your projects."
         actions={
           <Link href="/plans/new" className={primaryButton} data-testid="start-task">
             Start a task
@@ -235,10 +235,10 @@ function RunsPage() {
             </Link>
           }
         >
-          <p>Ask Coderhelm to do something. Work arrives here three ways:</p>
+          <p>Ask CoderHelm to do something. Work arrives here three ways:</p>
           <ul className="mx-auto mt-3 max-w-md space-y-1.5 text-left" data-testid="ways-in">
             <li>
-              <span className="font-medium text-zinc-200">Write a plan</span> and Coderhelm works through it step by step.
+              <span className="font-medium text-zinc-200">Write a plan</span> and CoderHelm works through it step by step.
             </li>
             <li>
               <span className="font-medium text-zinc-200">Tag a GitHub issue</span> with the <Code>coderhelm</Code> label.

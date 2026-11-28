@@ -5,6 +5,7 @@ import { pageMetadata } from "@/lib/seo";
 import { Shell } from "@/components/PageView";
 import { Inline } from "@/components/Md";
 import { PullRequestView } from "@/components/PullRequest";
+import { ProductShot } from "@/components/ProductShot";
 
 const page = pageBySlug("")!;
 
@@ -27,6 +28,12 @@ function first<T extends Block["type"]>(s: Section, type: T): Extract<Block, { t
 function all<T extends Block["type"]>(s: Section, type: T): Extract<Block, { type: T }>[] {
   return s.blocks.filter((x): x is Extract<Block, { type: T }> => x.type === type);
 }
+
+// Every section, the nav and the footer share one container.
+const wrap = "mx-auto max-w-6xl px-4 sm:px-6";
+
+// A screenshot set in a quiet window frame.
+const frame = "overflow-hidden rounded-xl border border-line bg-panel shadow-[0_1px_2px_rgba(24,24,27,0.04),0_24px_48px_-24px_rgba(24,24,27,0.18)]";
 
 const primary = "inline-flex items-center rounded-md bg-text-primary px-5 py-2.5 text-[15px] font-medium text-surface transition-opacity hover:opacity-85";
 const quiet = "inline-flex items-center text-[15px] font-medium text-text-primary underline decoration-text-muted/50 underline-offset-[6px] hover:decoration-text-primary";
@@ -51,47 +58,69 @@ function H2({ s, className = "" }: { s: Section; className?: string }) {
   );
 }
 
+// The headline and the words beside it, then the product itself.
 function Hero() {
   return (
     <section aria-labelledby="hero-h">
-      <div className="mx-auto grid max-w-6xl gap-12 px-4 pb-20 pt-14 sm:px-6 sm:pt-20 lg:grid-cols-[1.45fr_1fr] lg:items-end lg:gap-16 lg:pb-28 lg:pt-28">
-        <div>
-          <h1 id="hero-h" className="max-w-[18ch] text-balance font-serif text-[2.6rem] font-medium leading-[1.04] tracking-[-0.02em] sm:text-6xl lg:text-[4.4rem]">
+      <div className={`${wrap} pb-16 pt-12 sm:pt-16 lg:pb-24 lg:pt-20`}>
+        <div className="grid gap-8 lg:grid-cols-[1.55fr_1fr] lg:items-start lg:gap-14">
+          <h1 id="hero-h" className="max-w-[27ch] text-balance font-serif text-[2.35rem] font-medium leading-[1.06] tracking-[-0.02em] sm:text-5xl lg:text-[2.75rem] xl:text-[3.3rem]">
             {page.h1}
           </h1>
-          <p className="mt-7 max-w-xl text-[18px] leading-relaxed text-text-secondary">
-            <Inline text={page.lede} />
-          </p>
-          <div className="mt-9 flex flex-wrap items-center gap-x-7 gap-y-4">
-            <a href={SITE.appUrl} className={primary}>
-              Get started
-            </a>
-            <Link href="/self-host/" className={quiet}>
-              Self-host it
-            </Link>
+          <div className="lg:pt-2">
+            <p className="max-w-xl text-[17px] leading-relaxed text-text-secondary sm:text-[18px]">
+              <Inline text={page.lede} />
+            </p>
+            <div className="mt-7 flex flex-wrap items-center gap-x-7 gap-y-4">
+              <a href={SITE.appUrl} className={primary}>
+                Get started
+              </a>
+              <Link href="/self-host/" className={quiet}>
+                Self-host it
+              </Link>
+            </div>
+            <p className="mt-4 text-sm text-text-muted">{SITE.ctaNote}</p>
           </div>
-          <p className="mt-5 text-sm text-text-muted">{SITE.ctaNote}</p>
         </div>
+        <div className={`mt-12 lg:mt-16 ${frame}`}>
+          <ProductShot id="homeHero" sizes="(min-width: 1152px) 1104px, calc(100vw - 2rem)" priority />
+        </div>
+      </div>
+    </section>
+  );
+}
 
-        {/* How a run starts: the real triggers, nothing drawn. */}
-        <figure className="border-t border-text-primary/80 pt-5 lg:mb-2">
-          <figcaption className="text-[13px] text-text-muted">To start a run</figcaption>
-          <dl className="mt-4 grid gap-5 text-[15px] leading-relaxed">
-            <div>
-              <dt className="font-medium text-text-primary">On a GitHub issue</dt>
-              <dd className="mt-1 text-text-secondary">
-                assign it to CoderHelm, add the <code className="font-mono text-[14px] text-text-primary">coderhelm</code> label, or comment{" "}
-                <code className="font-mono text-[14px] text-text-primary">/coderhelm</code>
-              </dd>
-            </div>
-            <div>
-              <dt className="font-medium text-text-primary">On a Jira ticket</dt>
-              <dd className="mt-1 text-text-secondary">
-                assign it to CoderHelm, or add the <code className="font-mono text-[14px] text-text-primary">coderhelm</code> label
-              </dd>
-            </div>
-          </dl>
-        </figure>
+// The parts the headline names, each with its own screen.
+function Platform() {
+  const s = section("platform");
+  const parts = first(s, "cards").items;
+  return (
+    <section id={s.id} aria-labelledby={`${s.id}-h`} className="scroll-mt-20 border-t border-line">
+      <div className={`${wrap} py-20 lg:py-28`}>
+        <H2 s={s} />
+        <ul className="mt-12 grid gap-x-10 gap-y-14 md:grid-cols-2 lg:gap-x-12 lg:gap-y-16">
+          {parts.map((p) => (
+            <li key={p.title} className="flex min-w-0 flex-col">
+              {p.shot && (
+                <div className={frame}>
+                  <ProductShot id={p.shot} sizes="(min-width: 1152px) 540px, (min-width: 768px) 46vw, calc(100vw - 2rem)" />
+                </div>
+              )}
+              <h3 className="mt-6 text-[18px] font-semibold text-text-primary">
+                {p.href ? (
+                  <GoLink href={p.href} className="underline decoration-text-muted/40 underline-offset-[6px] hover:decoration-text-primary">
+                    {p.title}
+                  </GoLink>
+                ) : (
+                  p.title
+                )}
+              </h3>
+              <p className="mt-2 max-w-lg text-[16px] leading-relaxed text-text-secondary">
+                <Inline text={p.text} />
+              </p>
+            </li>
+          ))}
+        </ul>
       </div>
     </section>
   );
@@ -104,7 +133,7 @@ function HowItWorks() {
   const go = first(s, "actions").items[0];
   return (
     <section id={s.id} aria-labelledby={`${s.id}-h`} className="scroll-mt-20 border-t border-line">
-      <div className="mx-auto grid max-w-6xl gap-10 px-4 py-20 sm:px-6 lg:grid-cols-[1fr_1.6fr] lg:gap-16 lg:py-28">
+      <div className={`${wrap} grid gap-10 py-20 lg:grid-cols-[1fr_1.6fr] lg:gap-16 lg:py-28`}>
         <div>
           <H2 s={s} />
           <p className="mt-6">
@@ -138,19 +167,21 @@ function ARealOne() {
   const pr = first(s, "pr").pr;
   return (
     <section id={s.id} aria-labelledby={`${s.id}-h`} className="scroll-mt-20 border-y border-line bg-panel">
-      <div className="mx-auto max-w-4xl px-4 py-20 sm:px-6 lg:py-28">
-        <H2 s={s} />
-        <p className="mt-5 max-w-2xl text-[17px] leading-relaxed text-text-secondary">
-          <Inline text={intro.text} />
-        </p>
-        <div className="mt-10">
+      <div className={`${wrap} grid gap-10 py-20 lg:grid-cols-[1fr_1.6fr] lg:gap-16 lg:py-28`}>
+        <div>
+          <H2 s={s} />
+          <p className="mt-6 max-w-md text-[17px] leading-relaxed text-text-secondary">
+            <Inline text={intro.text} />
+          </p>
+          {after && (
+            <p className="mt-5 max-w-md text-[15px] leading-relaxed text-text-secondary">
+              <Inline text={after.text} />
+            </p>
+          )}
+        </div>
+        <div className="min-w-0">
           <PullRequestView pr={pr} />
         </div>
-        {after && (
-          <p className="mt-6 text-[15px] leading-relaxed text-text-secondary">
-            <Inline text={after.text} />
-          </p>
-        )}
       </div>
     </section>
   );
@@ -163,7 +194,7 @@ function AfterThePullRequest() {
   const go = first(s, "actions").items[0];
   return (
     <section id={s.id} aria-labelledby={`${s.id}-h`} className="scroll-mt-20">
-      <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:py-28">
+      <div className={`${wrap} py-20 lg:py-28`}>
         <H2 s={s} className="max-w-2xl" />
         <dl className="mt-12 border-t border-text-primary/80">
           {rows.map(([when, what]) => (
@@ -191,7 +222,7 @@ function SelfHost() {
   const actions = first(s, "actions").items;
   return (
     <section id={s.id} aria-labelledby={`${s.id}-h`} className="ink scroll-mt-20 bg-surface text-text-primary">
-      <div className="mx-auto grid max-w-6xl gap-12 px-4 py-20 sm:px-6 lg:grid-cols-[1fr_1.15fr] lg:gap-16 lg:py-28">
+      <div className={`${wrap} grid gap-12 py-20 lg:grid-cols-[1fr_1.15fr] lg:gap-16 lg:py-28`}>
         <div>
           <H2 s={s} />
           <p className="mt-6 max-w-lg text-[17px] leading-relaxed text-text-secondary">
@@ -227,7 +258,7 @@ function More() {
   const note = first(s, "note");
   return (
     <section id={s.id} aria-labelledby={`${s.id}-h`} className="scroll-mt-20">
-      <div className="mx-auto grid max-w-6xl gap-10 px-4 py-20 sm:px-6 lg:grid-cols-[1fr_1.6fr] lg:gap-16 lg:py-24">
+      <div className={`${wrap} grid gap-10 py-20 lg:grid-cols-[1fr_1.6fr] lg:gap-16 lg:py-24`}>
         <H2 s={s} />
         <div>
           <ul className="grid gap-x-10 sm:grid-cols-2">
@@ -255,6 +286,7 @@ export default function Home() {
   return (
     <Shell page={page}>
       <Hero />
+      <Platform />
       <HowItWorks />
       <ARealOne />
       <AfterThePullRequest />

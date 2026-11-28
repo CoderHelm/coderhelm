@@ -80,7 +80,7 @@ export default function SharedQueuePage() {
   if (denied) {
     return (
       <Page>
-        <PageHeader detail crumb={false} title="Access denied" lead="This page is only for Coderhelm platform administrators." />
+        <PageHeader detail crumb={false} title="Access denied" lead="This page is only for CoderHelm platform administrators." />
       </Page>
     );
   }

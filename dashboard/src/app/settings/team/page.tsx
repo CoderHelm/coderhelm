@@ -130,7 +130,7 @@ function TeamPage() {
   const active = useMemo(() => (members ?? []).filter((m) => m.status === "active"), [members]);
   const invites = useMemo(() => (members ?? []).filter((m) => m.status === "invited"), [members]);
   const owners = active.filter((m) => m.role === "owner").length;
-  // Copied from another Coderhelm and never signed in here (self-hosted).
+  // Copied from another CoderHelm and never signed in here (self-hosted).
   const notSetUp = useMemo(() => active.filter((m) => m.needs_setup), [active]);
   const githubSignIn = useSignInMethods().github;
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -316,7 +316,7 @@ function TeamPage() {
             }
           >
             <p>
-              They&apos;re on the team, copied from the previous Coderhelm, but can&apos;t sign in here until they set a password from the
+              They&apos;re on the team, copied from the previous CoderHelm, but can&apos;t sign in here until they set a password from the
               set-up email{githubSignIn ? " or sign in with their linked GitHub account" : ""}.
               {canInvites ? " Anyone sent one in the last hour is skipped." : " Ask an admin to send them the set-up email."}
             </p>
@@ -599,7 +599,7 @@ function MemberRow({
   if (manageable && linkable) {
     actions.push({ label: githubOnly ? "Link to a member who signs in with email…" : "Link a GitHub sign-in…", onSelect: onLink });
   }
-  // On the team but never signed in here: its activity time is from the previous Coderhelm.
+  // On the team but never signed in here: its activity time is from the previous CoderHelm.
   const notHere = Boolean(m.needs_setup);
   const setup = Boolean(notHere && onSetupEmail);
   const setupLabel = m.setup_email_sent_at ? "Send the set-up email again" : "Send set-up email";
@@ -650,7 +650,7 @@ function MemberRow({
           <span key="gh-sign-in" data-testid="github-sign-in">{`Can sign in with GitHub (${m.github_login})`}</span>
         ) : null,
         notHere && seen ? (
-          <span key="before" data-testid="previous-activity">{`Last active on the previous Coderhelm, ${seen}`}</span>
+          <span key="before" data-testid="previous-activity">{`Last active on the previous CoderHelm, ${seen}`}</span>
         ) : null,
       ]}
       chips={

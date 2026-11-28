@@ -37,13 +37,13 @@ export interface Skill {
   last_used_at: string;
   last_used_by: string;
   updated_at: string;
-  /** Questions Coderhelm's agents put to it; an admin's tries not counted. */
+  /** Questions CoderHelm's agents put to it; an admin's tries not counted. */
   asks: number;
   last_asked_at: string;
   /** Who last flipped its switch, and when. Empty if never. */
   switched_by: string;
   switched_at: string;
-  /** How Coderhelm runs it, from its last check. Null before the first. */
+  /** How CoderHelm runs it, from its last check. Null before the first. */
   compat?: CompatShort | null;
   /** An admin chose to give agents the translated version. */
   use_translated?: boolean;
@@ -156,19 +156,19 @@ export function suggestionLabel(s: AlwaysApplySuggestion): string {
 
 export type CompatStatus = "ready" | "translated" | "needs_tools" | "partial";
 /** What a gap offers: a link to connect it, to add credentials, or nothing
- * (the integration is already there, or it can't run in Coderhelm). */
+ * (the integration is already there, or it can't run in CoderHelm). */
 export type CompatAction = "connect" | "credentials" | "none";
 export type RequirementStatus = "available" | "translated" | "missing" | "blocked";
 /** A step's status: a requirement's, or "not_needed" for a step that only
  * set up a person's own machine (a login check, an output folder, an
- * install). Such a step is left out on Coderhelm and never counts against
+ * install). Such a step is left out on CoderHelm and never counts against
  * the item. */
 export type StepStatus = RequirementStatus | "not_needed";
 
 /** The short form of an item's last check, as lists get it. */
 export interface CompatShort {
   status: CompatStatus | "";
-  /** "7 of 7 steps run · 3 with Coderhelm's tools · 2 not needed here", or
+  /** "7 of 7 steps run · 3 with CoderHelm's tools · 2 not needed here", or
    * "4 of 10 steps run as written · 2 translated · 1 needs New Relic". */
   summary: string;
   /** What it needs that the team hasn't connected, by name. */
@@ -185,7 +185,7 @@ export interface CompatShort {
 
 /** One thing an item needs, with what to do: connect it, add its
  * credentials, or nothing ("none"). `local` marks one that assumes a
- * person's own machine; `instead` says what Coderhelm does. */
+ * person's own machine; `instead` says what CoderHelm does. */
 export interface NeedItem {
   name: string;
   action: CompatAction | "";
@@ -193,13 +193,13 @@ export interface NeedItem {
   instead?: string;
 }
 
-/** One thing a step relies on, and how Coderhelm covers it. */
+/** One thing a step relies on, and how CoderHelm covers it. */
 export interface Requirement {
   /** What the item asks for, in its words. */
   asks: string;
   kind: "tool" | "command" | "data" | "path" | "person" | "other";
   status: RequirementStatus;
-  /** Coderhelm tools that do it. */
+  /** CoderHelm tools that do it. */
   uses: string[];
   write: "none" | "repo" | "outside";
   needs: string;
@@ -212,7 +212,7 @@ export interface Requirement {
   server?: string;
   /** Where it is connected (an Integrations card or Data sources), worked out by the check. */
   link?: string;
-  /** For something only a person's own machine has: what Coderhelm does instead. */
+  /** For something only a person's own machine has: what CoderHelm does instead. */
   instead?: string;
 }
 
@@ -220,7 +220,7 @@ export interface CompatStep {
   title: string;
   does: string;
   requirements: Requirement[];
-  /** Not needed on Coderhelm: left out of the translated version. */
+  /** Not needed on CoderHelm: left out of the translated version. */
   dropped: boolean;
   status: StepStatus;
 }
@@ -259,16 +259,16 @@ export interface SkillWithBody extends Skill {
   /** For an agent: the read-only tools its own file gives it, and what it lists that it doesn't get. */
   agent_tools?: AgentToolset;
   compat?: Compat | null;
-  /** The version rewritten for Coderhelm's tools. Empty before a check. */
+  /** The version rewritten for CoderHelm's tools. Empty before a check. */
   translated?: string;
 }
 
 /** The tools a team agent runs with, worked out from its own file. */
 export interface AgentToolset {
   declared: string[];
-  /** Coderhelm's read-only tools it gets. */
+  /** CoderHelm's read-only tools it gets. */
   granted: string[];
-  /** Listed, with no read-only equivalent in Coderhelm. */
+  /** Listed, with no read-only equivalent in CoderHelm. */
   missing: string[];
   /** Listed tools that write: never given to an agent. */
   blocked: string[];
@@ -353,9 +353,9 @@ export interface SkillUse extends Pick<Skill, "repo" | "path" | "name" | "kind">
 export interface SkillStats {
   days_covered: number;
   since: string;
-  /** Reads by Coderhelm's agents of a skill, agent brief or command. */
+  /** Reads by CoderHelm's agents of a skill, agent brief or command. */
   reads: number;
-  /** Questions Coderhelm's agents put to a team agent. Tries not counted. */
+  /** Questions CoderHelm's agents put to a team agent. Tries not counted. */
   asks: number;
   answered: number;
   no_answer: number;
@@ -440,7 +440,7 @@ export const itemHref = (s: Pick<Skill, "repo" | "path">) =>
 export const pageHref = (s: Pick<Skill, "repo" | "path" | "kind">) => (s.kind === "agent" ? agentHref(s) : itemHref(s));
 
 /**
- * The settings an agent's brief asks for in its front matter. Coderhelm
+ * The settings an agent's brief asks for in its front matter. CoderHelm
  * reads `model` (as a hint for which of the team's models to use) and shows
  * `tools`, which it never gives.
  */
@@ -509,9 +509,9 @@ export function asker(by: string): string {
 
 export const isTry = (a: Pick<AgentAsk, "by">) => a.by.endsWith(" (try)");
 
-/** Where a file is on GitHub at the commit Coderhelm read. */
+/** Where a file is on GitHub at the commit CoderHelm read. */
 export const fileUrl = (repo: string, sha: string, path: string) =>
   `https://github.com/${repo}/blob/${sha || "HEAD"}/${path.split("/").map(encodeURIComponent).join("/")}`;
 
-/** A description too thin for Coderhelm's agents to know when to ask. */
+/** A description too thin for CoderHelm's agents to know when to ask. */
 export const thinDescription = (d: string) => d.trim().length < 40;

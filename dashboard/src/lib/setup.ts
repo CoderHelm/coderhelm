@@ -1,4 +1,4 @@
-// Setup: pick repos, let Coderhelm read each one and recommend a value for
+// Setup: pick repos, let CoderHelm read each one and recommend a value for
 // every setting it manages, review those next to the current values, then
 // apply them in one run that can be retried and undone. The gateway keeps
 // the rules (coderhelm-platform, /api/setup/*); this file is the dashboard's
@@ -14,7 +14,7 @@ export type RunState = "analyzing" | "ready" | "applying" | "done" | "failed" | 
 export type Choice = "keep_mine" | "use_recommended" | "decide" | "smart";
 export type Decision = "use" | "keep" | "edit";
 export type Source = "detected" | "inferred" | "default";
-/** "auto": Coderhelm applies the recommendations itself; "guided": you review each one first. */
+/** "auto": CoderHelm applies the recommendations itself; "guided": you review each one first. */
 export type RunMode = "auto" | "guided";
 
 /** The capability that runs Setup and changes its team settings (admins). Each change also needs its setting's own capability. */
@@ -236,7 +236,7 @@ export type RepoPick = string[] | "all" | "not_set_up";
 // A reply missing the parts a page reads (an older server, a proxy's error
 // page) is an error the page can show, never a crash.
 
-export const SHAPE_ERROR = "Coderhelm's server answered in a form this page can't read. Update the install, then reload.";
+export const SHAPE_ERROR = "CoderHelm's server answered in a form this page can't read. Update the install, then reload.";
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const fail = (): never => {
   throw new Error(SHAPE_ERROR);
@@ -620,9 +620,9 @@ export const REPO_STATE_LOOK: Record<RepoState, { label: string; tone: Tone; hov
   not_set_up: { label: "Not set up", tone: "waiting", hover: "Setup has never run on this repo." },
   set_up: { label: "Set up", tone: "success", hover: "Every setting matches what Setup last applied." },
   custom: { label: "Custom", tone: "info", hover: "Someone changed a setting by hand after Setup applied it. Setup leaves those alone." },
-  update_available: { label: "Update available", tone: "merged", hover: "A Coderhelm release added recommendations this repo hasn't reviewed." },
+  update_available: { label: "Update available", tone: "merged", hover: "A CoderHelm release added recommendations this repo hasn't reviewed." },
   failed: { label: "Failed", tone: "danger", hover: "The last Setup run couldn't change some settings on this repo." },
-  analyzing: { label: "Analyzing", tone: "live", hover: "Coderhelm is reading this repo now." },
+  analyzing: { label: "Analyzing", tone: "live", hover: "CoderHelm is reading this repo now." },
 };
 
 export const RUN_STATE_LOOK: Record<RunState, { label: string; tone: Tone }> = {
@@ -647,7 +647,7 @@ export const SOURCE_LOOK: Record<Source, { label: string; hover: string; classNa
   },
   default: {
     label: "Default",
-    hover: "Nothing in the repo says otherwise, so this is Coderhelm's own default.",
+    hover: "Nothing in the repo says otherwise, so this is CoderHelm's own default.",
     className: "border-zinc-700 text-zinc-400",
   },
 };

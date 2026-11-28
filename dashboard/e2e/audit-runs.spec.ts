@@ -240,7 +240,7 @@ test("a finished run shows its pull request, steps, documents and tasks without 
   await expect(page.getByTestId("merge-standing")).toHaveCount(0);
   await expect(page.getByTestId("merge-standing-link")).toHaveCount(0);
   await expect(outcome.getByRole("link", { name: /Open pull request #101/ })).toHaveAttribute("href", "https://github.com/your-team/web/pull/101");
-  // The steps read as what Coderhelm did, in words, not the worker's ids, ending on where the run is.
+  // The steps read as what CoderHelm did, in words, not the worker's ids, ending on where the run is.
   const steps = page.getByRole("list", { name: "Steps" });
   await expect(steps.getByTestId("run-step")).toHaveText([/Read the ticket/, /Planned the change/, /Built the change/, /Ran the tests/, /Opened pull request #101/, /Checked the pull request/, /Handed pull request #101 over for review/]);
   await expect(steps.locator('[data-state="done"]')).toHaveCount(7);
@@ -367,7 +367,7 @@ test("a run that learned the fix was elsewhere shows the lesson it saved", async
     run: baseRun({ lesson: "Classes missing from the site are often because their semester is not available on web in the booking system; check that setting first." }),
   });
   await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
-  await expect(page.getByText("Coderhelm learned")).toBeVisible();
+  await expect(page.getByText("CoderHelm learned")).toBeVisible();
   await expect(page.getByText(/semester is not available on web in the booking system/)).toBeVisible();
 });
 
@@ -500,10 +500,10 @@ test("a repo that asks for a person's approval says so: its own setting, or its 
   await shot(page, "run-standing-branch-rules");
 });
 
-test("Coderhelm reviewing a newer commit asks nobody: no person chip and no setting link", async ({ page }) => {
+test("CoderHelm reviewing a newer commit asks nobody: no person chip and no setting link", async ({ page }) => {
   const outcome = await openStanding(page, STANDING.reviewing);
   await expect(outcome).toHaveAttribute("data-tone", "waiting");
-  await expect(outcome).toContainText("Pull request #101 is open; Coderhelm is reviewing its newest commit");
+  await expect(outcome).toContainText("Pull request #101 is open; CoderHelm is reviewing its newest commit");
   await expect(outcome).not.toContainText("still working");
   await expect(page.getByTestId("run-who")).toHaveText("Nothing needed from you");
   await expect(page.getByText("Needs a person")).toHaveCount(0);
@@ -521,20 +521,20 @@ test("a finished run never says a fix round is taking its review's findings", as
   await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
   const outcome = page.getByTestId("run-outcome");
   await expect(page.getByTestId("merge-standing")).toHaveAttribute("data-code", "review_changes_requested");
-  await expect(outcome).toContainText("Pull request #101 is open; Coderhelm's review asks for changes");
+  await expect(outcome).toContainText("Pull request #101 is open; CoderHelm's review asks for changes");
   await expect(outcome).not.toContainText("still working");
   await expect(outcome).not.toContainText("a fix round is taking them");
-  await expect(page.getByTestId("merge-standing")).toHaveText("Coderhelm's review asks for changes on 6470f1d and no fix round is running on them.");
+  await expect(page.getByTestId("merge-standing")).toHaveText("CoderHelm's review asks for changes on 6470f1d and no fix round is running on them.");
   await expect(page.getByTestId("run-next")).toContainText("takes them in a fix round, or names on the pull request what only a person can do");
   await expect(page.getByTestId("run-who")).toHaveText("Nothing needed from you");
   await shot(page, "run-standing-finished-not-working");
   expect(errors).toEqual([]);
 });
 
-test("the other standings that need nobody say what Coderhelm does, each under its own title", async ({ page }) => {
+test("the other standings that need nobody say what CoderHelm does, each under its own title", async ({ page }) => {
   for (const [standing, title, tone] of [
-    [STANDING.merging, "Pull request #101 is approved; Coderhelm merges it", "success"],
-    [STANDING.review_changes_requested, "Pull request #101 is open; Coderhelm's review asks for changes", "waiting"],
+    [STANDING.merging, "Pull request #101 is approved; CoderHelm merges it", "success"],
+    [STANDING.review_changes_requested, "Pull request #101 is open; CoderHelm's review asks for changes", "waiting"],
     [STANDING.closed, "Pull request #101 was closed without merging", "neutral"],
   ] as const) {
     await page.unrouteAll({ behavior: "ignoreErrors" });
@@ -604,7 +604,7 @@ test("the top line says what the pull request waits on: a person's approval read
   await mockApi(page, { run: baseRun({ merge_standing: STANDING.needs_person_approval, checks: GREEN_CHECKS, preview: null }) });
   await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
   await expect(page.getByTestId("run-waiting-line")).toHaveText(
-    "Waiting on: an approving review from a person on #101 (this repo requires one before Coderhelm merges). Ready for review: checks passed.",
+    "Waiting on: an approving review from a person on #101 (this repo requires one before CoderHelm merges). Ready for review: checks passed.",
   );
   // It sits above the outcome card, which keeps its own detail.
   const line = await page.getByTestId("run-waiting-line").boundingBox();
@@ -617,7 +617,7 @@ test("the top line says what the pull request waits on: a person's approval read
 test("the server's line is shown as written, and a preview shows its checks and both widths", async ({ page }) => {
   const errors = watchConsole(page);
   const line =
-    "Waiting on: an approving review from a person on #101 (this repo requires one before Coderhelm merges). Ready for review: checks passed, preview checked.";
+    "Waiting on: an approving review from a person on #101 (this repo requires one before CoderHelm merges). Ready for review: checks passed, preview checked.";
   await mockApi(page, { run: baseRun({ merge_standing: STANDING.needs_person_approval, checks: GREEN_CHECKS, preview: PREVIEW, waiting_line: line }) });
   await stubShots(page);
   await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
@@ -645,7 +645,7 @@ test("a preview still deploying keeps the line from saying ready, and a check no
     }),
   });
   await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
-  await expect(page.getByTestId("run-waiting-line")).toHaveText("Waiting on: an approving review from a person on #101 (this repo requires one before Coderhelm merges).");
+  await expect(page.getByTestId("run-waiting-line")).toHaveText("Waiting on: an approving review from a person on #101 (this repo requires one before CoderHelm merges).");
   await expect(page.getByTestId("run-preview-check")).toContainText("not run yet");
   await expect(page.getByTestId("run-preview-shot")).toHaveCount(0);
 });
@@ -679,7 +679,7 @@ test("a run waiting for CI says the pull request is open and which checks are st
   await expect(outcome).not.toContainText("The change is ready");
   await expect(page.getByTestId("checks-line")).toHaveText("1 running, 1 queued, 2 passed.");
   await expect(page.getByTestId("run-who")).toHaveText("Nothing needed from you");
-  await expect(page.getByTestId("run-next")).toContainText("If a check fails, Coderhelm fixes it");
+  await expect(page.getByTestId("run-next")).toContainText("If a check fails, CoderHelm fixes it");
   // The steps end on the wait, with the checks: still to finish first, the passed ones folded.
   const last = page.getByRole("list", { name: "Steps" }).getByTestId("run-step").last();
   await expect(last).toHaveAttribute("data-state", "waiting");
@@ -710,7 +710,7 @@ test("a failed check comes first, and an older backend without checks still read
   // checks: null (no open pull request, or GitHub couldn't be read): a plain line, no panel.
   await mockApi(page, { run: baseRun({ status: "awaiting_ci", duration_s: null, checks: null }) });
   await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
-  await expect(page.getByTestId("run-outcome")).toContainText("Coderhelm is watching the checks on GitHub.");
+  await expect(page.getByTestId("run-outcome")).toContainText("CoderHelm is watching the checks on GitHub.");
   await expect(page.getByTestId("checks-unknown")).toBeVisible();
   await expect(page.getByTestId("run-checks")).toHaveCount(0);
 });
@@ -761,7 +761,7 @@ test("a running run can be cancelled and the step list wraps on a phone", async 
   });
   await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
   await expect(page.getByText("Running", { exact: true }).first()).toBeVisible();
-  await expect(page.getByTestId("run-outcome")).toContainText("Coderhelm is working on this");
+  await expect(page.getByTestId("run-outcome")).toContainText("CoderHelm is working on this");
   await expect(page.getByTestId("run-outcome")).toContainText("build step");
   await expect(page.getByRole("menuitem", { name: /Start over/ })).toHaveCount(0);
   await shot(page, "runs-detail-running");
@@ -788,7 +788,7 @@ test("a failed run shows what went wrong with one retry, and a refused retry say
   await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
   // A plain headline and the next step; the raw error waits behind Technical details.
   const outcome = page.getByTestId("run-outcome");
-  await expect(outcome).toContainText("Coderhelm couldn't ship this run");
+  await expect(outcome).toContainText("CoderHelm couldn't ship this run");
   await expect(outcome).toContainText("test step");
   await expect(outcome.getByText(/ci\.example\.com/)).toBeHidden();
   await outcome.getByText("Technical details").click();
@@ -927,7 +927,7 @@ test("a finished run with an old error says it's done; the old error waits in Ac
   await page.goto("/runs/detail/?id=01RUNDONE000000000000000A");
   await expect(page.getByTestId("run-outcome")).toContainText("Pull request #101 is ready for review");
   await expect(page.getByText(/TypeError/)).toHaveCount(0);
-  await expect(page.getByText("Coderhelm couldn't ship this run")).toHaveCount(0);
+  await expect(page.getByText("CoderHelm couldn't ship this run")).toHaveCount(0);
   await openTab(page, "Activity");
   await expect(page.getByText("A problem earlier in this run")).toBeVisible();
 });

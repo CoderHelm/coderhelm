@@ -57,7 +57,7 @@ async function mock(page: Page, over: Partial<State> = {}): Promise<State> {
       if (b.code !== "111111") {
         return json(route, { error: "Your password or that code didn't match. Enter both again.", code: "wrong_code" }, 400);
       }
-      return json(route, { secret: "JBSWY3DPEHPK3PXP", qr_uri: "otpauth://totp/Coderhelm:ann%40acme.dev?secret=JBSWY3DPEHPK3PXP&issuer=Coderhelm", expires_in: 600 });
+      return json(route, { secret: "JBSWY3DPEHPK3PXP", qr_uri: "otpauth://totp/CoderHelm:ann%40acme.dev?secret=JBSWY3DPEHPK3PXP&issuer=CoderHelm", expires_in: 600 });
     }
     if (p === "/api/users/2fa/replace/verify") {
       const code = body().code;

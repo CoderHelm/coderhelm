@@ -211,7 +211,7 @@ function AgentPage() {
 
       <div className="mt-6 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/40">
         <SettingsRow
-          label="Let Coderhelm ask this agent"
+          label="Let CoderHelm ask this agent"
           layout="toggle"
           help={
             <>
@@ -226,7 +226,7 @@ function AgentPage() {
           }
           control={() =>
             canManage ? (
-              <Switch checked={agent.enabled} label={`Let Coderhelm ask ${agent.name}`} disabled={switching} onChange={() => void toggle()} />
+              <Switch checked={agent.enabled} label={`Let CoderHelm ask ${agent.name}`} disabled={switching} onChange={() => void toggle()} />
             ) : (
               <Chip tone={agent.enabled ? "success" : "muted"}>{agent.enabled ? "On" : "Off"}</Chip>
             )
@@ -238,7 +238,7 @@ function AgentPage() {
         <div className="mt-4">
           <Callout variant="warning" title="The last sync failed">
             <p>
-              {repo.error} Coderhelm is still using the version at {agent.sha.slice(0, 7)}.
+              {repo.error} CoderHelm is still using the version at {agent.sha.slice(0, 7)}.
             </p>
           </Callout>
         </div>
@@ -246,7 +246,7 @@ function AgentPage() {
       {!agent.enabled && (
         <div className="mt-4">
           <Callout variant="neutral" title="Switched off">
-            <p>Coderhelm&apos;s agents can&apos;t read or ask {agent.name} until an admin switches it on.</p>
+            <p>CoderHelm&apos;s agents can&apos;t read or ask {agent.name} until an admin switches it on.</p>
           </Callout>
         </div>
       )}
@@ -269,9 +269,9 @@ function AgentPage() {
 
       {tab === "overview" && (
         <div className="mt-6 space-y-8">
-          {/* When it's asked: the description is what Coderhelm decides on. */}
+          {/* When it's asked: the description is what CoderHelm decides on. */}
           <div className={`${card} p-5`}>
-            <p className="text-xs font-medium text-zinc-400">Coderhelm asks this agent when</p>
+            <p className="text-xs font-medium text-zinc-400">CoderHelm asks this agent when</p>
             {agent.description ? (
               <p className="mt-1 text-sm text-zinc-200">{agent.description}</p>
             ) : (
@@ -279,7 +279,7 @@ function AgentPage() {
             )}
             {thinDescription(agent.description) && (
               <p className="mt-2 text-xs text-amber-300">
-                Coderhelm&apos;s agents pick who to ask from this line alone, so a short or missing one means it&apos;s rarely asked. Say what kind of
+                CoderHelm&apos;s agents pick who to ask from this line alone, so a short or missing one means it&apos;s rarely asked. Say what kind of
                 work it&apos;s for in the file&apos;s <Code>description:</Code>.
               </p>
             )}
@@ -296,7 +296,7 @@ function AgentPage() {
                   )}
                 </>
               ) : (
-                "Not asked by Coderhelm's agents yet."
+                "Not asked by CoderHelm's agents yet."
               )}
             </p>
           </div>
@@ -305,7 +305,7 @@ function AgentPage() {
 
           <section aria-labelledby="how-heading">
             <h2 id="how-heading" className={sectionHeading}>
-              When Coderhelm asks it
+              When CoderHelm asks it
             </h2>
             <dl className={`${card} divide-y divide-zinc-800`}>
               <Fact term="Who asks it">The planner, coder and reviewer, at most 3 asks in one run.</Fact>
@@ -379,7 +379,7 @@ function AgentPage() {
             )}
           </div>
           <p className="mt-2 text-xs text-zinc-400">
-            Read from the default branch. To change it, open a pull request to {agent.repo}; Coderhelm reads it again when that merges.
+            Read from the default branch. To change it, open a pull request to {agent.repo}; CoderHelm reads it again when that merges.
           </p>
         </section>
       )}
@@ -435,7 +435,7 @@ function AgentTools({ tools, toolsSet }: { tools?: AgentToolset; toolsSet: boole
           </p>
         )}
         {granted.length === 0 && !toolsSet && <p>Its file doesn&apos;t list tools, and an agent only gets the read-only tools its file lists.</p>}
-        {missing.length > 0 && <p>Coderhelm has no read-only equivalent of {missing.join(", ")}, so it answers without them.</p>}
+        {missing.length > 0 && <p>CoderHelm has no read-only equivalent of {missing.join(", ")}, so it answers without them.</p>}
         {blocked.length > 0 && <p>Team agents never write; the planner, coder or reviewer that asked makes any change.</p>}
         <p>It never writes, runs commands, uses an MCP server or browses the web.</p>
       </SettingsMore>
@@ -494,7 +494,7 @@ function RecentAsks({
         <ListSkeleton rows={3} label="Loading asks" />
       ) : asks.length === 0 ? (
         <ListEmpty title={`Nobody has asked ${agent.name} anything yet.`}>
-          Each question Coderhelm&apos;s agents put to it shows here with the answer, for 30 days.
+          Each question CoderHelm&apos;s agents put to it shows here with the answer, for 30 days.
         </ListEmpty>
       ) : (
         <>
@@ -722,7 +722,7 @@ function TryIt({
         </p>
       )}
       <p className="mt-1 text-xs text-zinc-400">
-        Ask it what Coderhelm&apos;s agents would, with your team&apos;s model.{" "}
+        Ask it what CoderHelm&apos;s agents would, with your team&apos;s model.{" "}
         {(agent.agent_tools?.granted.length ?? 0) > 0
           ? "A try has no work to read, so it answers without its tools; asked during work, it reads that work's repository."
           : "It has no tools, here or during work."}

@@ -209,7 +209,7 @@ export function sourceLabel(source: string, servers: StdioServer[]): string {
     if (s?.source.kind === "npm") return `${s.source.package}@${s.source.version}, in the run's sandbox`;
     return `${id}, in the run's sandbox`;
   }
-  if (source.startsWith("coderhelm:")) return `Coderhelm's ${source.slice("coderhelm:".length)} connection`;
+  if (source.startsWith("coderhelm:")) return `CoderHelm's ${source.slice("coderhelm:".length)} connection`;
   return source;
 }
 

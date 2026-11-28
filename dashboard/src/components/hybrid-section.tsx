@@ -33,7 +33,7 @@ function RowHeading({ id, title, children, aside }: { id?: string; title: string
 
 /**
  * Settings, then System, Hybrid (self-hosted install admins): register the
- * install with Coderhelm, claim a name.coderhelm.com address, use Coderhelm's
+ * install with CoderHelm, claim a name.coderhelm.com address, use CoderHelm's
  * GitHub App and other apps instead of your own, and choose what support may
  * see. Every write answers with the whole status (GET /api/system/hybrid).
  */
@@ -99,14 +99,14 @@ export function HybridSection() {
     <div className="min-w-0 divide-y divide-zinc-800" data-testid="hybrid-section" data-registered={String(s.registered)}>
       <div className={row}>
         <p className="max-w-prose text-sm text-zinc-300">
-          Hybrid lets this install use Coderhelm&apos;s apps and a coderhelm.com address, so there is less to set up. Your code, tickets and runs stay in your AWS account either way.
+          Hybrid lets this install use CoderHelm&apos;s apps and a coderhelm.com address, so there is less to set up. Your code, tickets and runs stay in your AWS account either way.
         </p>
         <div className="mt-4">
           <Setups current={s.registered ? "hybrid" : "private"} />
         </div>
         {outcome && (
           <div className="mt-4" data-testid="hybrid-github-outcome" data-outcome={outcome}>
-            <Callout variant={known?.ok ? "success" : "error"} title={known?.title ?? "GitHub sent back an answer Coderhelm didn't expect."}>
+            <Callout variant={known?.ok ? "success" : "error"} title={known?.title ?? "GitHub sent back an answer CoderHelm didn't expect."}>
               <p>{known?.fix ?? "Press Install on GitHub again. If it keeps happening, contact support."}</p>
             </Callout>
           </div>
@@ -128,7 +128,7 @@ export function HybridSection() {
 
       <div className={`${row} flex flex-wrap gap-x-6 gap-y-2`}>
         <a href={TRUST_MODEL_URL} target="_blank" rel="noopener noreferrer" className={`${linkButton} gap-1.5`}>
-          What Coderhelm can and can&apos;t see <ExternalLinkIcon />
+          What CoderHelm can and can&apos;t see <ExternalLinkIcon />
           <span className="sr-only"> (opens in a new tab)</span>
         </a>
         <Link href="/settings/deliveries" className={linkButton}>See every delivery</Link>
@@ -144,28 +144,28 @@ const SETUPS: { key: "private" | "hybrid" | "hosted"; title: string; tag: string
     key: "private",
     title: "Fully private",
     tag: "Default",
-    good: ["Your own GitHub App and other apps", "Nothing passes through Coderhelm"],
+    good: ["Your own GitHub App and other apps", "Nothing passes through CoderHelm"],
     cost: "You create and look after each app, and the address is your AWS one or a domain you own.",
   },
   {
     key: "hybrid",
     title: "Hybrid",
     tag: "Easiest to run",
-    good: ["Coderhelm's GitHub App and other apps", "A name.coderhelm.com address", "Code, tickets and runs stay in your AWS account"],
-    cost: "Events from those apps pass through Coderhelm on their way to you.",
+    good: ["CoderHelm's GitHub App and other apps", "A name.coderhelm.com address", "Code, tickets and runs stay in your AWS account"],
+    cost: "Events from those apps pass through CoderHelm on their way to you.",
   },
   {
     key: "hosted",
-    title: "Hosted by Coderhelm",
+    title: "Hosted by CoderHelm",
     tag: "Not this install",
-    good: ["Nothing to run or update", "Coderhelm runs it all"],
-    cost: "Your code is read in Coderhelm's cloud, not in your AWS account.",
+    good: ["Nothing to run or update", "CoderHelm runs it all"],
+    cost: "Your code is read in CoderHelm's cloud, not in your AWS account.",
   },
 ];
 
 function Setups({ current }: { current: "private" | "hybrid" }) {
   return (
-    <ul className="grid min-w-0 gap-3 md:grid-cols-3" aria-label="Ways to run Coderhelm" data-testid="hybrid-setups">
+    <ul className="grid min-w-0 gap-3 md:grid-cols-3" aria-label="Ways to run CoderHelm" data-testid="hybrid-setups">
       {SETUPS.map((x) => {
         const on = x.key === current;
         return (
@@ -228,13 +228,13 @@ function Registration({ hybrid, s }: RowProps) {
   if (!s.registered) {
     return (
       <div className={row} id="hybrid-register" data-testid="hybrid-register">
-        <RowHeading title="Register with Coderhelm">
+        <RowHeading title="Register with CoderHelm">
           <p>
-            Registering gives this install an identity at Coderhelm. It changes nothing in your AWS account, and you can leave at any time.
+            Registering gives this install an identity at CoderHelm. It changes nothing in your AWS account, and you can leave at any time.
           </p>
         </RowHeading>
         <div className="mt-3 rounded-lg border border-zinc-800 bg-zinc-950/40 p-3 text-sm">
-          <p className="font-medium text-zinc-200">What Coderhelm will see</p>
+          <p className="font-medium text-zinc-200">What CoderHelm will see</p>
           <ul className="mt-1.5 space-y-1 text-zinc-400">
             <li>This install&apos;s id and its AWS address{s.cloudfront ? <> (<Code>{s.cloudfront}</Code>)</> : null}</li>
             <li>The version it runs, and whether it answers</li>
@@ -246,9 +246,9 @@ function Registration({ hybrid, s }: RowProps) {
           className={`mt-4 ${primaryButton}`}
           disabled={!!busy}
           data-testid="hybrid-register-button"
-          onClick={() => void act("register", async () => hybrid.set(await api.registerHybrid()), "Registered with Coderhelm")}
+          onClick={() => void act("register", async () => hybrid.set(await api.registerHybrid()), "Registered with CoderHelm")}
         >
-          {busy ? "Registering…" : "Register with Coderhelm"}
+          {busy ? "Registering…" : "Register with CoderHelm"}
         </button>
       </div>
     );
@@ -258,7 +258,7 @@ function Registration({ hybrid, s }: RowProps) {
     const ok = await confirm({
       title: "Leave hybrid?",
       message:
-        "Coderhelm's apps stop sending events to this install, its coderhelm.com address is released, and repositories linked through Coderhelm's GitHub App stop working until you set up your own app. Your data stays where it is.",
+        "CoderHelm's apps stop sending events to this install, its coderhelm.com address is released, and repositories linked through CoderHelm's GitHub App stop working until you set up your own app. Your data stays where it is.",
       confirmLabel: "Leave hybrid",
       destructive: true,
     });
@@ -269,14 +269,14 @@ function Registration({ hybrid, s }: RowProps) {
   return (
     <div className={row} id="hybrid-register" data-testid="hybrid-registered">
       <RowHeading
-        title="Registered with Coderhelm"
+        title="Registered with CoderHelm"
         aside={
           <button type="button" className={buttonClass("danger", "sm")} disabled={!!busy} onClick={() => void leave()} data-testid="hybrid-leave">
             {busy === "leave" ? "Leaving…" : "Leave hybrid"}
           </button>
         }
       >
-        <p>Coderhelm knows this install and can send it events from its apps.</p>
+        <p>CoderHelm knows this install and can send it events from its apps.</p>
       </RowHeading>
       <dl className="mt-3 grid min-w-0 gap-x-4 gap-y-2 text-sm sm:grid-cols-[8rem_1fr]">
         <dt className="text-zinc-400">Install id</dt>
@@ -286,7 +286,7 @@ function Registration({ hybrid, s }: RowProps) {
         </dd>
         <dt className="text-zinc-400">Verified</dt>
         <dd data-testid="hybrid-verified">
-          {s.verified ? <Chip tone="success">Verified</Chip> : <Chip tone="waiting">Waiting for Coderhelm to reach this install</Chip>}
+          {s.verified ? <Chip tone="success">Verified</Chip> : <Chip tone="waiting">Waiting for CoderHelm to reach this install</Chip>}
         </dd>
       </dl>
     </div>
@@ -332,7 +332,7 @@ function NameRow({ hybrid, s }: RowProps) {
     const release = async () => {
       const ok = await confirm({
         title: `Release ${s.name!.hostname}?`,
-        message: "Links to this address stop working, and someone else may claim the name. Coderhelm keeps answering on your other addresses.",
+        message: "Links to this address stop working, and someone else may claim the name. CoderHelm keeps answering on your other addresses.",
         confirmLabel: "Release the address",
         destructive: true,
       });
@@ -342,14 +342,14 @@ function NameRow({ hybrid, s }: RowProps) {
     return (
       <div className={row} id="hybrid-name" data-testid="hybrid-name" data-claimed="true">
         <RowHeading
-          title="Coderhelm address"
+          title="CoderHelm address"
           aside={
             <button type="button" className={buttonClass("secondary", "sm")} disabled={!!busy} onClick={() => void release()} data-testid="hybrid-release">
               {busy === "release" ? "Releasing…" : "Release"}
             </button>
           }
         >
-          <p>People and GitHub can reach this install here, with a certificate Coderhelm looks after.</p>
+          <p>People and GitHub can reach this install here, with a certificate CoderHelm looks after.</p>
         </RowHeading>
         <div className="mt-3 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-zinc-800 bg-zinc-950/40 px-3 py-2.5">
           <a href={url} target="_blank" rel="noopener noreferrer" className={`min-w-0 rounded text-sm font-medium text-zinc-100 hover:underline ${focusRing}`} data-testid="hybrid-hostname">
@@ -387,8 +387,8 @@ function NameRow({ hybrid, s }: RowProps) {
 
   return (
     <div className={row} id="hybrid-name" data-testid="hybrid-name" data-claimed="false">
-      <RowHeading title="Coderhelm address">
-        <p>An address that&apos;s easy to share, with no domain or DNS records to set up. Coderhelm points it at this install.</p>
+      <RowHeading title="CoderHelm address">
+        <p>An address that&apos;s easy to share, with no domain or DNS records to set up. CoderHelm points it at this install.</p>
       </RowHeading>
       <form
         className="mt-3 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start"
@@ -489,7 +489,7 @@ function GithubRow({ hybrid, s }: RowProps) {
   const hosted = s.github.mode === "hosted";
   const choose = async (v: "hosted" | "own") => {
     setMode(v);
-    const ok = await act("mode", () => hybrid.save({ github_mode: v }), v === "hosted" ? "Using Coderhelm's GitHub App" : "Using your own GitHub App");
+    const ok = await act("mode", () => hybrid.save({ github_mode: v }), v === "hosted" ? "Using CoderHelm's GitHub App" : "Using your own GitHub App");
     if (!ok) setMode(s.github.mode);
   };
 
@@ -513,8 +513,8 @@ function GithubRow({ hybrid, s }: RowProps) {
           disabled={!!busy}
           onChange={(v) => void choose(v)}
           options={[
-            { value: "hosted", title: "Use Coderhelm's GitHub App (easiest)", body: "Install it on GitHub in a few clicks. GitHub's events reach this install through Coderhelm." },
-            { value: "own", title: "Use my own GitHub App (fully private)", body: "Your own app sends events straight to this install. Nothing passes through Coderhelm." },
+            { value: "hosted", title: "Use CoderHelm's GitHub App (easiest)", body: "Install it on GitHub in a few clicks. GitHub's events reach this install through CoderHelm." },
+            { value: "own", title: "Use my own GitHub App (fully private)", body: "Your own app sends events straight to this install. Nothing passes through CoderHelm." },
           ]}
         />
       </div>
@@ -522,7 +522,7 @@ function GithubRow({ hybrid, s }: RowProps) {
         <div className="mt-4 min-w-0 space-y-3">
           {s.github.links.length === 0 ? (
             <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-lg border border-zinc-800 bg-zinc-950/40 p-4">
-              <p className="min-w-0 flex-1 basis-56 text-sm text-zinc-300">Install Coderhelm&apos;s app on the GitHub account or organization that owns your repositories. Coderhelm then shows which install it is about to link: check that the address is this one and press Link. Tokens reach only the repositories you can push to.</p>
+              <p className="min-w-0 flex-1 basis-56 text-sm text-zinc-300">Install CoderHelm&apos;s app on the GitHub account or organization that owns your repositories. CoderHelm then shows which install it is about to link: check that the address is this one and press Link. Tokens reach only the repositories you can push to.</p>
               <button type="button" className={`${primaryButton} gap-1.5`} disabled={!!busy} onClick={() => void install()} data-testid="hybrid-github-install">
                 <span aria-hidden="true"><GitHubIcon /></span>
                 {busy === "link" ? "Opening GitHub…" : "Install on GitHub"}
@@ -590,7 +590,7 @@ export function repoScope(account: string, chosen: string[], ceiling: string[] |
   if (!ceiling) {
     return {
       chip: "Link again",
-      text: `This link is older than Coderhelm's record of which repositories you can push to, so this install gets no GitHub token for ${account}. Unlink it, then install on GitHub again to link it anew.`,
+      text: `This link is older than CoderHelm's record of which repositories you can push to, so this install gets no GitHub token for ${account}. Unlink it, then install on GitHub again to link it anew.`,
     };
   }
   return {
@@ -700,7 +700,7 @@ function GithubLinkCard({ link, hybrid }: { link: HybridGithubLink; hybrid: Hybr
 // ── Other apps ─────────────────────────────────────────────────────
 
 /**
- * One choice for the whole install: Coderhelm's apps for every tool the
+ * One choice for the whole install: CoderHelm's apps for every tool the
  * catalog has one for (new ones included), or fully private. The tools are
  * the gateway's catalog, never a list kept here.
  */
@@ -717,7 +717,7 @@ function IntegrationsRow({ hybrid, s }: RowProps) {
   return (
     <div className={row} id="hybrid-integrations" data-testid="hybrid-integrations" data-apps-mode={mode}>
       <RowHeading title="Other apps">
-        <p>One choice for every tool Coderhelm has an app for, now and later. GitHub has its own choice above.</p>
+        <p>One choice for every tool CoderHelm has an app for, now and later. GitHub has its own choice above.</p>
       </RowHeading>
       {tools.length > 0 && (
         <>
@@ -727,7 +727,7 @@ function IntegrationsRow({ hybrid, s }: RowProps) {
               value={mode}
               disabled={!!busy}
               onChange={(v) =>
-                void act("apps", () => hybrid.save(appsModePatch(s, v)), v === "coderhelm" ? "Other apps use Coderhelm's apps" : "Other apps are fully private")
+                void act("apps", () => hybrid.save(appsModePatch(s, v)), v === "coderhelm" ? "Other apps use CoderHelm's apps" : "Other apps are fully private")
               }
               options={APPS_MODES.map(({ value, label }) => ({ value, label }))}
             />
@@ -755,13 +755,13 @@ function IntegrationsRow({ hybrid, s }: RowProps) {
           )}
           {included.length > 0 && (
             <div className="min-w-0" data-testid="hybrid-apps-included">
-              <dt className="inline text-zinc-300">Always through Coderhelm&apos;s app: </dt>
+              <dt className="inline text-zinc-300">Always through CoderHelm&apos;s app: </dt>
               <dd className="inline text-zinc-400">{included.map((i) => i.name).join("; ")}</dd>
             </div>
           )}
           {unavailable.length > 0 && (
             <div className="min-w-0" data-testid="hybrid-apps-unavailable">
-              <dt className="inline text-zinc-300">Not through Coderhelm: </dt>
+              <dt className="inline text-zinc-300">Not through CoderHelm: </dt>
               <dd className="inline text-zinc-400">{unavailable.map((i) => i.name).join("; ")}</dd>
             </div>
           )}
@@ -782,7 +782,7 @@ function SharingRow({ hybrid, s }: RowProps) {
     <div className={row} id="hybrid-sharing" data-testid="hybrid-sharing" data-enabled={String(share.enabled)}>
       <div className="flex min-w-0 items-start justify-between gap-4">
         <div className="min-w-0">
-          <h3 id={`${base}-label`} className="text-sm font-semibold text-zinc-100">Share failed deliveries with Coderhelm support</h3>
+          <h3 id={`${base}-label`} className="text-sm font-semibold text-zinc-100">Share failed deliveries with CoderHelm support</h3>
           <p id={`${base}-help`} className="mt-1 max-w-prose text-sm text-zinc-400">Off unless you turn it on. You can turn it off at any time.</p>
         </div>
         <Switch
@@ -799,7 +799,7 @@ function SharingRow({ hybrid, s }: RowProps) {
           <p className="font-medium text-zinc-200">What you get</p>
           <ul className="mt-1.5 space-y-1 text-zinc-400">
             <li>Support can see failed deliveries and help you find the cause</li>
-            <li>A heads-up from Coderhelm when deliveries to this install keep failing</li>
+            <li>A heads-up from CoderHelm when deliveries to this install keep failing</li>
           </ul>
         </div>
         <div className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-950/40 p-3 text-sm">

@@ -183,7 +183,7 @@ function SignInSettingsPage() {
           : ""
       }${
         o.keys_unread
-          ? " Coderhelm couldn't read the team's keys, so it can't say which would be suspended. Try again in a minute."
+          ? " CoderHelm couldn't read the team's keys, so it can't say which would be suspended. Try again in a minute."
           : (o.suspended_keys ?? []).length > 0
           ? ` These keys are suspended until their maker links ${o.name}: ${(o.suspended_keys ?? []).map((k) => k.name).join(", ")}.`
           : ""
@@ -362,7 +362,7 @@ function SignInSettingsPage() {
               <p className="text-sm text-zinc-300" data-testid="require-sso-state">
                 {inUse
                   ? `Required with ${inUse.name}${data.require_sso_since ? ` since ${new Date(data.require_sso_since).toLocaleDateString()}` : ""}. Only the owner can turn it off.`
-                  : "Off: people sign in any way this Coderhelm offers."}
+                  : "Off: people sign in any way this CoderHelm offers."}
               </p>
               {inUse && (
                 <div className="space-y-3">
@@ -436,7 +436,7 @@ function SignInSettingsPage() {
                     <>
                       <p className="mt-1 text-sm text-zinc-400">
                         {inUse
-                          ? `They can't sign in until they're linked. Coderhelm never links anyone by email: an admin gives each of them a one-time link, good for 72 hours, that works only through ${o.name} with exactly their own email. The owners are emailed when one is made and when it is used.`
+                          ? `They can't sign in until they're linked. CoderHelm never links anyone by email: an admin gives each of them a one-time link, good for 72 hours, that works only through ${o.name} with exactly their own email. The owners are emailed when one is made and when it is used.`
                           : `They link ${o.name} in Settings, Security. Once single sign-on is required, they can't sign in until an admin gives them a one-time link.`}
                       </p>
                       <ul className="mt-2 space-y-1 text-sm text-zinc-200" data-testid="unlinked-list">
@@ -480,7 +480,7 @@ function SignInSettingsPage() {
               </p>
               {(inUse ? [inUse] : options).some((o) => o.keys_unread) && (
                 <p className="text-sm text-amber-300" data-testid="keys-unread">
-                  Coderhelm couldn&apos;t read the team&apos;s keys, so it can&apos;t say which would be suspended. Try again in a minute.
+                  CoderHelm couldn&apos;t read the team&apos;s keys, so it can&apos;t say which would be suspended. Try again in a minute.
                 </p>
               )}
               {(inUse ? [inUse] : options)
@@ -491,7 +491,7 @@ function SignInSettingsPage() {
                   </p>
                 ))}
               <p className="text-sm text-zinc-400" data-testid="require-sso-support">
-                Coderhelm support can open a support view of this team only with the support access you grant, and only from a session of
+                CoderHelm support can open a support view of this team only with the support access you grant, and only from a session of
                 theirs that passed a second factor. It is read-only, never a session in your team, and every page they read goes in your audit log.
                 Turning the rule on ends every earlier session from another way in for good: turning it off later doesn&apos;t bring them back.
               </p>

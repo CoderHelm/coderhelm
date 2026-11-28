@@ -1,6 +1,6 @@
 "use client";
 
-// Setup: every repo with whether Coderhelm's recommended settings are on it,
+// Setup: every repo with whether CoderHelm's recommended settings are on it,
 // what's new since the last run, the runs so far, and the team's choice for
 // newly connected repos. A run itself (pick, analyze, review, apply) is at
 // /setup/run.
@@ -114,7 +114,7 @@ export default function SetupPage() {
     <Page testId="setup-home">
       <PageHeader
         title="Setup"
-        lead="Coderhelm reads each repo and recommends a value for every setting, with the reason next to it. Let it turn them on for you, or review each one first. Either way, any change can be undone."
+        lead="CoderHelm reads each repo and recommends a value for every setting, with the reason next to it. Let it turn them on for you, or review each one first. Either way, any change can be undone."
       />
 
       {error ? (
@@ -137,7 +137,7 @@ export default function SetupPage() {
               </Link>
             }
           >
-            Coderhelm reads each repo you connect and turns on the reviewer, tests, labels and the rest the way that repo already works, and shows you why
+            CoderHelm reads each repo you connect and turns on the reviewer, tests, labels and the rest the way that repo already works, and shows you why
             before anything changes.
           </EmptyState>
         </div>
@@ -212,10 +212,10 @@ function HomeSkeleton() {
 function OpenRun({ run }: { run: RunSummary }) {
   const words =
     run.state === "analyzing"
-      ? "Coderhelm is still reading the repos. You can watch it, or come back later."
+      ? "CoderHelm is still reading the repos. You can watch it, or come back later."
       : run.state === "applying"
         ? "Your last run is applying now."
-        : "Coderhelm has finished reading the repos. Your review is waiting.";
+        : "CoderHelm has finished reading the repos. Your review is waiting.";
   return (
     <div className="mt-6">
       <Callout
@@ -237,7 +237,7 @@ function OpenRun({ run }: { run: RunSummary }) {
   );
 }
 
-/** What a Coderhelm release added: small, one line each, dismissible one by one. */
+/** What a CoderHelm release added: small, one line each, dismissible one by one. */
 function NewPanel({ items, admin, onDismiss }: { items: NewRecommendation[]; admin: boolean; onDismiss: (n: NewRecommendation) => void }) {
   const shown = items.slice(0, 5);
   return (

@@ -119,7 +119,7 @@ function TicketPage() {
     }
     if (action === "resolve") {
       if (!(await run(() => api.resolveSupportTicket(t.id), "Could not mark it resolved."))) return false;
-      toast("Marked resolved. Coderhelm support was told.");
+      toast("Marked resolved. CoderHelm support was told.");
     }
     return true;
   };
@@ -138,10 +138,10 @@ function TicketPage() {
         note={
           <>
             {t.status === "waiting"
-              ? "Coderhelm support is waiting for your answer."
+              ? "CoderHelm support is waiting for your answer."
               : t.status === "resolved"
                 ? "Reply to open it again."
-                : "Coderhelm support will answer here and by email."}
+                : "CoderHelm support will answer here and by email."}
             {deliveryWords(t) && (
               <span
                 className={`mt-1 block ${t.coderhelm?.state === "sending" && t.coderhelm.error ? "text-amber-300" : ""}`}
@@ -177,7 +177,7 @@ function TicketPage() {
       />
       {justOpened && (
         <p role="status" className="mt-4 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-sm text-emerald-300">
-          Sent. We emailed Coderhelm support and will email you when they answer.
+          Sent. We emailed CoderHelm support and will email you when they answer.
         </p>
       )}
       <TicketLayout
@@ -210,7 +210,7 @@ function TicketPage() {
             {canGrant && t.status !== "resolved" && (
               <PanelSection title="Let support look at this" testId="ticket-support-access">
                 <p className="mb-3 text-xs text-zinc-400">
-                  Coderhelm support sees your workspace read only, for the time you choose. You can end it any time in{" "}
+                  CoderHelm support sees your workspace read only, for the time you choose. You can end it any time in{" "}
                   <Link href="/settings/support-access" className={`rounded underline underline-offset-4 hover:text-zinc-300 ${focusRing}`}>
                     Settings
                   </Link>

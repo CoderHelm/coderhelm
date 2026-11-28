@@ -6,7 +6,7 @@ import { formatSize } from "@/lib/data-sources";
 import { focusRing, inputClass, linkButton } from "./ui";
 
 /**
- * Choose which log groups Coderhelm may search. Searchable, with each group's
+ * Choose which log groups CoderHelm may search. Searchable, with each group's
  * size so people can tell the busy ones apart. A chosen name that isn't in the
  * list (a group since deleted, or a prefix ending in *) stays chosen and shown.
  */
@@ -68,7 +68,7 @@ export function LogGroupPicker({
         )}
       </div>
       <fieldset className="rounded-lg border border-zinc-800 bg-zinc-900/50">
-        <legend className="sr-only">Log groups Coderhelm may search</legend>
+        <legend className="sr-only">Log groups CoderHelm may search</legend>
         {shown.length === 0 ? (
           <p className="p-4 text-sm text-zinc-400">
             {listed.length === 0 ? "This account has no log groups in this region." : "No log group matches that."}

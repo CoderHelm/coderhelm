@@ -23,7 +23,7 @@ import { StatGrid, StatTile } from "@/components/stat-tile";
 import { StatusPill } from "@/components/status-pill";
 import { smallSecondaryButton } from "@/components/ui";
 
-// What became of the pull requests Coderhelm opened (the scorecard), the
+// What became of the pull requests CoderHelm opened (the scorecard), the
 // lessons it took from what people did with them, and what each reviewer
 // keeps asking for. Three sections of the Learning page, each loading by
 // itself; a gateway from before them has no such routes and they show
@@ -123,7 +123,7 @@ const REPO_COLUMNS: Column<RepoRow>[] = [
   { key: "time", header: "Time to merge", width: "fit", align: "right", cell: (r) => hours(r.avg_hours_to_merge) },
 ];
 
-/** What became of the pull requests Coderhelm opened, for the team and each repository. */
+/** What became of the pull requests CoderHelm opened, for the team and each repository. */
 export function ScorecardSection({ repo }: { repo: string }) {
   const [span, setSpan] = useState<Span>("3");
   const fetcher = useCallback(() => api.getScorecard(Number(span), repo || undefined), [span, repo]);
@@ -137,7 +137,7 @@ export function ScorecardSection({ repo }: { repo: string }) {
       id="scorecard"
       description={
         <>
-          What became of the pull requests Coderhelm opened, counted as each one is merged, closed, reviewed or reverted. A pull request counts in the month it was opened.
+          What became of the pull requests CoderHelm opened, counted as each one is merged, closed, reviewed or reverted. A pull request counts in the month it was opened.
           {data?.since ? ` Counting began in ${monthWords(data.since)}; pull requests opened before that are not included.` : ""}
         </>
       }
@@ -149,7 +149,7 @@ export function ScorecardSection({ repo }: { repo: string }) {
         <ListSkeleton rows={2} label="Loading the scorecard" />
       ) : t.opened === 0 ? (
         <p className={emptyBox} data-testid="scorecard-empty">
-          No pull request from Coderhelm has been counted {period}
+          No pull request from CoderHelm has been counted {period}
           {repo ? ` in ${repo}` : ""}. The scorecard fills in as pull requests open, merge and close from now on.
         </p>
       ) : (
@@ -286,7 +286,7 @@ const REPO_CHOICES = [
 type RepoChoice = (typeof REPO_CHOICES)[number]["value"];
 
 /**
- * Whether Coderhelm may open guide pull requests: one switch for the team,
+ * Whether CoderHelm may open guide pull requests: one switch for the team,
  * and, with a repository picked in the page's filter, that repository's own
  * setting. Each change is saved at once. Everyone sees how it is set; only
  * an admin can change it.
@@ -332,7 +332,7 @@ function GuidePrSetting({ repo, canManage }: { repo: string; canManage: boolean 
         notDefault={!setting.enabled}
         help={
           <>
-            When a lesson has been seen on several pull requests, Coderhelm proposes it for the repository&apos;s guide file as a pull request for the team to review. Off, Coderhelm writes nothing to any repository for this; its lessons still go to every run.
+            When a lesson has been seen on several pull requests, CoderHelm proposes it for the repository&apos;s guide file as a pull request for the team to review. Off, CoderHelm writes nothing to any repository for this; its lessons still go to every run.
             {cannot ? ` ${cannot}` : ""}
           </>
         }
@@ -409,7 +409,7 @@ export function OutcomeLessonsSection({ repo, canManage }: { repo: string; canMa
           )}
           {data.lessons.length === 0 ? (
             <p className={emptyBox} data-testid="lessons-empty">
-              No lessons yet{repo ? ` in ${repo}` : ""}. One is written when people edit one of Coderhelm&apos;s pull requests before merging it, close one with a comment, or revert one and say why.
+              No lessons yet{repo ? ` in ${repo}` : ""}. One is written when people edit one of CoderHelm&apos;s pull requests before merging it, close one with a comment, or revert one and say why.
             </p>
           ) : (
             <ul className="grid min-w-0 gap-3 lg:grid-cols-2">
@@ -434,7 +434,7 @@ const CATEGORY: Record<string, string> = {
 };
 const categoryWords = (c: string) => CATEGORY[c] ?? `${c.charAt(0).toUpperCase()}${c.slice(1).replace(/_/g, " ")}`;
 
-/** What each reviewer repeatedly asks for on Coderhelm's pull requests, with a way to forget it. */
+/** What each reviewer repeatedly asks for on CoderHelm's pull requests, with a way to forget it. */
 export function ReviewerAsksSection({ canManage }: { canManage: boolean }) {
   const fetcher = useCallback(() => api.getReviewerAsks(), []);
   const { data, error, gone, load } = useSection(fetcher, isAsks);
@@ -447,8 +447,8 @@ export function ReviewerAsksSection({ canManage }: { canManage: boolean }) {
     const ok = await confirm({
       title: id ? "Forget this ask?" : `Forget everything kept about ${login}?`,
       message: id
-        ? "Coderhelm stops applying it. It is kept again only if the reviewer asks for it on later pull requests."
-        : `Every ask kept for ${login} is removed, and where they reviewed. Coderhelm learns them again only from later pull requests.`,
+        ? "CoderHelm stops applying it. It is kept again only if the reviewer asks for it on later pull requests."
+        : `Every ask kept for ${login} is removed, and where they reviewed. CoderHelm learns them again only from later pull requests.`,
       confirmLabel: "Forget",
       destructive: true,
     });
@@ -469,7 +469,7 @@ export function ReviewerAsksSection({ canManage }: { canManage: boolean }) {
     <Section
       title="What reviewers ask for"
       id="reviewers"
-      description={`What each person repeatedly asks for when reviewing Coderhelm's pull requests. An ask seen on ${data?.min_seen ?? 2} or more pull requests is given to the coding agent, and to Coderhelm's own review, when that person is likely to review the change: a code owner of the files, or someone who reviewed that part of the repository recently. Only the ask, its kind and the pull requests are kept; never the reviewer's comments, and nothing about the person.`}
+      description={`What each person repeatedly asks for when reviewing CoderHelm's pull requests. An ask seen on ${data?.min_seen ?? 2} or more pull requests is given to the coding agent, and to CoderHelm's own review, when that person is likely to review the change: a code owner of the files, or someone who reviewed that part of the repository recently. Only the ask, its kind and the pull requests are kept; never the reviewer's comments, and nothing about the person.`}
     >
       {error ? (
         <LoadProblem title="Couldn't load what reviewers ask for" error={error} onRetry={() => void load()} />
@@ -477,7 +477,7 @@ export function ReviewerAsksSection({ canManage }: { canManage: boolean }) {
         <ListSkeleton rows={2} label="Loading what reviewers ask for" />
       ) : data.reviewers.length === 0 ? (
         <p className={emptyBox} data-testid="reviewers-empty">
-          Nothing kept yet. Asks are learned when people review Coderhelm&apos;s pull requests.
+          Nothing kept yet. Asks are learned when people review CoderHelm&apos;s pull requests.
         </p>
       ) : (
         <div className="space-y-3" aria-busy={busy}>

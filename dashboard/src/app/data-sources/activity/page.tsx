@@ -63,7 +63,7 @@ function DataSourceActivityPage() {
         title="Activity"
         lead={
           <>
-            Each time Coderhelm or a teammate looks something up in a connected source, it appears here: who asked, what they asked,
+            Each time CoderHelm or a teammate looks something up in a connected source, it appears here: who asked, what they asked,
             for which pull request or run, and whether it worked. Only the lookup is kept, never what came back, for 180 days.
           </>
         }

@@ -1,7 +1,7 @@
 "use client";
 
 // Code graph: its own section (the planner, the coding agent, CI fixes and
-// the reviewer all use it). Every repo Coderhelm works in is listed with its
+// the reviewer all use it). Every repo CoderHelm works in is listed with its
 // graph's status (off, not built, queued, indexing, ready, failed) and its
 // Turn off / Rebuild actions. A ready repo opens below: load-bearing files
 // (PageRank), symbol search (definitions + callers), and the neighbourhood
@@ -66,7 +66,7 @@ function graphSummary(repos: GraphRepo[]): string {
   const failed = states.filter((s) => s === "failed").length;
   const building = states.filter((s) => s === "queued" || s === "indexing" || s === "not_built").length;
   if (on === 0) return "The code graph is off for every repository.";
-  const parts = [`Coderhelm has mapped ${ready} of ${plural(on, "repository", "repositories")}.`];
+  const parts = [`CoderHelm has mapped ${ready} of ${plural(on, "repository", "repositories")}.`];
   if (building) parts.push(`${plural(building, "is", "are")} being built.`.replace(/^(\d+) (is|are)/, "$1 $2"));
   if (failed) parts.push(`${plural(failed, "build", "builds")} failed and ${failed === 1 ? "needs" : "need"} a look.`);
   if (ready === on) parts.push(ready === 1 ? "It is up to date." : "All are up to date.");
@@ -267,7 +267,7 @@ export default function GraphPage() {
               </Link>
             }
           >
-            Turn a repository on and Coderhelm builds its code graph for the planner, the coding agent, the reviewer and CI fixes.
+            Turn a repository on and CoderHelm builds its code graph for the planner, the coding agent, the reviewer and CI fixes.
           </ListEmpty>
         ) : (
           <List label="Repositories and their code graphs">

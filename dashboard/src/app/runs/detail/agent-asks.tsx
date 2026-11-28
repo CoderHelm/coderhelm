@@ -135,7 +135,7 @@ export function AsksHistory({
 
 function StopNote({ note, past = false }: { note: string; past?: boolean }) {
   return (
-    <Callout variant={past ? "neutral" : "warning"} title={past ? "Coderhelm stopped at one point" : "Coderhelm stopped"}>
+    <Callout variant={past ? "neutral" : "warning"} title={past ? "CoderHelm stopped at one point" : "CoderHelm stopped"}>
       <p>{note}</p>
       <p>
         <Link href="/settings/agents/" className={linkButton}>

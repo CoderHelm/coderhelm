@@ -11,7 +11,7 @@ import { Tabs } from "@/components/tabs";
 const HEADER = (
   <PageHeader
     title="Deliveries"
-    lead="Every webhook Coderhelm receives and every notice it sends, whether it worked, and what to do when it didn't."
+    lead="Every webhook CoderHelm receives and every notice it sends, whether it worked, and what to do when it didn't."
   />
 );
 

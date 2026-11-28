@@ -85,7 +85,7 @@ async function mockApi(page: Page) {
   });
 }
 
-const SETUP_UPLOAD = "- name: Upload E2E results for Coderhelm\n  if: ${{ !cancelled() }}\n  uses: actions/upload-artifact@v4\n  with:\n    name: coderhelm-e2e-results\n    path: |\n      playwright-report/\n      test-results/";
+const SETUP_UPLOAD = "- name: Upload E2E results for CoderHelm\n  if: ${{ !cancelled() }}\n  uses: actions/upload-artifact@v4\n  with:\n    name: coderhelm-e2e-results\n    path: |\n      playwright-report/\n      test-results/";
 const SETUP_REPORTER = { file: "playwright.config.ts", code: 'reporter: [["html"], ["json", { outputFile: "test-results/results.json" }]],' };
 const SETUP_ROW = {
   repo: "your-team/web", default_branch: "main", status: "needs_setup", runner: "playwright", runners: ["playwright", "jest"],
@@ -161,7 +161,7 @@ test("code block: the Tests setup copies the exact snippet and highlights it", a
   await step.locator("pre").focus();
   await page.keyboard.press("Control+c");
   const last = (await copied(page)).at(-1) ?? "";
-  expect(last.startsWith("- name: Upload E2E results for Coderhelm")).toBe(true);
+  expect(last.startsWith("- name: Upload E2E results for CoderHelm")).toBe(true);
   expect(last).toContain("if: ${{ !cancelled() }}");
 
   await shot(page, "tests-setup");

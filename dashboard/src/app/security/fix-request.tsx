@@ -362,7 +362,7 @@ export function FixRequest({
                 {majors.length === 1
                   ? `${majors[0].package} moves to a new major version`
                   : `${majors.length} packages move to a new major version (${listSome(majors.map((b) => b.package))})`}
-                . It may need code changes; Coderhelm fixes CI in the same PR, and moves a major upgrade to its own PR only if CI can&apos;t pass with it.
+                . It may need code changes; CoderHelm fixes CI in the same PR, and moves a major upgrade to its own PR only if CI can&apos;t pass with it.
               </Note>
             )}
             {joined.map((u) => (
@@ -670,7 +670,7 @@ function BumpRow({ b, onRemove, disabled }: { b: PlanBump; onRemove: (b: PlanBum
             {b.from} to {b.to}
           </span>
           {b.major && (
-            <span data-testid="fix-major" title="A new major version: it may need code changes, which Coderhelm makes in the same PR.">
+            <span data-testid="fix-major" title="A new major version: it may need code changes, which CoderHelm makes in the same PR.">
               <Chip tone="attention">Major</Chip>
             </span>
           )}

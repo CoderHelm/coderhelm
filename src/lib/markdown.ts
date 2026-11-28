@@ -18,7 +18,7 @@ function block(b: Block): string {
     case "cards":
       return b.items
         .map((c) => {
-          const title = c.href ? `[${c.title}](${SITE.url}${c.href})` : c.title;
+          const title = c.href ? `[${c.title}](${c.href.startsWith("/") ? SITE.url + c.href : c.href})` : c.title;
           return `- **${title}:** ${absolutize(c.text)}`;
         })
         .join("\n");

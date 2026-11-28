@@ -19,7 +19,7 @@ export function ReviewStepsBadge({ item }: { item: Pick<Skill, "reviews" | "kind
   if (item.kind !== "agent" || steps.length === 0) return null;
   return (
     <span data-testid="reviews-badge" className="inline-flex max-w-full">
-      <Chip title="The review steps Coderhelm runs this agent in">Reviews: {reviewsLabel(steps)}</Chip>
+      <Chip title="The review steps CoderHelm runs this agent in">Reviews: {reviewsLabel(steps)}</Chip>
     </span>
   );
 }
@@ -71,7 +71,7 @@ export function ReviewStepsSection({
             Ask it to review
           </h2>
           <p className="mt-1 text-xs text-zinc-400">
-            In a review step Coderhelm runs this agent on every matching run, not only when an agent thinks to ask it (at most two agents a step). Its
+            In a review step CoderHelm runs this agent on every matching run, not only when an agent thinks to ask it (at most two agents a step). Its
             answer is advice: the planner, reviewer or writer weighs each gap.
           </p>
           <p className="mt-2 text-sm text-zinc-200">

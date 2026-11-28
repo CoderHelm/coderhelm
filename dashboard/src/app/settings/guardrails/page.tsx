@@ -12,7 +12,7 @@ import { Problem } from "@/components/problem";
 import { LockIcon } from "@/components/icons";
 import { ScopeBar, type Scope } from "../scope-bar";
 
-/** The rules Coderhelm keeps on every run, whatever the team sets. */
+/** The rules CoderHelm keeps on every run, whatever the team sets. */
 const BUILT_IN = [
   "Never push to your default branch",
   "Never commit secrets or keys",
@@ -208,12 +208,12 @@ function GuardrailsPage() {
   return (
     <Page>
       <div className="mb-6">
-        <PageHeader title="Rules" lead="Rules every Coderhelm run must follow. A repository's own rules add to the ones for every repository." />
+        <PageHeader title="Rules" lead="Rules every CoderHelm run must follow. A repository's own rules add to the ones for every repository." />
       </div>
 
       <div className="max-w-3xl space-y-8">
-      <SettingsSection id="always-on" title="Always on" description="Coderhelm keeps these on every run. They can't be turned off.">
-        <ul aria-label="Rules Coderhelm always follows" data-testid="built-in-rules" className="divide-y divide-zinc-800">
+      <SettingsSection id="always-on" title="Always on" description="CoderHelm keeps these on every run. They can't be turned off.">
+        <ul aria-label="Rules CoderHelm always follows" data-testid="built-in-rules" className="divide-y divide-zinc-800">
           {BUILT_IN.map((rule) => (
             <li key={rule} className="flex min-w-0 items-center gap-3 px-4 py-2.5 text-sm text-zinc-300">
               <span aria-hidden="true" className="shrink-0 text-zinc-400">

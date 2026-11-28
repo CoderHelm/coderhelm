@@ -461,7 +461,7 @@ test.describe("chat: asking", () => {
     await expect(sources.nth(0)).toContainText("HAR-7 Embed the portal");
     await expect(sources.nth(0)).toContainText("Ticket");
     await expect(sources.nth(1)).toContainText("Pull request");
-    await expect(sources.nth(2)).toContainText("Coderhelm run");
+    await expect(sources.nth(2)).toContainText("CoderHelm run");
     await expect(sources.nth(3)).toContainText("Finding");
     const open = async (n: number) => {
       await answer.getByTestId("cite-marker").nth(n).click();
@@ -472,9 +472,9 @@ test.describe("chat: asking", () => {
     };
     expect(await open(0)).toEqual({ href: "https://team.atlassian.net/browse/HAR-7", text: expect.stringContaining("Open the ticket") });
     expect(await open(1)).toEqual({ href: "https://github.com/your-team/web/pull/88", text: expect.stringContaining("Open on GitHub") });
-    expect(await open(2)).toEqual({ href: expect.stringMatching(/^\/runs\/detail\/?\?id=run_1$/), text: expect.stringContaining("Open in Coderhelm") });
-    // A finding opens its page in Coderhelm, not the pull request that fixed it.
-    expect(await open(3)).toEqual({ href: expect.stringMatching(/^\/security\/detail\/?\?id=sf1$/), text: expect.stringContaining("Open in Coderhelm") });
+    expect(await open(2)).toEqual({ href: expect.stringMatching(/^\/runs\/detail\/?\?id=run_1$/), text: expect.stringContaining("Open in CoderHelm") });
+    // A finding opens its page in CoderHelm, not the pull request that fixed it.
+    expect(await open(3)).toEqual({ href: expect.stringMatching(/^\/security\/detail\/?\?id=sf1$/), text: expect.stringContaining("Open in CoderHelm") });
   });
 
   test("hovering a number shows its source card", async ({ page }) => {
@@ -616,12 +616,12 @@ test.describe("chat: the chat list", () => {
     await mockApi(page);
     await page.goto("/chat");
     const nav = page.getByTestId("chat-nav");
-    await expect(nav.getByRole("link", { name: /Back to Coderhelm/ })).toBeVisible();
+    await expect(nav.getByRole("link", { name: /Back to CoderHelm/ })).toBeVisible();
     await expect(nav.getByTestId("thread-rail")).toBeVisible();
     // Exactly one chat list, and the app's own menu is replaced while in Chat.
     await expect(page.getByTestId("thread-rail")).toHaveCount(1);
     await expect(page.getByTestId("main-nav")).toHaveCount(0);
-    await nav.getByRole("link", { name: /Back to Coderhelm/ }).click();
+    await nav.getByRole("link", { name: /Back to CoderHelm/ }).click();
     await expect(page.getByTestId("main-nav")).toBeVisible();
   });
 
@@ -714,7 +714,7 @@ test.describe("chat: the chat list", () => {
     await mockApi(page);
     await page.goto("/chat?thread=th_old");
     await expect(page.getByTestId("answer")).toBeVisible();
-    await page.getByTestId("chat-nav").getByRole("link", { name: /Back to Coderhelm/ }).click();
+    await page.getByTestId("chat-nav").getByRole("link", { name: /Back to CoderHelm/ }).click();
     await expect(page.getByTestId("main-nav")).toBeVisible();
     await page.keyboard.press("ControlOrMeta+KeyJ");
     await expect(page).toHaveURL(/\/chat\/?$/);

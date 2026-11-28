@@ -29,14 +29,14 @@ const SHA = "4f2c9a1e7b3d5c8a9e0f1b2c3d4e5f6a7b8c9d0e";
 const REPOS: Repo[] = [
   { repo: "acme/playbook", added_by: "admin@example.com", added_at: ago(3000), sha: SHA, synced_at: ago(4), error: "", items: 6, skipped: ["skills/debug/diagram.png: not text", "commands/huge-export.md: larger than 64 KB"] },
   { repo: "acme/runbooks", added_by: "admin@example.com", added_at: ago(1), sha: "", synced_at: "", error: "", items: 0, skipped: [] },
-  { repo: "acme/old-guides", added_by: "lead@example.com", added_at: ago(9000), sha: "9a8b7c6d5e4f", synced_at: ago(25), error: "Coderhelm's GitHub App can't read this repository. Install the app on it, then sync again.", items: 1, skipped: [] },
+  { repo: "acme/old-guides", added_by: "lead@example.com", added_at: ago(9000), sha: "9a8b7c6d5e4f", synced_at: ago(25), error: "CoderHelm's GitHub App can't read this repository. Install the app on it, then sync again.", items: 1, skipped: [] },
 ];
 const item = (p: Partial<Item> & Pick<Item, "path" | "kind" | "name" | "description">): Item => ({
   repo: "acme/playbook", sha: SHA, hash: "h", enabled: true, files: [], missing_tools: [], uses: 0, last_used_at: "", last_used_by: "", updated_at: ago(60),
   asks: 0, last_asked_at: "", switched_by: "", switched_at: "", ...p,
 });
 // Each need is something to connect, unless named in LOCAL: those assume a
-// person's own machine, with what Coderhelm does instead.
+// person's own machine, with what CoderHelm does instead.
 const LOCAL: Record<string, string> = { "Local files": "Reads the repository and the team's connected sources instead" };
 const checked = (status: string, summary: string, needs: string[] = [], current = true) => ({
   status,
@@ -65,14 +65,14 @@ const DEBUG_COMPAT = {
     { title: "Reproduce it", does: "Write down the exact record, page and time.", dropped: false, status: "available", requirements: [] },
     { title: "Read the logs", does: "Search the service logs around that time.", dropped: false, status: "translated", requirements: [req("CloudWatch logs", "translated", ["logs_search"], { kind: "data" })] },
     { title: "Check the data", does: "Query the record in the database.", dropped: false, status: "translated", requirements: [req("psql", "translated", ["db_query"], { kind: "command" })] },
-    { title: "Check deploy markers", does: "Look for a deploy right before the failure.", dropped: false, status: "missing", requirements: [req("list_change_events", "missing", [], { needs: "Monitoring", fix: "Connect your monitoring tool's MCP server.", connect: "plugins" }), req("git log", "missing", [], { kind: "command", needs: "Commit history", fix: "Coderhelm's GitHub connection doesn't do this yet.", connect: "github", action: "none" })] },
-    { title: "Write the lesson", does: "Append what was learned to the team wiki page.", dropped: false, status: "blocked", requirements: [req("updatePage", "blocked", [], { write: "outside", needs: "Wiki writes", fix: "Coderhelm only reads outside systems here." })] },
+    { title: "Check deploy markers", does: "Look for a deploy right before the failure.", dropped: false, status: "missing", requirements: [req("list_change_events", "missing", [], { needs: "Monitoring", fix: "Connect your monitoring tool's MCP server.", connect: "plugins" }), req("git log", "missing", [], { kind: "command", needs: "Commit history", fix: "CoderHelm's GitHub connection doesn't do this yet.", connect: "github", action: "none" })] },
+    { title: "Write the lesson", does: "Append what was learned to the team wiki page.", dropped: false, status: "blocked", requirements: [req("updatePage", "blocked", [], { write: "outside", needs: "Wiki writes", fix: "CoderHelm only reads outside systems here." })] },
   ],
   counts: { steps: 5, as_written: 1, translated: 2, missing: 1, blocked: 1 },
   needs: [
     { name: "Monitoring", fix: "Connect your monitoring tool's MCP server.", connect: "plugins", status: "missing", steps: 1 },
-    { name: "Wiki writes", fix: "Coderhelm only reads outside systems here.", connect: "none", status: "blocked", steps: 1 },
-    { name: "Commit history", fix: "Coderhelm's GitHub connection doesn't do this yet.", connect: "github", action: "none", status: "missing", steps: 1 },
+    { name: "Wiki writes", fix: "CoderHelm only reads outside systems here.", connect: "none", status: "blocked", steps: 1 },
+    { name: "Commit history", fix: "CoderHelm's GitHub connection doesn't do this yet.", connect: "github", action: "none", status: "missing", steps: 1 },
   ],
   notes: ["1 step had no title; it was made from what it does."],
   model: "light-model", input_tokens: 9100, output_tokens: 3200, cost_usd: 0.034, ms: 41000,
@@ -83,7 +83,7 @@ const DEBUG_TRANSLATED = `# Debug
 2. Search the service logs with \`logs_search\` around that time for errors that name the record.
 3. If the data is wrong, query it with \`db_query\` and follow it back to the code that wrote it.
 4. If the data is right, the bug is in the code that reads or shows it.
-GAP: Deploy markers — look for a recent deploy — not connected in Coderhelm (connect your monitoring tool)`;
+GAP: Deploy markers — look for a recent deploy — not connected in CoderHelm (connect your monitoring tool)`;
 const BODY = `---
 name: debug
 description: Find the cause before the fix.
@@ -187,7 +187,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
         const agent_tools = it.name === "spec-checker"
           ? { declared: ["Read", "Grep", "Bash", "WebFetch", "Write"], granted: ["read_file", "read_file_lines", "search_code"], missing: ["Bash", "WebFetch"], blocked: ["Write"] }
           : { declared: [], granted: [], missing: [], blocked: [] };
-        return json(route, { ...it, body: AGENT_BODY, agent_tools, prompt: "You are one of this team's own agents, asked a question by Coderhelm's reviewer.\n\n## Your brief\nYou review specs before work starts.", translated: "" });
+        return json(route, { ...it, body: AGENT_BODY, agent_tools, prompt: "You are one of this team's own agents, asked a question by CoderHelm's reviewer.\n\n## Your brief\nYou review specs before work starts.", translated: "" });
       }
       const full = it.name === "debug" && it.compat ? { ...it.compat, ...DEBUG_COMPAT, needs: it.compat.needs, needs_detail: DEBUG_COMPAT.needs } : it.compat;
       return json(route, { ...it, body: BODY, compat: full, translated: it.compat && it.name === "debug" ? DEBUG_TRANSLATED : "" });
@@ -288,7 +288,7 @@ async function shot(page: Page, name: string) {
   await page.setViewportSize({ width: 1280, height: 800 });
 }
 
-test("no repository yet: the page says what Coderhelm reads and how to connect one", async ({ page }) => {
+test("no repository yet: the page says what CoderHelm reads and how to connect one", async ({ page }) => {
   await mockApi(page, { repos: [], items: [] });
   await page.goto("/skills");
   await expect(page.getByRole("heading", { name: "Skills", exact: true })).toBeVisible();
@@ -309,17 +309,17 @@ test("repositories in each state, items by kind, agents marked as askable, one o
   await expect(page.getByRole("heading", { name: /^Commands\s*2$/ })).toBeVisible();
   // Rows read as names, not machine handles; the handle is the hover text.
   await expect(page.locator('[data-handle="skill:debug"]').getByRole("link")).toHaveText("Debug");
-  await expect(page.getByRole("switch", { name: "Let Coderhelm read copy-tone" })).toHaveAttribute("aria-checked", "false");
+  await expect(page.getByRole("switch", { name: "Let CoderHelm read copy-tone" })).toHaveAttribute("aria-checked", "false");
 
   await expect(page.getByRole("link", { name: "Debug", exact: true })).toHaveAttribute("href", /\/skills\/item\/?\?repo=acme%2Fplaybook&path=skills%2Fdebug%2FSKILL\.md/);
   await shot(page, "skills-list");
 
-  await page.getByRole("switch", { name: "Let Coderhelm read copy-tone" }).click();
-  await expect(page.getByRole("switch", { name: "Let Coderhelm read copy-tone" })).toHaveAttribute("aria-checked", "true");
+  await page.getByRole("switch", { name: "Let CoderHelm read copy-tone" }).click();
+  await expect(page.getByRole("switch", { name: "Let CoderHelm read copy-tone" })).toHaveAttribute("aria-checked", "true");
   expect(db.calls.some((c) => c.method === "PUT" && c.path === "/api/skills/item" && c.body?.enabled === true)).toBe(true);
 });
 
-test("an item that asks for tools Coderhelm doesn't have says so, and which ones", async ({ page }) => {
+test("an item that asks for tools CoderHelm doesn't have says so, and which ones", async ({ page }) => {
   await mockApi(page);
   await page.goto("/skills");
   // One status chip per row; the tools are named in its hover text.
@@ -327,9 +327,9 @@ test("an item that asks for tools Coderhelm doesn't have says so, and which ones
   await expect(chips).toHaveCount(2);
   const command = page.locator('[data-handle="command:release-notes"]');
   await expect(command.getByTestId("missing-tools")).toHaveText("Needs tools");
-  await expect(command.getByTestId("missing-tools")).toHaveAttribute("title", "Asks for tools Coderhelm doesn't have: Bash, mcp__tracker__list_issues. Coderhelm runs it without them.");
+  await expect(command.getByTestId("missing-tools")).toHaveAttribute("title", "Asks for tools CoderHelm doesn't have: Bash, mcp__tracker__list_issues. CoderHelm runs it without them.");
   const agent = page.locator('[data-handle="agent:spec-checker"]');
-  await expect(agent.getByTestId("missing-tools")).toHaveAttribute("title", "Lists tools it won't get: Read, Grep, Bash, WebFetch. Coderhelm runs it without them.");
+  await expect(agent.getByTestId("missing-tools")).toHaveAttribute("title", "Lists tools it won't get: Read, Grep, Bash, WebFetch. CoderHelm runs it without them.");
   // An item asking for nothing it lacks shows no warning.
   await expect(page.locator('[data-handle="skill:debug"]').getByTestId("missing-tools")).toHaveCount(0);
   await shot(page, "skills-missing-tools");
@@ -358,7 +358,7 @@ test("page stats: reads and asks per day, who used them, most used, and what sit
 test("page stats: nothing used yet says so, and a failed stats call leaves the page working", async ({ page }) => {
   const db = await mockApi(page, { stats: { ...STATS, reads: 0, asks: 0, answered: 0, no_answer: 0, top: [], days: STATS.days.map((d) => ({ ...d, reads: 0, asks: 0, answered: 0 })) } });
   await page.goto("/skills?tab=activity");
-  await expect(page.getByText("Coderhelm hasn't read a skill or asked an agent yet.")).toBeVisible();
+  await expect(page.getByText("CoderHelm hasn't read a skill or asked an agent yet.")).toBeVisible();
   db.stats = null;
   await page.goto("/skills");
   await expect(page.getByRole("heading", { name: /^Skills\s*3$/ })).toBeVisible();
@@ -398,10 +398,10 @@ test("an agent's page: when it's asked, how it runs, recent asks and its instruc
   await page.getByRole("region", { name: /^Agents\s*2$/ }).getByRole("link", { name: "Spec checker", exact: true }).click();
   await expect(page).toHaveURL(/\/skills\/agent\/?\?repo=acme%2Fplaybook&path=agents%2Fspec-checker\.md/);
   await expect(page.getByRole("heading", { name: "spec-checker", level: 1 })).toBeVisible();
-  await expect(page.getByText("Coderhelm asks this agent when")).toBeVisible();
+  await expect(page.getByText("CoderHelm asks this agent when")).toBeVisible();
   await expect(page.getByText("Turning it off doesn't change the file in your repo.")).toBeVisible();
   await expect(page.getByRole("link", { name: "Open on GitHub" })).toHaveAttribute("href", `https://github.com/acme/playbook/blob/${SHA}/agents/spec-checker.md`);
-  // It reads with what its own file lists, mapped to Coderhelm's read-only tools.
+  // It reads with what its own file lists, mapped to CoderHelm's read-only tools.
   const tools = page.getByTestId("agent-tools");
   await expect(tools).toContainText("Read-only, the ones its file lists.");
   await expect(tools.getByRole("list", { name: "Tools it gets" }).getByRole("listitem")).toHaveText(["read_file", "read_file_lines", "search_code"]);
@@ -510,11 +510,11 @@ test("a run's page lists the files it kept as outputs, each a download, the link
 
 const DEBUG_URL = "/skills/item?repo=acme%2Fplaybook&path=skills%2Fdebug%2FSKILL.md";
 
-test("the overview counts items by how Coderhelm runs them and filters by what they need", async ({ page }) => {
+test("the overview counts items by how CoderHelm runs them and filters by what they need", async ({ page }) => {
   await mockApi(page);
   await page.goto("/skills");
   const overview = page.getByTestId("compat-overview");
-  await expect(overview.getByRole("heading", { name: "How Coderhelm runs your skills" })).toBeVisible();
+  await expect(overview.getByRole("heading", { name: "How CoderHelm runs your skills" })).toBeVisible();
   // One line until opened.
   await expect(overview).toContainText("2 need a tool you haven't connected");
   await expect(overview.getByRole("button", { name: "1 Ready" })).toBeHidden();
@@ -526,7 +526,7 @@ test("the overview counts items by how Coderhelm runs them and filters by what t
   await expect(overview.getByRole("button", { name: "Monitoring needed by 2 items" })).toBeVisible();
   await expect(overview.getByRole("button", { name: "Wiki writes needed by 1 item" })).toBeVisible();
   // A laptop file has nothing to connect: it's its own folded group, with
-  // what Coderhelm does instead, never "most needed".
+  // what CoderHelm does instead, never "most needed".
   await expect(overview.getByRole("button", { name: /Local files needed by/ })).toHaveCount(0);
   const local = overview.getByTestId("compat-local");
   await expect(local.getByText("Assumes a local machine (1)")).toBeVisible();
@@ -565,7 +565,7 @@ test("an item's page: each step, what it relies on, what to connect, and the two
   const needs = section.getByTestId("compat-needs");
   await expect(needs.getByText("Monitoring", { exact: true })).toBeVisible();
   await expect(needs.getByRole("link", { name: "Connect in Connected accounts" })).toHaveAttribute("href", /^\/connections\/?$/);
-  await expect(needs.getByText("Coderhelm only reads outside systems here.")).toBeVisible();
+  await expect(needs.getByText("CoderHelm only reads outside systems here.")).toBeVisible();
 
   // The steps in order, with their status; gaps open by default.
   const steps = section.getByTestId("compat-step");
@@ -578,7 +578,7 @@ test("an item's page: each step, what it relies on, what to connect, and the two
   await expect(steps.nth(3).getByText("list_change_events")).toBeVisible();
   await expect(steps.nth(3).getByRole("link", { name: "Connect Monitoring in Connected accounts" })).toHaveAttribute("href", /^\/connections\/?$/);
   await expect(steps.nth(4).getByText("writes outside")).toBeVisible();
-  // A translated step shows what it asks for and what Coderhelm uses instead.
+  // A translated step shows what it asks for and what CoderHelm uses instead.
   await expect(steps.nth(1).getByRole("button", { name: "Hide what it relies on (1)" })).toBeVisible();
   await expect(steps.nth(1).getByText("CloudWatch logs")).toBeVisible();
   await expect(steps.nth(1).getByText("logs_search")).toBeVisible();
@@ -606,10 +606,10 @@ test("an item's page: each step, what it relies on, what to connect, and the two
   await expect(page.getByText("debug checked")).toBeVisible({ timeout: 15_000 });
 });
 
-// A report skill whose every step runs on Coderhelm: two setup steps for a
+// A report skill whose every step runs on CoderHelm: two setup steps for a
 // laptop are not needed, the script runs in the sandbox, its files are kept.
 const REPORT_URL = "/skills/item?repo=acme%2Fplaybook&path=skills%2Freport-rate%2FSKILL.md";
-const REPORT_SUMMARY = "7 of 7 steps run · 3 with Coderhelm's tools · 2 not needed here";
+const REPORT_SUMMARY = "7 of 7 steps run · 3 with CoderHelm's tools · 2 not needed here";
 const reportItem = () => ({
   ...item({ path: "skills/report-rate/SKILL.md", kind: "skill", name: "report-rate", description: "Merge rate by contributor across the team's repositories.", files: ["skills/report-rate/report_rate.py"] }),
   body: "---\nname: report-rate\n---\n1. Parse the arguments.\n2. Choose an output directory.\n3. Check access with `gh auth status`.\n",
@@ -627,7 +627,7 @@ const reportItem = () => ({
     ],
     counts: { steps: 7, as_written: 2, translated: 3, missing: 0, blocked: 0, not_needed: 2 },
     needs_detail: [],
-    notes: ['Step "Run the bundled script" changed from missing to translated: Coderhelm\'s or the team\'s tools changed since the last check.'],
+    notes: ['Step "Run the bundled script" changed from missing to translated: CoderHelm\'s or the team\'s tools changed since the last check.'],
   },
 });
 
@@ -646,7 +646,7 @@ for (const width of [1280, 390]) {
     const steps = section.getByTestId("compat-step");
     await expect(steps).toHaveCount(5);
     await expect(steps.nth(1)).toContainText("4.Run the bundled script");
-    // Each translated step shows what the skill asks for and what Coderhelm uses.
+    // Each translated step shows what the skill asks for and what CoderHelm uses.
     await expect(steps.nth(1).getByText("python3 report_rate.py")).toBeVisible();
     await expect(steps.nth(1).getByText("run_skill_script")).toBeVisible();
     await expect(steps.nth(2).getByText("read_output")).toBeVisible();
@@ -657,9 +657,9 @@ for (const width of [1280, 390]) {
     await expect(section.getByText(/left out of the translation|Assumes a local machine/)).toHaveCount(0);
     // The setup steps: one closed, quiet line that opens to name them.
     const skipped = section.getByTestId("compat-not-needed");
-    await expect(skipped.getByText("Not needed on Coderhelm (2)")).toBeVisible();
+    await expect(skipped.getByText("Not needed on CoderHelm (2)")).toBeVisible();
     await expect(skipped.getByTestId("compat-step-not-needed").first()).toBeHidden();
-    await skipped.getByText("Not needed on Coderhelm (2)").click();
+    await skipped.getByText("Not needed on CoderHelm (2)").click();
     await expect(skipped.getByTestId("compat-step-not-needed")).toHaveText(["2.Choose an output directory", "3.Check GitHub access"]);
     // The re-check says what got better.
     await expect(section.getByTestId("compat-notes")).toContainText("changed from missing to translated");
@@ -679,14 +679,14 @@ test("a gap on GitHub, which is always connected, offers no connect link; a part
   await page.goto(DEBUG_URL);
   const needs = page.getByTestId("compat-needs");
   const history = needs.getByRole("listitem").filter({ hasText: "Commit history" });
-  await expect(history.getByText("Coderhelm's GitHub connection doesn't do this yet.")).toBeVisible();
+  await expect(history.getByText("CoderHelm's GitHub connection doesn't do this yet.")).toBeVisible();
   await expect(history.getByRole("link")).toHaveCount(0);
   await expect(page.getByRole("link", { name: /Connect in GitHub/ })).toHaveCount(0);
   const step = page.getByTestId("compat-step").nth(3);
-  await expect(step.getByText("Not available in Coderhelm")).toBeVisible();
+  await expect(step.getByText("Not available in CoderHelm")).toBeVisible();
   await expect(page.getByTestId("compat-notes")).toContainText("1 step had no title; it was made from what it does.");
 
-  db.items[1].compat = { status: "partial", summary: "Coderhelm couldn't list this item's steps yet", needs: [], at: ago(2), error: "", current: true };
+  db.items[1].compat = { status: "partial", summary: "CoderHelm couldn't list this item's steps yet", needs: [], at: ago(2), error: "", current: true };
   await page.goto("/skills/item?repo=acme%2Fplaybook&path=skills%2Fapi-conventions%2FSKILL.md");
   await expect(page.getByText("Partly checked", { exact: true })).toBeVisible();
   await expect(page.getByText("Check failed")).toHaveCount(0);

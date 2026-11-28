@@ -47,7 +47,7 @@ function DataChoice({ stage, initial }: { stage: string; initial: UninstallMode 
   };
   return (
     <div className="space-y-3 px-4 py-4" data-testid="uninstall-data">
-      <h3 className="text-sm font-medium text-zinc-100">When Coderhelm is uninstalled</h3>
+      <h3 className="text-sm font-medium text-zinc-100">When CoderHelm is uninstalled</h3>
       {mode.delete_data ? (
         <Callout variant="warning" title="Delete everything" testId="uninstall-data-on">
           Deleting the stack also deletes the tables, data bucket, sign-in users and secret, and schedules the KMS keys for deletion (AWS&apos;s 7-day minimum).
@@ -55,7 +55,7 @@ function DataChoice({ stage, initial }: { stage: string; initial: UninstallMode 
         </Callout>
       ) : (
         <p className="text-sm text-zinc-400" data-testid="uninstall-data-off">
-          Keep my data: deleting the stack removes Coderhelm, and the tables, data bucket, keys, sign-in users and secret stay.
+          Keep my data: deleting the stack removes CoderHelm, and the tables, data bucket, keys, sign-in users and secret stay.
         </p>
       )}
       {mode.delete_data ? (
@@ -104,16 +104,16 @@ export function UninstallSection({ version }: { version: SystemVersion | null })
     <div className="divide-y divide-zinc-800" data-testid="uninstall-section">
       <div className="space-y-3 px-4 py-4">
       <p className="text-sm text-zinc-400">
-        Remove Coderhelm from this AWS account{install ? <> (<code className="font-mono">coderhelm-{install.stage}</code> in {install.region})</> : null}. It is one CloudFormation stack: deleting it removes Coderhelm.{" "}
+        Remove CoderHelm from this AWS account{install ? <> (<code className="font-mono">coderhelm-{install.stage}</code> in {install.region})</> : null}. It is one CloudFormation stack: deleting it removes CoderHelm.{" "}
         {choice
           ? "Choose below whether its data goes with it."
           : <>Its <code className="font-mono">KeepDataOnDelete</code> setting decides whether the tables, data bucket, keys, sign-in users and secret stay (they do unless you change it; KMS keys go after AWS&apos;s 7-day minimum).</>}{" "}
         The uninstall guide walks you through it and ends with a check that nothing is left.
       </p>
       {hybrid?.registered ? (
-        <Callout variant="warning" title={links || jira ? "Coderhelm forwards GitHub or Jira events here" : "This install is hybrid"} testId="uninstall-hybrid">
+        <Callout variant="warning" title={links || jira ? "CoderHelm forwards GitHub or Jira events here" : "This install is hybrid"} testId="uninstall-hybrid">
           {links || jira
-            ? `Coderhelm hosted forwards ${[links ? `${links} GitHub installation${links === 1 ? "" : "s"}` : "", jira ? "a Jira site" : ""].filter(Boolean).join(" and ")} to this install. Uninstalling hands them back to Coderhelm hosted: their events go there again, as before the move.`
+            ? `CoderHelm hosted forwards ${[links ? `${links} GitHub installation${links === 1 ? "" : "s"}` : "", jira ? "a Jira site" : ""].filter(Boolean).join(" and ")} to this install. Uninstalling hands them back to CoderHelm hosted: their events go there again, as before the move.`
             : "Uninstalling releases this install's coderhelm.com address and its links first."}
         </Callout>
       ) : null}

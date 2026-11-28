@@ -1,6 +1,6 @@
 "use client";
 
-// Support access: the team lets Coderhelm support see its workspace, read
+// Support access: the team lets CoderHelm support see its workspace, read
 // only, for a fixed time, and sees every read support made. Also the banner a
 // platform admin sees on every page while in a support view.
 
@@ -110,7 +110,7 @@ export function SupportAccessControl({
       {g ? (
         <>
           <p className="text-sm text-emerald-300" role="status">
-            Coderhelm support can see your workspace, read only, until {untilWords(g)}
+            CoderHelm support can see your workspace, read only, until {untilWords(g)}
             <span className="text-zinc-500"> ({timeLeft(g.until)})</span>.
           </p>
           {!compact && (
@@ -125,7 +125,7 @@ export function SupportAccessControl({
         </>
       ) : (
         <>
-          {!compact && <p className="text-sm text-zinc-400">Off. Coderhelm support cannot see your workspace.</p>}
+          {!compact && <p className="text-sm text-zinc-400">Off. CoderHelm support cannot see your workspace.</p>}
           <div className={`grid gap-3 ${compact ? "" : "sm:grid-cols-[12rem_minmax(0,1fr)]"}`}>
             <div>
               <label htmlFor={`support-hours${ticketId ? "-t" : ""}`} className="mb-1.5 block text-sm font-medium text-zinc-300">
@@ -157,7 +157,7 @@ export function SupportAccessControl({
             )}
           </div>
           <button type="button" onClick={() => void grant()} disabled={busy} className={primaryButton} data-testid="support-access-grant">
-            {busy ? "Turning on…" : ticketId ? "Let support look at this" : "Let Coderhelm support see your workspace"}
+            {busy ? "Turning on…" : ticketId ? "Let support look at this" : "Let CoderHelm support see your workspace"}
           </button>
         </>
       )}

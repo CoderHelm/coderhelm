@@ -2,7 +2,7 @@
 // Code and docs, Work, Infrastructure, Logs and operations, Security and
 // Team knowledge. The gateway keeps the rules (services/gateway/src/bases.rs):
 // each base has its own audience, and one decision says who reads what, the
-// same for Chat, this page and the AI tools connected to Coderhelm.
+// same for Chat, this page and the AI tools connected to CoderHelm.
 
 import { request } from "./api";
 

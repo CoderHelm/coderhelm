@@ -104,7 +104,7 @@ function ConnectDataSourcePage() {
     return (
       <Page>
         <div className="mb-6">
-          <PageHeader title="What do you want to connect?" lead="Pick the kind of system. Each one takes a few minutes and ends with a check that Coderhelm can only read." />
+          <PageHeader title="What do you want to connect?" lead="Pick the kind of system. Each one takes a few minutes and ends with a check that CoderHelm can only read." />
         </div>
         <div data-testid="connect-kind-picker">
           <KindPicker />
@@ -124,7 +124,7 @@ function ConnectDataSourcePage() {
     return (
       <FlowShell
         step="key"
-        title="Paste a key Coderhelm can use"
+        title="Paste a key CoderHelm can use"
         back={{ href: `${CONNECT}?${new URLSearchParams({ step: "address", url }).toString()}`, label: "Back" }}
       >
         <KeyStep
@@ -139,8 +139,8 @@ function ConnectDataSourcePage() {
   }
 
   const titles: Record<Exclude<StepId, "address" | "key">, string> = {
-    choose: "Choose what Coderhelm may use",
-    try: "Run a lookup the way Coderhelm would",
+    choose: "Choose what CoderHelm may use",
+    try: "Run a lookup the way CoderHelm would",
     review: "Check before you turn it on",
     done: "Fact-checking is on",
   };
@@ -191,7 +191,7 @@ function ConnectDataSourcePage() {
           crumb={false}
           title="Fact-checking is on"
           titleId="step-heading"
-          lead="Coderhelm uses it from now on, while it plans, writes code and reviews. When it looks something up, the plan or pull request shows what it asked and what came back."
+          lead="CoderHelm uses it from now on, while it plans, writes code and reviews. When it looks something up, the plan or pull request shows what it asked and what came back."
         />
         {!source.enabled && (
           <div className="mt-5 max-w-prose">
@@ -504,7 +504,7 @@ function KeyStep({ url, onConnected }: { url: string; onConnected: (source: Data
       {ready && result?.has_mutations && (
         <Callout variant="warning" title="This API can also change data.">
           <p>
-            Coderhelm can&apos;t: every lookup is checked before it leaves Coderhelm and anything that isn&apos;t a
+            CoderHelm can&apos;t: every lookup is checked before it leaves CoderHelm and anything that isn&apos;t a
             pure read is refused.
           </p>
         </Callout>
@@ -526,7 +526,7 @@ function KeyStep({ url, onConnected }: { url: string; onConnected: (source: Data
 
       <Disclosure summary="Where do I find a key?">
         <p>
-          Keys are created by whoever runs your API. Ask them for &quot;a read-only API key for Coderhelm&quot;. If you
+          Keys are created by whoever runs your API. Ask them for &quot;a read-only API key for CoderHelm&quot;. If you
           are not the right person to ask, use the link below to send this step to a teammate.
         </p>
       </Disclosure>
@@ -537,7 +537,7 @@ function KeyStep({ url, onConnected }: { url: string; onConnected: (source: Data
         </p>
         <p>
           A request is refused unless it parses as a single read query. Anything that would change data is refused
-          before it leaves Coderhelm.
+          before it leaves CoderHelm.
         </p>
         <p>The key is encrypted with a key dedicated to secrets and is never shown again.</p>
       </Disclosure>
@@ -653,13 +653,13 @@ function ChooseStep({ source, onSaved }: { source: DataSource; onSaved: (saved: 
 
       <section aria-labelledby="hidden-heading" className="flex flex-col gap-3">
         <div>
-          <h2 id="hidden-heading" className="text-sm font-semibold text-zinc-100">What Coderhelm can&apos;t see</h2>
+          <h2 id="hidden-heading" className="text-sm font-semibold text-zinc-100">What CoderHelm can&apos;t see</h2>
           <p className="mt-1 text-sm text-zinc-400 max-w-prose">
             {source.kind === "database"
               ? "Columns with these names are hidden wherever they appear: a lookup that asks for one, or filters or sorts by one, is refused."
               : source.kind === "logs"
                 ? "Fields with these names are hidden wherever they appear. Secrets, email addresses and card numbers inside log lines are always hidden too."
-                : "Fields with these names are hidden from Coderhelm wherever they appear."}{" "}
+                : "Fields with these names are hidden from CoderHelm wherever they appear."}{" "}
             Remove one to show it, or add your own.
           </p>
         </div>
@@ -765,7 +765,7 @@ function TryStep({ source, onContinue }: { source: DataSource; onContinue: () =>
     <div className="flex flex-col gap-5">
       <p className="text-sm text-zinc-400 max-w-prose">
         This runs a real {lookupWord} on {source.name} with the access you just set up, so you can see exactly what
-        Coderhelm sees before you turn it on.
+        CoderHelm sees before you turn it on.
       </p>
 
       <div>
@@ -962,7 +962,7 @@ function ReviewStep({ source, onTurnedOn }: { source: DataSource; onTurnedOn: (s
   const cannot: ReactNode[] =
     kind === "database" && isWarehouse(source)
       ? [
-          "Change or delete anything. Each lookup is one SELECT, run as a warehouse user with no password that can only read. Coderhelm checks it can't change any table before it connects and again before it reads",
+          "Change or delete anything. Each lookup is one SELECT, run as a warehouse user with no password that can only read. CoderHelm checks it can't change any table before it connects and again before it reads",
           `Read databases you didn't share${sharedDbs.length ? ` (it may read ${sharedDbs.length === 1 ? "one database" : `${sharedDbs.length} databases`})` : ""}`,
           "Read more than 200 rows at a time",
         ]
@@ -976,7 +976,7 @@ function ReviewStep({ source, onTurnedOn }: { source: DataSource; onTurnedOn: (s
             "Change or delete anything",
             `Search log groups you didn't choose${source.aws?.log_groups.length ? ` (it may search ${source.aws.log_groups.length === 1 ? "one group" : `${source.aws.log_groups.length} groups`})` : ""}`,
             "Search more than two weeks at a time",
-            "See secrets, email addresses or card numbers in log lines. They are hidden before Coderhelm reads them",
+            "See secrets, email addresses or card numbers in log lines. They are hidden before CoderHelm reads them",
           ]
         : ["Change or delete anything"];
 
@@ -995,7 +995,7 @@ function ReviewStep({ source, onTurnedOn }: { source: DataSource; onTurnedOn: (s
       change: { href: HUB, label: "Change what is connected" },
     },
     {
-      k: "Coderhelm can",
+      k: "CoderHelm can",
       v: (
         <ul className="list-disc space-y-1 pl-5">
           <li>
@@ -1006,10 +1006,10 @@ function ReviewStep({ source, onTurnedOn }: { source: DataSource; onTurnedOn: (s
           <li>Quote what it found, with the {kind === "logs" ? "search" : "lookup"} it ran</li>
         </ul>
       ),
-      change: { href: chooseHref, label: "Change what Coderhelm can do" },
+      change: { href: chooseHref, label: "Change what CoderHelm can do" },
     },
     {
-      k: "Coderhelm cannot",
+      k: "CoderHelm cannot",
       v: (
         <ul className="list-disc space-y-1 pl-5">
           {cannot.map((c, i) => <li key={i}>{c}</li>)}
@@ -1024,7 +1024,7 @@ function ReviewStep({ source, onTurnedOn }: { source: DataSource; onTurnedOn: (s
           <li>Use a source that is paused or needs attention</li>
         </ul>
       ),
-      change: { href: chooseHref, label: "Change what Coderhelm cannot see" },
+      change: { href: chooseHref, label: "Change what CoderHelm cannot see" },
     },
     {
       k: "We store",
@@ -1062,7 +1062,7 @@ function ReviewStep({ source, onTurnedOn }: { source: DataSource; onTurnedOn: (s
 
       {source.status === "error" && (
         <Callout variant="warning" title={`${source.name} needs attention`}>
-          <p>{source.status_message || "Its last check failed."} You can turn it on, but Coderhelm won&apos;t use it until the problem is fixed. Use Test again on the data sources page to see what to do.</p>
+          <p>{source.status_message || "Its last check failed."} You can turn it on, but CoderHelm won&apos;t use it until the problem is fixed. Use Test again on the data sources page to see what to do.</p>
         </Callout>
       )}
       {error && <Callout variant="error" title="We couldn't turn it on"><p>{error}</p></Callout>}

@@ -27,7 +27,7 @@ export type RunCheckCountsContract = None<Undocumented<RunChecks["counts"], "Run
 export type RunPrReviewContract = None<Undocumented<RunPrReview, "RunPrReview">>;
 // How a run was started (the runs list and the run page's header).
 export type RunTriggerContract = None<Undocumented<RunTrigger, "RunTrigger">>;
-// What a run asked, the answers given in Coderhelm, and answering.
+// What a run asked, the answers given in CoderHelm, and answering.
 export type RunQuestionContract = None<Undocumented<RunQuestion, "RunQuestion">>;
 export type RunAnswerContract = None<Undocumented<RunAnswer, "RunAnswer">>;
 export type AnswerRunContract = None<Undocumented<AnswerRunResult, "AnswerRunResult">>;
@@ -47,7 +47,7 @@ export type PlanContract = None<Undocumented<Answer<"getPlan">, "PlanWithTasks">
 export type PlanListContract = None<Undocumented<Omit<Plan, "tasks">, "Plan">>;
 export type TaskContract = None<Undocumented<Task, "PlanTask">>;
 
-// A review's session (the page a PR's "Coderhelm review" check links to).
+// A review's session (the page a PR's "CoderHelm review" check links to).
 export type ReviewSessionContract = None<Undocumented<ReviewSession, "ReviewSession">>;
 // One review (the review page), with the session that produced it.
 export type ReviewContract = None<Undocumented<Review, "Review">>;

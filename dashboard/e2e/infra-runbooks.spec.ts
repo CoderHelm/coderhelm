@@ -92,7 +92,7 @@ test.describe("Infrastructure: database updates", () => {
     await expect(patch.getByTestId("runbook-backup")).toContainText("create-db-cluster-snapshot --db-cluster-identifier ledger-prod-aurora");
     await expect(patch.getByTestId("runbook-rollback")).toContainText("undo-opt-in");
     await expect(patch.getByTestId("apply-by")).toContainText("AWS's date for this action");
-    await expect(patch).toContainText("Coderhelm never runs this.");
+    await expect(patch).toContainText("CoderHelm never runs this.");
     // A patch's target is a version: shown.
     await expect(patch.getByTestId("from-to")).toHaveText("16.4 to 16.4.3");
     // Each fact's page and the day it was read; an old one is flagged.
@@ -121,7 +121,7 @@ test.describe("Infrastructure: database updates", () => {
     const refused = rows(page).filter({ hasText: "audit-prod-aurora" });
     await expect(refused.getByTestId("fix-chip")).toHaveText("Runbook");
     await refused.getByRole("button", { name: /details of audit-prod-aurora/ }).click();
-    await expect(refused.getByText("Coderhelm made its pull request a draft")).toBeVisible();
+    await expect(refused.getByText("CoderHelm made its pull request a draft")).toBeVisible();
     await expect(refused.getByTestId("fix-refused")).toContainText("modules/aurora/main.tf, line 5");
     await expect(refused.getByTestId("fix-refused")).toContainText("which replaces the resource");
     await expect(refused.getByTestId("fix-refused-note")).toContainText("kept as a draft");
@@ -134,7 +134,7 @@ test.describe("Infrastructure: database updates", () => {
     const fixing = rows(page).filter({ hasText: "billing-prod-aurora" });
     await expect(fixing.getByTestId("fix-chip")).toHaveText("Fix PR");
     await fixing.getByRole("button", { name: /details of billing-prod-aurora/ }).click();
-    await expect(fixing.getByText("Coderhelm is correcting its own change")).toBeVisible();
+    await expect(fixing.getByText("CoderHelm is correcting its own change")).toBeVisible();
     await expect(fixing.getByTestId("fix-refused-note")).toContainText("One fix round is correcting the lines below");
   });
 

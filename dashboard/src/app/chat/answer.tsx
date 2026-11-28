@@ -154,24 +154,24 @@ export function whereOf(doc: SourceDoc): string {
   return [c.base || CITATION_KIND[c.kind] || c.kind, dated ? citationWhen(c.as_of) : ""].filter(Boolean).join(" · ");
 }
 
-/** What the link to a source outside Coderhelm says. */
+/** What the link to a source outside CoderHelm says. */
 function originalLabel(c: Citation): string {
   if (c.code || c.kind === "pull_request") return "Open on GitHub";
   if (c.kind === "ticket") return "Open the ticket";
   return "Open the original";
 }
 
-/** Where a source opens: the file on GitHub at its commit, the synced page, or its page in the dashboard. A run, finding or record opens its page in Coderhelm first. */
+/** Where a source opens: the file on GitHub at its commit, the synced page, or its page in the dashboard. A run, finding or record opens its page in CoderHelm first. */
 function openTarget(doc: SourceDoc): { href: string; external: boolean; label: string } | null {
   const c = doc.parts[0];
   const url = doc.parts.find((p) => p.url)?.url;
   if ((c.kind === "run" || c.kind === "finding" || c.kind === "record") && c.href && c.href.startsWith("/")) {
-    return { href: c.href, external: false, label: "Open in Coderhelm" };
+    return { href: c.href, external: false, label: "Open in CoderHelm" };
   }
   if (url && /^https:\/\//.test(url)) {
     return { href: url, external: true, label: originalLabel(c) };
   }
-  if (c.href && c.href.startsWith("/")) return { href: c.href, external: false, label: c.kind === "knowledge" ? "Open in Knowledge" : "Open in Coderhelm" };
+  if (c.href && c.href.startsWith("/")) return { href: c.href, external: false, label: c.kind === "knowledge" ? "Open in Knowledge" : "Open in CoderHelm" };
   return null;
 }
 

@@ -279,7 +279,7 @@ function TaskRow({
             {drift.slice(0, 2).map((d, i) => (
               <span
                 key={i}
-                title={`${d.detail}${d.by === "agent" ? " (by Coderhelm)" : d.by_name ? ` (by ${d.by_name})` : ""}`}
+                title={`${d.detail}${d.by === "agent" ? " (by CoderHelm)" : d.by_name ? ` (by ${d.by_name})` : ""}`}
                 data-testid="drift-mark"
                 className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs ${TONES.info.chip}`}
               >
@@ -364,7 +364,7 @@ function TaskRow({
                   {drift.map((d, i) => (
                     <li key={i}>
                       {d.detail}
-                      {d.by === "agent" ? " (by Coderhelm)" : d.by_name ? ` (by ${d.by_name})` : ""}
+                      {d.by === "agent" ? " (by CoderHelm)" : d.by_name ? ` (by ${d.by_name})` : ""}
                     </li>
                   ))}
                 </ul>

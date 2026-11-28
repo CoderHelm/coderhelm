@@ -22,7 +22,7 @@ function SourceIcon({ children, small = false }: { children: ReactNode; small?: 
 /** Every kind of source that can be added, in the same order the list groups them. */
 const KINDS: { href: string; icon: ReactNode; title: string; time: string; text: string }[] = [
   { href: `${CONNECT}?step=address`, icon: <CodeIcon />, title: "A GraphQL API", time: "About 2 minutes",
-    text: "The web address your apps already talk to. Coderhelm asks it questions." },
+    text: "The web address your apps already talk to. CoderHelm asks it questions." },
   { href: "/data-sources/connect/reader?kind=rest", icon: <CloudIcon />, title: "A REST API", time: "About 2 minutes",
     text: "A booking, payments or vendor API, read with GET requests under the paths you allow." },
   { href: `${CONNECT_AWS}?for=database`, icon: <DatabaseIcon />, title: "A database in your AWS account", time: "About 5 minutes",
@@ -30,7 +30,7 @@ const KINDS: { href: string; icon: ReactNode; title: string; time: string; text:
   { href: "/data-sources/connect/reader?kind=search", icon: <ScanIcon />, title: "An OpenSearch cluster", time: "About 2 minutes",
     text: "The search indexes your app reads, searched read only. Only the indexes you list." },
   { href: `${CONNECT_AWS}?for=logs`, icon: <LogsIcon />, title: "Logs in your AWS account", time: "About 3 minutes",
-    text: "Coderhelm searches your logs for the errors behind a bug report. Only the log groups you choose." },
+    text: "CoderHelm searches your logs for the errors behind a bug report. Only the log groups you choose." },
   { href: "/data-sources/tools", icon: <WrenchIcon />, title: "Your own tools", time: "About 5 minutes",
     text: "Named lookups your engineers already trust, like “find order by number”. Approved by another admin." },
 ];

@@ -1,6 +1,6 @@
 "use client";
 
-// One security finding: the advisory, why Coderhelm thinks the repo is (or
+// One security finding: the advisory, why CoderHelm thinks the repo is (or
 // isn't) affected with the lines that show it, the fix, what happened so
 // far, and dismissing or reopening it.
 
@@ -164,7 +164,7 @@ function FindingView({ f, timeline, admin, reload }: { f: Finding; timeline: Tim
     setBusy(true);
     try {
       await securityApi.reopen(f.id);
-      toast("Reopened. Coderhelm picks it up again with its tier and deadline.");
+      toast("Reopened. CoderHelm picks it up again with its tier and deadline.");
       reload();
     } catch (e) {
       toast(e instanceof Error && /\b403\b/.test(e.message) ? "Only admins can reopen a finding." : "Could not reopen it. Try again.", "error");
@@ -322,15 +322,15 @@ function Evidence({ f, name }: { f: Finding; name: string }) {
           <dt className="text-zinc-400">What would settle it</dt>
           <dd className="min-w-0 text-zinc-200" data-testid="settle">
             {parent
-              ? `It's pulled in by ${parent}. Whether your code sends untrusted input into ${f.package} through ${parent} settles it: if it doesn't, dismiss this with that reason. Coderhelm checks again when the advisory names the vulnerable function.`
-              : `Whether your code sends untrusted input into the vulnerable part of ${f.package}. If it doesn't, dismiss this with that reason; Coderhelm checks again when the advisory names the vulnerable function.`}
+              ? `It's pulled in by ${parent}. Whether your code sends untrusted input into ${f.package} through ${parent} settles it: if it doesn't, dismiss this with that reason. CoderHelm checks again when the advisory names the vulnerable function.`
+              : `Whether your code sends untrusted input into the vulnerable part of ${f.package}. If it doesn't, dismiss this with that reason; CoderHelm checks again when the advisory names the vulnerable function.`}
           </dd>
         </dl>
       ) : ev?.summary ? (
         <p className="text-sm text-zinc-200 [overflow-wrap:anywhere]">{tidy(ev.summary)}</p>
       ) : (
         <p className="text-sm text-zinc-400">
-          {f.verdict === "pending" ? "Coderhelm is reading the code. This updates in a few minutes." : "No evidence was recorded for this verdict."}
+          {f.verdict === "pending" ? "CoderHelm is reading the code. This updates in a few minutes." : "No evidence was recorded for this verdict."}
         </p>
       )}
       {lines.length > 0 && (
@@ -380,7 +380,7 @@ function FixBlock({
     f.pr?.ci === "passing"
       ? "CI is passing"
       : f.pr?.ci === "failing"
-        ? "CI is failing and Coderhelm is fixing it"
+        ? "CI is failing and CoderHelm is fixing it"
         : f.pr?.ci === "pending"
           ? "CI is running"
           : null;
@@ -404,7 +404,7 @@ function FixBlock({
               .
             </p>
           ) : (
-            <p className="mt-1 text-zinc-200">No fixed version is out yet. Coderhelm checks again when the advisory gets one.</p>
+            <p className="mt-1 text-zinc-200">No fixed version is out yet. CoderHelm checks again when the advisory gets one.</p>
           )}
         </div>
         <div className="flex flex-wrap gap-2">
@@ -476,7 +476,7 @@ function FixBlock({
       {f.pr?.state === "closed" && isActive(f) && (
         <p className="text-xs text-zinc-300" data-testid="fix-closed">
           PR #{f.pr.number} was {closedWords(f.pr)} without merging.{" "}
-          {reask ? "Open a new one when you want the fix; Coderhelm does not open one by itself for a week after a pull request is closed." : "A new one can be opened by an admin."}
+          {reask ? "Open a new one when you want the fix; CoderHelm does not open one by itself for a week after a pull request is closed." : "A new one can be opened by an admin."}
         </p>
       )}
       {cannot && f.fixed_version && admin && !f.pr && isActive(f) && (
@@ -488,7 +488,7 @@ function FixBlock({
         <p className="text-zinc-300">
           <OutLink href={f.pr.url}>Pull request #{f.pr.number}</OutLink>{" "}
           {f.pr.state === "merged" ? "is merged." : f.pr.state === "closed" ? "was closed without merging." : ci ? `is open; ${ci}.` : "is open."}
-          {f.pr.adopted && " Coderhelm adopted the pull request Dependabot or Renovate had opened, instead of opening a duplicate."}
+          {f.pr.adopted && " CoderHelm adopted the pull request Dependabot or Renovate had opened, instead of opening a duplicate."}
         </p>
       )}
 
@@ -546,7 +546,7 @@ function FixBlock({
       )}
       {f.private_report && (
         <p className="text-zinc-300" data-testid="private-report">
-          A private report against this repository&apos;s own code. Coderhelm keeps it here only: it is never posted to a channel and never fixed in a public
+          A private report against this repository&apos;s own code. CoderHelm keeps it here only: it is never posted to a channel and never fixed in a public
           pull request or issue. Publishing the advisory on GitHub makes it public.
         </p>
       )}
@@ -871,7 +871,7 @@ function DismissForm({ f, onDone, onCancel }: { f: Finding; onDone: () => void; 
         r?.synced
           ? "Dismissed here and on the Dependabot alert."
           : f.dependabot_alert
-            ? "Dismissed in Coderhelm. The Dependabot alert stays open: the GitHub App can only read alerts."
+            ? "Dismissed in CoderHelm. The Dependabot alert stays open: the GitHub App can only read alerts."
             : "Dismissed.",
       );
       onDone();
@@ -895,7 +895,7 @@ function DismissForm({ f, onDone, onCancel }: { f: Finding; onDone: () => void; 
           Dismiss this finding
         </h2>
         <p className="mt-1 max-w-prose text-sm text-zinc-400">
-          Coderhelm stops working on it and posts nothing more about it. The reason is kept with the finding
+          CoderHelm stops working on it and posts nothing more about it. The reason is kept with the finding
           {f.dependabot_alert ? ", and the Dependabot alert is dismissed too when the GitHub App may change alerts" : ""}.
         </p>
       </div>

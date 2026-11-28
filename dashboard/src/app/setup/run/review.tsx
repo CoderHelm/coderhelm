@@ -101,7 +101,7 @@ export function ReviewStep({
   if (!current) {
     return (
       <Callout variant="warning" title="Nothing to review" testId="review-nothing">
-        <p>Coderhelm couldn&apos;t read any of these repos, so there is nothing to recommend yet. Start a new run once the problem below is fixed.</p>
+        <p>CoderHelm couldn&apos;t read any of these repos, so there is nothing to recommend yet. Start a new run once the problem below is fixed.</p>
         <FailedList repos={failed} />
       </Callout>
     );

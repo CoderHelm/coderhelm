@@ -98,7 +98,7 @@ function HealthPage() {
     <Page>
       <PageHeader
         title="System health"
-        lead="Whether Coderhelm's work for your team is flowing normally: runs, queues and failed messages."
+        lead="Whether CoderHelm's work for your team is flowing normally: runs, queues and failed messages."
         actions={
           <button type="button" onClick={() => refresh()} disabled={checking} className={secondaryButton}>
             {checking ? "Checking..." : "Check now"}

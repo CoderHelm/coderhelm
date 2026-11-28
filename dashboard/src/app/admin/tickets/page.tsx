@@ -42,7 +42,7 @@ function AdminTickets() {
 function Denied() {
   return (
     <Page>
-      <PageHeader detail crumb={false} title="Access denied" lead="This page is only for Coderhelm platform administrators." />
+      <PageHeader detail crumb={false} title="Access denied" lead="This page is only for CoderHelm platform administrators." />
     </Page>
   );
 }
@@ -389,7 +389,7 @@ function AdminTicket({ id }: { id: string }) {
             <ThreadDock>
               <Composer
                 onSend={reply}
-                placeholder="Reply as Coderhelm support. Everyone on the ticket gets this by email."
+                placeholder="Reply as CoderHelm support. Everyone on the ticket gets this by email."
                 actions={t.status === "resolved" ? [] : [{ key: "resolve", label: "Reply & resolve" }]}
                 quote={quote}
                 draftKey={`support-admin:reply:${t.id}`}

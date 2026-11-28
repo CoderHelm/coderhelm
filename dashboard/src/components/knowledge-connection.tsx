@@ -62,7 +62,7 @@ export function KnowledgeDisconnect({
       message:
         k.sources > 0
           ? `Its ${sourcesWords(k.sources)} in Knowledge stop syncing until someone signs in again. What is already synced stays.`
-          : `Coderhelm forgets the ${k.label} sign-in Knowledge syncs with, and revokes it where ${k.label} allows.`,
+          : `CoderHelm forgets the ${k.label} sign-in Knowledge syncs with, and revokes it where ${k.label} allows.`,
       confirmLabel: "Disconnect",
       destructive: true,
     });
@@ -81,8 +81,8 @@ export function KnowledgeDisconnect({
   return (
     <DangerRow title={beside ? `Disconnect ${k.label} from Knowledge` : `Disconnect ${k.label}`} label="Disconnect" onClick={() => void go()} busy={busy} testId="disconnect-knowledge">
       {k.sources > 0
-        ? `Coderhelm forgets the sign-in. Its ${sourcesWords(k.sources)} in Knowledge stop syncing until someone signs in again.`
-        : "Coderhelm forgets the sign-in. Nothing in Knowledge syncs from it yet."}
+        ? `CoderHelm forgets the sign-in. Its ${sourcesWords(k.sources)} in Knowledge stop syncing until someone signs in again.`
+        : "CoderHelm forgets the sign-in. Nothing in Knowledge syncs from it yet."}
     </DangerRow>
   );
 }

@@ -4,6 +4,7 @@ import path from "node:path";
 import { mockKnowledge, newBackend } from "./knowledge-page-data";
 import { autoDoneRun, mockSetup } from "./setup-mock";
 import { INFRA_FEEDS, INFRA_INSIGHTS, INFRA_RESOURCES, infraOverview } from "./infra-data";
+import { prepare } from "./landing-shots-kit";
 
 // The screenshots on coderhelm.com's feature pages (public/shots at the repo
 // root), taken from the same made up data as the other specs. Only runs with
@@ -14,6 +15,8 @@ import { INFRA_FEEDS, INFRA_INSIGHTS, INFRA_RESOURCES, infraOverview } from "./i
 
 const DIR = process.env.LANDING_SHOTS_DIR;
 test.skip(!DIR, "LANDING_SHOTS_DIR not set");
+// The system font, as people see the dashboard, not the test server's fixed one.
+test.beforeEach(({ page }) => prepare(page));
 
 const SIZES = [
   { suffix: "", width: 1440, height: 900 },

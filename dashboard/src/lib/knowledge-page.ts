@@ -233,7 +233,7 @@ export function viaWords(s: Pick<PageSource, "via" | "kind" | "signin" | "accoun
     case "saved_key":
       return `An API token saved for the team`;
     case "github_app":
-      return "The Coderhelm GitHub App";
+      return "The CoderHelm GitHub App";
     case "aws_role":
       return s.account ? `The team's read-only AWS role in ${s.account}` : "The team's read-only AWS role";
     case "public":

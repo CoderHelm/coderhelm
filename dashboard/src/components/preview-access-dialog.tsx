@@ -7,7 +7,7 @@ import { Modal, ModalFooter } from "./modal";
 import { Select } from "./select";
 import { inputClass, primaryButton, secondaryButton } from "./ui";
 
-// A repository's preview access. Most previews need nothing here: Coderhelm
+// A repository's preview access. Most previews need nothing here: CoderHelm
 // finds the pull request's preview in its deployments, deploy statuses,
 // preview checks and bot comments. This is for the two things only the team
 // can give: the preview's address when nothing publishes it, and the secret
@@ -124,7 +124,7 @@ export function PreviewAccessDialog({
       onOpenChange={(v) => !busy && onOpenChange(v)}
       testId="preview-access-dialog"
       title={`Preview access for ${repo}`}
-      description="Coderhelm finds each pull request's preview on its own, in the commit's deployments, deploy statuses, preview checks and bot comments, and checks the changed pages there. Set this only when nothing publishes the preview's address, or when the preview asks for a sign-in."
+      description="CoderHelm finds each pull request's preview on its own, in the commit's deployments, deploy statuses, preview checks and bot comments, and checks the changed pages there. Set this only when nothing publishes the preview's address, or when the preview asks for a sign-in."
     >
       <form
         id="preview-access-form"
@@ -207,7 +207,7 @@ export function PreviewAccessDialog({
         )}
         {kind !== "none" && (
           <p className="text-xs text-zinc-400">
-            Kept sealed, never shown again, and sent only to the preview&apos;s own host when Coderhelm opens its pages.
+            Kept sealed, never shown again, and sent only to the preview&apos;s own host when CoderHelm opens its pages.
           </p>
         )}
         {error && (

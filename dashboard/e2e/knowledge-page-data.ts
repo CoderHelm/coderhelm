@@ -144,7 +144,7 @@ function waitingItems(): KItem[] {
     kitem({ id: `w${i}`, kind: "sanity", source_id: "src_sanity", name: `Location page ${i + 1}`, path: "Marketing site / production", url: `https://www.sanity.io/docs/w${i}`, ...over });
   for (let i = 0; i < 6; i++) out.push(doc(i, { name: ["Membership policy", "Guest policy", "Summer camp page", "Gift cards", "Parking", "Accessibility"][i], chunks: 40 + i }));
   for (let i = 6; i < 171; i++) {
-    if (i < 168) out.push(doc(i, { status: "failed", searchable: false, chunks: 0, error: "Sanity is limiting how fast Coderhelm reads. The server asked Coderhelm to slow down (429).", reason: "rate_limited", retry_at: iso(-4) }));
+    if (i < 168) out.push(doc(i, { status: "failed", searchable: false, chunks: 0, error: "Sanity is limiting how fast CoderHelm reads. The server asked CoderHelm to slow down (429).", reason: "rate_limited", retry_at: iso(-4) }));
     else if (i < 169) out.push(doc(i, { status: "failed", searchable: false, chunks: 0, error: "Sanity didn't answer in time. The server is overloaded right now (503).", reason: "unavailable", retry_at: iso(-6) }));
     else out.push(doc(i, { name: `Private draft ${i}`, status: "failed", searchable: false, chunks: 0, error: "The Sanity connection can't see this.", reason: "forbidden" }));
   }
@@ -418,7 +418,7 @@ export function runsFor(db: Backend): Run[] {
       name: `Location page ${i + 7}`,
       url: `https://www.sanity.io/docs/w${i + 6}`,
       kind: "waiting",
-      error: "Sanity is limiting how fast Coderhelm reads. The server asked Coderhelm to slow down (429).",
+      error: "Sanity is limiting how fast CoderHelm reads. The server asked CoderHelm to slow down (429).",
       fix: "Nothing to do: it's read again on its own.",
       reason: "rate_limited",
     }));

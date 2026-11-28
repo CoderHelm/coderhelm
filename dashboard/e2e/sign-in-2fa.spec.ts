@@ -104,7 +104,7 @@ async function mock(page: Page, over: Partial<State> = {}): Promise<State> {
     }
     if (p === "/api/users/2fa/app/setup") {
       state.setup.push("app");
-      return json(route, { secret: "JBSWY3DPEHPK3PXP", qr_uri: "otpauth://totp/Coderhelm:bo%40example.org?secret=JBSWY3DPEHPK3PXP&issuer=Coderhelm" });
+      return json(route, { secret: "JBSWY3DPEHPK3PXP", qr_uri: "otpauth://totp/CoderHelm:bo%40example.org?secret=JBSWY3DPEHPK3PXP&issuer=CoderHelm" });
     }
     if (p === "/api/users/2fa/app/verify") {
       state.verified.push(body().code);
@@ -125,7 +125,7 @@ async function mock(page: Page, over: Partial<State> = {}): Promise<State> {
     }
     // A member whose second factor is the app code: the code screen comes next.
     if (p === "/auth/login" && body().email === "ann@example.org") return json(route, { status: "second_step" });
-    if (p === "/auth/login") return json(route, { error: "This Coderhelm is private to one organization.", code: "not_invited" }, 403);
+    if (p === "/auth/login") return json(route, { error: "This CoderHelm is private to one organization.", code: "not_invited" }, 403);
     if (p === "/auth/signup") return json(route, { error: "private", code: "not_invited" }, 403);
     if (p === "/auth/logout") return json(route, {});
     // Anything else a page asks for on its way: empty.

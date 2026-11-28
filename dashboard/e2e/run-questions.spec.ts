@@ -150,7 +150,7 @@ test.describe("a run waiting on an answer", () => {
     await mockApi(page);
     await page.goto("/runs/detail?id=01RUNQ");
     const card = page.getByTestId("run-outcome");
-    await expect(card).toContainText("Coderhelm needs your answer");
+    await expect(card).toContainText("CoderHelm needs your answer");
     await expect(card).toContainText("It stopped to ask 2 questions.");
     const qs = card.getByTestId("run-question");
     await expect(qs).toHaveCount(2);
@@ -193,10 +193,10 @@ test.describe("a run waiting on an answer", () => {
         { question_id: "q2", answer: "120 per minute" },
       ],
     });
-    await expect(page.getByText("Sent. Your answer is on the Jira ticket and Coderhelm is continuing.")).toBeVisible();
+    await expect(page.getByText("Sent. Your answer is on the Jira ticket and CoderHelm is continuing.")).toBeVisible();
 
     // The page reads the run again: answered, with where the work went on.
-    await expect(card).toContainText("Answered. Coderhelm is continuing in a new run.");
+    await expect(card).toContainText("Answered. CoderHelm is continuing in a new run.");
     const answered = card.getByTestId("run-answered");
     await expect(answered).toContainText("Which environments get the new sign-up limit?");
     await expect(answered).toContainText("Production only");
@@ -279,7 +279,7 @@ test.describe("a run waiting on an answer", () => {
     await mockApi(page, { runs: { "01RUNQ": asking({ questions: [], questions_url: null, error: "The ticket doesn't say which page." }) } });
     await page.goto("/runs/detail?id=01RUNQ");
     const card = page.getByTestId("run-outcome");
-    await expect(card).toContainText("Coderhelm needs more detail");
+    await expect(card).toContainText("CoderHelm needs more detail");
     await expect(card).toContainText("The ticket doesn't say which page.");
     await expect(card.getByRole("button", { name: "Retry" })).toBeVisible();
     await expect(card.getByRole("textbox")).toHaveCount(0);

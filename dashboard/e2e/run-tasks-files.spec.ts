@@ -143,7 +143,7 @@ test("an open pull request with no recorded file list never reads as no change",
   await mockApi(page, run());
   await page.goto(`/runs/detail?id=${RUN_ID}`);
   const files = page.getByTestId("run-files");
-  await expect(files).toContainText("Coderhelm didn't record which files this run changed. Pull request #1508 has every change.");
+  await expect(files).toContainText("CoderHelm didn't record which files this run changed. Pull request #1508 has every change.");
   await expect(page.getByText("This run didn't change any code.")).toHaveCount(0);
   await expect(files.getByRole("link", { name: /See the diff on GitHub/ })).toHaveAttribute("href", "https://github.com/acme/web/pull/1508/files");
 

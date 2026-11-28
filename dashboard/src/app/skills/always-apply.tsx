@@ -105,7 +105,7 @@ export function AlwaysApplySection({
   const save = async (next: Draft) => {
     setError("");
     if (next.on && next.passes.length === 0) {
-      setError("Pick at least one moment for Coderhelm to use it.");
+      setError("Pick at least one moment for CoderHelm to use it.");
       return;
     }
     setSaving(true);
@@ -134,7 +134,7 @@ export function AlwaysApplySection({
       title="Always apply"
       description={
         <>
-          Off, Coderhelm lists {item.name} and its agents read it when they think it fits. On, its whole text goes into their
+          Off, CoderHelm lists {item.name} and its agents read it when they think it fits. On, its whole text goes into their
           instructions on every matching run and review, under &ldquo;Team standards you must follow&rdquo;.
           {item.kind === "command" && " A command is given as reference: agents won't try the steps that need a person."}
         </>
@@ -209,7 +209,7 @@ export function AlwaysApplySection({
               </div>
             </fieldset>
             <fieldset className="min-w-0">
-              <legend className="text-sm font-medium text-zinc-200">Use it when Coderhelm is…</legend>
+              <legend className="text-sm font-medium text-zinc-200">Use it when CoderHelm is…</legend>
               <div className="mt-2 space-y-1.5">
                 {PASSES.map((p) => (
                   <label key={p.id} className="flex items-center gap-2 text-sm text-zinc-300">

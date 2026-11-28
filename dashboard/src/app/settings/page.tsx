@@ -43,7 +43,7 @@ export default function SettingsPage() {
           title="Settings"
           lead={
             <>
-              <p>Everything Coderhelm does for your team, and the settings that are just yours.</p>
+              <p>Everything CoderHelm does for your team, and the settings that are just yours.</p>
               {roleLabel && (
                 <p className="mt-2 text-sm text-zinc-400">
                   Your role: <span className="font-medium text-zinc-200">{roleLabel}</span>.
@@ -161,7 +161,7 @@ function MoveToSelfHost() {
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-zinc-100">Move to your own AWS account</p>
-          <p className="mt-0.5 text-sm text-zinc-400">Run Coderhelm in your own AWS account. We&apos;ll help you plan the move and bring your settings and data over.</p>
+          <p className="mt-0.5 text-sm text-zinc-400">Run CoderHelm in your own AWS account. We&apos;ll help you plan the move and bring your settings and data over.</p>
           <Link href="/support?new=1&type=selfhost" className={`${secondaryButton} mt-3`}>
             Talk to us about moving
           </Link>

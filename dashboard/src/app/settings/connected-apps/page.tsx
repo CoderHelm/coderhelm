@@ -16,7 +16,7 @@ import { relativeTime } from "@/lib/team";
 import { linkButton, smallDangerButton } from "@/components/ui";
 import { WRITE_SCOPE, connectedAppsApi, type Connection, type ConnectionList } from "@/lib/connected-apps";
 
-// The AI apps (MCP clients) people connected to Coderhelm, and the address
+// The AI apps (MCP clients) people connected to CoderHelm, and the address
 // to add. Everyone sees and removes their own; people who manage API keys
 // see and remove everyone's.
 
@@ -41,8 +41,8 @@ export default function ConnectedAppsPage() {
     const ok = await confirm({
       title: `Remove ${c.client_name}?`,
       message: c.mine
-        ? "The app stops working with Coderhelm at once. To use it again, add Coderhelm to it again."
-        : `${c.email} connected this app. It stops working with Coderhelm at once.`,
+        ? "The app stops working with CoderHelm at once. To use it again, add CoderHelm to it again."
+        : `${c.email} connected this app. It stops working with CoderHelm at once.`,
       confirmLabel: "Remove app",
       destructive: true,
     });
@@ -65,7 +65,7 @@ export default function ConnectedAppsPage() {
         title="Connected AI apps"
         lead={
           <p>
-            Use Coderhelm from Claude, Cursor, VS Code and other AI apps: see runs, start and retry them, and read or ask for reviews. An app
+            Use CoderHelm from Claude, Cursor, VS Code and other AI apps: see runs, start and retry them, and read or ask for reviews. An app
             acts as the person who connected it and can do only what their role allows.
           </p>
         }
@@ -90,13 +90,13 @@ export default function ConnectedAppsPage() {
             <h2 id="apps-add" className="mb-2 text-sm font-semibold text-zinc-100">
               Connect an app
             </h2>
-            <p className="text-sm text-zinc-400">Add Coderhelm to your app as a remote MCP server with this address:</p>
+            <p className="text-sm text-zinc-400">Add CoderHelm to your app as a remote MCP server with this address:</p>
             <div className="mt-2 flex min-w-0 flex-wrap items-center gap-2">
               <Code>{data.mcp_url}</Code>
               <CopyButton text={data.mcp_url} label="Copy address" />
             </div>
             <p className="mt-2 text-sm text-zinc-400">
-              The app opens Coderhelm in your browser so you can sign in and choose what it may do.{" "}
+              The app opens CoderHelm in your browser so you can sign in and choose what it may do.{" "}
               <Link href="/connect/" className={linkButton}>
                 Set it up in Claude, ChatGPT, Cursor, VS Code or Windsurf
               </Link>

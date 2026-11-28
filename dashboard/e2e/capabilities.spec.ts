@@ -51,7 +51,7 @@ test("a member-plus-repos custom role sees the repo settings controls and can us
   await expect(page.getByTestId("repos-read-only")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Refresh from GitHub" })).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Role of acme/web" })).toBeVisible();
-  const toggle = page.getByRole("switch", { name: "Let Coderhelm work on acme/api" });
+  const toggle = page.getByRole("switch", { name: "Let CoderHelm work on acme/api" });
   await expect(toggle).toBeEnabled();
   await toggle.click();
   await expect.poll(() => calls.some((c) => c.path === "/api/repos/acme/api" && c.method !== "GET")).toBe(true);
@@ -73,7 +73,7 @@ test("a custom role without repos sees the repos read-only", async ({ page }) =>
   await expect(page.getByRole("button", { name: "Refresh from GitHub" })).toHaveCount(0);
   await expect(page.getByRole("combobox", { name: "Role of acme/web" })).toHaveCount(0);
   await expect(page.getByText("Website", { exact: true })).toBeVisible();
-  const toggle = page.getByRole("switch", { name: "Let Coderhelm work on acme/api" });
+  const toggle = page.getByRole("switch", { name: "Let CoderHelm work on acme/api" });
   await expect(toggle).toBeDisabled();
   expect(calls.some((c) => c.path.startsWith("/api/repos/"))).toBe(false);
   fs.mkdirSync(SHOTS_DIR, { recursive: true });

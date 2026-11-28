@@ -7,11 +7,11 @@ import { Modal, ModalFooter } from "./modal";
 import { inputClass, primaryButton, secondaryButton } from "./ui";
 
 // A repository's staging CMS write connection. When a feature changes the CMS
-// schema and the end-to-end tests read pages from the CMS, Coderhelm updates
+// schema and the end-to-end tests read pages from the CMS, CoderHelm updates
 // the staging content those tests read through this connection, never
 // production. Without one, the run stops and lists the content to change.
 
-/** Dataset names Coderhelm refuses: they look like production. */
+/** Dataset names CoderHelm refuses: they look like production. */
 const PRODUCTION_WORDS = ["production", "prod", "prd", "live", "master", "main"];
 
 export function looksLikeProduction(dataset: string): boolean {
@@ -95,7 +95,7 @@ export function StagingCmsDialog({
       onOpenChange={(v) => !busy && onOpenChange(v)}
       testId="staging-cms-dialog"
       title={`Staging content for ${repo}`}
-      description="When a new feature changes the CMS schema and the end-to-end tests read pages from the CMS, Coderhelm updates the staging content those tests read. It never writes to production. Without a connection, the run stops and lists the content to change."
+      description="When a new feature changes the CMS schema and the end-to-end tests read pages from the CMS, CoderHelm updates the staging content those tests read. It never writes to production. Without a connection, the run stops and lists the content to change."
     >
       <form
         id="staging-cms-form"
@@ -137,7 +137,7 @@ export function StagingCmsDialog({
           />
           <p id={`${ids.dataset}-help`} className={`mt-1 text-xs ${production ? "text-red-400" : "text-zinc-400"}`}>
             {production
-              ? "This looks like production. Coderhelm writes only to staging; enter the staging dataset."
+              ? "This looks like production. CoderHelm writes only to staging; enter the staging dataset."
               : "The dataset your end-to-end tests read on staging."}
           </p>
         </div>
@@ -153,7 +153,7 @@ export function StagingCmsDialog({
             className={inputClass}
             autoComplete="off"
           />
-          <p className="mt-1 text-xs text-zinc-400">Named so Coderhelm refuses it, whatever it is called.</p>
+          <p className="mt-1 text-xs text-zinc-400">Named so CoderHelm refuses it, whatever it is called.</p>
         </div>
         <div>
           <label htmlFor={ids.token} className="mb-1 block text-sm font-medium text-zinc-200">

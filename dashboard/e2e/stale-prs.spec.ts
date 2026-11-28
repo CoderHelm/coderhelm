@@ -15,8 +15,8 @@ const DEFAULTS = {
   stale_days: 7,
   close_days: 7,
   label: "stale",
-  warn_message: "This pull request has had no activity for {stale_days} days, so Coderhelm marked it stale.",
-  close_message: "Coderhelm closed this pull request. To pick it back up, reopen this pull request.",
+  warn_message: "This pull request has had no activity for {stale_days} days, so CoderHelm marked it stale.",
+  close_message: "CoderHelm closed this pull request. To pick it back up, reopen this pull request.",
   exempt_labels: ["keep-open", "pinned", "security", "do-not-close"],
   exempt_drafts: true,
   exempt_authors: [] as string[],
@@ -151,9 +151,9 @@ async function mockApi(
         plans: db.plans ?? (team.enabled ? plans(team.dry_run) : []),
         kept_open: db.kept,
         log: !db.log ? [] : [
-          { at: at(-1), repo: "acme/web", pr: 7, action: "closed", title: "Try the new parser", url: "https://github.com/acme/web/pull/7", author: "fay", why: "marked stale 7 days ago with no activity since", by: "Coderhelm", run_id: "run-7" },
-          { at: at(-2), repo: "acme/web", pr: 6, action: "unstaled", title: "Docs", url: "https://github.com/acme/web/pull/6", author: "ana", why: "a comment after it was marked", by: "Coderhelm", run_id: "" },
-          { at: at(-4), repo: "acme/api", pr: 5, action: "closed", title: "Drop the old client", url: "https://github.com/acme/api/pull/5", author: "gus", why: "marked stale 7 days ago with no activity since", by: "Coderhelm", run_id: "" },
+          { at: at(-1), repo: "acme/web", pr: 7, action: "closed", title: "Try the new parser", url: "https://github.com/acme/web/pull/7", author: "fay", why: "marked stale 7 days ago with no activity since", by: "CoderHelm", run_id: "run-7" },
+          { at: at(-2), repo: "acme/web", pr: 6, action: "unstaled", title: "Docs", url: "https://github.com/acme/web/pull/6", author: "ana", why: "a comment after it was marked", by: "CoderHelm", run_id: "" },
+          { at: at(-4), repo: "acme/api", pr: 5, action: "closed", title: "Drop the old client", url: "https://github.com/acme/api/pull/5", author: "gus", why: "marked stale 7 days ago with no activity since", by: "CoderHelm", run_id: "" },
         ],
       });
     }
@@ -413,7 +413,7 @@ test("settings: one mode, Off, Preview only or On, each with a plain line; saved
   await expect(page.getByTestId("stale-mode-dry_run")).toContainText("Recommended to start");
   await expect(page.getByTestId("stale-mode-off")).toContainText("Nothing happens.");
   await expect(page.getByTestId("stale-mode-dry_run")).toContainText("Nothing is labeled, commented on or closed on GitHub.");
-  await expect(page.getByTestId("stale-mode-on")).toContainText("After 7 days with no activity Coderhelm labels the pull request stale and comments; if nothing happens in the next 7 days it closes it. Up to 10 an hour per repository.");
+  await expect(page.getByTestId("stale-mode-on")).toContainText("After 7 days with no activity CoderHelm labels the pull request stale and comments; if nothing happens in the next 7 days it closes it. Up to 10 an hour per repository.");
   await expect(page.getByTestId("stale-timing-line")).toHaveText("7 days quiet + 7 days to close = closed after 14 days with no activity.");
   await expect(page.getByTestId("stale-stale_days")).toHaveValue("7");
   for (const w of [1280, 390]) {

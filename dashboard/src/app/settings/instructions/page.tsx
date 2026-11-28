@@ -20,7 +20,7 @@ export default function InstructionsPageGuarded() {
   return <RoleGuard need="agent_settings"><InstructionsPage /></RoleGuard>;
 }
 
-const PREVIEW_NOTE = "Coderhelm reads this exactly as written, after your instructions for every repository. This is how its headings and lists read.";
+const PREVIEW_NOTE = "CoderHelm reads this exactly as written, after your instructions for every repository. This is how its headings and lists read.";
 
 const GLOBAL_PLACEHOLDER = `Example:
 - Link the Jira ticket in every pull request
@@ -43,7 +43,7 @@ function InstructionsPage() {
   const isRepo = scope === "repo";
   const [saving, setSaving] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
-  // What Coderhelm wrote itself about the team or the repository, read only.
+  // What CoderHelm wrote itself about the team or the repository, read only.
   const [generated, setGenerated] = useState<AgentFile>({ content: "" });
   const [regenerating, setRegenerating] = useState(false);
   const [loads, setLoads] = useState(0);
@@ -101,7 +101,7 @@ function InstructionsPage() {
       <div className="mb-6">
         <PageHeader
           title="Conventions"
-          lead="Conventions Coderhelm follows when it writes code. A repository's own instructions are added after the ones for every repository."
+          lead="Conventions CoderHelm follows when it writes code. A repository's own instructions are added after the ones for every repository."
         />
         <SetupLink />
       </div>
@@ -127,12 +127,12 @@ function InstructionsPage() {
             <div role="status" className="flex flex-col items-center justify-center rounded-lg border border-zinc-800 py-12 text-center">
               <div aria-hidden="true" className="mb-3 h-6 w-6 animate-spin rounded-full border-2 border-zinc-600 border-t-zinc-300 motion-reduce:animate-none" />
               <p className="text-sm text-zinc-300">Reading this repository…</p>
-              <p className="mt-1 text-sm text-zinc-400">Coderhelm is learning its structure and conventions.</p>
+              <p className="mt-1 text-sm text-zinc-400">CoderHelm is learning its structure and conventions.</p>
             </div>
           ) : (
             <>
               {generationFailed && (
-                <Problem title="Coderhelm couldn't read this repository" tone="warning" details={repoData?.onboard_error}>
+                <Problem title="CoderHelm couldn't read this repository" tone="warning" details={repoData?.onboard_error}>
                   You can still write instructions below. To try reading it again, turn the repository off and on in Repositories.
                 </Problem>
               )}
@@ -157,10 +157,10 @@ function InstructionsPage() {
                 )}
               </Field>
               {generated.content && (
-                <SettingsDisclosure summary={isRepo ? "What Coderhelm learned about this repository" : "What Coderhelm learned about your team"}>
+                <SettingsDisclosure summary={isRepo ? "What CoderHelm learned about this repository" : "What CoderHelm learned about your team"}>
                   <p className="text-sm text-zinc-400">
-                    Written by Coderhelm and given to agents with your instructions. You can&apos;t edit it here.
-                    {isRepo && " Coderhelm writes it again by itself after changes to the files it is read from, such as package.json, CI workflows, the README and review guidelines."}
+                    Written by CoderHelm and given to agents with your instructions. You can&apos;t edit it here.
+                    {isRepo && " CoderHelm writes it again by itself after changes to the files it is read from, such as package.json, CI workflows, the README and review guidelines."}
                   </p>
                   {isRepo && <AgentFileUpdated file={generated} />}
                   {isRepo && generated.out_of_date && (
@@ -173,7 +173,7 @@ function InstructionsPage() {
                         </button>
                       }
                     >
-                      This file was saved by hand, so Coderhelm didn&apos;t replace it
+                      This file was saved by hand, so CoderHelm didn&apos;t replace it
                       {generated.out_of_date_reasons?.length ? ` after ${joinWords(generated.out_of_date_reasons)}` : ""}. Writing it again replaces those edits.
                     </Problem>
                   )}
@@ -198,7 +198,7 @@ function joinWords(words: string[]): string {
   return `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}`;
 }
 
-/** When and why Coderhelm last wrote the file, in a sentence. */
+/** When and why CoderHelm last wrote the file, in a sentence. */
 function updatedLine(file: AgentFile): string | null {
   if (!file.updated_at) return null;
   const when = new Date(file.updated_at);

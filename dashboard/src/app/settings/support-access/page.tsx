@@ -23,7 +23,7 @@ function SupportAccessPage() {
     <Page>
       <PageHeader
         title="Support access"
-        lead="Let Coderhelm support see your workspace while they help you. It is off unless you turn it on, and it ends on its own."
+        lead="Let CoderHelm support see your workspace while they help you. It is off unless you turn it on, and it ends on its own."
       />
       <div className="mt-6 max-w-3xl space-y-6">
         <section aria-labelledby="sa-now" className={cardClass}>
@@ -43,7 +43,7 @@ function SupportAccessPage() {
             <li>See your dashboard read only: runs, reviews, releases, plans, alerts and settings.</li>
             <li>Never change anything, start runs or reviews, merge, or send email. Every change is refused.</li>
             <li>Never see passwords, keys or connection secrets.</li>
-            <li>Never sign in as anyone on your team. Support looks as Coderhelm support.</li>
+            <li>Never sign in as anyone on your team. Support looks as CoderHelm support.</li>
             <li>Every page support reads is listed below, with who and when.</li>
           </ul>
         </section>

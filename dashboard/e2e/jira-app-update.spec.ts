@@ -1,6 +1,6 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 
-// A Jira site running an older Coderhelm app: the Integrations page's Jira
+// A Jira site running an older CoderHelm app: the Integrations page's Jira
 // row says which version it runs, the latest, what it lacks and how its admin
 // accepts the update; a run on a ticket from that site says its comments may
 // be incomplete. Once the site catches up, both are gone. Every API call is
@@ -14,9 +14,9 @@ const BEHIND = {
   install_url: "https://developer.atlassian.com/console/install/00000000-0000-0000-0000-000000000002?signature=abc&product=jira",
   seen_at: "2026-11-14T10:00:00Z",
   message:
-    "Your Jira site runs an older Coderhelm app (version 6.8.0, latest 6.11.0). Missing: mentions, in-place edits, extended issue fields, threaded replies. An Atlassian site admin can open the app's installation link (https://developer.atlassian.com/console/install/00000000-0000-0000-0000-000000000002?signature=abc&product=jira), choose the site and Update, or accept it in Atlassian Administration (admin.atlassian.com): Apps, Sites, choose the site, Connected apps, Coderhelm, View app details, Update.",
+    "Your Jira site runs an older CoderHelm app (version 6.8.0, latest 6.11.0). Missing: mentions, in-place edits, extended issue fields, threaded replies. An Atlassian site admin can open the app's installation link (https://developer.atlassian.com/console/install/00000000-0000-0000-0000-000000000002?signature=abc&product=jira), choose the site and Update, or accept it in Atlassian Administration (admin.atlassian.com): Apps, Sites, choose the site, Connected apps, CoderHelm, View app details, Update.",
   run_note:
-    "Comments on this ticket may be incomplete: its Jira site runs an older Coderhelm app (version 6.8.0, latest 6.11.0) without mentions, in-place edits, extended issue fields, threaded replies. An Atlassian site admin can accept the update in Atlassian Administration, Connected apps.",
+    "Comments on this ticket may be incomplete: its Jira site runs an older CoderHelm app (version 6.8.0, latest 6.11.0) without mentions, in-place edits, extended issue fields, threaded replies. An Atlassian site admin can accept the update in Atlassian Administration, Connected apps.",
 };
 
 const RUN = {
@@ -81,14 +81,14 @@ test("Integrations: a Jira site on an older app says its version, the latest, wh
   await page.goto("/settings/integrations/");
   const notice = page.getByTestId("jira-app-update");
   await expect(notice).toBeVisible();
-  await expect(notice).toContainText("Your Jira site runs an older Coderhelm app (version 6.8.0, latest 6.11.0).");
+  await expect(notice).toContainText("Your Jira site runs an older CoderHelm app (version 6.8.0, latest 6.11.0).");
   await expect(notice).toContainText("Missing: mentions, in-place edits, extended issue fields, threaded replies.");
-  await expect(notice).toContainText("Atlassian Administration (admin.atlassian.com): Apps, Sites, choose the site, Connected apps, Coderhelm, View app details, Update.");
+  await expect(notice).toContainText("Atlassian Administration (admin.atlassian.com): Apps, Sites, choose the site, Connected apps, CoderHelm, View app details, Update.");
   // Atlassian Administration and the one-click installation link: never Jira's Manage apps, which has no Update for it.
   await expect(notice.getByRole("link", { name: "Open Connected apps in Atlassian Administration" })).toHaveAttribute("href", "https://admin.atlassian.com/");
   const link = notice.getByRole("link", { name: "Update with the installation link" });
   await expect(link).toHaveAttribute("href", /^https:\/\/developer\.atlassian\.com\/console\/install\//);
-  await expect(notice).not.toContainText("Manage apps, Coderhelm");
+  await expect(notice).not.toContainText("Manage apps, CoderHelm");
   await expect(link).toHaveAttribute("target", "_blank");
   // It sits with the Jira row, not elsewhere on the page.
   await expect(page.getByTestId("integration-jira").getByTestId("jira-app-update")).toBeVisible();
@@ -107,7 +107,7 @@ test("Run page: a ticket from a behind site gets one quiet line about its commen
   await page.goto("/runs/detail?id=01RUNJ");
   const line = page.getByTestId("run-jira-app-note");
   await expect(line).toHaveCount(1);
-  await expect(line).toContainText("Comments on this ticket may be incomplete: its Jira site runs an older Coderhelm app (version 6.8.0, latest 6.11.0)");
+  await expect(line).toContainText("Comments on this ticket may be incomplete: its Jira site runs an older CoderHelm app (version 6.8.0, latest 6.11.0)");
   await expect(line.getByRole("link", { name: "Update the app" })).toHaveAttribute("href", BEHIND.install_url);
   // Quiet: a plain line, not a warning box.
   await expect(line).toHaveClass(/text-zinc-400/);

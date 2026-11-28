@@ -11,7 +11,7 @@ import { buttonClass, fullWidthOnPhone, primaryButton } from "./ui";
  * Setting up two-factor sign-in with an authenticator app, in three steps:
  * (your password, for a password account), a code to scan, then a code from
  * the app. `kind` is the one that fits how the person signed in: Cognito's
- * codes after a password, Coderhelm's own after Google or GitHub.
+ * codes after a password, CoderHelm's own after Google or GitHub.
  */
 export function TwoFactorSetup({
   kind,

@@ -8,14 +8,22 @@ import type { ShotId } from "./types";
 
 type Img = { src: string; width: number; height: number };
 
-export const SHOTS: Record<ShotId, { alt: string; desktop: Img; phone?: Img }> = {
+// The home page's pictures (public/shots/home) are the light versions from
+// e2e/landing-shots-*.spec.ts, made by dashboard/scripts/home-shots.py into `<name>.png`
+// (1280 wide), `<name>-1280.{avif,webp}` and `<name>-2400.{avif,webp}`, the
+// larger one `large` pixels wide. Cropped ones leave out the dashboard's menu.
+type Shot = { alt: string; desktop: Img; phone?: Img; large?: number };
+
+const home = (name: string, alt: string, large = 2056): Shot => ({ alt, large, desktop: { src: `/shots/home/${name}.png`, width: 1280, height: 800 } });
+
+export const SHOTS: Record<ShotId, Shot> = {
   chat: {
     alt: "CoderHelm Chat answering how a web app is put together: a line saying it read two files and searched knowledge, the steps it took, and an answer with numbered citations to source files.",
     desktop: { src: "/shots/chat.webp", width: 760, height: 594 },
     phone: { src: "/shots/chat-phone.webp", width: 390, height: 844 },
   },
   knowledge: {
-    alt: "A CoderHelm knowledge base fed by Notion, Google Drive, Confluence, Sanity and uploaded files, each with its sync state.",
+    alt: "A CoderHelm knowledge base page: pages searchable, freshness, one source that needs signing in again with its fix, Ask this knowledge base, and the start of its connections.",
     desktop: { src: "/shots/knowledge.webp", width: 1440, height: 900 },
     phone: { src: "/shots/knowledge-phone.webp", width: 390, height: 844 },
   },
@@ -32,7 +40,7 @@ export const SHOTS: Record<ShotId, { alt: string; desktop: Img; phone?: Img }> =
   kbUsage: {
     alt: "The Usage section of a knowledge base: searches this week by Chat, coder runs, MCP and API keys and the page itself, the most cited pages, the runs and chats that used it, questions with no good answer, and pages no search found in 90 days.",
     desktop: { src: "/shots/kb-usage.webp", width: 1116, height: 504 },
-    phone: { src: "/shots/kb-usage-phone.webp", width: 354, height: 985 },
+    phone: { src: "/shots/kb-usage-phone.webp", width: 354, height: 986 },
   },
   setupResults: {
     alt: "The results of a Do it for me Setup run: 9 settings turned on, 4 kept, two previews to switch on with what each would have done in the last 14 days, and each change with its evidence and Undo.",
@@ -44,4 +52,11 @@ export const SHOTS: Record<ShotId, { alt: string; desktop: Img; phone?: Img }> =
     desktop: { src: "/shots/infra.webp", width: 1440, height: 900 },
     phone: { src: "/shots/infra-phone.webp", width: 390, height: 844 },
   },
+  homeHero: { ...home("hero", "A CoderHelm run for Jira ticket ACME-123 on acme/web: pull request #412 is ready for review, CoderHelm's reviewer approved it, and the step list shows it planned, built, tested, opened the pull request and fixed a failing check.", 2400), phone: { src: "/shots/home/hero-main.png", width: 1280, height: 800 } },
+  homeRun: home("run", "The Activity tab of a CoderHelm run: a failing lint check fixed by a pushed commit, a reviewer's comment answered with a new commit and a reply, then its review approved and all four checks passed."),
+  homeReview: home("review", "A CoderHelm review of acme/web pull request #921 requesting changes, with a summary and four findings ranked High, Medium and Low, each linked to its file and line."),
+  homeAlert: home("alert", "A checkout 5xx incident in acme/api on the Logs page: its cause, a payments timeout lowered to 2 seconds, the checks CoderHelm ran, and fix pull request #482 waiting for a person's review."),
+  homeRelease: home("release", "The Releases page with acme/api v3.8.0 open: published to GitHub, Confluence and email, and its release notes listing five pull requests."),
+  homeChat: home("chat", "CoderHelm Chat answering how checkout talks to the payments service in four numbered steps, each citing a file, above the list of cited source files from acme/web and acme/api."),
+  homeAppMap: home("app-map", "The App map of an online store: the website, API, payments service, background jobs, data stores and outside services as cards joined by lines, with its journeys and screens listed beside them.", 2400),
 };

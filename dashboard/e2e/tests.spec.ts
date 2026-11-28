@@ -94,7 +94,7 @@ const Q_FIX_PR = quarantined("q_fix_pr", "search: filters by price", 9, {
 const Q_RUNNING = quarantined("q_running", "profile: uploads an avatar", 3, {
   fix_status: "fixing",
   quarantine: standing({
-    state: "fix_running", headline: "Coderhelm is writing a fix", hold: "in_flight", actions: ["release"],
+    state: "fix_running", headline: "CoderHelm is writing a fix", hold: "in_flight", actions: ["release"],
     link: { kind: "run", label: "Open the run", target: "01JQRUNFIX00000000000000" },
   }),
 });
@@ -104,7 +104,7 @@ const Q_FAILED = quarantined("q_failed", "orders: cancels an order", 21, {
     state: "fix_failed", headline: "The last fix did not hold", hold: "cooling_off",
     attempt: "The fix pull request was closed without merging by sam-reviewer on 4 November 2026.",
     attempt_link: { kind: "pr", label: "The fix PR", target: "https://github.com/your-team/web/pull/118" },
-    why: "The last fix did not hold. Coderhelm tries again by itself after 15 November 2026.",
+    why: "The last fix did not hold. CoderHelm tries again by itself after 15 November 2026.",
   }),
 });
 const Q_MERGED = quarantined("q_merged", "login: remembers the device", 6, {
@@ -134,7 +134,7 @@ const Q_REMOVAL = quarantined("q_removal", "reports: exports a spreadsheet", 40,
 });
 const Q_UNSTABLE = quarantined("q_unstable", "cart: applies a voucher", 2, {
   unstable: "Unstable: it left quarantine by itself and was quarantined again 2 times in 30 days. It now also needs 7 days without a failure before it leaves by itself.",
-  quarantine: standing({ why: "Next in line for an automatic fix: Coderhelm starts it on its next look at this repository." }),
+  quarantine: standing({ why: "Next in line for an automatic fix: CoderHelm starts it on its next look at this repository." }),
 });
 const QUARANTINE_ROWS = [Q_IDLE, Q_FIX_PR, Q_RUNNING, Q_FAILED, Q_MERGED, Q_PASSING, Q_REMOVAL, Q_UNSTABLE];
 const SPENT: Budget = { repo: WEB, on: true, cap: 2, used: 2, resumes_at: RESUMES };
@@ -183,7 +183,7 @@ const DOCS = "your-team/docs";
 const WORKFLOW = ".github/workflows/e2e.yml";
 type SetupRow = Record<string, unknown> & { repo: string; status: string; pr: Record<string, unknown> | null; polls?: number };
 
-const UPLOAD_YAML = `- name: Upload E2E results for Coderhelm
+const UPLOAD_YAML = `- name: Upload E2E results for CoderHelm
   if: \${{ !cancelled() }}
   uses: actions/upload-artifact@v4
   with:
@@ -200,7 +200,7 @@ function setupRow(repo: string, over: Partial<SetupRow> = {}): SetupRow {
     workflow: { path: WORKFLOW, job_id: "e2e", job_name: "Browser tests", step_name: "Run E2E tests", test_command: "npx playwright test" },
     steps: {
       upload: { state: "missing", detail: "Not found in the workflow.", paths: [] },
-      reporter: { state: "done", detail: "Writes a report Coderhelm reads.", file: "playwright.config.ts" },
+      reporter: { state: "done", detail: "Writes a report CoderHelm reads.", file: "playwright.config.ts" },
       quarantine: { state: "missing", detail: "Not found in the workflow." },
     },
     results: { last_at: null, run_url: null, tests: 0, empty_runs: 0 },
@@ -208,7 +208,7 @@ function setupRow(repo: string, over: Partial<SetupRow> = {}): SetupRow {
     can_auto: { upload: true, quarantine: true, repair: false, why: null },
     snippets: {
       upload: UPLOAD_YAML,
-      quarantine: "- name: Get quarantined tests from Coderhelm\n  id: coderhelm_quarantine\n  run: |\n    echo grep",
+      quarantine: "- name: Get quarantined tests from CoderHelm\n  id: coderhelm_quarantine\n  run: |\n    echo grep",
       reporter: { file: "playwright.config.ts", code: 'reporter: [["html"], ["json", { outputFile: "test-results/results.json" }]],' },
       by_runner: {
         playwright: { upload: UPLOAD_YAML, reporter: { file: "playwright.config.ts", code: 'reporter: [["html"]],' } },
@@ -223,7 +223,7 @@ const SET_UP = (repo: string) => setupRow(repo, {
   status: "set_up",
   steps: {
     upload: { state: "done", detail: "In the workflow on the default branch.", paths: ["playwright-report/"] },
-    reporter: { state: "done", detail: "Writes a report Coderhelm reads.", file: "playwright.config.ts" },
+    reporter: { state: "done", detail: "Writes a report CoderHelm reads.", file: "playwright.config.ts" },
     quarantine: { state: "done", detail: "In the workflow on the default branch." },
   },
   results: { last_at: ago(2 * 3_600_000), run_url: `https://github.com/${repo}/actions/runs/1`, tests: 128, empty_runs: 0 },
@@ -245,7 +245,7 @@ const NOTHING = setupRow(API, {
   status: "nothing_received",
   steps: {
     upload: { state: "partial", detail: "Found, but it uploads other files than the results.", paths: ["coverage/"] },
-    reporter: { state: "done", detail: "Writes a report Coderhelm reads.", file: "playwright.config.ts" },
+    reporter: { state: "done", detail: "Writes a report CoderHelm reads.", file: "playwright.config.ts" },
     quarantine: { state: "missing", detail: "Not found in the workflow." },
   },
   results: { last_at: null, run_url: null, tests: 0, empty_runs: 3 },
@@ -260,7 +260,7 @@ const DIFF = `--- a/${WORKFLOW}
 @@ -20,6 +20,16 @@
        - name: Run E2E tests
          run: npx playwright test
-+      - name: Upload E2E results for Coderhelm
++      - name: Upload E2E results for CoderHelm
 +        if: \${{ !cancelled() }}
 +        uses: actions/upload-artifact@v4
        # Keep the HTML report for people.`;
@@ -343,7 +343,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
     if (p === "/api/tests/setup/preview" && method === "POST") {
       return json(route, {
         repo: body?.repo, path: WORKFLOW, branch: "coderhelm/e2e-results-setup", base: "main",
-        title: body?.repair ? "Fix the E2E results upload for Coderhelm" : "Send E2E results to Coderhelm and skip quarantined tests",
+        title: body?.repair ? "Fix the E2E results upload for CoderHelm" : "Send E2E results to CoderHelm and skip quarantined tests",
         body: "## Summary", added: ["upload"], notes: ["Uploads playwright-report/, test-results/ after the test step, also when tests fail."], diff: DIFF,
       });
     }
@@ -423,7 +423,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
         t.quarantine = standing({ state: "fix_running", headline: "Reproducing the failure with 20 repeat runs", hold: "in_flight", actions: ["release"] });
       } else {
         t.removal = { status: "running", by: "admin@example.com", at: new Date().toISOString() };
-        t.quarantine = standing({ state: "removal_running", headline: "Coderhelm is writing a pull request that removes this test", hold: "removal", actions: ["release"] });
+        t.quarantine = standing({ state: "removal_running", headline: "CoderHelm is writing a pull request that removes this test", hold: "removal", actions: ["release"] });
       }
       return json(route, { queued: true, test: t });
     }
@@ -443,7 +443,7 @@ async function mockApi(page: Page, init: Partial<Backend> = {}): Promise<Backend
         history,
         events: [
           ...(t.release ? [{ at: t.release.at, from: "quarantined", to: "healthy", reason: t.release.reason, actor: "coderhelm" }] : []),
-          { at: ago(2 * DAY), from: "healthy", to: t.state === "broken" ? "broken" : "flaky", reason: "Passed and failed on the same commit twice in 14 days.", actor: "Coderhelm" },
+          { at: ago(2 * DAY), from: "healthy", to: t.state === "broken" ? "broken" : "flaky", reason: "Passed and failed on the same commit twice in 14 days.", actor: "CoderHelm" },
         ],
         ...(db.autoFixes ? { auto_fixes: db.autoFixes.find((b) => b.repo === t.repo) ?? null, auto_fixes_reason: CAP_REASON } : {}),
       });
@@ -668,7 +668,7 @@ test("tests: the quarantine ledger and releasing a test", async ({ page }) => {
   const list = page.getByRole("list", { name: "Quarantined tests" });
   await expect(list.getByRole("listitem")).toHaveCount(1);
   await expect(page.getByText("1 test has been quarantined for over 2 days.")).toBeVisible();
-  await expect(page.getByText(/When only quarantined tests fail, Coderhelm treats the run as passing/)).toBeVisible();
+  await expect(page.getByText(/When only quarantined tests fail, CoderHelm treats the run as passing/)).toBeVisible();
   await expect(page.getByText(/Setup adds that step for you/)).toBeVisible();
   await expect(list.getByRole("link", { name: "Ticket" })).toHaveAttribute("href", /issues\/42/);
   await expect(list).toContainText("Proving the fix (20 runs)");
@@ -836,8 +836,8 @@ test("setup: Create setup PR previews the diff, shows progress, then the PR and 
   await expect(web.getByLabel("Also skip quarantined tests in this build")).toBeChecked();
   await web.getByRole("button", { name: "Create setup PR" }).click();
   const dialog = page.getByRole("dialog", { name: "Create setup PR" });
-  await expect(dialog.getByTestId("ci-setup-preview")).toContainText("Send E2E results to Coderhelm and skip quarantined tests");
-  await expect(dialog.getByRole("region", { name: `Change to ${WORKFLOW}` })).toContainText("Upload E2E results for Coderhelm");
+  await expect(dialog.getByTestId("ci-setup-preview")).toContainText("Send E2E results to CoderHelm and skip quarantined tests");
+  await expect(dialog.getByRole("region", { name: `Change to ${WORKFLOW}` })).toContainText("Upload E2E results for CoderHelm");
   await expect(dialog).toContainText("From coderhelm/e2e-results-setup into main");
   expect(callsTo(db, "POST", /\/api\/tests\/setup\/preview/)[0].body).toEqual({ repo: WEB, quarantine: true });
   await shot(page, "setup-preview");
@@ -866,7 +866,7 @@ test("setup: added but nothing received names the cause and offers a fix PR", as
   await expect(step(page, API, "results")).toContainText("No results in the last 3 runs.");
   await shot(page, "setup-nothing");
   await api.getByRole("button", { name: "Fix it with a PR" }).click();
-  await expect(page.getByRole("dialog", { name: "Fix the results upload" })).toContainText("Fix the E2E results upload for Coderhelm");
+  await expect(page.getByRole("dialog", { name: "Fix the results upload" })).toContainText("Fix the E2E results upload for CoderHelm");
   expect(callsTo(db, "POST", /\/api\/tests\/setup\/preview/)[0].body).toEqual({ repo: API, repair: true });
 });
 
@@ -889,7 +889,7 @@ test("setup: do it myself shows one step's snippet, runner tabs and Copy", async
   await expect(block).toContainText("junit.xml");
   await block.getByRole("button", { name: /Copy/ }).click();
   const copied = await page.evaluate(() => (window as unknown as { __copied: string[] }).__copied);
-  expect(copied[copied.length - 1]).toContain("name: Upload E2E results for Coderhelm");
+  expect(copied[copied.length - 1]).toContain("name: Upload E2E results for CoderHelm");
   expect(copied[copied.length - 1]).toContain("junit.xml");
   // Only that step's snippet is shown.
   await expect(card(page, WEB).locator("[data-code-block]:visible")).toHaveCount(1);
@@ -972,7 +972,7 @@ test("quarantine: every row says where it stands and what happens next", async (
 
   // A run that is working: linked to the run.
   const running = rowOf(page, "profile: uploads an avatar");
-  await expect(running).toContainText("Coderhelm is writing a fix");
+  await expect(running).toContainText("CoderHelm is writing a fix");
   await expect(running.getByRole("link", { name: "Open the run" })).toHaveAttribute("href", /\/runs\/detail\/?\?id=01JQRUNFIX00000000000000/);
 
   // Nothing in flight: the two actions, and the one reason nothing happened by itself.
@@ -1043,7 +1043,7 @@ test("quarantine: the limit reads as used so far, as off, and per repository; a 
   });
   await page.goto("/tests?view=quarantine");
   const note = page.getByTestId("auto-fix-note");
-  await expect(note).toContainText(`Coderhelm has started 1 of this week's 3 automatic fixes for ${MOBILE}.`);
+  await expect(note).toContainText(`CoderHelm has started 1 of this week's 3 automatic fixes for ${MOBILE}.`);
   await expect(note).toContainText(`Automatic fix pull requests are turned off (${WEB})`);
   await expect(note.getByRole("link")).toHaveCount(0);
   // A member reads the page: no actions and nothing to select.
@@ -1057,11 +1057,11 @@ test("quarantine: Fix this test starts a fix now, after saying what happens", as
   const row = rowOf(page, "basket: keeps items after sign-in");
   await row.getByRole("button", { name: "Fix this test" }).click();
   const dialog = dialogOf(page);
-  await expect(dialog).toContainText("Ask Coderhelm to fix this test?");
+  await expect(dialog).toContainText("Ask CoderHelm to fix this test?");
   await expect(dialog).toContainText("It starts a fix run now");
   await expect(dialog).toContainText("not counted against the weekly limit of automatic fixes");
   await page.getByRole("button", { name: "Fix it" }).click();
-  await expect(page.getByText("Coderhelm is on it")).toBeVisible();
+  await expect(page.getByText("CoderHelm is on it")).toBeVisible();
   // The row now says the run is working, and offers no second fix.
   await expect(row.getByTestId("standing")).toHaveAttribute("data-state", "fix_running");
   await expect(row).toContainText("Reproducing the failure with 20 repeat runs");
@@ -1078,13 +1078,13 @@ test("quarantine: Remove this test opens a removal PR, never a deletion on the s
   await expect(dialog).toContainText("Open a pull request that removes this test?");
   await expect(dialog).toContainText("deletes this one test and what only it used");
   await expect(dialog).toContainText("what still covers the behaviour");
-  await expect(dialog).toContainText("Nothing is deleted until your team approves and merges it. Coderhelm never merges it.");
+  await expect(dialog).toContainText("Nothing is deleted until your team approves and merges it. CoderHelm never merges it.");
   // Cancelling asks for nothing.
   await page.getByRole("button", { name: "Cancel" }).click();
   expect(callsTo(db, "POST", /\/remove/)).toHaveLength(0);
   await row.getByRole("button", { name: "Remove this test" }).click();
   await page.getByRole("button", { name: "Open removal PR" }).click();
-  await expect(page.getByText("Coderhelm is writing the removal PR")).toBeVisible();
+  await expect(page.getByText("CoderHelm is writing the removal PR")).toBeVisible();
   await expect(row.getByTestId("standing")).toHaveAttribute("data-state", "removal_running");
   await expect(row.getByRole("button", { name: /Fix this test|Remove this test/ })).toHaveCount(0);
   // The test stays in the list until the team merges the pull request.
@@ -1115,11 +1115,11 @@ test("quarantine: fix selected and remove selected say what will happen first", 
   await expect(bulk).toContainText("2 tests selected");
   await bulk.getByRole("button", { name: "Fix selected (2)" }).click();
   const dialog = dialogOf(page);
-  await expect(dialog).toContainText("Ask Coderhelm to fix 2 tests?");
+  await expect(dialog).toContainText("Ask CoderHelm to fix 2 tests?");
   await expect(dialog).toContainText("It starts 2 fix runs now, one per test: basket: keeps items after sign-in (chromium); orders: cancels an order (chromium).");
   await expect(dialog).toContainText("not counted against the weekly limit");
   await page.getByRole("button", { name: "Fix 2 tests" }).click();
-  await expect(page.getByText("Coderhelm started 2 fixes")).toBeVisible();
+  await expect(page.getByText("CoderHelm started 2 fixes")).toBeVisible();
   expect(callsTo(db, "POST", /\/fix$/).map((c) => c.path)).toEqual(["/api/tests/q_idle/fix", "/api/tests/q_failed/fix"]);
   // Both rows are in flight now, so nothing is left selected and they can't be picked again.
   await expect(boxes).toHaveCount(2);
@@ -1132,7 +1132,7 @@ test("quarantine: fix selected and remove selected say what will happen first", 
   await expect(dialog).toContainText("Open 2 pull requests that each remove one test?");
   await expect(dialog).toContainText("Nothing is deleted until your team approves and merges them.");
   await page.getByRole("button", { name: "Open 2 removal PRs" }).click();
-  await expect(page.getByText("Coderhelm started 2 removals")).toBeVisible();
+  await expect(page.getByText("CoderHelm started 2 removals")).toBeVisible();
   expect(callsTo(db, "POST", /\/remove$/).map((c) => c.path).sort()).toEqual(["/api/tests/q_passing/remove", "/api/tests/q_unstable/remove"]);
   await expect(bulk).toHaveCount(0);
 });
@@ -1245,7 +1245,7 @@ test("quarantine: a diagnosed environment cause names what the test depends on",
       depends_on: "the preview deployment's rates service",
       independent: "Stub the rates response in the test's own setup instead of calling the shared preview.",
     },
-    quarantine: standing({ why: "Next in line for an automatic fix: Coderhelm starts it on its next look at this repository." }),
+    quarantine: standing({ why: "Next in line for an automatic fix: CoderHelm starts it on its next look at this repository." }),
   });
   await quarantineDb(page, { tests: [t] });
   await page.goto("/tests/test?id=q_env");
@@ -1277,6 +1277,6 @@ test("quarantine: a test that left by itself, and one that was removed, say why 
   const gone = page.getByTestId("test-removed");
   await expect(gone).toContainText("This test was removed");
   await expect(gone).toContainText("Approved by robin-lead, sam-reviewer, merged by robin-lead.");
-  await expect(gone).toContainText("Coderhelm proposed the removal.");
+  await expect(gone).toContainText("CoderHelm proposed the removal.");
   await expect(gone.getByRole("link", { name: "Open the removal PR" })).toHaveAttribute("href", /pull\/152/);
 });

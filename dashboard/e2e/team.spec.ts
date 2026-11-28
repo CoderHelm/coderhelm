@@ -71,7 +71,7 @@ function invite(p: Partial<Member> & { user_id: string }, sentAgo: number): Memb
 
 const ROLES = [
   { key: "viewer", label: "Viewer", level: 0, summary: "Read-only: sees runs, plans, reviews and settings, changes nothing.", assignable: true },
-  { key: "member", label: "Member", level: 1, summary: "Works with Coderhelm: plans, runs, reviews and recommendations.", assignable: true },
+  { key: "member", label: "Member", level: 1, summary: "Works with CoderHelm: plans, runs, reviews and recommendations.", assignable: true },
   { key: "billing", label: "Billing", level: 2, summary: "Older role with the same access as Member.", assignable: false },
   { key: "admin", label: "Admin", level: 3, summary: "Runs the workspace: repos, integrations, agent settings and people.", assignable: true },
   { key: "owner", label: "Owner", level: 4, summary: "Everything, plus budget, account-level changes and managing admins.", assignable: true },
@@ -520,14 +520,14 @@ test("self-hosted: a member who never signed in here gets a set-up email from th
 test("self-hosted: someone copied over shows they haven't signed in here, not their old activity", async ({ page }) => {
   const db = await mockApi(page, "admin", { githubSignIn: true });
   db.members.push(
-    member({ user_id: "u-al", email: "al.chan@acme.example", name: "Al Chan", github_login: "achan", github_id: "777", sign_in: "email_and_github", last_active_at: ago(5 * DAY), needs_setup: true }),
+    member({ user_id: "u-al", email: "al.park@acme.example", name: "Al Park", github_login: "apark", github_id: "777", sign_in: "email_and_github", last_active_at: ago(5 * DAY), needs_setup: true }),
   );
   await page.goto("/settings/team");
-  const al = row(page, "Al Chan");
+  const al = row(page, "Al Park");
   await expect(al.getByTestId("setup-status")).toHaveText("Hasn't signed in here yet");
   await expect(al).not.toContainText("Active 5 days ago");
-  await expect(al.getByTestId("previous-activity")).toHaveText("Last active on the previous Coderhelm, 5 days ago");
-  await expect(al.getByTestId("github-sign-in")).toHaveText("Can sign in with GitHub (achan)");
+  await expect(al.getByTestId("previous-activity")).toHaveText("Last active on the previous CoderHelm, 5 days ago");
+  await expect(al.getByTestId("github-sign-in")).toHaveText("Can sign in with GitHub (apark)");
   await expect(al.getByRole("button", { name: "Send set-up email" })).toBeVisible();
   // People who signed in here keep their plain activity time.
   await expect(row(page, "Sam Rivera")).toContainText("Active 5 days ago");
@@ -536,10 +536,10 @@ test("self-hosted: someone copied over shows they haven't signed in here, not th
 
 test("self-hosted: without GitHub sign-in, no GitHub line for someone copied over", async ({ page }) => {
   const db = await mockApi(page, "admin", { githubSignIn: false });
-  db.members.push(member({ user_id: "u-al", email: "al.chan@acme.example", name: "Al Chan", github_login: "achan", github_id: "777", needs_setup: true }));
+  db.members.push(member({ user_id: "u-al", email: "al.park@acme.example", name: "Al Park", github_login: "apark", github_id: "777", needs_setup: true }));
   await page.goto("/settings/team");
-  await expect(row(page, "Al Chan").getByTestId("setup-status")).toBeVisible();
-  await expect(row(page, "Al Chan").getByTestId("github-sign-in")).toHaveCount(0);
+  await expect(row(page, "Al Park").getByTestId("setup-status")).toBeVisible();
+  await expect(row(page, "Al Park").getByTestId("github-sign-in")).toHaveCount(0);
 });
 
 test("self-hosted: the banner counts who hasn't set up an account and sends to all, skipping the last hour", async ({ page }) => {

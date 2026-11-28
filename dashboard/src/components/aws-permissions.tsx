@@ -43,7 +43,7 @@ export function stateLabel(s: AccountPermissions): string {
   const v = s.view;
   if (!v) return s.checking ? "Checking permissions" : s.error ? "Couldn't check permissions" : "Not checked yet";
   if (v.status === "up_to_date") return "Permissions up to date";
-  if (v.status === "error") return "Can't check: Coderhelm can't take on the role";
+  if (v.status === "error") return "Can't check: CoderHelm can't take on the role";
   // The install's own account: the release brings them to its reader by itself.
   if (v.install_account) return "Updates with the release";
   return `Update needed: ${v.missing_count} new read-only permission${v.missing_count === 1 ? "" : "s"}`;
@@ -87,7 +87,7 @@ function UpdateLink({ url, onPress, size = "md" }: { url: string; onPress: () =>
 /** Every account's permission state in one list, with an update link for each (two or more accounts). */
 export function PermissionsOverview({ connections, perms, canEdit }: { connections: AwsConnection[]; perms: AwsPermissionsApi; canEdit: boolean }) {
   const rows = connections.map((c) => ({ account: accountOf(c), region: c.region, s: perms.of(accountOf(c)) }));
-  // The install's own account gets its permissions with the next Coderhelm update: never "needs an update".
+  // The install's own account gets its permissions with the next CoderHelm update: never "needs an update".
   const needing = rows.filter((r) => r.s.view?.status === "update_needed" && !r.s.view?.install_account).length;
   return (
     <section aria-labelledby="aws-perms-heading" className="rounded-lg border border-zinc-800 bg-zinc-900/40" data-testid="aws-permissions-overview">
@@ -188,7 +188,7 @@ export function PermissionsPanel({ account, perms, canEdit }: { account: string;
   if (v.status === "error") {
     return (
       <div data-testid={`aws-perms-${account}`}>
-        <Callout variant="error" title="Coderhelm can't check this role" actions={canEdit ? checkAgain : undefined}>
+        <Callout variant="error" title="CoderHelm can't check this role" actions={canEdit ? checkAgain : undefined}>
           <p>{v.problem?.message}</p>
           {v.problem?.fix && <p>{v.problem.fix}</p>}
         </Callout>
@@ -215,7 +215,7 @@ export function PermissionsPanel({ account, perms, canEdit }: { account: string;
               <p className="mt-1 text-sm text-zinc-400" data-testid={`aws-install-reads-${account}`}>
                 This install&apos;s own account. This release reads a little more from it: {n} read-only permission{n === 1 ? "" : "s"}. Each version
                 update brings {n === 1 ? "it" : "them"} to <Code>{v.role || "CoderHelmLogReader"}</Code> here by itself, so there is nothing to do. Until
-                then, Coderhelm skips what needs {n === 1 ? "it" : "them"} and keeps working with the rest.
+                then, CoderHelm skips what needs {n === 1 ? "it" : "them"} and keeps working with the rest.
               </p>
             </div>
             <p className="flex flex-wrap gap-1.5" data-testid={`aws-needed-${account}`}>
@@ -250,8 +250,8 @@ export function PermissionsPanel({ account, perms, canEdit }: { account: string;
                 {title}
               </h3>
               <p className="mt-1 text-sm text-zinc-300">
-                {`This release reads a little more from account ${v.account}. Everything stays read-only: Coderhelm can list, describe and query, never change anything.`}{" "}
-                Until the role has it, Coderhelm skips what needs it and keeps working with the rest.
+                {`This release reads a little more from account ${v.account}. Everything stays read-only: CoderHelm can list, describe and query, never change anything.`}{" "}
+                Until the role has it, CoderHelm skips what needs it and keeps working with the rest.
               </p>
             </div>
           </div>

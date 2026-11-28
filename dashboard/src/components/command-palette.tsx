@@ -124,9 +124,9 @@ function actionsFor(who: PaletteUser): (Entry & { need?: string })[] {
     { id: "act:write-notes", group: "actions", label: "Write release notes for a tag…", sub: "Releases", href: "/releases?write=1", need: "reviews", keywords: ["release", "changelog", "tag"] },
     { id: "act:release-now", group: "actions", label: "Release now…", sub: "Releases waiting to go out", href: "/releases", need: "reviews", keywords: ["release", "ship", "deploy"] },
     { id: "act:chat", group: "actions", label: "New chat…", sub: "Ask about your team's knowledge, code and tools", href: "/chat", need: "brain_ask", keywords: ["ask", "question", "chat", "search", "knowledge", "brain", "docs"] },
-    { id: "act:new-plan", group: "actions", label: "New plan", sub: "Break work into tasks Coderhelm builds", href: "/plans/new", need: "plans", keywords: ["new run", "start", "create", "task"] },
+    { id: "act:new-plan", group: "actions", label: "New plan", sub: "Break work into tasks CoderHelm builds", href: "/plans/new", need: "plans", keywords: ["new run", "start", "create", "task"] },
     { id: "act:add-source", group: "actions", label: "Add a data source", sub: "Connect an API, logs or a database", href: "/data-sources/connect", need: "data_sources", keywords: ["connect", "database", "api"] },
-    { id: "act:new-tool", group: "actions", label: "Write a tool", sub: "A named lookup Coderhelm can call", href: "/data-sources/tools/new", need: "data_sources", keywords: ["lookup", "query"] },
+    { id: "act:new-tool", group: "actions", label: "Write a tool", sub: "A named lookup CoderHelm can call", href: "/data-sources/tools/new", need: "data_sources", keywords: ["lookup", "query"] },
     { id: "act:invite", group: "actions", label: "Invite a teammate", sub: "Team", href: "/settings/team", need: "people", keywords: ["member", "add person", "user"] },
     { id: "act:skills-repo", group: "actions", label: "Connect a skills repository", sub: "Skills", href: "/skills", need: "data_sources", keywords: ["skill", "agent", "command"] },
     { id: "act:setup", group: "actions", label: "Set up repos", sub: "Setup: recommended settings for each repo", href: "/setup/run", need: "setup", keywords: ["setup", "onboard", "recommended", "configure", "wizard", "new repo"] },
@@ -137,7 +137,7 @@ function actionsFor(who: PaletteUser): (Entry & { need?: string })[] {
     { id: "act:get-help", group: "actions", label: "Get help…", sub: "Open a support ticket about this page", href: "/support?new=1", keywords: ["support", "ticket", "help", "contact", "broken", "bug"] },
     { id: "act:tickets", group: "actions", label: "Your support tickets", sub: "Support", href: "/support", keywords: ["support", "ticket", "help", "replies"] },
     { id: "act:report", group: "actions", label: "Report an issue", sub: "Open a ticket about something that went wrong", href: "/support?new=1&type=issue", keywords: ["bug", "feedback", "support", "broken"] },
-    { id: "act:contact", group: "actions", label: "Contact us", sub: "Ask Coderhelm support a question", href: "/support?new=1&type=contact", keywords: ["contact", "email", "question", "feedback"] },
+    { id: "act:contact", group: "actions", label: "Contact us", sub: "Ask CoderHelm support a question", href: "/support?new=1&type=contact", keywords: ["contact", "email", "question", "feedback"] },
   ];
   return all.filter((a) => !a.need || can(who, a.need));
 }

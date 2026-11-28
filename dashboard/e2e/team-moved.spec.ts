@@ -74,7 +74,7 @@ for (const width of WIDTHS) {
       await page.goto("/");
       const notice = page.getByTestId("team-moved");
       await expect(notice).toBeVisible();
-      await expect(notice.getByRole("heading", { name: "This team moved to its own Coderhelm", level: 1 })).toBeVisible();
+      await expect(notice.getByRole("heading", { name: "This team moved to its own CoderHelm", level: 1 })).toBeVisible();
       await expect(page.getByTestId("team-moved-link")).toHaveAttribute("href", INSTALL);
       await expect(notice.getByText(INSTALL)).toBeVisible();
       // Never the sign-in screen: the session is real, its team is elsewhere.

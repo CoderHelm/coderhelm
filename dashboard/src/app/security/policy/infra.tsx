@@ -1,7 +1,7 @@
 "use client";
 
 // Security policy, Infrastructure: the two opt-in sources that depend on the
-// team's AWS plan. Amazon Inspector (billed by AWS) replaces Coderhelm's own
+// team's AWS plan. Amazon Inspector (billed by AWS) replaces CoderHelm's own
 // matching for what it covers; AWS Health comes from its API (Business
 // Support or higher) or from an EventBridge rule in each account. Each
 // change saves at once (PUT /api/security/infrastructure/config).
@@ -14,7 +14,7 @@ import { focusRing, linkButton } from "@/components/ui";
 import { infraApi, type HealthMode, type InfraConfigReply } from "@/lib/infra-security";
 
 const HEALTH: { value: HealthMode; title: string; body: string }[] = [
-  { value: "off", title: "Off", body: "Coderhelm matches by version only." },
+  { value: "off", title: "Off", body: "CoderHelm matches by version only." },
   { value: "api", title: "Health API (Business Support or higher)", body: "Reads AWS Health events that name your own affected resources." },
   { value: "eventbridge", title: "EventBridge rule in your account", body: "Works on any support plan: a rule in each account forwards the same Health events." },
 ];
@@ -80,10 +80,10 @@ export function InfraPolicySection({ readOnly }: { readOnly: boolean }) {
           label="Amazon Inspector"
           help={
             <>
-              When Inspector is on in your accounts, its findings replace Coderhelm&apos;s own matching for the instances, images and functions it covers, and add
+              When Inspector is on in your accounts, its findings replace CoderHelm&apos;s own matching for the instances, images and functions it covers, and add
               whether an exploit is known and whether the network reaches it.
               <span className="mt-1 block text-amber-200" data-testid="inspector-cost">
-                {data?.inspector_cost || "Billed by AWS, not Coderhelm."}
+                {data?.inspector_cost || "Billed by AWS, not CoderHelm."}
               </span>
             </>
           }

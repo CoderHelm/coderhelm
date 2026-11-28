@@ -1,4 +1,4 @@
-// The access log: every time Coderhelm's agents (or a person trying an agent)
+// The access log: every time CoderHelm's agents (or a person trying an agent)
 // read a skill, a file kept with it, an agent brief or a command, or asked a
 // team agent a question. Names, reasons and outcomes only; never what was
 // read or answered.
@@ -150,7 +150,7 @@ export function outcomeOf(e: Pick<SkillAccessEvent, "action" | "outcome">): { to
         label: ask ? "No answer" : "Failed",
         means: ask
           ? "The model call failed, so the asking agent went on without it."
-          : "Coderhelm couldn't read it right then, so the agent went on without it.",
+          : "CoderHelm couldn't read it right then, so the agent went on without it.",
       };
   }
 }

@@ -73,7 +73,7 @@ export default function ConnectPage() {
   const revoke = async (c: Connection) => {
     const ok = await confirm({
       title: `Remove ${c.client_name}?`,
-      message: "The tool stops working with Coderhelm at once. To use it again, connect it again.",
+      message: "The tool stops working with CoderHelm at once. To use it again, connect it again.",
       confirmLabel: "Remove tool",
       destructive: true,
     });
@@ -106,7 +106,7 @@ export default function ConnectPage() {
         lead={
           <p>
             Ask about your team&apos;s code, tickets, runs and documents from Claude, ChatGPT, Cursor, VS Code and other AI tools. A tool acts as
-            you and reads only what you can read in Coderhelm.
+            you and reads only what you can read in CoderHelm.
           </p>
         }
       />
@@ -132,21 +132,21 @@ export default function ConnectPage() {
             <h2 id="connect-address" className="mb-2 text-sm font-semibold text-zinc-100">
               Your team&apos;s address
             </h2>
-            <p className="text-sm text-zinc-400">Every tool connects to this one address. It opens Coderhelm in your browser so you can sign in.</p>
+            <p className="text-sm text-zinc-400">Every tool connects to this one address. It opens CoderHelm in your browser so you can sign in.</p>
             <div className="mt-2 flex min-w-0 flex-wrap items-center gap-2">
               <Code>{data.mcp_url}</Code>
               <CopyButton text={data.mcp_url} label="Copy address" />
             </div>
           </section>
 
-          <Section id="connect-setup" title="Set it up" description="Pick your tool. Each needs one step, then you sign in to Coderhelm when it asks.">
+          <Section id="connect-setup" title="Set it up" description="Pick your tool. Each needs one step, then you sign in to CoderHelm when it asks.">
             <Segmented label="AI tool" options={TOOLS.map((t) => ({ value: t.key, label: t.label }))} value={tool} onChange={setTool} />
             <div className={`mt-4 ${cardClass}`} data-testid={`tool-${tool}`}>
               <ToolSetup tool={tool} url={data.mcp_url} />
             </div>
           </Section>
 
-          <Section id="connect-ask" title="What you can ask" description="Once connected, ask in plain words. The tool looks it up in Coderhelm and links to where each answer came from.">
+          <Section id="connect-ask" title="What you can ask" description="Once connected, ask in plain words. The tool looks it up in CoderHelm and links to where each answer came from.">
             {offered.filter((r) => r.examples.length > 0).length === 0 ? (
               <p className="text-sm text-zinc-400">This server doesn&apos;t offer anything to read yet.</p>
             ) : (
@@ -341,16 +341,16 @@ function ToolSetup({ tool, url }: { tool: ToolKey; url: string }) {
             <Steps>
               <li>In Claude, open Customize, then Connectors.</li>
               <li>Press Add, then Add custom connector.</li>
-              <li>Name it Coderhelm, paste the address and press Add. {copy}</li>
-              <li>Press Connect and sign in to Coderhelm.</li>
+              <li>Name it CoderHelm, paste the address and press Add. {copy}</li>
+              <li>Press Connect and sign in to CoderHelm.</li>
             </Steps>
             <p className="mt-2 text-sm text-zinc-400">Free plans can add one custom connector.</p>
           </div>
           <div>
             <Sub>Team and Enterprise</Sub>
             <Steps>
-              <li>An owner adds it once: Organization settings, Connectors, Add, then Custom and Web. Name it Coderhelm and paste the address.</li>
-              <li>Then each person opens Customize, Connectors, finds Coderhelm and presses Connect.</li>
+              <li>An owner adds it once: Organization settings, Connectors, Add, then Custom and Web. Name it CoderHelm and paste the address.</li>
+              <li>Then each person opens Customize, Connectors, finds CoderHelm and presses Connect.</li>
             </Steps>
           </div>
           <Docs tool="claude" name="Claude" />
@@ -368,7 +368,7 @@ function ToolSetup({ tool, url }: { tool: ToolKey; url: string }) {
           </div>
           <div>
             <Sub>Or share it with a repository</Sub>
-            <p className="mb-2 text-sm text-zinc-400">Commit this file at the repository&apos;s root, so everyone who opens it in Claude Code gets Coderhelm.</p>
+            <p className="mb-2 text-sm text-zinc-400">Commit this file at the repository&apos;s root, so everyone who opens it in Claude Code gets CoderHelm.</p>
             <CodeBlock code={claudeCodeProjectFile(url)} lang="json" filename=".mcp.json" testId="snippet-claude-code-file" />
           </div>
           <Docs tool="claude-code" name="Claude Code" />
@@ -381,13 +381,13 @@ function ToolSetup({ tool, url }: { tool: ToolKey; url: string }) {
             <Sub>Business, Enterprise and Edu workspaces</Sub>
             <Steps>
               <li>A workspace admin or owner turns on developer mode: Settings, Apps, Advanced settings.</li>
-              <li>They create an app from a custom MCP server: name it Coderhelm, paste the address, and choose OAuth to sign in. {copy}</li>
-              <li>They publish it to the workspace from Workspace settings, Apps. Each person then connects it and signs in to Coderhelm.</li>
+              <li>They create an app from a custom MCP server: name it CoderHelm, paste the address, and choose OAuth to sign in. {copy}</li>
+              <li>They publish it to the workspace from Workspace settings, Apps. Each person then connects it and signs in to CoderHelm.</li>
             </Steps>
           </div>
           <Callout variant="info" live={false} title="Deep research and company knowledge">
             ChatGPT&apos;s deep research and company knowledge read through only two tools, <Code>search</Code> and <Code>fetch</Code>. Chats in developer mode
-            can use every tool Coderhelm offers.
+            can use every tool CoderHelm offers.
           </Callout>
           <Docs tool="chatgpt" name="ChatGPT" />
         </div>
@@ -400,7 +400,7 @@ function ToolSetup({ tool, url }: { tool: ToolKey; url: string }) {
             <a href={cursorInstallLink(url)} className={primaryButton} data-testid="add-to-cursor">
               Add to Cursor
             </a>
-            <p className="mt-2 text-sm text-zinc-400">Cursor opens and asks to install. Then sign in to Coderhelm when it asks.</p>
+            <p className="mt-2 text-sm text-zinc-400">Cursor opens and asks to install. Then sign in to CoderHelm when it asks.</p>
           </div>
           <div>
             <Sub>Or add it by hand</Sub>
@@ -420,7 +420,7 @@ function ToolSetup({ tool, url }: { tool: ToolKey; url: string }) {
             <a href={vscodeInstallLink(url)} className={primaryButton} data-testid="add-to-vscode">
               Add to VS Code
             </a>
-            <p className="mt-2 text-sm text-zinc-400">VS Code shows the server to check, then installs it. Sign in to Coderhelm when it asks.</p>
+            <p className="mt-2 text-sm text-zinc-400">VS Code shows the server to check, then installs it. Sign in to CoderHelm when it asks.</p>
           </div>
           <div>
             <Sub>Or from a terminal</Sub>
@@ -446,7 +446,7 @@ function ToolSetup({ tool, url }: { tool: ToolKey; url: string }) {
             <Sub>Add it to Cascade</Sub>
             <p className="mb-2 text-sm text-zinc-400">
               In Cascade, open the MCP config file (<Code>~/.config/devin/mcp_config.json</Code> on macOS and Linux, <Code>%AppData%\devin\mcp_config.json</Code>{" "}
-              on Windows) and add this. Then sign in to Coderhelm when it asks.
+              on Windows) and add this. Then sign in to CoderHelm when it asks.
             </p>
             <CodeBlock code={windsurfFile(url)} lang="json" filename="mcp_config.json" testId="snippet-windsurf" />
           </div>

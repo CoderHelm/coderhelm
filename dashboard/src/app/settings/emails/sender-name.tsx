@@ -188,7 +188,7 @@ export function SenderName({ transport }: { transport: EmailTransport }) {
           />
           <SettingsRow
             label="Organization name"
-            help="Names your install on email sent through Coderhelm and starts its subjects. Left empty, the sender name is used."
+            help="Names your install on email sent through CoderHelm and starts its subjects. Left empty, the sender name is used."
             unsaved={form.isDirty("organization")}
             controlClassName="sm:w-80"
             testId="sender-organization-field"
@@ -212,7 +212,7 @@ export function SenderName({ transport }: { transport: EmailTransport }) {
           />
           <div className="min-w-0 px-4 py-4" data-testid="sender-preview">
             <p className="text-sm font-medium text-zinc-100">
-              Preview{relay ? ", through Coderhelm" : ", through your own Amazon SES"}
+              Preview{relay ? ", through CoderHelm" : ", through your own Amazon SES"}
             </p>
             <dl className="mt-2 grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm">
               <dt className="text-zinc-400">From</dt>
@@ -228,9 +228,9 @@ export function SenderName({ transport }: { transport: EmailTransport }) {
             </dl>
             {relay ? (
               <p className="mt-2 max-w-prose text-sm text-zinc-400" data-testid="sender-relay-note">
-                Through Coderhelm the name always ends in &ldquo;{data.suffix}&rdquo;, so people can tell Coderhelm&apos;s mail service sent it for your install. Coderhelm checks the organization name on every email, and one that reads as Coderhelm&apos;s own mail (Support, Billing, Security and similar) is refused.
+                Through CoderHelm the name always ends in &ldquo;{data.suffix}&rdquo;, so people can tell CoderHelm&apos;s mail service sent it for your install. CoderHelm checks the organization name on every email, and one that reads as CoderHelm&apos;s own mail (Support, Billing, Security and similar) is refused.
                 {!form.dirty && !data.relay.organization_used && (data.organization || data.sender_name)
-                  ? " The name you set isn't one Coderhelm uses, so your install's address names it."
+                  ? " The name you set isn't one CoderHelm uses, so your install's address names it."
                   : ""}
               </p>
             ) : (

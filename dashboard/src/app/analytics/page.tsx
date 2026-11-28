@@ -46,7 +46,7 @@ function tokens(v: number) {
   return String(Math.round(v));
 }
 const plural = (n: number, one: string, many = `${one}s`) => `${count(n)} ${n === 1 ? one : many}`;
-/** All four token parts (new input, cache read, cache write, output), the measure of what Coderhelm used. */
+/** All four token parts (new input, cache read, cache write, output), the measure of what CoderHelm used. */
 const totalTokens = (s: { tokens?: number; tokens_in: number; tokens_out: number }) => s.tokens ?? s.tokens_in + s.tokens_out;
 const perPr = (s: { tokens?: number; tokens_in: number; tokens_out: number; prs_merged: number; tokens_per_merged_pr?: number | null }) =>
   s.tokens_per_merged_pr ?? (s.prs_merged ? Math.round(totalTokens(s) / s.prs_merged) : null);
@@ -80,7 +80,7 @@ function stepLabel(s: string) {
 function sourceLabel(s: string) {
   return ({ github: "GitHub issues", jira: "Jira", alert: "Alerts", other: "Other" } as Record<string, string>)[s] ?? s;
 }
-/** People first, then Coderhelm's own work, then runs that recorded nobody; most runs first inside each. */
+/** People first, then CoderHelm's own work, then runs that recorded nobody; most runs first inside each. */
 function peopleRows(people: Analytics["people"]) {
   const order = (r: Analytics["people"][number]) => (r.kind === "coderhelm" ? 1 : r.kind === "not_recorded" || !r.person ? 2 : 0);
   return [...people].sort((a, b) => order(a) - order(b) || b.runs - a.runs).map((r) => [r.person || "Not recorded", r.runs, r.merged]);
@@ -193,7 +193,7 @@ function AnalyticsPage() {
     <Page>
       <PageHeader
         title="Analytics"
-        lead="What Coderhelm delivered, the tokens it used, and where it struggles. Every number comes from your runs, reviews and lookups."
+        lead="What CoderHelm delivered, the tokens it used, and where it struggles. Every number comes from your runs, reviews and lookups."
       />
 
       <Tabs label="Analytics views" items={TABS.map((t) => ({ value: t.value, label: t.label, href: t.value === "overview" ? "/analytics" : `/analytics?tab=${t.value}` }))} value={tab} />
@@ -245,7 +245,7 @@ function Body({ data, loading, stats, tab }: { data: Analytics; loading: boolean
     return (
       <div className="mt-6 rounded-lg border border-zinc-800 bg-zinc-900/50 p-6 text-sm text-zinc-400">
         <p className="text-zinc-200">Nothing to show for {span} yet.</p>
-        <p className="mt-1">Numbers appear here as Coderhelm works on tickets, reviews pull requests and looks things up. Try a longer period, or another repository.</p>
+        <p className="mt-1">Numbers appear here as CoderHelm works on tickets, reviews pull requests and looks things up. Try a longer period, or another repository.</p>
       </div>
     );
   }
@@ -266,7 +266,7 @@ function Body({ data, loading, stats, tab }: { data: Analytics; loading: boolean
             <Tile testId="tile-tokens-per-pr" label="Tokens per merged PR" value={perPr(s) == null ? "—" : tokens(perPr(s)!)} change={delta(perPr(s), perPr(p), "count", vs)} basis={`${tokens(totalTokens(s))} tokens across ${plural(s.runs, "run")}, failed and unmerged ones included`} />
           )}
           <Tile testId="tile-untouched" label="Merged as written" value={s.edits_known ? pct(s.merged_untouched / s.edits_known) : "—"} basis={s.edits_known ? `${count(s.merged_untouched)} of ${plural(s.edits_known, "merged PR")} had no commits from people` : "Recorded for PRs merged from now on"} />
-          <Tile testId="tile-ci" label="Red CI fixed by Coderhelm" value={pct(data.ci.fix_rate)} basis={data.ci.runs_with_red_ci ? `${count(data.ci.fixed_by_coderhelm)} of ${plural(data.ci.runs_with_red_ci, "run")} went green after its fixes` : "No red CI on Coderhelm's PRs"} />
+          <Tile testId="tile-ci" label="Red CI fixed by CoderHelm" value={pct(data.ci.fix_rate)} basis={data.ci.runs_with_red_ci ? `${count(data.ci.fixed_by_coderhelm)} of ${plural(data.ci.runs_with_red_ci, "run")} went green after its fixes` : "No red CI on CoderHelm's PRs"} />
           <Tile testId="tile-findings" label="Review findings acted on" value={pct(data.reviews.acted_on_rate)} basis={data.reviews.outcomes_known_reviews ? `${count(data.reviews.findings_fixed)} fixed in code, ${count(data.reviews.findings_settled_by_person)} settled by a person` : "Counted from re-reviews from now on"} />
           <Tile testId="tile-failed" label="Failed runs" value={count(s.failed_runs)} change={delta(s.failed_runs, p.failed_runs, "count", vs)} basis={s.runs ? `${pct(s.failure_rate)} of runs${s.failed_then_retried ? ` · ${count(s.failed_then_retried)} retried by a person` : ""}${s.closed_runs ? ` · ${plural(s.closed_runs, "run")} closed by a person, not counted` : ""}` : undefined} />
         </StatGrid>
@@ -335,7 +335,7 @@ function Body({ data, loading, stats, tab }: { data: Analytics; loading: boolean
           <p className="mt-3 text-sm text-zinc-400" data-testid="ci-line">
             CI went red on {plural(data.ci.runs_with_red_ci, "run")}
             {(data.ci.red_on_base_runs ?? 0) > 0 && <>, plus {plural(data.ci.red_on_base_runs ?? 0, "run")} red only on failures that aren&apos;t the change&apos;s (a check that already fails on the base branch, or a test its fix round showed fails outside the change)</>}
-            . Coderhelm tried {plural(data.ci.fix_attempts, "fix", "fixes")}, pushed {plural(data.ci.fix_commits, "change")}, and {count(data.ci.fixed_by_coderhelm)} ended green after its fixes.
+            . CoderHelm tried {plural(data.ci.fix_attempts, "fix", "fixes")}, pushed {plural(data.ci.fix_commits, "change")}, and {count(data.ci.fixed_by_coderhelm)} ended green after its fixes.
           </p>
         )}
         {data.ci.outcomes && <CiOutcomes ci={data.ci} outcomes={data.ci.outcomes} />}
@@ -359,7 +359,7 @@ function Body({ data, loading, stats, tab }: { data: Analytics; loading: boolean
                 .{" "}
               </>
             )}
-            Neither should happen: tell Coderhelm support.
+            Neither should happen: tell CoderHelm support.
           </p>
         )}
         {!!data.loops_stopped?.total && <LoopsStopped stopped={data.loops_stopped} />}
@@ -368,7 +368,7 @@ function Body({ data, loading, stats, tab }: { data: Analytics; loading: boolean
 
       <DecisionsSection days={d} />
 
-      <Section title="Reviews" id="reviews" description="Pull request reviews Coderhelm posted, and what became of the findings it raised before.">
+      <Section title="Reviews" id="reviews" description="Pull request reviews CoderHelm posted, and what became of the findings it raised before.">
         <StatGrid>
           <Tile label="Reviews posted" value={count(data.reviews.posted)} change={delta(s.reviews, p.reviews, "count", vs)} basis={`On ${plural(data.reviews.prs_reviewed, "PR")}`} />
           <Tile label="Approved / changes asked / comments" value={`${count(data.reviews.approve)} / ${count(data.reviews.request_changes)} / ${count(data.reviews.comment)}`} />
@@ -551,7 +551,7 @@ const METRICS: Metric[] = [
   { key: "comments", label: "Plain comments", sub: true },
   { key: "repos", label: "Repositories covered" },
   { key: "people", label: "People who asked", note: "people" },
-  { key: "deploys", label: "Deploys Coderhelm started", note: "deploys" },
+  { key: "deploys", label: "Deploys CoderHelm started", note: "deploys" },
   { key: "deploys_preview", label: "To preview", sub: true, note: "deploys", failed: "deploys_preview_failed" },
   { key: "deploys_staging", label: "To staging", sub: true, note: "deploys", failed: "deploys_staging_failed" },
   { key: "deploys_prod", label: "To production", sub: true, note: "deploys", failed: "deploys_prod_failed" },
@@ -565,7 +565,7 @@ const CHART_METRICS = [
   { value: "prs_reviewed", label: "Reviewed", title: "PRs reviewed" },
   { value: "prs_opened", label: "Opened", title: "PRs opened" },
   { value: "tickets", label: "Tickets", title: "Tickets" },
-  { value: "deploys", label: "Deploys", title: "Deploys Coderhelm started" },
+  { value: "deploys", label: "Deploys", title: "Deploys CoderHelm started" },
 ] as const;
 type ChartMetric = (typeof CHART_METRICS)[number]["value"];
 
@@ -619,7 +619,7 @@ function Comparison({ c, period, previous, mtd }: { c: AnalyticsComparison; peri
   }
   const deployState = c.deploys_previous_state ?? (c.deploys_comparable ? "known" : "counting");
   notes.push(
-    "Deploys Coderhelm started counts GitHub Actions deploy runs its app triggered (a deploy label it added, a push to its PR, a merge it made, a tag or release it created), by the environment the run deployed to. Runs a person starts or re-runs are not counted.",
+    "Deploys CoderHelm started counts GitHub Actions deploy runs its app triggered (a deploy label it added, a push to its PR, a merge it made, a tag or release it created), by the environment the run deployed to. Runs a person starts or re-runs are not counted.",
   );
   const progress = countingProgress(c.deploys_backfill_progress);
   if (deployState === "counting") {
@@ -632,7 +632,7 @@ function Comparison({ c, period, previous, mtd }: { c: AnalyticsComparison; peri
   }
   if (c.deploys_no_access?.length) {
     notes.push(
-      `Coderhelm can't read workflow runs in ${plural(c.deploys_no_access.length, "repository", "repositories")} (${c.deploys_no_access.join(", ")}), so deploys there are not counted. Grant the app Actions: read on them.`,
+      `CoderHelm can't read workflow runs in ${plural(c.deploys_no_access.length, "repository", "repositories")} (${c.deploys_no_access.join(", ")}), so deploys there are not counted. Grant the app Actions: read on them.`,
     );
   }
   if (c.deploys_source_note) {
@@ -640,7 +640,7 @@ function Comparison({ c, period, previous, mtd }: { c: AnalyticsComparison; peri
   }
   if (c.deploys_not_read?.length) {
     notes.push(
-      `Coderhelm could not read earlier deploys in ${plural(c.deploys_not_read.length, "repository", "repositories")} (${c.deploys_not_read.map((r) => (r.reason ? `${r.repo}: ${r.reason}` : r.repo)).join("; ")}), so deploys there before webhooks recorded them are not counted.`,
+      `CoderHelm could not read earlier deploys in ${plural(c.deploys_not_read.length, "repository", "repositories")} (${c.deploys_not_read.map((r) => (r.reason ? `${r.repo}: ${r.reason}` : r.repo)).join("; ")}), so deploys there before webhooks recorded them are not counted.`,
     );
   }
 
@@ -741,8 +741,8 @@ function CiOutcomes({ ci, outcomes }: { ci: Analytics["ci"]; outcomes: Analytics
     ? reasons.map((r) => [`Gave up: ${r.reason}`, r.count])
     : [["Gave up", outcomes.gave_up]];
   const rows: ReactNode[][] = [
-    ["Green after a Coderhelm fix", outcomes.green_after_fix],
-    ["Green without a Coderhelm fix", outcomes.green_without_fix],
+    ["Green after a CoderHelm fix", outcomes.green_after_fix],
+    ["Green without a CoderHelm fix", outcomes.green_without_fix],
     ["Flaky: green on a re-run", outcomes.flaky],
     ["Red, not the change's: fails on the base branch or outside the change", outcomes.red_on_base],
     ...gaveUp,
@@ -799,7 +799,7 @@ function Waiting({ waiting }: { waiting: NonNullable<Analytics["waiting"]> }) {
   );
 }
 
-/** Runs Coderhelm stopped for making no progress, handing them to a person. */
+/** Runs CoderHelm stopped for making no progress, handing them to a person. */
 function LoopsStopped({ stopped }: { stopped: NonNullable<Analytics["loops_stopped"]> }) {
   const rows: ReactNode[][] = stopped.reasons.map((r) => [r.reason, r.count]);
   return (
@@ -831,7 +831,7 @@ function TimeSaved({ merged, span }: { merged: number; span: string }) {
   const valid = minutes !== "" && Number.isFinite(perPr) && perPr > 0 && perPr <= 10_000;
   const total = useMemo(() => (valid ? (merged * perPr) / 60 : 0), [merged, perPr, valid]);
   return (
-    <Section title="Time saved (your estimate)" id="saved" description="Coderhelm doesn't guess how long work would have taken you. Enter your own figure to see an estimate; it's remembered on this device.">
+    <Section title="Time saved (your estimate)" id="saved" description="CoderHelm doesn't guess how long work would have taken you. Enter your own figure to see an estimate; it's remembered on this device.">
       <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 text-sm">
         <label htmlFor="minutes-per-pr" className="block text-sm font-medium text-zinc-200">
           Minutes a person would spend on one pull request

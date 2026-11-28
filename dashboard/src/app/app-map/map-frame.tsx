@@ -20,7 +20,7 @@
 //   JSON string under a size cap, never in the URL;
 // - the viewer's layout engine runs in a Web Worker inside the frame.
 //
-// - on the App map page (`full`), the frame adds Coderhelm's presentation
+// - on the App map page (`full`), the frame adds CoderHelm's presentation
 //   (public/app-map/present.js): the System, Parts and Code levels, Journeys
 //   and Screens, a journey played on one board (`flow`), and a step's place
 //   in the code, which the frame can't open itself (no popups in the

@@ -7,12 +7,12 @@ import { RepoCombobox, splitRepo } from "./repo-combobox";
 import { focusRing, linkButton } from "./ui";
 import { Code } from "./settings/code";
 
-// The repo a log group's (or alarm's) code lives in, as Coderhelm worked it
+// The repo a log group's (or alarm's) code lives in, as CoderHelm worked it
 // out: shown as a choice already made, with the reason in small text and a
-// Change link. When Coderhelm isn't sure, its best guess is preselected, the
+// Change link. When CoderHelm isn't sure, its best guess is preselected, the
 // row says "Check this" and the other likely repos are one press away.
 
-/** The repo Coderhelm would preselect, if any. */
+/** The repo CoderHelm would preselect, if any. */
 export function resolvedChoice(r: RepoResolution | null): string {
   return r?.repo ?? "";
 }
@@ -36,7 +36,7 @@ function Permissions({ list }: { list: string[] }) {
   if (list.length === 0) return null;
   return (
     <p className="mt-1.5 text-xs text-zinc-400" data-testid="resolved-repo-permissions">
-      Coderhelm&apos;s AWS role couldn&apos;t read{" "}
+      CoderHelm&apos;s AWS role couldn&apos;t read{" "}
       {list.slice(0, 4).map((p, i) => (
         <span key={p}>
           {i > 0 && ", "}
@@ -104,7 +104,7 @@ export function ResolvedRepo({
               onSelect(r!.repo!);
             }}
           >
-            Use Coderhelm&apos;s choice ({splitRepo(r!.repo!).name})
+            Use CoderHelm&apos;s choice ({splitRepo(r!.repo!).name})
           </button>
         )}
         <Permissions list={r?.permissions ?? []} />

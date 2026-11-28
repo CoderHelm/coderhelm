@@ -40,7 +40,7 @@ async function mockApi(page: Page, init: Partial<Db> = {}): Promise<Db> {
     if (live && method === "POST") {
       if (db.hold) await db.hold;
       const infra = db.live(live[1]);
-      if (!infra) return json(route, { error: "Coderhelm couldn't take on the role." }, 502);
+      if (!infra) return json(route, { error: "CoderHelm couldn't take on the role." }, 502);
       const view = permissionsView(live[1], { optionalOff: [] });
       view.abilities = view.abilities.map((g) => (g.key === "infra" ? { ...g, missing: infra } : g));
       return json(route, { account: { account: live[1] }, status: "connected", reason: "", last_check: iso(0), permissions: view });
@@ -179,7 +179,7 @@ test.describe("Infrastructure vulnerabilities", () => {
     await expect(db1.getByTestId("advisory-note")).toContainText("AWS publishes no CVE list for this action");
     await expect(db1.getByTestId("fix-decision")).toContainText("This cannot be expressed in code.");
     await expect(db1.getByTestId("apply-by")).toContainText("Apply by");
-    await expect(db1).toContainText("Coderhelm never runs this.");
+    await expect(db1).toContainText("CoderHelm never runs this.");
     // A runbook's target is an action, not a version: no "from to" line.
     await expect(db1.getByTestId("from-to")).toHaveCount(0);
     await shoot(page, "security-infrastructure");

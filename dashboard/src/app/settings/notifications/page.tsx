@@ -61,7 +61,7 @@ export default function NotificationsPage() {
   return (
     <Page>
       <div className="mb-6">
-        <PageHeader title="Notifications" lead="Choose which emails Coderhelm sends you. These settings are yours alone." />
+        <PageHeader title="Notifications" lead="Choose which emails CoderHelm sends you. These settings are yours alone." />
       </div>
 
       <div className="max-w-3xl space-y-6">

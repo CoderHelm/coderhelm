@@ -41,7 +41,7 @@ export interface Member {
   invited_at?: string | null;
   invite_expires_at?: string | null;
   invite_expired?: boolean;
-  /** Self-hosted: on the team (copied from another Coderhelm) but never signed in here. */
+  /** Self-hosted: on the team (copied from another CoderHelm) but never signed in here. */
   needs_setup?: boolean;
   /** When the last set-up email went to them. */
   setup_email_sent_at?: string | null;

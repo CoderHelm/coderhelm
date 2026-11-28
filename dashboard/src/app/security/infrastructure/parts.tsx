@@ -280,7 +280,7 @@ export function LocationBlock({ fix }: { fix: InfraFix }) {
   );
 }
 
-/** The whole runbook a person follows in AWS. Coderhelm never runs it. */
+/** The whole runbook a person follows in AWS. CoderHelm never runs it. */
 export function RunbookBlocks({ rb }: { rb: InfraRunbook }) {
   return (
     <>
@@ -322,7 +322,7 @@ export function RunbookBlocks({ rb }: { rb: InfraRunbook }) {
           <div className="min-w-0 max-w-full" data-testid="runbook-cli">
             <Steps steps={rb.steps} />
           </div>
-          <p className="mt-1 text-xs text-zinc-400">Coderhelm never runs this. A person with access to the account does.</p>
+          <p className="mt-1 text-xs text-zinc-400">CoderHelm never runs this. A person with access to the account does.</p>
         </DetailBlock>
       )}
       {rb.validation.length > 0 && (
@@ -399,13 +399,13 @@ export function PrNotesBlocks({ n }: { n: InfraPrNotes }) {
   );
 }
 
-/** What Coderhelm applies after an approval, and what AWS answered. */
+/** What CoderHelm applies after an approval, and what AWS answered. */
 function ApplyBlock({ f }: { f: InfraFinding }) {
   const plan = f.fix.apply;
   if (!plan) return null;
   const a = f.apply;
   return (
-    <DetailBlock title="What Coderhelm applies">
+    <DetailBlock title="What CoderHelm applies">
       <p className="max-w-prose text-sm leading-relaxed text-zinc-300 [overflow-wrap:anywhere]" data-testid="apply-plan">
         <Code>{plan.action}</Code> through AWS&apos;s apply-pending-maintenance-action, on {plan.arns.length} resource{plan.arns.length === 1 ? "" : "s"}, in the next
         maintenance window unless you pick now. {plan.effect}
@@ -474,7 +474,7 @@ export function FindingDetails({ f }: { f: InfraFinding }) {
       )}
       {!done && fix.kind === "apply" && <ApplyBlock f={f} />}
       {!done && fix.kind !== "aws" && fix.decision && (
-        <DetailBlock title={fix.kind === "pr" ? "Why a pull request" : fix.kind === "apply" ? "Why Coderhelm applies it" : "Why a runbook"}>
+        <DetailBlock title={fix.kind === "pr" ? "Why a pull request" : fix.kind === "apply" ? "Why CoderHelm applies it" : "Why a runbook"}>
           <p className="max-w-prose text-sm leading-relaxed text-zinc-300 [overflow-wrap:anywhere]" data-testid="fix-decision">
             <Ticks text={fix.decision} />
           </p>
@@ -486,7 +486,7 @@ export function FindingDetails({ f }: { f: InfraFinding }) {
         </DetailBlock>
       )}
       {(f.refused?.length ?? 0) > 0 && (
-        <DetailBlock title={f.drafted ? "Coderhelm made its pull request a draft" : "Coderhelm is correcting its own change"}>
+        <DetailBlock title={f.drafted ? "CoderHelm made its pull request a draft" : "CoderHelm is correcting its own change"}>
           <Lines items={f.refused!} testid="fix-refused" />
           <p className="mt-1 max-w-prose text-xs leading-relaxed text-zinc-400" data-testid="fix-refused-note">
             {f.note ||
@@ -519,7 +519,7 @@ export function FindingDetails({ f }: { f: InfraFinding }) {
           <div className="min-w-0 max-w-full" data-testid="runbook-cli">
             <CodeBlock code={fix.cli.join("\n")} lang="bash" wrap />
           </div>
-          {fix.kind === "runbook" && <p className="mt-1 text-xs text-zinc-400">Coderhelm never runs this. A person with access to the account does.</p>}
+          {fix.kind === "runbook" && <p className="mt-1 text-xs text-zinc-400">CoderHelm never runs this. A person with access to the account does.</p>}
         </DetailBlock>
       )}
       {!done && !rb && fix.kind === "runbook" && fix.console && (
@@ -571,7 +571,7 @@ export function FindingDetails({ f }: { f: InfraFinding }) {
         </p>
         <p className="mt-1 text-xs text-zinc-400">
           First seen <Time iso={f.first_seen_at} />.
-          {done ? "" : " It closes when Coderhelm reads the account again and sees the fix running, or the resource gone."}
+          {done ? "" : " It closes when CoderHelm reads the account again and sees the fix running, or the resource gone."}
         </p>
       </DetailBlock>
     </>

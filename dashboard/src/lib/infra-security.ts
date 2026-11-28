@@ -28,7 +28,7 @@ export type InfraStatus = "open" | "fixing" | "pr_open" | "fixed" | "aws_managed
 /** When to apply a pending action in AWS. */
 export type ApplyWhen = "next-maintenance" | "immediate";
 
-/** How Coderhelm applies a pending action once a person approves it. */
+/** How CoderHelm applies a pending action once a person approves it. */
 export interface InfraApplyPlan {
   /** AWS's name for the action: os-upgrade, system-update, db-upgrade, ... */
   action: string;
@@ -169,7 +169,7 @@ export interface InfraFix {
   after?: string[];
   /** Why no CVE is named, or that an advisory is only related. */
   advisory_note?: string;
-  /** What Coderhelm applies after one approval (kind "apply"). */
+  /** What CoderHelm applies after one approval (kind "apply"). */
   apply?: InfraApplyPlan | null;
 }
 
@@ -198,7 +198,7 @@ export interface InfraFinding {
     /** Closed without merging: when, and who closed it (a GitHub login, or the person who closed its run). Absent while open, and on older servers. */
     closed_at?: string;
     closed_by?: string;
-    /** False when Coderhelm closed it itself. */
+    /** False when CoderHelm closed it itself. */
     closed_by_person?: boolean;
   } | null;
   inspector?: { exploit_available: boolean; reachable: boolean | null; findings?: number } | null;
@@ -207,7 +207,7 @@ export interface InfraFinding {
   fixed_at?: string | null;
   /** When a full read of the account stopped listing the resource. */
   removed_at?: string | null;
-  /** A person's approval of the action Coderhelm applies, and AWS's answer. */
+  /** A person's approval of the action CoderHelm applies, and AWS's answer. */
   apply?: InfraApplyState | null;
   /** False once the finding is closed: nothing to open, follow or approve. */
   actionable?: boolean;
@@ -268,7 +268,7 @@ export function isClosed(f: Pick<InfraFinding, "status">): boolean {
   return f.status === "fixed" || f.status === "removed";
 }
 
-/** A step in AWS: a runbook, or an action Coderhelm applies after approval. */
+/** A step in AWS: a runbook, or an action CoderHelm applies after approval. */
 export function inAws(f: Pick<InfraFinding, "fix">): boolean {
   return f.fix.kind === "runbook" || f.fix.kind === "apply";
 }
@@ -420,7 +420,7 @@ export const infraApi = {
   check: () => request<{ status: string }>("/api/security/infrastructure/check", json("POST")),
   fix: (id: string) =>
     request<{ status: "started" | "queued" | "skipped"; reason: string | null }>(`/api/security/infrastructure/findings/${encodeURIComponent(id)}/fix`, json("POST")),
-  /** Approve a pending action Coderhelm applies in AWS. */
+  /** Approve a pending action CoderHelm applies in AWS. */
   apply: (id: string, when: ApplyWhen) =>
     request<{ status: "queued" | "skipped"; reason?: string | null; when?: ApplyWhen }>(
       `/api/security/infrastructure/findings/${encodeURIComponent(id)}/apply`,
@@ -463,8 +463,8 @@ export function countWords(kind: InfraKind, n: number): string {
 
 export const FIX_LOOK: Record<FixKind, { label: string; tone: Tone; hover: string }> = {
   pr: { label: "Fix PR", tone: "info", hover: "A pull request in the code that defines it." },
-  apply: { label: "Applied by Coderhelm", tone: "info", hover: "A step in AWS with no code change. Coderhelm applies it after one approval, non-production first, and checks the result." },
-  runbook: { label: "Runbook", tone: "attention", hover: "A step to apply in AWS. Coderhelm shows it; it never runs it." },
+  apply: { label: "Applied by CoderHelm", tone: "info", hover: "A step in AWS with no code change. CoderHelm applies it after one approval, non-production first, and checks the result." },
+  runbook: { label: "Runbook", tone: "attention", hover: "A step to apply in AWS. CoderHelm shows it; it never runs it." },
   aws: { label: "AWS-managed", tone: "muted", hover: "AWS patches it. Nothing to do." },
 };
 
@@ -522,7 +522,7 @@ export function howWords(how: string): string {
 export const CONFIDENCE_LOOK: Record<InfraConfidence, { label: string; tone: Tone; hover: string }> = {
   high: { label: "Sure", tone: "success", hover: "AWS's own stack records name it, or the code writes its identifier." },
   medium: { label: "Likely", tone: "info", hover: "One place fits, without the identifier itself being written there." },
-  low: { label: "Not sure", tone: "attention", hover: "More than one place could define it, or only weak signs point here. Coderhelm opens no pull request on a guess." },
+  low: { label: "Not sure", tone: "attention", hover: "More than one place could define it, or only weak signs point here. CoderHelm opens no pull request on a guess." },
 };
 
 /** Where the edit's value lives, in words: "a module call's input". */

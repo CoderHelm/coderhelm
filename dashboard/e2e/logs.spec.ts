@@ -502,7 +502,7 @@ for (const width of [1280, 390]) {
       await expect(card).toHaveAttribute("data-state", "off");
       await expect(card).toContainText("Automatic fix PRs are off.");
       await expect(card).toContainText(
-        "Turn them on and Coderhelm opens a fix pull request for every critical finding, up to 3 a day, and posts it to Microsoft Teams and Slack, where production alerts post.",
+        "Turn them on and CoderHelm opens a fix pull request for every critical finding, up to 3 a day, and posts it to Microsoft Teams and Slack, where production alerts post.",
       );
       await expect(card.getByRole("button", { name: "Turn on" })).toBeVisible();
       await expect(card.getByRole("button", { name: "Change what counts" })).toBeVisible();
@@ -645,10 +645,10 @@ for (const width of [1440, 390]) {
       expect(overflow).toBeLessThanOrEqual(0);
       await shot(page, `log-repo-sure-${width}`);
 
-      // Change opens the picker; Coderhelm's choice is one press away.
+      // Change opens the picker; CoderHelm's choice is one press away.
       await chosen.getByTestId("resolved-repo-change").click();
       await expect(dialog.getByTestId("resolved-repo")).toHaveAttribute("data-state", "changing");
-      await dialog.getByRole("button", { name: "Use Coderhelm's choice (api)" }).click();
+      await dialog.getByRole("button", { name: "Use CoderHelm's choice (api)" }).click();
       await dialog.getByRole("button", { name: "Start fix run" }).click();
       await expect(dialog).toBeHidden();
       expect(db.calls.find((c) => c.path === "/api/log-findings/rec_new/fix")?.body).toEqual({ repo: API, remember: true });

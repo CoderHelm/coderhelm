@@ -21,7 +21,7 @@ import { focusRing, smallSecondaryButton } from "@/components/ui";
 const LIVE_MS = 10_000;
 
 const ACTOR_WORD: Record<RunActivityEntry["actor"], string> = {
-  coderhelm: "Coderhelm",
+  coderhelm: "CoderHelm",
   person: "A person",
   github: "GitHub",
   jira: "Jira",

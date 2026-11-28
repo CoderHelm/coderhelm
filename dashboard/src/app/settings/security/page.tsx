@@ -57,7 +57,7 @@ export default function SecurityPage() {
   const [mfaEnabled, setMfaEnabled] = useState(false);
   const [mfaLoading, setMfaLoading] = useState(false);
 
-  // Google and GitHub sign-ins get Coderhelm's own authenticator-app codes;
+  // Google and GitHub sign-ins get CoderHelm's own authenticator-app codes;
   // a person has one second factor, asked for however they sign in.
   const [mine, setMine] = useState<MyTwoFactor | null>(null);
   const [appStep, setAppStep] = useState<"idle" | "setup" | "off">("idle");
@@ -89,7 +89,7 @@ export default function SecurityPage() {
   const isOAuth = authProvider !== null && authProvider in PROVIDERS;
   // It stays on while a team they're on (self-hosted: the organization) requires it.
   const mustKeep = !!(mine?.must_keep ?? mine?.required);
-  // The code is this Coderhelm's own (set up after Google or GitHub, or
+  // The code is this CoderHelm's own (set up after Google or GitHub, or
   // moved here by Replace) or on the password account.
   const appCode = mine?.set_up === "app";
   const stepOn = mfaEnabled || appCode || mine?.set_up === "cognito";
@@ -306,7 +306,7 @@ export default function SecurityPage() {
               <SettingsSection
                 id="app-two-step"
                 title="Two-factor sign-in"
-                description={`After ${provider.name}, Coderhelm asks for a code from an authenticator app on your phone.${mustKeep ? ` ${keepWords.replace(", so it stays on.", ".")}` : ""}`}
+                description={`After ${provider.name}, CoderHelm asks for a code from an authenticator app on your phone.${mustKeep ? ` ${keepWords.replace(", so it stays on.", ".")}` : ""}`}
               >
                 <div className="space-y-4 px-4 py-4">
                   {mine.set_up === "cognito" && (

@@ -44,7 +44,7 @@ const COMMON_REGIONS = [
   "eu-north-1", "ap-south-1", "ap-southeast-1", "ap-southeast-2", "ap-northeast-1", "sa-east-1",
 ];
 
-/** What the role lets Coderhelm do, from the CloudFormation template it ships. */
+/** What the role lets CoderHelm do, from the CloudFormation template it ships. */
 const SCOPES: { title: string; detail: string }[] = [
   { title: "Search logs and read alarms", detail: "Logs Insights queries and matching lines in the log groups you choose, and alarm states for alert routes." },
   { title: "Read metrics and Airflow", detail: "CloudWatch metrics around a deploy, and Airflow runs and task logs as its Viewer role." },
@@ -139,7 +139,7 @@ function AwsPage() {
     <Page>
       <PageHeader
         title="AWS"
-        lead="Connect an AWS account and Coderhelm reads its CloudWatch logs every 6 hours, groups the errors it finds and suggests fixes you can turn into plans. It can only read."
+        lead="Connect an AWS account and CoderHelm reads its CloudWatch logs every 6 hours, groups the errors it finds and suggests fixes you can turn into plans. It can only read."
         actions={
           canEdit && connections.length > 0 && !adding ? (
             <button type="button" onClick={() => setAdding(true)} className={secondaryButton}>
@@ -182,7 +182,7 @@ function AwsPage() {
           <div className="flex min-w-0 flex-col gap-8 lg:col-span-2">
             {/* On a phone the "what it can do" panel sits up here, folded, not 1,500px down. */}
             <div className="lg:hidden">
-              <Disclosure summary="What Coderhelm can do with it">
+              <Disclosure summary="What CoderHelm can do with it">
                 <ScopeCard bare />
               </Disclosure>
             </div>
@@ -327,7 +327,7 @@ function AccountSettings({
     setTest(null);
     try {
       const r = await api.testAwsConnection(id);
-      setTest({ ok: r.status === "connected", message: r.status === "connected" ? "Coderhelm assumed the role." : r.message, at: new Date().toISOString() });
+      setTest({ ok: r.status === "connected", message: r.status === "connected" ? "CoderHelm assumed the role." : r.message, at: new Date().toISOString() });
       onChanged();
     } catch (e) {
       setTest({ ok: false, message: e instanceof Error && e.message ? e.message : "The test could not run.", at: new Date().toISOString() });
@@ -353,7 +353,7 @@ function AccountSettings({
   const disconnect = async () => {
     const ok = await confirm({
       title: `Disconnect AWS account ${id}?`,
-      message: "Coderhelm stops reading its logs right away. Findings you already have are kept. The role stays in your AWS account until you delete it there.",
+      message: "CoderHelm stops reading its logs right away. Findings you already have are kept. The role stays in your AWS account until you delete it there.",
       confirmLabel: "Disconnect",
       destructive: true,
     });
@@ -402,11 +402,11 @@ function AccountSettings({
       <div className="mt-3 flex flex-col gap-3 empty:hidden">
         {savedRoleBad && healthy && (
           <Callout variant="warning" title={`The role should be named ${ROLE_NAME}`} live={false}>
-            <p>Coderhelm may stop reading logs if the role isn&apos;t renamed. Change it below, or recreate the role with that name in AWS.</p>
+            <p>CoderHelm may stop reading logs if the role isn&apos;t renamed. Change it below, or recreate the role with that name in AWS.</p>
           </Callout>
         )}
         {!healthy && (
-          <Callout variant="error" title="Coderhelm cannot use the role" live={false}>
+          <Callout variant="error" title="CoderHelm cannot use the role" live={false}>
             <p>{c.error_message || "The last check failed."}</p>
             <p>No logs are read until this is fixed. Check the role&apos;s trust policy, then test again.</p>
           </Callout>
@@ -425,7 +425,7 @@ function AccountSettings({
           </Callout>
         )}
         {a?.check_error && (
-          <Callout variant="error" title="Coderhelm couldn't take on the role" live={false}>
+          <Callout variant="error" title="CoderHelm couldn't take on the role" live={false}>
             <p>{a.check_error}</p>
           </Callout>
         )}
@@ -442,7 +442,7 @@ function AccountSettings({
           label="Role"
           layout="stacked"
           unsaved={dirty("role_arn")}
-          help={`The read only role Coderhelm takes on. It must be named ${ROLE_NAME}.`}
+          help={`The read only role CoderHelm takes on. It must be named ${ROLE_NAME}.`}
           control={(ids) =>
             canEdit && (editRole || dirty("role_arn")) ? (
               <div>
@@ -476,7 +476,7 @@ function AccountSettings({
           label="Region"
           controlClassName="sm:w-48"
           unsaved={dirty("region")}
-          help="Coderhelm reads log groups in this region."
+          help="CoderHelm reads log groups in this region."
           control={(ids) =>
             canEdit ? (
               <div>
@@ -499,7 +499,7 @@ function AccountSettings({
         <SettingsRow
           label="Log groups"
           unsaved={dirty("log_groups")}
-          help={`Which log groups Coderhelm reads. With none chosen it reads every log group in ${v.region || c.region}.`}
+          help={`Which log groups CoderHelm reads. With none chosen it reads every log group in ${v.region || c.region}.`}
           control={(ids) => (
             <div className="flex flex-wrap items-center gap-3">
               <span id={ids.inputId} className="text-sm text-zinc-200">{groupsText}</span>
@@ -698,10 +698,10 @@ function LogGroupsPicker({ connection, chosen, onChange }: { connection: AwsConn
 
 function ScopeCard({ bare = false }: { bare?: boolean }) {
   return (
-    <aside aria-labelledby={bare ? undefined : "scope-heading"} aria-label={bare ? "What Coderhelm can do with it" : undefined} className={`min-w-0 text-sm ${bare ? "" : "rounded-lg border border-zinc-800 bg-zinc-900/50 p-5"}`}>
-      {!bare && <h2 id="scope-heading" className="font-semibold text-zinc-100">What Coderhelm can do with it</h2>}
+    <aside aria-labelledby={bare ? undefined : "scope-heading"} aria-label={bare ? "What CoderHelm can do with it" : undefined} className={`min-w-0 text-sm ${bare ? "" : "rounded-lg border border-zinc-800 bg-zinc-900/50 p-5"}`}>
+      {!bare && <h2 id="scope-heading" className="font-semibold text-zinc-100">What CoderHelm can do with it</h2>}
       <p className="mt-1 text-zinc-400">
-        The role is read only. Its policy allows exactly this, and the External ID means only your team&apos;s Coderhelm can use it.
+        The role is read only. Its policy allows exactly this, and the External ID means only your team&apos;s CoderHelm can use it.
       </p>
       <ul className="mt-3 flex flex-col gap-2.5">
         {SCOPES.map((s) => (
@@ -776,7 +776,7 @@ function ConnectPanel({ first, onCancel, onConnected }: { first: boolean; onCanc
     try {
       const r = await api.createAwsConnection(arn, region.trim());
       if (r.error) {
-        setResult({ ok: false, message: r.message || "Coderhelm could not use the role." });
+        setResult({ ok: false, message: r.message || "CoderHelm could not use the role." });
       } else {
         toast("AWS account connected");
         onConnected();
@@ -858,7 +858,7 @@ function ConnectPanel({ first, onCancel, onConnected }: { first: boolean; onCanc
                 <p className="text-xs text-zinc-400">{cfnError ? "Your External ID couldn't load." : "Loading your External ID…"}</p>
               )}
               <p className="mt-1.5 text-xs text-zinc-400">
-                It stops anyone else{cfn?.self_hosted ? " with access to this install's AWS account" : " using Coderhelm"} from assuming your role. The stack fills it in for you.
+                It stops anyone else{cfn?.self_hosted ? " with access to this install's AWS account" : " using CoderHelm"} from assuming your role. The stack fills it in for you.
               </p>
             </div>
           </div>
@@ -892,7 +892,7 @@ function ConnectPanel({ first, onCancel, onConnected }: { first: boolean; onCanc
             <Field
               id="aws-region"
               label="Region of your logs"
-              helper="Coderhelm reads log groups in this region."
+              helper="CoderHelm reads log groups in this region."
               error={region.trim() && !regionOk ? "Enter an AWS region such as us-east-1." : undefined}
             >
               {(props) => (
@@ -909,9 +909,9 @@ function ConnectPanel({ first, onCancel, onConnected }: { first: boolean; onCanc
             </Field>
 
             <h3 className="font-semibold text-zinc-100">3. Check and connect</h3>
-            <p className="-mt-2 text-sm text-zinc-400">Coderhelm tries the role once before it saves anything.</p>
+            <p className="-mt-2 text-sm text-zinc-400">CoderHelm tries the role once before it saves anything.</p>
             {result && !result.ok && (
-              <Callout variant="error" title="Coderhelm could not use the role">
+              <Callout variant="error" title="CoderHelm could not use the role">
                 <p>{result.message}</p>
                 <p>
                   Check that the trust policy names account {cfn?.account_id ?? "shown in step 1"} and your External ID, then try again.
@@ -950,7 +950,7 @@ function permissionsPolicy(setup: AwsRoleSetup): string {
   const statements: Record<string, unknown>[] = [{ Effect: "Allow", Action: all.filter((a) => !special.includes(a)), Resource: "*" }];
   if (all.includes("airflow:InvokeRestApi")) statements.push({ Effect: "Allow", Action: "airflow:InvokeRestApi", Resource: "arn:aws:airflow:*:*:role/*/Viewer" });
   if (all.includes("iam:SimulatePrincipalPolicy")) statements.push({ Effect: "Allow", Action: "iam:SimulatePrincipalPolicy", Resource: "arn:aws:iam::<this account>:role/CoderHelmLogReader" });
-  // Only Coderhelm's own update stacks: another stack's parameters aren't read.
+  // Only CoderHelm's own update stacks: another stack's parameters aren't read.
   if (all.includes("cloudformation:DescribeStacks")) statements.push({ Effect: "Allow", Action: "cloudformation:DescribeStacks", Resource: "arn:aws:cloudformation:*:<this account>:stack/CoderHelmLogReaderUpdate-*/*" });
   return JSON.stringify({ Version: "2012-10-17", Statement: statements }, null, 2);
 }
@@ -1014,7 +1014,7 @@ function ManualRole({ setup }: { setup: AwsRoleSetup | null }) {
 /** Findings moved to the Logs page; this anchor (#findings) points there. */
 function FindingsMoved() {
   return (
-    <Section id="findings" title="Findings" description="Errors Coderhelm finds in these accounts' logs.">
+    <Section id="findings" title="Findings" description="Errors CoderHelm finds in these accounts' logs.">
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 text-sm">
         <p className="min-w-0 text-zinc-400">
           Findings, fix PRs and automatic fixes now live on the Logs page.

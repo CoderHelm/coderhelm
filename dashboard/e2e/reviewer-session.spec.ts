@@ -16,7 +16,7 @@ import {
   triggerLabel,
 } from "../src/app/reviewer/session/session";
 
-// A review's session page: where a PR's "Coderhelm review" check links. Every
+// A review's session page: where a PR's "CoderHelm review" check links. Every
 // API call is answered here; nothing reaches a real backend.
 
 const ID = "3f2c9a1e-5b7d-4c8e-9a0b-1c2d3e4f5a6b";

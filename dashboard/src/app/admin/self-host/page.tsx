@@ -29,7 +29,7 @@ const PART_LABEL: Record<string, string> = {
 const STATUS_TONE = { active: "success", paused: "warning", revoked: "error" } as const;
 
 /**
- * Admin, then Self-host (Coderhelm's platform admins, hosted deployment):
+ * Admin, then Self-host (CoderHelm's platform admins, hosted deployment):
  * every self-hosted install registered for hybrid, which hosted parts each
  * uses, and the event relay and email relay numbers. Metadata only: no
  * payloads, no email contents, recipients only as counts.
@@ -52,7 +52,7 @@ export default function SelfHostAdminPage() {
     <div className="mb-6">
       <PageHeader
         title="Self-host"
-        lead="Self-hosted installs that use Coderhelm's hosted parts: addresses, the GitHub relay, the integration apps, the token broker and email. Counts and metadata only."
+        lead="Self-hosted installs that use CoderHelm's hosted parts: addresses, the GitHub relay, the integration apps, the token broker and email. Counts and metadata only."
       />
     </div>
   );
@@ -82,7 +82,7 @@ export default function SelfHostAdminPage() {
 
   const tiles: { label: string; value: string; note: string }[] = [
     { label: "Installs", value: n(data.installs.total), note: `${n(data.installs.active_7d)} active in 7 days, ${n(data.installs.revoked)} revoked` },
-    { label: "Coderhelm address", value: n(data.address.claimed), note: `${n(data.address.live)} live` },
+    { label: "CoderHelm address", value: n(data.address.claimed), note: `${n(data.address.live)} live` },
     {
       label: "GitHub relay",
       value: n(data.github.installs),
@@ -115,7 +115,7 @@ export default function SelfHostAdminPage() {
         ))}
       </ul>
 
-      <Section title="Last 7 days" description="Events relayed to installs and emails sent through Coderhelm, per day (UTC).">
+      <Section title="Last 7 days" description="Events relayed to installs and emails sent through CoderHelm, per day (UTC).">
         <Trend days={data.trend} />
       </Section>
 
@@ -209,10 +209,10 @@ function InstallDetail({ row, onChanged }: { row: SelfHostRow; onChanged: () => 
       title: what === "revoke" ? "Revoke this install?" : what === "pause" ? "Pause its email?" : "Resume its email?",
       message:
         what === "revoke"
-          ? "Its Coderhelm address, GitHub relay, integration apps, token broker and email stop working until it registers again."
+          ? "Its CoderHelm address, GitHub relay, integration apps, token broker and email stop working until it registers again."
           : what === "pause"
-            ? "Coderhelm stops sending email for this install until you resume it. The install shows the pause in Setup."
-            : "Coderhelm sends this install's email again.",
+            ? "CoderHelm stops sending email for this install until you resume it. The install shows the pause in Setup."
+            : "CoderHelm sends this install's email again.",
       confirmLabel: what === "revoke" ? "Revoke" : what === "pause" ? "Pause email" : "Resume email",
       destructive: what !== "resume",
     });

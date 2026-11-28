@@ -224,7 +224,7 @@ test("when the service itself went quiet the page says it can't tell, and the fi
   await expect(row).toHaveAttribute("data-status", "new");
   await expect(row).toHaveAttribute("data-activity", "unknown");
   await expect(row.getByTestId("finding-cant-tell")).toContainText(
-    "No matching line in the last 3 log checks, but the service itself wrote little or nothing then, so Coderhelm can't tell whether the error stopped.",
+    "No matching line in the last 3 log checks, but the service itself wrote little or nothing then, so CoderHelm can't tell whether the error stopped.",
   );
   await expect(row).not.toContainText("Stopped:");
   await expect(row.locator('span[title="Critical"]')).toHaveClass(/text-red/);

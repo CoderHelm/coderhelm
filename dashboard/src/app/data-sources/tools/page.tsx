@@ -122,7 +122,7 @@ function ToolsPage() {
         lead={
           <>
             Named lookups your engineers already trust, like &quot;find order by number&quot;. Someone writes the read once, another
-            admin approves it after seeing it run, and Coderhelm calls it with the inputs it needs. It can only read.
+            admin approves it after seeing it run, and CoderHelm calls it with the inputs it needs. It can only read.
           </>
         }
         actions={<Link href="/data-sources/tools/new" className={primaryButton}>New tool</Link>}
@@ -138,7 +138,7 @@ function ToolsPage() {
         <ListSection id="inbox" title="Waiting for your yes" count={pending.length || undefined} tone={pending.length ? "waiting" : undefined}>
           {pending.length === 0 ? (
             <EmptyState title="Nothing waiting." testId="tools-inbox-empty">
-              Tools marked &quot;ask me first&quot; show up here when Coderhelm wants to run them, and wait up to 10 minutes.
+              Tools marked &quot;ask me first&quot; show up here when CoderHelm wants to run them, and wait up to 10 minutes.
             </EmptyState>
           ) : (
             <List label="Calls waiting for approval">
@@ -234,7 +234,7 @@ function ToolsPage() {
                     }
                     actions={
                       t.approved ? (
-                        <ToolSwitch on={t.enabled} label={`Let Coderhelm use ${t.name}`} busy={busy === t.name} onToggle={() => toggle(t)} />
+                        <ToolSwitch on={t.enabled} label={`Let CoderHelm use ${t.name}`} busy={busy === t.name} onToggle={() => toggle(t)} />
                       ) : (
                         <Link href={href} className={secondaryButton}>Review</Link>
                       )

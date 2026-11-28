@@ -102,11 +102,11 @@ test("a catalog app sign-in goes back to its catalog row", async ({ page }) => {
 test("an MCP refusal names the server and its error code", async ({ page }) => {
   await mockApi(page, () => ({
     status: 400,
-    body: { error: "Docs refused the permissions Coderhelm asked for (invalid_scope).", code: "invalid_scope", flow: "mcp", server_name: "Docs", catalog_id: "", return_to: "" },
+    body: { error: "Docs refused the permissions CoderHelm asked for (invalid_scope).", code: "invalid_scope", flow: "mcp", server_name: "Docs", catalog_id: "", return_to: "" },
   }));
   await page.goto("/settings/integrations/mcp-callback/?error=invalid_scope&state=mcp.abc");
   await expect(page.getByText("Docs isn't connected")).toBeVisible();
-  await expect(page.getByText(/Docs refused the permissions Coderhelm asked for \(invalid_scope\)/)).toBeVisible();
+  await expect(page.getByText(/Docs refused the permissions CoderHelm asked for \(invalid_scope\)/)).toBeVisible();
   await expect(page.getByRole("link", { name: "Back to Integrations" })).toBeVisible();
 });
 

@@ -16,7 +16,7 @@ import { SIGNED_IN, SIGN_IN_FAILED, announceSignIn } from "@/lib/sign-in-flow";
 
 // Where every OAuth sign-in comes back to: an MCP server's, a catalog
 // app's, a knowledge source's, and a self-hosted install's through
-// Coderhelm's app. The answer (code or error, with the provider's own
+// CoderHelm's app. The answer (code or error, with the provider's own
 // words) is always posted to the API with this person's session: the state
 // works once, only for the person and team that started the sign-in, and
 // the server checks who sent the answer before the code is exchanged. The
@@ -51,7 +51,7 @@ function McpCallback() {
   useEffect(() => {
     if (sent.current) return;
     sent.current = true;
-    // A self-hosted install's sign-in through Coderhelm's app goes back to
+    // A self-hosted install's sign-in through CoderHelm's app goes back to
     // the install (lib/hybrid.ts); anything else carries on here unchanged.
     void hybridOAuthHandoff().then((moved) => {
       if (!moved) finish();

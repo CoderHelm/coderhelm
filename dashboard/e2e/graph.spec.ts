@@ -125,7 +125,7 @@ test("every repo is listed with its graph's status, and admins can turn it off o
 
   await expect(page.getByText(/The planner, the coding agent, the reviewer and CI fixes all use it/)).toBeVisible();
   // One plain status line for every repo's map.
-  await expect(page.getByTestId("graph-summary")).toContainText("Coderhelm has mapped 1 of 5 repositories.");
+  await expect(page.getByTestId("graph-summary")).toContainText("CoderHelm has mapped 1 of 5 repositories.");
   await expect(page.getByText(/once the reviewer is set up/)).toHaveCount(0);
 
   // One row per repo, each with its state.

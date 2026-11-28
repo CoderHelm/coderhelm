@@ -76,7 +76,7 @@ test("1280×800: the whole menu fits without scrolling, and help and the person 
   await page.goto("/settings/budget");
   const settings = nav.getByRole("navigation", { name: "Settings" });
   await expect(settings.getByRole("link", { name: /^Token limit/ })).toHaveAttribute("aria-current", "page");
-  await expect(nav.getByRole("link", { name: /Back to Coderhelm/ })).toBeInViewport();
+  await expect(nav.getByRole("link", { name: /Back to CoderHelm/ })).toBeInViewport();
   await expect(nav.getByRole("button", { name: "Sign out" })).toBeInViewport();
 });
 

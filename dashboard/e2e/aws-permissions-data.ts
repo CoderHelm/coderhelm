@@ -2,7 +2,7 @@
 // (services/common/src/live/permissions.rs, `PermissionCheck::view`).
 
 const GROUPS = [
-  { key: "logs", name: "CloudWatch logs and alarms", why: "Reads error lines and alarm states so Coderhelm can find what broke and propose a fix.", actions: ["logs:DescribeLogGroups", "logs:StartQuery", "logs:GetQueryResults", "logs:StopQuery", "logs:FilterLogEvents", "logs:GetLogEvents", "cloudwatch:DescribeAlarms", "sts:GetCallerIdentity"] },
+  { key: "logs", name: "CloudWatch logs and alarms", why: "Reads error lines and alarm states so CoderHelm can find what broke and propose a fix.", actions: ["logs:DescribeLogGroups", "logs:StartQuery", "logs:GetQueryResults", "logs:StopQuery", "logs:FilterLogEvents", "logs:GetLogEvents", "cloudwatch:DescribeAlarms", "sts:GetCallerIdentity"] },
   { key: "check", name: "Checking its own permissions", why: "Asks IAM which of these permissions the role has, and whether CoderHelm's own update stack finished, so this page can say when an update is needed. It only looks at this one role and CoderHelm's update stacks.", actions: ["iam:SimulatePrincipalPolicy", "cloudformation:DescribeStacks"] },
   { key: "metrics", name: "CloudWatch metrics", why: "Reads error rate, latency and other metrics before and after a deploy.", actions: ["cloudwatch:GetMetricData", "cloudwatch:ListMetrics"] },
   { key: "airflow", name: "Airflow", why: "Reads DAG runs, task logs and import errors as Airflow's Viewer role, which can't trigger or change anything.", actions: ["airflow:ListEnvironments", "airflow:GetEnvironment", "airflow:InvokeRestApi"] },
@@ -87,7 +87,7 @@ export function permissionsView(
     problem:
       opts.problem ??
       (status === "error"
-        ? { code: "role", message: "Coderhelm couldn't use the role in your AWS account (AccessDenied).", fix: `Check that the CoderHelmLogReader role still exists in account ${account} and trusts this Coderhelm install with your External ID.` }
+        ? { code: "role", message: "CoderHelm couldn't use the role in your AWS account (AccessDenied).", fix: `Check that the CoderHelmLogReader role still exists in account ${account} and trusts this CoderHelm install with your External ID.` }
         : null),
   };
 }

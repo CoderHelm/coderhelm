@@ -52,7 +52,7 @@ const FINISHED: Entry[] = [
   entry(40, "Run started from Jira ABC-9", { actor: "jira", kind: "started", link: "https://your-team.example.com/browse/ABC-9" }),
   entry(35, "Started build", { kind: "step" }),
   entry(24, "Opened the pull request in 1m 5s", { kind: "step_done", tone: "good", link: "https://github.com/your-team/web/pull/12" }),
-  entry(22, "Coderhelm's review of #12 approved", { kind: "review", tone: "good", link: "/reviewer/detail?sk=REVIEW%23x" }),
+  entry(22, "CoderHelm's review of #12 approved", { kind: "review", tone: "good", link: "/reviewer/detail?sk=REVIEW%23x" }),
   entry(21, "Approved: Use deploy on staging", { actor: "person", who: "Pat Doe", kind: "approval_answered", tone: "good" }),
   entry(20, "Finished", { kind: "status", tone: "good" }),
 ];

@@ -80,7 +80,7 @@ function PlansPage() {
     <Page>
       <PageHeader
         title="Plans"
-        lead="Describe a bigger change and Coderhelm splits it into tasks. Approve them, and each task's state follows its runs and pull requests until it merges."
+        lead="Describe a bigger change and CoderHelm splits it into tasks. Approve them, and each task's state follows its runs and pull requests until it merges."
         actions={
           <Link href="/plans/new" className={primaryButton}>
             New plan
@@ -127,7 +127,7 @@ function PlansPage() {
               </Link>
             }
           >
-            A plan splits a bigger change into tasks. You approve them, Coderhelm builds each one, and the plan is done when every task merged.
+            A plan splits a bigger change into tasks. You approve them, CoderHelm builds each one, and the plan is done when every task merged.
           </ListEmpty>
         ) : shown.length === 0 ? (
           <ListEmpty title={q ? `No plans match “${q}”` : "No plans here"} onClear={clear}>

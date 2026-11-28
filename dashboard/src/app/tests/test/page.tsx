@@ -170,7 +170,7 @@ function TestDetail() {
             <p>
               {test.removal.approved_by?.length ? `Approved by ${test.removal.approved_by.join(", ")}` : "No approving review is on record"}
               {test.removal.pr?.by ? `, merged by ${test.removal.pr.by}.` : "."}{" "}
-              {test.removal.by === "coderhelm" ? "Coderhelm proposed the removal." : `Asked for by ${test.removal.by}.`}
+              {test.removal.by === "coderhelm" ? "CoderHelm proposed the removal." : `Asked for by ${test.removal.by}.`}
             </p>
           </Callout>
         </div>
@@ -223,7 +223,7 @@ function TestDetail() {
               <p className="mt-2 text-zinc-400">
                 What it said: <span className="line-through decoration-zinc-600">{cause.evidence}</span>
               </p>
-              <p className="mt-2 text-zinc-400">Coderhelm works the cause out again if the test fails again.</p>
+              <p className="mt-2 text-zinc-400">CoderHelm works the cause out again if the test fails again.</p>
             </Callout>
           ) : (
             <Callout variant="neutral" title={`Likely cause: ${CAUSE_LABEL[cause.label]}`} live={false}>

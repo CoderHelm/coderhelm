@@ -88,7 +88,7 @@ test.describe("buildLog", () => {
     expect(build.sections.find((s) => s.divider)?.divider).toBe("Fixing the failing checks");
     // The worker's notes show as notes, in plain words.
     const notes = build.sections.flatMap((s) => s.items).filter((i) => i.kind === "note");
-    expect(notes.map((n) => n.kind === "note" && n.text)).toEqual(["Coderhelm told the agent it had used 30 of its 40 steps", "Time was nearly up: Coderhelm asked the agent to wrap up"]);
+    expect(notes.map((n) => n.kind === "note" && n.text)).toEqual(["CoderHelm told the agent it had used 30 of its 40 steps", "Time was nearly up: CoderHelm asked the agent to wrap up"]);
     expect(build.final?.text).toContain("Moved the More menu items behind `menuV2`");
     expect(m.passes[3].final?.cutOff).toBe(true);
   });

@@ -73,7 +73,7 @@ export function SettingsSidebarNav({
         href="/"
         className={`mb-3 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-100 ${focusRing}`}
       >
-        <span aria-hidden="true">&lsaquo;</span> Back to Coderhelm
+        <span aria-hidden="true">&lsaquo;</span> Back to CoderHelm
       </Link>
       <p className="px-2 text-base font-semibold text-zinc-50">Settings</p>
       <div className="mt-3 px-0.5">

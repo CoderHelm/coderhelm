@@ -171,7 +171,7 @@ test.describe("the source picker", () => {
     await page.goto("/knowledge/");
     await page.getByTestId("start-notion").click();
     const empty = page.getByTestId("picker-empty");
-    await expect(empty).toContainText("Notion hasn’t shared anything with Coderhelm yet.");
+    await expect(empty).toContainText("Notion hasn’t shared anything with CoderHelm yet.");
     const steps = empty.getByTestId("share-steps").locator("li");
     await expect(steps).toHaveCount(3);
     await expect(steps.nth(1)).toHaveText("Select ••• at the top right, then Connections.");

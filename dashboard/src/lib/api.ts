@@ -160,7 +160,7 @@ export interface MyTwoFactor {
   must_keep?: boolean;
   session_has_2fa?: boolean;
   signed_in_with?: "password" | "google" | "github";
-  /** What they have set up: Cognito's codes (password sign-in) or Coderhelm's (Google, GitHub). */
+  /** What they have set up: Cognito's codes (password sign-in) or CoderHelm's (Google, GitHub). */
   set_up?: "cognito" | "app" | null;
   /** The kind that fits how they signed in. */
   fits?: "cognito" | "app";
@@ -364,8 +364,8 @@ export interface SignInSenders {
  */
 export type ForgotStatus = "sent";
 
-/** A repository's agent file: what Coderhelm learned about it, and when and
- * why it was last written. Coderhelm writes it again by itself after
+/** A repository's agent file: what CoderHelm learned about it, and when and
+ * why it was last written. CoderHelm writes it again by itself after
  * changes to the files it is written from; one saved by hand is only marked
  * out of date. */
 export interface AgentFile {
@@ -430,7 +430,7 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ email, code, new_password }),
     }),
-  /** A sign-in carried over from another Coderhelm: the same email and password, with the
+  /** A sign-in carried over from another CoderHelm: the same email and password, with the
    *  authenticator code of the account there. The password is sent, never stored. */
   loginCarryOverCode: (email: string, password: string, code: string) =>
     request<{ status: string; session?: string; team_id?: string }>("/auth/login/code", {
@@ -455,7 +455,7 @@ export const api = {
   supportTicket: (id: string) => request<SupportDetail>(`/api/support/tickets/${encodeURIComponent(id)}`),
   openSupportTicket: (body: NewSupportTicket) =>
     request<SupportDetail>("/api/support/tickets", { method: "POST", body: JSON.stringify(body) }),
-  /** A team admin asks Coderhelm to move the team to its self-hosted install (opens a ticket). */
+  /** A team admin asks CoderHelm to move the team to its self-hosted install (opens a ticket). */
   requestMove: (body: MoveRequest) =>
     request<SupportDetail>("/api/support/move", { method: "POST", body: JSON.stringify(body) }),
   replySupportTicket: (id: string, body: string, items: SupportItemRef[] = []) =>
@@ -482,7 +482,7 @@ export const api = {
   adminSupportTickets: () =>
     request<{ tickets: SupportTicket[]; support_access?: Record<string, string> }>("/api/admin/support/tickets"),
   adminSupportTicket: (id: string) => request<SupportDetail>(`/api/admin/support/tickets/${encodeURIComponent(id)}`),
-  // Support access: the team lets Coderhelm support see its workspace for a while.
+  // Support access: the team lets CoderHelm support see its workspace for a while.
   supportAccess: () => request<SupportAccess>("/api/support/access"),
   grantSupportAccess: (body: { hours: number; note?: string; ticket_id?: string }) =>
     request<{ grant: SupportGrant }>("/api/support/access", { method: "POST", body: JSON.stringify(body) }),
@@ -609,7 +609,7 @@ export const api = {
   /** Undo a close: the run shows as before (or waiting on a person); nothing restarts. */
   /**
    * Close the ticket's earlier pull request a covered run superseded. Only
-   * Coderhelm's own pull request is closed (the gateway reads it from GitHub
+   * CoderHelm's own pull request is closed (the gateway reads it from GitHub
    * first); anything else comes back `ok: false` with the reason.
    */
   closeSupersededPr: (id: string) =>
@@ -693,7 +693,7 @@ export const api = {
       `/api/analytics?${period === "mtd" ? "period=mtd" : `days=${period}`}${repo ? `&repo=${encodeURIComponent(repo)}` : ""}`,
     ),
 
-  // Learning: what Coderhelm learned from outcomes and what it changed because of them.
+  // Learning: what CoderHelm learned from outcomes and what it changed because of them.
   /** The Learning page: rewards, finding categories, behavior changes, exemplars and variants. */
   getLearning: (days: number, repo?: string) =>
     request<Learning>(`/api/learning?days=${days}${repo ? `&repo=${encodeURIComponent(repo)}` : ""}`),
@@ -714,15 +714,15 @@ export const api = {
   /** The team's signal weights (admin); `{}` goes back to the defaults. */
   putRewardWeights: (weights: Record<string, number>) =>
     request<{ weights: Record<string, number> }>("/api/learning/weights", { method: "PUT", body: JSON.stringify({ weights }) }),
-  /** What became of the pull requests Coderhelm opened, per team and per repository. `months` 0 is all time. */
+  /** What became of the pull requests CoderHelm opened, per team and per repository. `months` 0 is all time. */
   getScorecard: (months: number, repo?: string) =>
     request<Scorecard>(`/api/learning/scorecard?months=${months}${repo ? `&repo=${encodeURIComponent(repo)}` : ""}`),
   /** The coding agent's lessons with their evidence, and each repository's guide pull request. */
   getOutcomeLessons: (repo?: string) =>
     request<OutcomeLessons>(`/api/learning/lessons${repo ? `?repo=${encodeURIComponent(repo)}` : ""}`),
-  /** What each reviewer repeatedly asks for on Coderhelm's pull requests. */
+  /** What each reviewer repeatedly asks for on CoderHelm's pull requests. */
   getReviewerAsks: () => request<ReviewerAsks>("/api/learning/reviewers"),
-  /** Whether Coderhelm may open guide pull requests: for the team, and per repository set apart. */
+  /** Whether CoderHelm may open guide pull requests: for the team, and per repository set apart. */
   getGuideSetting: () => request<GuideSetting>("/api/settings/guide-prs"),
   /** Save it (admin). The whole setting is sent. */
   putGuideSetting: (setting: { enabled: boolean; repos: Record<string, boolean> }) =>
@@ -835,7 +835,7 @@ export const api = {
   deleteJiraIntegration: () =>
     request<void>("/api/integrations/jira/check", { method: "DELETE" }),
   getJiraConfig: () => request<JiraConfig>("/api/integrations/jira/config"),
-  /** Whether the team's Jira site runs an older Coderhelm app: `behind` is null when it is current or nothing is known. */
+  /** Whether the team's Jira site runs an older CoderHelm app: `behind` is null when it is current or nothing is known. */
   getJiraAppStatus: () => request<{ behind: JiraAppUpdate | null }>("/api/integrations/jira/app"),
   updateJiraConfig: (body: Partial<JiraConfig>) =>
     request<void>("/api/integrations/jira/config", {
@@ -1479,7 +1479,7 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ sk, rating, comment }),
     }),
-  /** One review job step by step: where a PR's "Coderhelm review" check links. */
+  /** One review job step by step: where a PR's "CoderHelm review" check links. */
   getReviewSession: (id: string) =>
     request<ReviewSession>(`/api/reviewer/session?id=${encodeURIComponent(id)}`),
   /** One PR's auto-merge gate: state, checklist, who stopped it, every stop and re-arm. */
@@ -1613,7 +1613,7 @@ export const api = {
       body: JSON.stringify({
         ...(version ? { version } : {}),
         ...(skipCheck ? { skip_check: true } : {}),
-        // The press agrees to changes of what Coderhelm's own roles may do,
+        // The press agrees to changes of what CoderHelm's own roles may do,
         // inside the install's permission limit; never to data changes.
         ...(acceptPermissions ? { accept_permissions: true } : {}),
       }),
@@ -1661,7 +1661,7 @@ export const api = {
   getEmailSender: () => request<EmailSender>("/api/system/emails/sender"),
   setEmailSender: (change: { sender_name?: string; organization?: string }) =>
     request<EmailSender>("/api/system/emails/sender", { method: "PUT", body: JSON.stringify(change) }),
-  // Self-hosted installs on Coderhelm's hosted parts (platform admins, hosted deployment).
+  // Self-hosted installs on CoderHelm's hosted parts (platform admins, hosted deployment).
   adminSelfHostSummary: () => request<SelfHostSummary>("/api/admin/hybrid/summary"),
   adminSelfHostInstall: (id: string) => request<SelfHostDetail>(`/api/admin/hybrid/${encodeURIComponent(id)}`),
   adminPauseInstallEmail: (id: string, paused: boolean, reason = "") =>
@@ -1690,7 +1690,7 @@ export const api = {
   redeliver: (id: string) =>
     requestWithBody<{ message?: string }, { code?: string }>(`/api/deliveries/${encodeURIComponent(id)}/redeliver`, { method: "POST", body: "{}" }),
 
-  // Hybrid (install admins, self-hosted only): connect this install to Coderhelm's apps and address.
+  // Hybrid (install admins, self-hosted only): connect this install to CoderHelm's apps and address.
   getHybrid: (deep = false) => request<HybridStatus>(`/api/system/hybrid${deep ? "?deep=1" : ""}`),
   registerHybrid: () => request<HybridStatus>("/api/system/hybrid/register", { method: "POST", body: "{}" }),
   leaveHybrid: () => request<HybridStatus>("/api/system/hybrid", { method: "DELETE" }),
@@ -1703,13 +1703,13 @@ export const api = {
     request<HybridStatus>(`/api/system/hybrid/github/${installationId}`, { method: "PUT", body: JSON.stringify({ repositories }) }),
   unlinkHybridGithub: (installationId: number) => request<HybridStatus>(`/api/system/hybrid/github/${installationId}`, { method: "DELETE" }),
   setHybridSettings: (s: HybridSettingsPatch) => request<HybridStatus>("/api/system/hybrid/settings", { method: "PUT", body: JSON.stringify(s) }),
-  /** A hybrid install: the Coderhelm page where a hosted team admin confirms linking their Jira site. */
+  /** A hybrid install: the CoderHelm page where a hosted team admin confirms linking their Jira site. */
   linkHybridJira: (site_url: string, return_url?: string) =>
     request<{ state: string; code: string; link_url: string }>("/api/system/hybrid/jira/link", { method: "POST", body: JSON.stringify({ site_url, ...(return_url ? { return_url } : {}) }) }),
   unlinkHybridJira: () => request<HybridStatus>("/api/system/hybrid/jira/link", { method: "DELETE" }),
-  /** Coderhelm's hosted dashboard: what linking this team's Jira site to an install would do. */
+  /** CoderHelm's hosted dashboard: what linking this team's Jira site to an install would do. */
   getJiraLinkRequest: (state: string) => request<JiraLinkRequest>(`/api/hybrid/jira-link/${encodeURIComponent(state)}`),
-  /** Coderhelm's hosted dashboard: where this team's Jira site is linked, and unlinking it. */
+  /** CoderHelm's hosted dashboard: where this team's Jira site is linked, and unlinking it. */
   getTeamJiraLink: () => request<{ linked: boolean; install_address?: string | null; linked_at?: string | null }>("/api/hybrid/jira-link"),
   unlinkTeamJira: () => request<{ linked: boolean }>("/api/hybrid/jira-link", { method: "DELETE" }),
   answerJiraLinkRequest: (state: string, choice: "link" | "cancel", code = "") =>
@@ -1792,7 +1792,7 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ client_id, client_secret }),
     }),
-  /** Signs in with Coderhelm's own app for a catalog server (Figma): replaces the team's own app, if one was saved, and answers where to send the browser. */
+  /** Signs in with CoderHelm's own app for a catalog server (Figma): replaces the team's own app, if one was saved, and answers where to send the browser. */
   connectCoderhelmApp: (catalogId: string) =>
     request<SignInStart & { own_app: OwnAppState }>(`/api/mcp-servers/apps/${encodeURIComponent(catalogId)}/coderhelm`, { method: "POST" }),
   setMcpClient: (id: string, client_id: string, client_secret: string) =>
@@ -1917,7 +1917,7 @@ export const api = {
   /** Starts a fix run now. `test` is the row as it stands after, from servers that send it. */
   fixTest: (id: string) =>
     request<{ queued: boolean; test?: TestCase }>(`/api/tests/${encodeURIComponent(id)}/fix`, { method: "POST", body: "{}" }),
-  /** Opens a pull request that removes a quarantined test. The team merges it; Coderhelm never does. */
+  /** Opens a pull request that removes a quarantined test. The team merges it; CoderHelm never does. */
   removeTest: (id: string) =>
     request<{ queued: boolean; test?: TestCase }>(`/api/tests/${encodeURIComponent(id)}/remove`, { method: "POST", body: "{}" }),
   listFailureGroups: (repo?: string) => request<{ groups: FailureGroup[] }>(`/api/tests/failure-groups${qs({ repo })}`),
@@ -1967,7 +1967,7 @@ export interface WaitingRelease {
   base_branch: string;
 }
 
-/** A release tag Coderhelm couldn't cut after its retries. */
+/** A release tag CoderHelm couldn't cut after its retries. */
 export interface BlockedRelease {
   repo: string;
   error: string;
@@ -2147,7 +2147,7 @@ export interface ReviewerConfig {
   auto_label_requires: string;
   /** When to use which label (free text for the reviewer). */
   auto_label_guide: string;
-  /** Write + publish release notes when Coderhelm cuts a release tag. */
+  /** Write + publish release notes when CoderHelm cuts a release tag. */
   release_notes: boolean;
   /** Only tags on this branch get notes; empty = the default branch. */
   release_notes_branch: string;
@@ -2451,15 +2451,15 @@ export type RunTriggerKind = "jira" | "github" | "coderhelm" | "alert" | "plan" 
 
 /** How a run was started, worked out by the gateway. */
 export interface RunTrigger {
-  /** A kind this dashboard doesn't know reads as Coderhelm's own work. */
+  /** A kind this dashboard doesn't know reads as CoderHelm's own work. */
   kind: RunTriggerKind | (string & {});
-  /** "Jira", "GitHub issue", "Started by Coderhelm · flaky test", … */
+  /** "Jira", "GitHub issue", "Started by CoderHelm · flaky test", … */
   label: string;
   /** The ticket key, "#42", or a plan's, alert's or log group's name. */
   ref?: string | null;
   /** A dashboard path ("/tests/test?id=…") or an https address. */
   ref_url?: string | null;
-  /** The person who started it; null for Coderhelm's own work. */
+  /** The person who started it; null for CoderHelm's own work. */
   by?: string | null;
 }
 
@@ -2552,7 +2552,7 @@ export interface RunPreviewShot {
 export interface RunPreview {
   stage: "not_needed" | "triggered" | "deploying" | "ready" | "checked" | "failed" | "blocked" | (string & {});
   url: string;
-  /** Labels Coderhelm added to start the preview. */
+  /** Labels CoderHelm added to start the preview. */
   labels_added: string[];
   checks: RunPreviewCheck[];
   shots: RunPreviewShot[];
@@ -2671,7 +2671,7 @@ export interface RunDetail extends Run {
   github_wait?: string | null;
   /** The comment with those questions on the ticket or issue. */
   questions_url?: string | null;
-  /** Answers people gave to them in Coderhelm. */
+  /** Answers people gave to them in CoderHelm. */
   answers?: RunAnswer[];
   /** The reply with the answers on the ticket or issue. */
   answers_url?: string | null;
@@ -2724,7 +2724,7 @@ export interface RunQuestion {
   why?: string | null;
   /** Candidate answers the run found in the code or the data; the choices when `decision` is set. */
   suggestions?: string[];
-  /** Set when the question is a choice Coderhelm records on the ticket (e.g. an open pull request: work on it, or open its own). */
+  /** Set when the question is a choice CoderHelm records on the ticket (e.g. an open pull request: work on it, or open its own). */
   decision?: string | null;
   /** The evidence the question cites: a `path:line` in the code or a lookup the run made. */
   evidence?: string[];
@@ -2744,7 +2744,7 @@ export interface RunNoChange {
   reason: string;
   /** What the plan checked, one line each. */
   checks?: string[];
-  /** The ticket's open pull request (Coderhelm's own) the run was continuing, and the decision about it. */
+  /** The ticket's open pull request (CoderHelm's own) the run was continuing, and the decision about it. */
   open_pr?: RunNoChangePr | null;
 }
 
@@ -2757,7 +2757,7 @@ export interface RunNoChangePr {
   /** `keep` (still needed: it stays open) or `not_needed`. */
   verdict: string;
   why?: string;
-  /** Coderhelm closed it (only when not needed; its branch is kept). */
+  /** CoderHelm closed it (only when not needed; its branch is kept). */
   closed?: boolean;
   /** The decision in one plain sentence. */
   line?: string;
@@ -2770,7 +2770,7 @@ export interface RunCoveredBy {
   title?: string;
   author?: string;
   reason?: string;
-  /** It is Coderhelm's own pull request: only then does a run continue in it or offer to close the earlier one. */
+  /** It is CoderHelm's own pull request: only then does a run continue in it or offer to close the earlier one. */
   own?: boolean;
   /** `continued`, `complete`, `person`, `busy` or `not_carried`; empty on older runs. */
   outcome?: string;
@@ -2778,13 +2778,13 @@ export interface RunCoveredBy {
   carried?: RunCoveredCarried | null;
   /** What is still open for this ticket in it. */
   open_items?: string[];
-  /** The ticket's earlier pull request Coderhelm opened, now redundant. */
+  /** The ticket's earlier pull request CoderHelm opened, now redundant. */
   superseded?: RunSupersededPr | null;
   /** What the run page says, in one paragraph. */
   note?: string;
 }
 
-/** What a covered run carried over to Coderhelm's own covering pull request. */
+/** What a covered run carried over to CoderHelm's own covering pull request. */
 export interface RunCoveredCarried {
   branch: string;
   head?: string;
@@ -2803,7 +2803,7 @@ export interface RunSupersededPr {
   closed_by?: string;
 }
 
-/** An answer given in Coderhelm to a run's question. */
+/** An answer given in CoderHelm to a run's question. */
 export interface RunAnswer {
   question_id: string;
   question: string;
@@ -3075,7 +3075,7 @@ export interface NotificationPrefs {
   email_run_failed?: boolean;
 }
 
-/** The team's templates; an empty one keeps Coderhelm's default. */
+/** The team's templates; an empty one keeps CoderHelm's default. */
 export interface GitConventionTemplates {
   branch: string;
   commit: string;
@@ -3500,7 +3500,7 @@ export interface JiraConfig {
   projects: JiraProject[];
 }
 
-/** A Jira site running an older Coderhelm app than the latest release. */
+/** A Jira site running an older CoderHelm app than the latest release. */
 export interface JiraAppUpdate {
   /** The version the site runs; empty when its app is too old to say. */
   version: string;
@@ -3587,7 +3587,7 @@ export interface TopicAlarm {
 /**
  * What a chat message is: an alert (a production alarm or incident, a failed
  * deploy, a critical security finding), action (a person has to do
- * something Coderhelm can't) or an update (a fix PR opened or merged, new
+ * something CoderHelm can't) or an update (a fix PR opened or merged, new
  * findings). Each team channel takes the kinds it lists.
  */
 export type NotifyKind = "alert" | "action" | "update";
@@ -3601,7 +3601,7 @@ export interface AlertNotifySettings {
   default_kinds?: NotifyKind[];
 }
 
-/** A chat channel Coderhelm posts to. */
+/** A chat channel CoderHelm posts to. */
 export type ChatChannel = "teams" | "slack";
 
 /** A saved webhook, as the API shows it: never the URL, only whether one is set and a hint. */
@@ -3629,7 +3629,7 @@ export type NotifyDestination =
   | { destination: "recommendations" }
   | { destination: "reviewer"; repo: string };
 
-/** One alert Coderhelm received, and what it did with it. */
+/** One alert CoderHelm received, and what it did with it. */
 export interface AlertEvent {
   id: string;
   received_at?: string | null;
@@ -3663,7 +3663,7 @@ export interface AlertEventDetail {
   }[];
 }
 
-/** Base URL of the Coderhelm API (shown to users who subscribe endpoints). */
+/** Base URL of the CoderHelm API (shown to users who subscribe endpoints). */
 /** The API base for fetch calls ("" means this hostname). */
 export const apiBaseUrl = apiBase;
 
@@ -3812,14 +3812,14 @@ export interface LogFinding {
    *  one card and one fix. Older servers leave these out. */
   incident_id?: string | null;
   incident?: LogIncident | null;
-  /** A repo Coderhelm saved for its log group itself, and why. */
+  /** A repo CoderHelm saved for its log group itself, and why. */
   repo_learned?: LogLearned | null;
 }
 
 /** Where an incident's fix belongs. */
 export type LogPlace = "code" | "aws" | "data" | "infra" | "config";
 
-/** Findings with one cause, what Coderhelm found and what it did. */
+/** Findings with one cause, what CoderHelm found and what it did. */
 export interface LogIncident {
   id: string;
   /** The finding its fix starts from. */
@@ -3828,7 +3828,7 @@ export interface LogIncident {
   log_groups: string[];
   first_seen: string;
   last_seen: string;
-  /** What Coderhelm did about it, in a sentence. */
+  /** What CoderHelm did about it, in a sentence. */
   action: string;
   diagnosis: {
     place: LogPlace;
@@ -3836,7 +3836,7 @@ export interface LogIncident {
     resource: string;
     headline: string;
     summary: string;
-    /** What Coderhelm checked and found, one sentence each. */
+    /** What CoderHelm checked and found, one sentence each. */
     facts: string[];
     /** The change to make, when it is in a repo. */
     fix: { repo: string; path: string; change: string } | null;
@@ -3845,12 +3845,12 @@ export interface LogIncident {
     /** When the errors stopped, when they did. */
     recovered_at: string;
     changed_at: string;
-    /** Read-only permissions that would let Coderhelm check more. */
+    /** Read-only permissions that would let CoderHelm check more. */
     permissions: string[];
   };
 }
 
-/** Why and when Coderhelm saved a log group's repo itself. */
+/** Why and when CoderHelm saved a log group's repo itself. */
 export interface LogLearned {
   reason: string;
   at: string;
@@ -3867,7 +3867,7 @@ export interface RepoResolution {
   decided_by: { kind: string; detail: string }[];
   /** Best first when a person should check. */
   candidates: { repo: string; reason: string }[];
-  /** AWS permissions that would let Coderhelm see more. */
+  /** AWS permissions that would let CoderHelm see more. */
   permissions: string[];
   resolved_at: string;
   cached: boolean;
@@ -3898,7 +3898,7 @@ export interface LogAutofix {
   scope: "all" | "listed";
   /** UTC hours. */
   quiet_hours: { start_hour: number; end_hour: number } | null;
-  /** `learned`: Coderhelm saved the repo itself from decisive evidence; a
+  /** `learned`: CoderHelm saved the repo itself from decisive evidence; a
    *  person choosing another repo clears it. */
   overrides: { log_group: string; repo: string; auto: boolean | null; min_severity: LogSeverity | null; learned?: LogLearned | null }[];
   /** Set by the server when it is turned on. */
@@ -3960,7 +3960,7 @@ export interface OwnAppDef {
   refresh: string;
   /** The scopes to tick on the app, exactly. */
   scopes: string[];
-  /** What those scopes let Coderhelm do, in plain words. Missing from older gateways. */
+  /** What those scopes let CoderHelm do, in plain words. Missing from older gateways. */
   reads?: string;
   /** Where the app is created. */
   console: string;
@@ -3981,9 +3981,9 @@ export interface SignInStart {
 export interface OwnAppState {
   /** The connection's id, for connect, disconnect and remove. */
   id: string;
-  /** Whose app it signs in with: Coderhelm's or the team's own. Missing from older gateways (own). */
+  /** Whose app it signs in with: CoderHelm's or the team's own. Missing from older gateways (own). */
   source?: "coderhelm" | "own";
-  /** The team's own app's client id; empty for Coderhelm's app. */
+  /** The team's own app's client id; empty for CoderHelm's app. */
   client_id: string;
   has_secret: boolean;
   status: "connected" | "not_connected" | "needs_reconnect" | "failed";
@@ -4147,7 +4147,7 @@ export interface PrivateNetworkRule {
 
 /** Where a search source's AWS domain lives, and how to read it from inside its VPC. */
 export interface PrivateNetworkPlan {
-  /** False on Coderhelm's hosted service: it runs outside your AWS account. */
+  /** False on CoderHelm's hosted service: it runs outside your AWS account. */
   available: boolean;
   why?: string;
   network?: string;
@@ -4226,7 +4226,7 @@ export interface DataSourceSample {
   database?: string | null;
 }
 
-/** How Coderhelm reaches a team's AWS account: the line the setup script printed, or a role it already uses. */
+/** How CoderHelm reaches a team's AWS account: the line the setup script printed, or a role it already uses. */
 export type AwsAccess = { code: string } | { role_arn: string; region: string };
 
 export interface AwsExistingConnection {
@@ -4336,7 +4336,7 @@ export interface AnalyticsCounts {
   tickets: number;
   /** Every run, reruns included. */
   runs: number;
-  /** Distinct PRs Coderhelm's runs opened or pushed to. */
+  /** Distinct PRs CoderHelm's runs opened or pushed to. */
   prs_opened: number;
   prs_merged: number;
   /** Neither merged nor closed yet. */
@@ -4353,7 +4353,7 @@ export interface AnalyticsCounts {
   people: number;
   /** Runs that recorded who (or what) asked for them. */
   runs_with_requester: number;
-  /** Deploys Coderhelm started: deploy workflow runs its app triggered (a
+  /** Deploys CoderHelm started: deploy workflow runs its app triggered (a
    * deploy label it added, a push to its PR, a merge it made, a tag or
    * release it created), one per run and environment. A person's are not. */
   deploys: number;
@@ -4385,9 +4385,9 @@ export interface AnalyticsComparison {
   deploys_previous_state: "known" | "counting" | "before_records";
   /** "running" while earlier deploys are still being read from GitHub. */
   deploys_backfill: "done" | "running";
-  /** Repositories whose workflow runs Coderhelm can't read. */
+  /** Repositories whose workflow runs CoderHelm can't read. */
   deploys_no_access: string[];
-  /** When some of this period's deploys were read from workflow names and jobs because Coderhelm can't read GitHub's Deployments: a sentence saying so (older servers: absent). */
+  /** When some of this period's deploys were read from workflow names and jobs because CoderHelm can't read GitHub's Deployments: a sentence saying so (older servers: absent). */
   deploys_source_note?: string | null;
   /** Repositories the count gave up on after GitHub kept failing, with why (older servers: absent). */
   deploys_not_read?: { repo: string; reason: string }[];
@@ -4469,7 +4469,7 @@ export interface Analytics {
   daily: { day: string; runs: number; prs_opened: number; merged: number; failed: number; cost_usd: number; tokens?: number; run_cost_usd?: number; run_tokens?: number; reviews: number }[];
   sources: { source: string; runs: number; prs: number; merged: number; merge_rate: number | null }[];
   repos: { repo: string; runs: number; prs: number; merged: number; failed: number; cost_usd: number; tokens?: number; merge_rate: number | null; reviews: number }[];
-  /** One row per person (however Jira, GitHub or the dashboard named them), Coderhelm's own work, and runs that recorded nobody. */
+  /** One row per person (however Jira, GitHub or the dashboard named them), CoderHelm's own work, and runs that recorded nobody. */
   people: { person: string; kind?: "person" | "coderhelm" | "not_recorded"; runs: number; merged: number }[];
   /**
    * Failed runs by reason, most first. `stage` is the step most of the group
@@ -4485,7 +4485,7 @@ export interface Analytics {
     /** Runs whose own CI went red (runs red only on base-branch checks are counted apart). */
     runs_with_red_ci: number;
     fixed_by_coderhelm: number;
-    /** Green after a Coderhelm fix, out of the red runs that are no longer running. */
+    /** Green after a CoderHelm fix, out of the red runs that are no longer running. */
     fix_rate: number | null;
     fix_attempts: number;
     fix_commits: number;
@@ -4494,9 +4494,9 @@ export interface Analytics {
     red_on_base_runs?: number;
     /** How each red run ended. Missing from older backends. */
     outcomes?: AnalyticsCiOutcomes;
-    /** Why Coderhelm left a red PR to a person, most common first. */
+    /** Why CoderHelm left a red PR to a person, most common first. */
     gave_up_reasons?: { reason: string; count: number }[];
-    /** Runs that ended in a state Coderhelm must never leave (both should be zero). Missing from older backends. */
+    /** Runs that ended in a state CoderHelm must never leave (both should be zero). Missing from older backends. */
     ended_wrong?: {
       completed_with_red_ci: number;
       completed_red_runs: string[];
@@ -4597,7 +4597,7 @@ export type RunOutcome = "passed" | "failed" | "flaky" | "skipped";
 /** How the runs whose CI went red ended up; each red run is in exactly one. */
 export interface AnalyticsCiOutcomes {
   green_after_fix: number;
-  /** Green without a Coderhelm fix (a person's push, a later run). */
+  /** Green without a CoderHelm fix (a person's push, a later run). */
   green_without_fix: number;
   /** Green after a re-run of the failed jobs, with no code change. */
   flaky: number;
@@ -4632,7 +4632,7 @@ export interface TestSettings {
   ticket_after_days: number;
   /** Where each repository's test reports are kept, for fixes of failing and flaky tests. */
   report_sources?: TestReportSource[];
-  /** Fix and removal runs Coderhelm starts by itself, per repository per week (1–10). Absent on older servers. */
+  /** Fix and removal runs CoderHelm starts by itself, per repository per week (1–10). Absent on older servers. */
   auto_fixes_per_week?: number;
 }
 
@@ -4679,7 +4679,7 @@ export interface QuarantineStanding {
   /** The attempt before this one that did not hold: what happened. */
   attempt?: string | null;
   attempt_link?: QuarantineLink | null;
-  /** Why Coderhelm has not fixed it by itself. Empty while work is in flight. */
+  /** Why CoderHelm has not fixed it by itself. Empty while work is in flight. */
   why: string;
   hold: string;
   actions: QuarantineAction[];
@@ -4951,7 +4951,7 @@ export interface Connector {
   write_enabled?: boolean;
   write_pages?: string[];
   /**
-   * Confluence: `jira_app` when it goes through the team's Coderhelm Jira app, `sign_in` when agents read
+   * Confluence: `jira_app` when it goes through the team's CoderHelm Jira app, `sign_in` when agents read
    * with the Atlassian sign-in the team made for Knowledge (no token either way), else empty.
    */
   via?: string;
@@ -5032,7 +5032,7 @@ export interface McpDetected {
   issuer?: string;
   resource?: string;
   scopes?: string[];
-  /** `manual`: the sign-in server can't register Coderhelm on its own. */
+  /** `manual`: the sign-in server can't register CoderHelm on its own. */
   registration?: "automatic" | "manual";
 }
 
@@ -5064,7 +5064,7 @@ export interface Integration {
   id: string;
   section: IntegrationSection;
   name: string;
-  /** What Coderhelm does with it, in a sentence. */
+  /** What CoderHelm does with it, in a sentence. */
   does: string;
   status: IntegrationStatus;
   /** Why it isn't working, or a note. */
@@ -5165,7 +5165,7 @@ export interface AwsAccountAbilities {
   permissions?: AwsPermissions | null;
 }
 
-/** One group of the role's permissions: what Coderhelm reads with them, and which are missing. */
+/** One group of the role's permissions: what CoderHelm reads with them, and which are missing. */
 export interface AwsPermissionGroup {
   key: string;
   name: string;
@@ -5390,11 +5390,11 @@ export interface SupportTicket {
   /** The latest message, one line, and who wrote it. */
   last_snippet?: string;
   last_author_name?: string;
-  /** On a self-hosted install: whether the ticket reached Coderhelm's support. */
+  /** On a self-hosted install: whether the ticket reached CoderHelm's support. */
   coderhelm?: SupportDelivery;
 }
 
-/** A self-hosted install's ticket on its way to Coderhelm's support. */
+/** A self-hosted install's ticket on its way to CoderHelm's support. */
 export interface SupportDelivery {
   state: "sending" | "sent";
   /** Why the install couldn't send it yet, in words. */
@@ -5569,7 +5569,7 @@ export interface Learning {
 
 /**
  * `quiet`: the loop should have learned from this window's work and did not.
- * `retrying`: it got its signal and Coderhelm is still learning from it by itself
+ * `retrying`: it got its signal and CoderHelm is still learning from it by itself
  * (GitHub held its requests for a while); nothing for a person to do.
  */
 export type LearningLoopState = "ok" | "quiet" | "retrying" | "idle";
@@ -5996,7 +5996,7 @@ export interface NativeChangeSet {
   preflight?: string[];
   /** The install's own deploy role and boundaries, kept as they are in this update. */
   held?: string[];
-  /** Whether Coderhelm can apply it here (otherwise: in the AWS console). */
+  /** Whether CoderHelm can apply it here (otherwise: in the AWS console). */
   can_apply?: boolean;
   /** The token of exactly the data and permission changes to confirm ("" when none). */
   confirm?: string;
@@ -6268,7 +6268,7 @@ export interface DeliveryAnalytics {
   endpoints: DeliveryEndpointRow[];
   seen_sources: string[];
   backfill: { complete: boolean };
-  /** Hybrid installs: events Coderhelm's relay forwarded, one row per provider. */
+  /** Hybrid installs: events CoderHelm's relay forwarded, one row per provider. */
   relay?: DeliveryRelayRow[];
   /** Self-hosted installs: email by kind over the period's days. */
   email?: DeliveryEmail | null;
@@ -6326,7 +6326,7 @@ export interface HybridGithubLink {
   /**
    * The repositories the person who linked it could push to, read when it
    * was linked: no token reaches past them. Absent on a link made before
-   * Coderhelm recorded them (no token until it is linked again).
+   * CoderHelm recorded them (no token until it is linked again).
    */
   ceiling?: string[] | null;
 }
@@ -6339,7 +6339,7 @@ export interface HybridIntegration {
   stays_with_you: string;
   reason?: string;
   uses_coderhelm: boolean;
-  /** False when Coderhelm's own app for it isn't set up, so it can't be chosen now. Missing from older gateways. */
+  /** False when CoderHelm's own app for it isn't set up, so it can't be chosen now. Missing from older gateways. */
   offered?: boolean;
   /** Tools under Other apps: the install has its own app for it, which it uses either way. Missing from older gateways. */
   own_app?: boolean;
@@ -6355,7 +6355,7 @@ export interface HybridCheck {
   fix: string | null;
 }
 
-/** Coderhelm's 15-minute check of a name.coderhelm.com address: the latest state, and when it last recovered (history, apart from the state). Absent on an older install. */
+/** CoderHelm's 15-minute check of a name.coderhelm.com address: the latest state, and when it last recovered (history, apart from the state). Absent on an older install. */
 export interface HybridNameWatch {
   state: string;
   checked_at: string;
@@ -6381,7 +6381,7 @@ export interface HybridStatus {
   /** Other apps, for the whole install. Missing from older gateways (then read from `integrations`). */
   apps_mode?: HybridAppsMode;
   sharing: { enabled: boolean; payloads: boolean };
-  /** Jira through Coderhelm: a hosted team's site linked to this install (absent on an older install). */
+  /** Jira through CoderHelm: a hosted team's site linked to this install (absent on an older install). */
   jira?: { enabled: boolean; link: HybridJiraLink | null; synced: boolean };
   checks: HybridCheck[];
 }
@@ -6411,7 +6411,7 @@ export interface HybridNameCheck {
   error: string | null;
 }
 
-/** Other apps: every tool on Coderhelm's app (new ones included), or none. */
+/** Other apps: every tool on CoderHelm's app (new ones included), or none. */
 export type HybridAppsMode = "coderhelm" | "private";
 
 export interface HybridSettingsPatch {
@@ -6421,7 +6421,7 @@ export interface HybridSettingsPatch {
   /** The same choice per tool, for a gateway from before `apps_mode` (it ignores `apps_mode`; a newer one ignores this). */
   apps?: Record<string, "coderhelm" | "own">;
   sharing?: { enabled: boolean; payloads: boolean };
-  /** Settings, Integrations, Jira: link a hosted team's Jira site through Coderhelm. */
+  /** Settings, Integrations, Jira: link a hosted team's Jira site through CoderHelm. */
   jira_link?: boolean;
 }
 
@@ -6440,7 +6440,7 @@ export interface SystemEmails {
     available: boolean;
     registered: boolean;
     turned_off: boolean;
-    /** What Coderhelm sees when email goes through it. */
+    /** What CoderHelm sees when email goes through it. */
     trust: string;
     status:
       | null
@@ -6460,7 +6460,7 @@ export interface EmailSender {
   sender_name: string;
   organization: string;
   max: { sender_name: number; organization: number };
-  /** What every name through Coderhelm's mail service ends with. */
+  /** What every name through CoderHelm's mail service ends with. */
   suffix: string;
   transport: EmailTransport;
   ses: { from_address: string; display_name: string; from: string; subject_prefix: string };
@@ -6622,7 +6622,7 @@ export interface AppMapResponse {
   graph_fallback?: string;
   /** When that map was written (unix seconds): the page reads it again only when this changes. */
   graph_at?: number;
-  /** Coderhelm's Recent work and Health, laid over the map on the page (lib/app-map-load.ts). */
+  /** CoderHelm's Recent work and Health, laid over the map on the page (lib/app-map-load.ts). */
   overlays?: import("./app-map-load").AppMapOverlays;
 }
 

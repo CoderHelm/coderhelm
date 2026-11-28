@@ -16,10 +16,10 @@ export const STATE_WORD: Record<StaleState, string> = { off: "Off", dry_run: "Pr
 
 /** One plain line under each mode in the settings. */
 export function modeHelp(mode: StaleState, c: Pick<StaleConfig, "stale_days" | "close_days" | "max_closes_per_run">): string {
-  if (mode === "off") return "Nothing happens. Coderhelm never labels, comments on or closes a pull request.";
+  if (mode === "off") return "Nothing happens. CoderHelm never labels, comments on or closes a pull request.";
   if (mode === "dry_run")
-    return "Coderhelm lists which pull requests it would mark and close in the Would mark or close tab. Nothing is labeled, commented on or closed on GitHub.";
-  return `After ${plural(c.stale_days, "day")} with no activity Coderhelm labels the pull request stale and comments; if nothing happens in the next ${plural(c.close_days, "day")} it closes it. Up to ${c.max_closes_per_run} an hour per repository.`;
+    return "CoderHelm lists which pull requests it would mark and close in the Would mark or close tab. Nothing is labeled, commented on or closed on GitHub.";
+  return `After ${plural(c.stale_days, "day")} with no activity CoderHelm labels the pull request stale and comments; if nothing happens in the next ${plural(c.close_days, "day")} it closes it. Up to ${c.max_closes_per_run} an hour per repository.`;
 }
 
 /** The settings with a mode picked: Off, Preview only (enabled, dry run) or On. */

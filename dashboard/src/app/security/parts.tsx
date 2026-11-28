@@ -183,7 +183,7 @@ export function PermissionBanner({ reason }: { reason?: string | null }) {
     >
       <p>
         {reason ||
-          "The GitHub App needs Dependabot alerts: read. An owner of your GitHub organization accepts it in Settings, GitHub Apps, Coderhelm."}{" "}
+          "The GitHub App needs Dependabot alerts: read. An owner of your GitHub organization accepts it in Settings, GitHub Apps, CoderHelm."}{" "}
         OSV and GitHub&apos;s advisory feed still cover your repos meanwhile.
       </p>
     </Callout>

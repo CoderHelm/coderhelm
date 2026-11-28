@@ -95,7 +95,7 @@ export const brainData: Handler = ({ method, path }) => {
         { key: "knowledge", label: "Files and pages", about: "Documents and pages your team added to Knowledge" },
         { key: "connections", label: "Connected apps", about: "Apps such as Notion, Linear or Sentry, read as you ask" },
         { key: "code", label: "Code", about: "Your team's code and how it fits together" },
-        { key: "memories", label: "Past work", about: "What Coderhelm learned from earlier work" },
+        { key: "memories", label: "Past work", about: "What CoderHelm learned from earlier work" },
         { key: "data_sources", label: "Logs and data", about: "Logs, databases and metrics you connected, only read" },
         { key: "skills", label: "Team know-how", about: "Your team's written skills and helpers" },
         { key: "plugins", label: "Plugins", about: "Installed plugins answer from their own skills" },

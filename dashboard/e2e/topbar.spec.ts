@@ -64,7 +64,7 @@ test("the trail names where you are, ending on the current page", async ({ page 
   await page.goto(`/runs/detail?id=${RUN_ID}`);
   await settle(page);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Show the class schedule on the details page");
-  await expect(page).toHaveTitle("Show the class schedule on the details page · Coderhelm");
+  await expect(page).toHaveTitle("Show the class schedule on the details page · CoderHelm");
 });
 
 test("the page's actions sit beside its title", async ({ page }) => {
@@ -102,7 +102,7 @@ test("back goes to the page you came from, or one level up when you came from ou
 
   // A top-level page has no back arrow: the logo goes home.
   await expect(second.getByTestId("topbar-back")).toHaveCount(0);
-  await expect(second.getByRole("link", { name: "Coderhelm home" })).toBeVisible();
+  await expect(second.getByRole("link", { name: "CoderHelm home" })).toBeVisible();
 });
 
 test("on a phone the bar is a back arrow and the page's name; the actions stay in view under the title", async ({ page }) => {

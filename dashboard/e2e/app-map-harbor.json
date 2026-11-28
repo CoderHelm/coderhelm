@@ -30,7 +30,7 @@
   },
   "exported": {
    "at": "2026-11-21T00:00:00Z",
-   "by": "Coderhelm"
+   "by": "CoderHelm"
   }
  },
  "project": {
@@ -323,8 +323,8 @@
     "id": "coderhelm:security:f1",
     "kind": "coderhelm-security",
     "severity": "high",
-    "title": "Coderhelm security: Prototype pollution in a query parser",
-    "detail": "Found by Coderhelm. See it in Coderhelm: /security/detail?id=f1",
+    "title": "CoderHelm security: Prototype pollution in a query parser",
+    "detail": "Found by CoderHelm. See it in CoderHelm: /security/detail?id=f1",
     "items": [
      "f:harbor-api/src/bookings.js"
     ],
@@ -438,7 +438,7 @@
     "id": "f:harbor-api/src/bookings.js",
     "task": 0,
     "change": "changed",
-    "note": "Changed by Coderhelm's run for DOCK-42"
+    "note": "Changed by CoderHelm's run for DOCK-42"
    }
   ],
   "source": "coderhelm"

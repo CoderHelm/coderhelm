@@ -193,7 +193,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     window.addEventListener(TWO_FACTOR_REQUIRED, held);
     return () => window.removeEventListener(TWO_FACTOR_REQUIRED, held);
   }, []);
-  // A self-hosted install's callback from Coderhelm's GitHub App or an OAuth
+  // A self-hosted install's callback from CoderHelm's GitHub App or an OAuth
   // sign-in (lib/hybrid.ts): passed on before sign-in, since the person here
   // usually has no hosted account.
   const [handoff, setHandoff] = useState<"" | "github" | "oauth">("");
@@ -330,7 +330,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   // Name the tab after the page (the top bar does it once a page shows; this
   // covers the screens before it). React hoists <title> into the head.
   const tabName = routeTabTitle(pathname);
-  const tabTitle = <title>{tabName ? `${tabName} · Coderhelm` : "Coderhelm"}</title>;
+  const tabTitle = <title>{tabName ? `${tabName} · CoderHelm` : "CoderHelm"}</title>;
 
   if (handoff) {
     return (
@@ -362,14 +362,14 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   if (moved) {
     return (
       <>
-        <title>Team moved · Coderhelm</title>
+        <title>Team moved · CoderHelm</title>
         <TeamMovedNotice url={moved.url} teams={teams} />
       </>
     );
   }
 
   if (!user) {
-    return <><title>Sign in · Coderhelm</title><AuthScreen onAuth={async (u) => {
+    return <><title>Sign in · CoderHelm</title><AuthScreen onAuth={async (u) => {
       const back = takeConsentReturn(window.location);
       if (back) {
         window.location.replace(back);
@@ -387,7 +387,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   if (twoFactor?.held) {
     return (
       <>
-        <title>Two-factor sign-in · Coderhelm</title>
+        <title>Two-factor sign-in · CoderHelm</title>
         <TwoFactorGate status={twoFactor} email={user.email || user.github_login || ""} onDone={() => window.location.reload()} />
       </>
     );
@@ -403,7 +403,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           </div>
           <h1 className="text-xl font-semibold text-zinc-50">The GitHub app was removed</h1>
           <p className="text-sm text-zinc-300">
-            Coderhelm can&apos;t reach your code until someone with admin rights on your GitHub organization reinstalls the Coderhelm app.
+            CoderHelm can&apos;t reach your code until someone with admin rights on your GitHub organization reinstalls the CoderHelm app.
             Runs and reviews are paused until then.
           </p>
           <div className="flex flex-col items-center gap-3">
@@ -746,7 +746,7 @@ function Sidebar({
         className={`flex items-center gap-2.5 px-2 py-2 mb-1 rounded-md ${focusRing}`}
       >
         <Logo />
-        <span className="text-sm font-semibold text-zinc-100">Coderhelm</span>
+        <span className="text-sm font-semibold text-zinc-100">CoderHelm</span>
       </Link>
 
       <TeamSwitcher teams={teams} currentTeam={currentTeam ?? null} switching={switching} onSwitch={handleSwitch} />
@@ -850,8 +850,8 @@ function Sidebar({
             <p className="text-sm text-zinc-200 truncate" title={user.email}>{user.email || user.github_login}</p>
             {user.github_login && <p className="text-xs text-zinc-400 truncate">@{user.github_login}</p>}
             {runtimeConfig().version && (
-              <p className="text-xs text-zinc-400 truncate" data-testid="install-version" title="This install's Coderhelm version">
-                Coderhelm {runtimeConfig().version}
+              <p className="text-xs text-zinc-400 truncate" data-testid="install-version" title="This install's CoderHelm version">
+                CoderHelm {runtimeConfig().version}
               </p>
             )}
           </div>
@@ -956,10 +956,10 @@ function TeamMovedNotice({ url, teams }: { url: string | null; teams: TeamInfo[]
       <main className="w-full max-w-md space-y-6" data-testid="team-moved">
         <div className="flex items-center gap-2.5">
           <Logo />
-          <span className="text-sm font-semibold text-zinc-100">Coderhelm</span>
+          <span className="text-sm font-semibold text-zinc-100">CoderHelm</span>
         </div>
         <div className="space-y-2">
-          <h1 className="text-xl font-semibold text-zinc-50">This team moved to its own Coderhelm</h1>
+          <h1 className="text-xl font-semibold text-zinc-50">This team moved to its own CoderHelm</h1>
           <p className="text-sm text-zinc-300">
             Its work, settings and history are there now. Sign in there with the same email.
           </p>
@@ -1013,7 +1013,7 @@ function TwoFactorGate({ status, email, onDone }: { status: MyTwoFactor; email: 
       <main className="w-full max-w-md space-y-6" data-testid="two-factor-gate">
         <div className="flex items-center gap-2.5">
           <Logo />
-          <span className="text-sm font-semibold text-zinc-100">Coderhelm</span>
+          <span className="text-sm font-semibold text-zinc-100">CoderHelm</span>
         </div>
         <div className="space-y-2">
           <h1 className="text-xl font-semibold text-zinc-50">
@@ -1052,7 +1052,7 @@ type AuthView = "login" | "signup" | "verify" | "forgot" | "reset" | "mfa" | "se
 
 /** What a self-hosted install says to someone it won't let in. */
 const NOT_INVITED =
-  "This Coderhelm is private to one organization. Ask one of its admins to invite you; the invite email has the link to set up your account.";
+  "This CoderHelm is private to one organization. Ask one of its admins to invite you; the invite email has the link to set up your account.";
 
 /** Hosted's answer when one address starts too many teams in an hour. */
 const SIGNUP_LIMIT = "Too many sign-ups from here just now. Try again in an hour.";
@@ -1106,7 +1106,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
   const [code, setCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [mfaSession, setMfaSession] = useState("");
-  // A sign-in carried over from another Coderhelm whose account there has an authenticator app:
+  // A sign-in carried over from another CoderHelm whose account there has an authenticator app:
   // the code goes with the password (kept in memory only) instead of with a session.
   const [carryOver, setCarryOver] = useState(false);
   const [error, setError] = useState("");
@@ -1204,7 +1204,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
     } else if (params.get("error") === "ask_admin_invite") {
       const org = params.get("org");
       setError(
-        `${org ? `${org} already uses Coderhelm` : "Your GitHub organization already uses Coderhelm"}. Ask one of its admins to invite you (Settings, then Team), then sign in with the email they invite.`,
+        `${org ? `${org} already uses CoderHelm` : "Your GitHub organization already uses CoderHelm"}. Ask one of its admins to invite you (Settings, then Team), then sign in with the email they invite.`,
       );
       window.history.replaceState({}, "", window.location.pathname);
     }
@@ -1248,7 +1248,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
         setMfaSession(result.session);
         setView("mfa");
       } else if (result.status === "second_step") {
-        // Their second factor is the authenticator-app code set up in Coderhelm.
+        // Their second factor is the authenticator-app code set up in CoderHelm.
         setView("second_step");
       } else {
         const u = await api.me();
@@ -1448,7 +1448,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
               )}
               {consentBack && methods.github && (
               <p className="rounded-lg border border-zinc-800 bg-zinc-900/60 px-4 py-3 text-sm text-zinc-300" data-testid="sign-in-reader">
-                An app wants to read your team&apos;s knowledge. No Coderhelm account? Continue with GitHub: if your team lets people connect AI tools as readers, you get read only access, without a seat.
+                An app wants to read your team&apos;s knowledge. No CoderHelm account? Continue with GitHub: if your team lets people connect AI tools as readers, you get read only access, without a seat.
               </p>
               )}
               {providers && (
@@ -1536,7 +1536,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
           {view === "signup" && selfHosted && !joinVia && (
             <div className="w-full space-y-4 text-center" data-testid="signup-invite-only">
               <p className="text-sm text-zinc-400">
-                This Coderhelm is invite-only. Use the link in your invite email, or ask an admin to invite you.
+                This CoderHelm is invite-only. Use the link in your invite email, or ask an admin to invite you.
               </p>
               <button onClick={() => { setView("login"); setError(""); setMessage(""); }} className="text-xs text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer">
                 Sign in
@@ -1559,7 +1559,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
                       <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                       <span className="text-xs font-medium text-emerald-400">Open beta</span>
                     </div>
-                    <p className="text-xs text-zinc-400">Your account starts its own team. To join a team that already uses Coderhelm, ask one of its admins to invite you.</p>
+                    <p className="text-xs text-zinc-400">Your account starts its own team. To join a team that already uses CoderHelm, ask one of its admins to invite you.</p>
                   </>
                 )}
               </div>
@@ -1701,7 +1701,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User) => void }) {
               <p className="text-sm text-zinc-400 text-center">Enter the code from your authenticator app</p>
               {carryOver && (
                 <p data-testid="carry-over-note" className="text-xs text-zinc-400 text-center">
-                  Your team moved here from another Coderhelm. Use the authenticator app you used there.
+                  Your team moved here from another CoderHelm. Use the authenticator app you used there.
                 </p>
               )}
               <div className="space-y-3">

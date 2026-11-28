@@ -132,7 +132,7 @@ export function NativeUpdateCard({
   const roles = permissionRoles(perms);
   const rolesLine = perms.length ? (
     <p className="mt-2" data-testid="native-update-permissions">
-      It changes what {roles === 1 ? "1 of Coderhelm's own roles" : `${roles} of Coderhelm's own roles`} may do, all inside this install&apos;s permission limit.
+      It changes what {roles === 1 ? "1 of CoderHelm's own roles" : `${roles} of CoderHelm's own roles`} may do, all inside this install&apos;s permission limit.
     </p>
   ) : null;
 
@@ -147,7 +147,7 @@ export function NativeUpdateCard({
               {phase === "preparing"
                 ? "AWS is preparing the change to your stack, which takes a minute or two."
                 : "AWS is applying the change to your stack, which takes 10 to 20 minutes."}
-              {from ? <> Coderhelm keeps running {from} until it finishes, and this page updates by itself.</> : null}
+              {from ? <> CoderHelm keeps running {from} until it finishes, and this page updates by itself.</> : null}
             </p>
             <UpdateSteps at={phase === "preparing" ? "prepare" : "apply"} />
             <div className="mt-2 h-1.5 w-full max-w-sm overflow-hidden rounded-full bg-zinc-800" role="progressbar" aria-label={title} aria-busy="true">
@@ -217,7 +217,7 @@ export function NativeUpdateCard({
                   {perms.map((c) => <li key={c}><Code className="text-xs">{c}</Code></li>)}
                 </ul>
               ) : null}
-              {perms.length ? <p className="text-xs text-zinc-400">Every Coderhelm role stays inside the install&apos;s permissions boundary whatever its policy says, and the deploy role can&apos;t change itself or the boundary.</p> : null}
+              {perms.length ? <p className="text-xs text-zinc-400">Every CoderHelm role stays inside the install&apos;s permissions boundary whatever its policy says, and the deploy role can&apos;t change itself or the boundary.</p> : null}
               {p.link ? (
                 <a href={p.link} target="_blank" rel="noopener noreferrer" className="font-medium underline" data-testid="native-update-console">See the change in the AWS console</a>
               ) : null}
@@ -230,7 +230,7 @@ export function NativeUpdateCard({
 }
 
 /**
- * How many of Coderhelm's own roles a list of permission changes touches:
+ * How many of CoderHelm's own roles a list of permission changes touches:
  * "LogAnalyzer.LogAnalyzerServiceRoleDefaultPolicy341691CC (AWS::IAM::Policy
  * Modify: ...)" and "LogAnalyzer.LogAnalyzerServiceRole1A2B3C4D (AWS::IAM::Role
  * Modify)" are one role.

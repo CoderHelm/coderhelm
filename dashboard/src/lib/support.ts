@@ -6,20 +6,20 @@ import type { StatusLook } from "@/components/list";
 import type { SupportItem, SupportItemKind, SupportMessage, SupportParticipant, SupportPriority, SupportStatus, SupportTicket } from "./api";
 
 /** The status as the team that filed it reads it. */
-/** Where Coderhelm's support can be written to when an install can't reach it. */
+/** Where CoderHelm's support can be written to when an install can't reach it. */
 export const SUPPORT_EMAIL = "support@coderhelm.com";
 
 /**
- * A self-hosted install's ticket on its way to Coderhelm's support, in
+ * A self-hosted install's ticket on its way to CoderHelm's support, in
  * words; null on the hosted deployment.
  */
 export function deliveryWords(t: Pick<SupportTicket, "coderhelm">): string | null {
   const d = t.coderhelm;
   if (!d) return null;
-  if (d.state === "sent") return "Sent to Coderhelm support. Its answers come here and by email.";
+  if (d.state === "sent") return "Sent to CoderHelm support. Its answers come here and by email.";
   if (d.error)
-    return `Not sent to Coderhelm yet: your install couldn't reach it (${d.error}). It tries again every few minutes. If this keeps happening, email ${SUPPORT_EMAIL}.`;
-  return "Sending to Coderhelm…";
+    return `Not sent to CoderHelm yet: your install couldn't reach it (${d.error}). It tries again every few minutes. If this keeps happening, email ${SUPPORT_EMAIL}.`;
+  return "Sending to CoderHelm…";
 }
 
 export function customerLook(status: SupportStatus): StatusLook {
@@ -272,11 +272,11 @@ const EVENT_WORDS: Record<string, string> = {
 export function eventWords(body: string): string {
   if (EVENT_WORDS[body]) return EVENT_WORDS[body];
   if (body === "support_viewed") return "viewed your workspace (read only)";
-  if (body === "support_access_revoked") return "ended Coderhelm support's access to the workspace";
+  if (body === "support_access_revoked") return "ended CoderHelm support's access to the workspace";
   if (body.startsWith("support_access_granted:")) {
     const until = new Date(body.slice("support_access_granted:".length));
     const when = Number.isNaN(until.getTime()) ? "" : ` until ${until.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}`;
-    return `let Coderhelm support see the workspace${when}`;
+    return `let CoderHelm support see the workspace${when}`;
   }
   if (body.startsWith("priority:")) {
     const p = body.slice("priority:".length) as keyof typeof PRIORITY_LABEL;

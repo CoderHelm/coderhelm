@@ -87,7 +87,7 @@ export function PrivateNetworkPanel({
         ) : (
           <>Reads over the internet.</>
         )}{" "}
-        A cluster that is reachable only inside a VPC is read through a small read-only lookup function Coderhelm runs there.{" "}
+        A cluster that is reachable only inside a VPC is read through a small read-only lookup function CoderHelm runs there.{" "}
         <a href={DOCS} target="_blank" rel="noreferrer" className={linkButton}>How it works</a>
       </p>
 
@@ -101,7 +101,7 @@ export function PrivateNetworkPanel({
       )}
 
       {plan?.available && plan.domain_error && (
-        <Callout variant="warning" title="Coderhelm couldn't find the domain">
+        <Callout variant="warning" title="CoderHelm couldn't find the domain">
           <p>{plan.domain_error}</p>
         </Callout>
       )}
@@ -171,7 +171,7 @@ export function PrivateNetworkPanel({
                 <p className="text-sm text-zinc-300">
                   {access.allowed === false
                     ? `The domain's security group doesn't let private network ${access.network} in yet. An AWS admin adds one inbound rule: tcp 443 from the network's security group.`
-                    : `Coderhelm couldn't read the domain's security group. If Test stops at "Connect on the port", an AWS admin adds this rule: tcp 443 from the network's security group.`}
+                    : `CoderHelm couldn't read the domain's security group. If Test stops at "Connect on the port", an AWS admin adds this rule: tcp 443 from the network's security group.`}
                 </p>
                 {access.rules.map((r) => (
                   <div key={r.target_group} className="flex min-w-0 flex-col gap-2">

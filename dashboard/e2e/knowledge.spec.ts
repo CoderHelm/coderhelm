@@ -405,7 +405,7 @@ test.describe("creating a knowledge base", () => {
     await page.goto("/knowledge/");
     await page.getByTestId("start-google_drive").click();
     const connectStep = page.getByTestId("connect-step");
-    await expect(connectStep).toContainText("Connect Google Drive to Coderhelm");
+    await expect(connectStep).toContainText("Connect Google Drive to CoderHelm");
     await shot(page, "flow-connect");
     await page.getByTestId("connect-button").click();
     await expect(page.getByRole("heading", { name: "Sign in to Google" })).toBeVisible();

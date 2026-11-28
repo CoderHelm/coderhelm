@@ -386,7 +386,7 @@ test("an approval card on the run page approves once, and a member can't choose 
   const card = page.getByTestId("run-agent-asks").getByTestId("approval-card");
   await expect(card).toHaveAttribute("data-status", "pending");
   // Plain words first; the tool's own name is under Show details.
-  await expect(card.getByTestId("approval-headline")).toHaveText("Coderhelm wants to create issue in Linear");
+  await expect(card.getByTestId("approval-headline")).toHaveText("CoderHelm wants to create issue in Linear");
   await expect(card).toContainText("Why: Track the flaky test so it gets fixed.");
   await card.getByText("Show details").click();
   await expect(card).toContainText("Use create_issue on linear");
@@ -417,7 +417,7 @@ test("the plan chat shows an approval card and carries on once it's approved", a
   await page.getByRole("textbox").first().fill("File an issue for the flaky test");
   await page.keyboard.press("Enter");
   const card = page.getByTestId("approval-card");
-  await expect(card.getByTestId("approval-headline")).toHaveText("Coderhelm wants to create issue in Linear");
+  await expect(card.getByTestId("approval-headline")).toHaveText("CoderHelm wants to create issue in Linear");
   await card.getByRole("button", { name: "Allow once" }).click();
   await expect.poll(() => db.calls.find((c) => c.path === "/api/agents/approvals/ap_chat/decide")?.body).toMatchObject({ approve: true, via: "chat" });
   // The conversation is sent on by itself.

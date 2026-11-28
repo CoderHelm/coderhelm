@@ -436,7 +436,7 @@ test("repositories: the list toolbar filters on and off repos and searches by na
   await page.goto("/settings/repos/");
   const list = page.getByRole("list", { name: "Repositories" });
   await expect(list.getByRole("listitem")).toHaveCount(2);
-  await expect(page.getByRole("switch", { name: "Let Coderhelm work on your-team/web" })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByRole("switch", { name: "Let CoderHelm work on your-team/web" })).toHaveAttribute("aria-checked", "true");
   const toggles = page.getByRole("group", { name: "Show repos" });
   await toggles.getByRole("button", { name: /^Off\s*1$/ }).click();
   await expect(page).toHaveURL(/status=off/);

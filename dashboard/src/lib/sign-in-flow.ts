@@ -258,7 +258,7 @@ export function useSignIn({
     if (!fn) throw new Error("Nothing to sign in to.");
     let slow: ReturnType<typeof setTimeout> | undefined;
     const late = new Promise<never>((_, reject) => {
-      slow = setTimeout(() => reject(new Error("Coderhelm took too long to answer. Try again.")), START_TIMEOUT_MS);
+      slow = setTimeout(() => reject(new Error("CoderHelm took too long to answer. Try again.")), START_TIMEOUT_MS);
     });
     try {
       const r = await Promise.race([fn(), late]);
@@ -304,7 +304,7 @@ export function useSignIn({
         }, seconds * 1000);
       } catch (e) {
         closeTab();
-        end({ kind: "failed", title: `The ${cb.current.name} sign-in couldn't start`, message: words(e, "Coderhelm couldn't start the sign-in. Try again.") });
+        end({ kind: "failed", title: `The ${cb.current.name} sign-in couldn't start`, message: words(e, "CoderHelm couldn't start the sign-in. Try again.") });
       }
     },
     [end, put],
@@ -336,7 +336,7 @@ export function useSignIn({
         end({ kind: "failed", title: `The ${cb.current.name} sign-in page didn't open`, message: "The sign-in address didn't leave this page. Try again." });
       }, 8000);
     } catch (e) {
-      end({ kind: "failed", title: `The ${cb.current.name} sign-in couldn't start`, message: words(e, "Coderhelm couldn't start the sign-in. Try again.") });
+      end({ kind: "failed", title: `The ${cb.current.name} sign-in couldn't start`, message: words(e, "CoderHelm couldn't start the sign-in. Try again.") });
     }
   }, [end, put]);
 

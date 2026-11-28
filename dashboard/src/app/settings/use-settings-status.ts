@@ -77,7 +77,7 @@ const LOADERS: Record<SettingsStatusKey, (me: Me) => Promise<ItemStatus | null>>
   models: async () => {
     const m = await api.getModelProvider();
     if (m.deployment_provider === "bedrock") return { text: "Amazon Bedrock", tone: "success" };
-    return m.api_key_masked ? { text: "Your own API key", tone: "success" } : { text: "Coderhelm's key", tone: "neutral" };
+    return m.api_key_masked ? { text: "Your own API key", tone: "success" } : { text: "CoderHelm's key", tone: "neutral" };
   },
   // This install: failing setup checks need someone; warnings are shown, not flagged.
   setup: async () => {

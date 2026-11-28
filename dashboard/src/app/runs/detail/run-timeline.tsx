@@ -274,8 +274,8 @@ function FileLine({ path }: { path: string }) {
  * an open pull request), or truly no change.
  */
 export function noFilesNote({ live, prNumber, hasPr }: { live: boolean; prNumber?: number | null; hasPr: boolean }): string {
-  if (live) return "Files show here as Coderhelm changes them.";
-  if (hasPr) return `Coderhelm didn't record which files this run changed. ${prNumber ? `Pull request #${prNumber}` : "The pull request"} has every change.`;
+  if (live) return "Files show here as CoderHelm changes them.";
+  if (hasPr) return `CoderHelm didn't record which files this run changed. ${prNumber ? `Pull request #${prNumber}` : "The pull request"} has every change.`;
   return "This run didn't change any code.";
 }
 

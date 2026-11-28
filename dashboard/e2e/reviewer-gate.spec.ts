@@ -153,7 +153,7 @@ test("the status comment's stop link asks first, then stops with one click", asy
   // The page reloads the gate: stopped, and the stop is in the history.
   await expect(page.getByText("Auto-merge is stopped")).toBeVisible();
   const history = page.getByTestId("gate-history");
-  await expect(history.getByRole("listitem").first()).toContainText("Stopped by @a-maintainer in Coderhelm");
+  await expect(history.getByRole("listitem").first()).toContainText("Stopped by @a-maintainer in CoderHelm");
   await expect(page.getByRole("button", { name: "Re-arm auto-merge" })).toBeVisible();
   // Phone width: nothing scrolls sideways.
   await page.setViewportSize({ width: 390, height: 800 });
@@ -172,7 +172,7 @@ test("a stopped PR shows who stopped it and every stop and re-arm, and re-arms w
   const items = page.getByTestId("gate-history").getByRole("listitem");
   await expect(items).toHaveCount(3);
   await expect(items.nth(0)).toContainText("Stopped by @a-reviewer from a PR comment");
-  await expect(items.nth(1)).toContainText("Re-armed by someone@example.com in Coderhelm");
+  await expect(items.nth(1)).toContainText("Re-armed by someone@example.com in CoderHelm");
   await expect(page.getByText(/checks its approval of the current commit, the required approvals and CI again/)).toBeVisible();
   await page.getByRole("button", { name: "Re-arm auto-merge" }).click();
   await expect(page.getByTestId("gate-result")).toContainText("checks CoderHelm's approval of commit abcdef1");

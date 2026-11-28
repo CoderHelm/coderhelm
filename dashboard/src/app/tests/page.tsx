@@ -181,8 +181,8 @@ function EmptyState({ off, isAdmin, turningOn, onTurnOn }: { off: boolean; isAdm
       </h2>
       <p className="mt-2 max-w-prose text-sm text-zinc-400">
         {off
-          ? "Coderhelm reads the results of every E2E run your CI finishes. It tells flaky tests from broken ones, keeps flaky tests from blocking pull requests, and opens PRs that fix them."
-          : "Tracking is on. Runs show up here a few minutes after a workflow that uploads test results finishes. Coderhelm can add that upload step for you."}
+          ? "CoderHelm reads the results of every E2E run your CI finishes. It tells flaky tests from broken ones, keeps flaky tests from blocking pull requests, and opens PRs that fix them."
+          : "Tracking is on. Runs show up here a few minutes after a workflow that uploads test results finishes. CoderHelm can add that upload step for you."}
       </p>
       {off && (
         <div className="mt-4">

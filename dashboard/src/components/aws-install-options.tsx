@@ -23,7 +23,7 @@ const POLL_MS = 5_000;
 /** The optional reads: their stack parameter and a short note on what turning one on means. */
 export const OPTIONAL_READS: Record<string, { param: InstallOption; note: string }> = {
   infra: { param: "InfrastructureVulnerabilities", note: "Describe and list calls only: which versions run, to match them against security advisories." },
-  inspector: { param: "InspectorFindings", note: "Amazon Inspector is billed by AWS when you run it; Coderhelm only reads its findings." },
+  inspector: { param: "InspectorFindings", note: "Amazon Inspector is billed by AWS when you run it; CoderHelm only reads its findings." },
   health: { param: "HealthEvents", note: "The AWS Health API needs AWS Business Support or higher." },
 };
 
@@ -172,7 +172,7 @@ export function InstallNeededNow({
     return (
       <div className="flex flex-col gap-2" data-testid="install-needed-update">
         <p className="text-sm text-zinc-300">
-          {latest} adds it to this install&apos;s own read role. Nothing is needed in AWS. The update may change what Coderhelm&apos;s own roles may do, always
+          {latest} adds it to this install&apos;s own read role. Nothing is needed in AWS. The update may change what CoderHelm&apos;s own roles may do, always
           inside this install&apos;s permission limit; anything that would replace data asks you first.
         </p>
         <div className="flex flex-wrap items-center gap-2">
@@ -272,7 +272,7 @@ export function OptionalReads({
       <div className="border-t border-zinc-800 px-4 py-3">
         <p className="text-sm text-zinc-400" data-testid="aws-optional-where">
           {install
-            ? "This install's own account: Coderhelm switches these on its own stack. You review the read-only permissions first; nothing else changes."
+            ? "This install's own account: CoderHelm switches these on its own stack. You review the read-only permissions first; nothing else changes."
             : `AWS account ${account}: turned on in AWS with the role's one-click stack update, which adds exactly these read-only permissions.`}
         </p>
         <ul className="mt-3 flex flex-col divide-y divide-zinc-800">
@@ -451,7 +451,7 @@ function InstallSwitch({
               </button>
             </div>
           ) : (
-            <p className="mt-2 text-sm text-amber-300">{live.hold || "Coderhelm can't apply this one here: an AWS admin executes it in the AWS console."}</p>
+            <p className="mt-2 text-sm text-amber-300">{live.hold || "CoderHelm can't apply this one here: an AWS admin executes it in the AWS console."}</p>
           )}
           {error && <p className="mt-2 text-sm text-red-300" role="alert">{error}</p>}
         </div>

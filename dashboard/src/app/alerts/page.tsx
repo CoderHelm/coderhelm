@@ -65,7 +65,7 @@ function AlertsHistory() {
     <Page>
       <PageHeader
         title="Alerts"
-        lead="Alerts from your monitoring tools, and what Coderhelm did with each one."
+        lead="Alerts from your monitoring tools, and what CoderHelm did with each one."
         actions={
           <Link href="/settings/alerts" className={secondaryButton}>
             Alert routes
@@ -115,7 +115,7 @@ function AlertsHistory() {
               </Link>
             }
           >
-            When one of your monitoring tools sends an alert to Coderhelm, it shows up here with what Coderhelm did about it.
+            When one of your monitoring tools sends an alert to CoderHelm, it shows up here with what CoderHelm did about it.
           </ListEmpty>
         ) : shown.length === 0 ? (
           <ListEmpty title={q ? `No alerts match “${q}”` : "No alerts here"} onClear={clear}>

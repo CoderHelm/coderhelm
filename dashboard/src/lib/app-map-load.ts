@@ -3,7 +3,7 @@
 //
 // The server writes the page's copy of the map when it builds it and answers
 // `GET /api/app-map` with a short-lived signed address for it (`graph_url`,
-// gzipped JSON the browser unzips) and Coderhelm's Recent work and Health as
+// gzipped JSON the browser unzips) and CoderHelm's Recent work and Health as
 // a small payload (`overlays`). The page reads the map once per build and lays
 // the overlays over it here, the same way the server's
 // `common::app_map::apply_overlays` does. Where the bucket can't be reached
@@ -16,17 +16,17 @@ import { apiBase } from "./runtime-config";
 /** How long the page waits for the status or the map before it says so. */
 export const LOAD_TIMEOUT_MS = 20_000;
 
-/** Coderhelm's overlays for a map, laid over it on the page. */
+/** CoderHelm's overlays for a map, laid over it on the page. */
 export interface AppMapOverlays {
   /** The map's Recent work; `null`: none. Absent: leave the map's own. */
   recent?: Record<string, unknown> | null;
-  /** Coderhelm's findings to add, Floorplan checks to drop (by id), and Health's counts. */
+  /** CoderHelm's findings to add, Floorplan checks to drop (by id), and Health's counts. */
   health?: { add: unknown[]; drop: string[]; summary: Record<string, number> } | null;
 }
 
 type Issue = { id?: unknown; source?: unknown };
 
-/** The map with Coderhelm's overlays in Floorplan's own fields (a new object; `graph` is untouched). */
+/** The map with CoderHelm's overlays in Floorplan's own fields (a new object; `graph` is untouched). */
 export function applyOverlays(graph: FloorplanGraph, o: AppMapOverlays | undefined): FloorplanGraph {
   if (!o) return graph;
   const out: FloorplanGraph = { ...graph };

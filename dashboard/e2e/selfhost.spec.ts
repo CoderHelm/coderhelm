@@ -348,7 +348,7 @@ for (const [name, viewport] of [["desktop", { width: 1280, height: 800 }], ["pho
 test("the setup banner shows on a new install and links to the checklist", async ({ page }) => {
   await setup(page, SELF, { signedIn: true });
   await page.goto("/settings/");
-  await expect(page.getByTestId("setup-banner")).toContainText(/Finish setting up Coderhelm: \d of 5 steps done/);
+  await expect(page.getByTestId("setup-banner")).toContainText(/Finish setting up CoderHelm: \d of 5 steps done/);
   await expect(page.getByRole("link", { name: "Setup", exact: false }).first()).toBeVisible();
   await page.getByTestId("setup-banner").getByRole("button", { name: "Hide" }).click();
   await expect(page.getByTestId("setup-banner")).toHaveCount(0);
@@ -391,7 +391,7 @@ for (const [name, viewport] of [["1440", { width: 1440, height: 1000 }], ["390",
       await expect(email.getByRole("button", { name: "Copy" })).toBeVisible();
       await expect(checks.locator("#check-email_sandbox")).toHaveAttribute("data-status", "warn");
       await expect(checks.locator("#check-slack")).toContainText("Not set up");
-      await expect(checks.locator("#check-slack").getByRole("link", { name: "Open in Coderhelm" })).toHaveAttribute("href", /\/settings\/alerts\/?$/);
+      await expect(checks.locator("#check-slack").getByRole("link", { name: "Open in CoderHelm" })).toHaveAttribute("href", /\/settings\/alerts\/?$/);
       const width = await page.evaluate(() => document.documentElement.scrollWidth);
       expect(width).toBeLessThanOrEqual(viewport.width);
       await page.screenshot({ path: `${SHOTS}/setup-failing-${name}.png`, fullPage: true });
@@ -493,7 +493,7 @@ test("System: use your own domain, see the records to add, fix a CAA refusal wit
   await expect(page.getByTestId("domain-record-certificate")).toContainText("_d4e5f6.xyz.acm-validations.aws");
   await expect(page.getByTestId("domain-record-address")).toContainText("d111test.cloudfront.net");
   // CoderHelm never changes DNS: no button that would, and plain steps for Route 53 and others.
-  await expect(sec).toContainText("Coderhelm never changes your DNS");
+  await expect(sec).toContainText("CoderHelm never changes your DNS");
   await expect(sec).not.toContainText("added for you");
   await expect(page.getByTestId("domain-providers")).toContainText("Route 53");
   await expect(page.getByTestId("domain-providers")).toContainText("Anywhere else");
@@ -611,7 +611,7 @@ test("System: data and permission changes: said plainly on the card, one clearly
   const card = page.getByTestId("native-update");
   await expect(card).toContainText("v2.0.0 would replace or remove data");
   await expect(page.getByTestId("native-update-data-changes")).toHaveText("The Table table in Database (replaced)");
-  await expect(page.getByTestId("native-update-permissions")).toHaveText("It changes what 1 of Coderhelm's own roles may do, all inside this install's permission limit.");
+  await expect(page.getByTestId("native-update-permissions")).toHaveText("It changes what 1 of CoderHelm's own roles may do, all inside this install's permission limit.");
   await expect(card).not.toContainText("choose Execute");
   await expect(page.getByRole("dialog")).toHaveCount(0);
   // The raw CloudFormation list is behind Technical details.
@@ -977,7 +977,7 @@ for (const [name, viewport] of [["desktop", { width: 1280, height: 800 }], ["pho
       const status = page.getByTestId("update-status");
       await expect(status).toHaveAttribute("data-state", "current");
       await expect(status).toContainText("You're up to date");
-      await expect(status).toContainText("Coderhelm v1.2.0");
+      await expect(status).toContainText("CoderHelm v1.2.0");
       await expect(page.getByTestId("release-notes")).toHaveCount(0);
       await page.screenshot({ path: `${SHOTS}/system-version-current-${name}.png`, fullPage: true });
     });

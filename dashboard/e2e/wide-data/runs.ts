@@ -65,7 +65,7 @@ const RUN = {
     kind: "held",
     summary: `Finished, but pull request #12345 stays a draft: ${TOKEN} is open under Open items. ${SENTENCE}`,
     reasons: [
-      { what: `Security items are open under Open items: ${FILE}`, todo: `Fix them on branch ${BRANCH} (Coderhelm checks again on the next push), or delete each security line once a person has checked it. ${LONG_URL}` },
+      { what: `Security items are open under Open items: ${FILE}`, todo: `Fix them on branch ${BRANCH} (CoderHelm checks again on the next push), or delete each security line once a person has checked it. ${LONG_URL}` },
       { what: TOKEN, todo: SENTENCE },
     ],
     pr_number: 12345,

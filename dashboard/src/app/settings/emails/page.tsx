@@ -18,7 +18,7 @@ import { SenderName } from "./sender-name";
  * Settings, then Emails (self-hosted installs, install admins): which
  * optional emails the install sends (all off until an admin turns them on),
  * the essential ones and why they are needed, how email leaves (the
- * install's own Amazon SES, or Coderhelm's mail service) and who it says it
+ * install's own Amazon SES, or CoderHelm's mail service) and who it says it
  * is from. Each person's own
  * unsubscribe (Settings, Notifications) still applies on top.
  */
@@ -45,8 +45,8 @@ const TRANSPORTS: { value: EmailTransport; label: string; help: string }[] = [
   },
   {
     value: "coderhelm",
-    label: "Through Coderhelm (easiest)",
-    help: "No SES setup. Coderhelm sends from its own address with your install's name, only to your install's people and pending invites.",
+    label: "Through CoderHelm (easiest)",
+    help: "No SES setup. CoderHelm sends from its own address with your install's name, only to your install's people and pending invites.",
   },
 ];
 
@@ -193,7 +193,7 @@ function Emails() {
                             {" "}
                             {data.relay.turned_off
                               ? "This install's config turned hybrid off."
-                              : "Register this install with Coderhelm first, in "}
+                              : "Register this install with CoderHelm first, in "}
                             {!data.relay.turned_off && (
                               <Link href="/settings/system#hybrid" className={linkButton}>System, Hybrid</Link>
                             )}
@@ -209,7 +209,7 @@ function Emails() {
           </div>
           {data.transport === "coderhelm" && relayError && (
             <div className="mt-3">
-              <Callout variant="error" title="Coderhelm's mail service didn't answer">
+              <Callout variant="error" title="CoderHelm's mail service didn't answer">
                 <p>{relayError.message} Nothing is sent another way meanwhile; Deliveries lists each email that failed.</p>
               </Callout>
             </div>
@@ -217,7 +217,7 @@ function Emails() {
           {data.transport === "coderhelm" && relayOk?.paused && (
             <div className="mt-3">
               <Callout variant="error" title="Email is paused for this install">
-                <p>Coderhelm paused email after too many {relayOk.paused.reason}. Fix the addresses in Deliveries, then ask Coderhelm support to resume, or switch to your own Amazon SES.</p>
+                <p>CoderHelm paused email after too many {relayOk.paused.reason}. Fix the addresses in Deliveries, then ask CoderHelm support to resume, or switch to your own Amazon SES.</p>
               </Callout>
             </div>
           )}
@@ -234,7 +234,7 @@ function Emails() {
         <SettingsSection
           id="essential"
           title="Essential emails"
-          description="Always sent: Coderhelm can't work without them. They can't be turned off here."
+          description="Always sent: CoderHelm can't work without them. They can't be turned off here."
         >
           {data.essential.map((e) => (
             <div key={e.id} className="min-w-0 px-4 py-4" data-testid={`essential-${e.id}`}>

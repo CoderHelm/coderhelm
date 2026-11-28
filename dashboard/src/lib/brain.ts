@@ -151,7 +151,7 @@ export interface CodeRef {
   end_line?: number;
 }
 
-/** The team's own work Chat looks up: a Jira ticket, a pull request or branch, a Coderhelm run, a security, infrastructure or test finding, or another record Coderhelm keeps. */
+/** The team's own work Chat looks up: a Jira ticket, a pull request or branch, a CoderHelm run, a security, infrastructure or test finding, or another record CoderHelm keeps. */
 export type WorkKind = "ticket" | "pull_request" | "run" | "finding" | "record";
 
 /** Whether a citation is one of the team's own records. */
@@ -168,7 +168,7 @@ export interface Citation {
   passage: string;
   /** A page in the dashboard. */
   href?: string;
-  /** The original outside Coderhelm (the file on GitHub at its commit, a synced page). */
+  /** The original outside CoderHelm (the file on GitHub at its commit, a synced page). */
   url?: string;
   authoritative: boolean;
   base?: string;
@@ -183,7 +183,7 @@ export interface Picks {
   memories: boolean;
   data_sources: boolean;
   skills: boolean;
-  /** Tickets, pull requests, runs, findings and the records Coderhelm keeps. */
+  /** Tickets, pull requests, runs, findings and the records CoderHelm keeps. */
   work?: boolean;
   repo?: string | null;
   repos?: string[];
@@ -606,9 +606,9 @@ export const CITATION_KIND: Record<string, string> = {
   skill: "Team know-how",
   ticket: "Ticket",
   pull_request: "Pull request",
-  run: "Coderhelm run",
+  run: "CoderHelm run",
   finding: "Finding",
-  record: "Coderhelm",
+  record: "CoderHelm",
   app_map: "App map",
 };
 

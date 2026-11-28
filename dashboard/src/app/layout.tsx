@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   // No title or description here: the shell names each tab after its page
   // (client-shell.tsx), and RouteHead writes each page's description and link
   // preview from lib/routes.ts.
-  applicationName: "Coderhelm",
+  applicationName: "CoderHelm",
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "32x32" },

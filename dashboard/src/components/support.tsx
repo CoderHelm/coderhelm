@@ -127,7 +127,7 @@ export function AvatarStack({ ticket, avatars = {}, max = 5 }: { ticket: Support
 /** Who wrote a message, as the reader sees it, and the tooltip. */
 function author(m: SupportMessage, admin: boolean): { name: string; title?: string } {
   if (m.author === "support") {
-    return admin ? { name: personName(m.author_name, m.author_email), title: m.author_email || undefined } : { name: "Coderhelm support" };
+    return admin ? { name: personName(m.author_name, m.author_email), title: m.author_email || undefined } : { name: "CoderHelm support" };
   }
   return { name: personName(m.author_name, m.author_email), title: m.author_email || undefined };
 }

@@ -135,7 +135,7 @@ function SecurityOverviewPage() {
                   </Link>
                 }
               >
-                When it&apos;s on, Coderhelm checks each advisory against your code, opens fix pull requests for the ones your code reaches, and
+                When it&apos;s on, CoderHelm checks each advisory against your code, opens fix pull requests for the ones your code reaches, and
                 posts the urgent ones to your alerts channel, within daily limits on runs and tokens. You can preview first instead.
               </EmptyState>
             </div>

@@ -1,6 +1,6 @@
 "use client";
 
-// Insights › Infrastructure, "Running in AWS": what Coderhelm read in the
+// Insights › Infrastructure, "Running in AWS": what CoderHelm read in the
 // team's AWS accounts (one row per fix group: an Auto Scaling group, a node
 // group, a database), with its versions, whether the internet reaches it,
 // where it is defined, what AWS has pending, and its open findings, each
@@ -87,7 +87,7 @@ export function LiveResources() {
               </Link>
             }
           >
-            Switch on Infrastructure vulnerabilities for a connected AWS account. Coderhelm reads what runs there once a day, read-only, and lists it here.
+            Switch on Infrastructure vulnerabilities for a connected AWS account. CoderHelm reads what runs there once a day, read-only, and lists it here.
           </EmptyState>
         ) : (
           <>
@@ -145,7 +145,7 @@ function ResourceRow({ r }: { r: InfraResource }) {
           )}
           {r.pending.length > 0 && <Chip tone="attention">Pending in AWS</Chip>}
           {r.source === "iac" && (
-            <span title="Read from your Terraform: Coderhelm never reads Lambda function settings, which hold environment variables.">
+            <span title="Read from your Terraform: CoderHelm never reads Lambda function settings, which hold environment variables.">
               <Chip tone="muted">From your code</Chip>
             </span>
           )}

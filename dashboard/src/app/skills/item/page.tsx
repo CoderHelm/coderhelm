@@ -32,7 +32,7 @@ export default function ItemPageGuarded() {
   );
 }
 
-/** A skill's or a command's page: what it is, how Coderhelm runs it, its
+/** A skill's or a command's page: what it is, how CoderHelm runs it, its
  * text and every read of it. Agents have their own page. */
 function ItemPage() {
   const params = useSearchParams();
@@ -165,7 +165,7 @@ function ItemPage() {
       {!item.enabled && (
         <div className="mt-4">
           <Callout variant="neutral" title="Switched off">
-            <p>Coderhelm&apos;s agents can&apos;t read {item.name} until an admin switches it on.</p>
+            <p>CoderHelm&apos;s agents can&apos;t read {item.name} until an admin switches it on.</p>
           </Callout>
         </div>
       )}

@@ -2,7 +2,7 @@
 
 // Where the preview of a web change stands: the repository's own preview
 // deploy, its end-to-end checks on it, and the changed pages captured at
-// desktop and phone width. A skipped preview check is a gap Coderhelm closes,
+// desktop and phone width. A skipped preview check is a gap CoderHelm closes,
 // so it is shown as not run yet, never as a result.
 
 import type { RunPreview } from "@/lib/api";
@@ -61,7 +61,7 @@ export function RunPreviewPanel({ preview }: { preview: RunPreview | null | unde
       )}
       {preview.e2e_required && (
         <p className="text-sm text-zinc-400" data-testid="run-preview-e2e-spec">
-          {preview.e2e_covered ? "The change adds or updates an end-to-end spec for what it changes." : "The change has no end-to-end spec for what it changes yet; Coderhelm writes one."}
+          {preview.e2e_covered ? "The change adds or updates an end-to-end spec for what it changes." : "The change has no end-to-end spec for what it changes yet; CoderHelm writes one."}
         </p>
       )}
       {preview.checks?.length > 0 && (

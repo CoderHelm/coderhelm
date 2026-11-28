@@ -11,10 +11,10 @@ import { Field } from "@/components/settings";
 import { ListSkeleton } from "@/components/list";
 import { fullWidthOnPhone, primaryButton, secondaryButton } from "@/components/ui";
 
-// The install guide's "Your data" step opens this page on hosted Coderhelm
+// The install guide's "Your data" step opens this page on hosted CoderHelm
 // with the install's region, name and address. A team admin or owner asks for
 // the move here; it opens a support ticket (POST /api/support/move), and a
-// person from Coderhelm arranges the rest on that ticket.
+// person from CoderHelm arranges the rest on that ticket.
 
 const REGION_RE = /^[a-z]{2}(-[a-z]+)+-[0-9]$/;
 const STAGE_RE = /^[a-z][a-z0-9]{0,19}$/;
@@ -34,10 +34,10 @@ function installFrom(params: URLSearchParams): { region: string; stage: string; 
 }
 
 const NEXT_STEPS = [
-  "Someone from Coderhelm answers on this ticket, usually within a working day.",
+  "Someone from CoderHelm answers on this ticket, usually within a working day.",
   "You agree on a time, and both sides confirm the team and the install.",
   "Your team's settings, history and connections are copied to your install and checked, count by count.",
-  "Hosted Coderhelm keeps working the whole time. You switch when you are ready.",
+  "Hosted CoderHelm keeps working the whole time. You switch when you are ready.",
   "People sign in to your install with the same email and password.",
 ];
 
@@ -100,7 +100,7 @@ function MovePage() {
   if (isSelfHosted()) {
     return (
       <Page narrow>
-        <PageHeader title="Move your team to your install" lead="The team that moves asks for it on hosted Coderhelm, not on an install." />
+        <PageHeader title="Move your team to your install" lead="The team that moves asks for it on hosted CoderHelm, not on an install." />
       </Page>
     );
   }
@@ -127,7 +127,7 @@ function MovePage() {
     <Page narrow testId="move-request">
       <PageHeader
         title="Move your team to your install"
-        lead="Ask Coderhelm to bring this team's settings, history and connections to your own install. A person sets up the move with you on a support ticket."
+        lead="Ask CoderHelm to bring this team's settings, history and connections to your own install. A person sets up the move with you on a support ticket."
       />
       {!loaded ? (
         <div className="mt-6">
@@ -162,7 +162,7 @@ function MovePage() {
           <Field id="move-window" label="When suits you? (optional)" value={when} maxLength={200} onChange={(e) => setWhen(e.target.value)} placeholder="Weekday mornings, US Eastern" />
           <Field as="textarea" id="move-notes" label="Anything else? (optional)" value={notes} maxLength={2000} rows={4} onChange={(e) => setNotes(e.target.value)} placeholder="Dates that matter, anything you must keep." />
           <p className="text-xs text-zinc-400" data-testid="move-no-secrets">
-            Never put AWS keys, tokens or passwords here. Coderhelm never needs them to move your team, and a request with one is refused.
+            Never put AWS keys, tokens or passwords here. CoderHelm never needs them to move your team, and a request with one is refused.
           </p>
           {error && (
             <p role="alert" className="text-sm text-red-400">

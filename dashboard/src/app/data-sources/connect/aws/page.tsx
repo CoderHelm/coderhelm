@@ -88,7 +88,7 @@ function ConnectAwsPage() {
       <FlowShell
         steps={AWS_FLOW_STEPS}
         step="pick"
-        title={goal === "logs" ? "Choose which logs Coderhelm may search" : "Check and connect"}
+        title={goal === "logs" ? "Choose which logs CoderHelm may search" : "Check and connect"}
         back={{ href: `${CONNECT}/aws?for=${goal}`, label: "Back" }}
       >
         {goal === "logs"
@@ -102,7 +102,7 @@ function ConnectAwsPage() {
     <FlowShell
       steps={AWS_FLOW_STEPS}
       step="access"
-      title="Give Coderhelm read-only access"
+      title="Give CoderHelm read-only access"
       back={{ href: HUB, label: "Back to data sources" }}
     >
       {setupError ? (
@@ -149,7 +149,7 @@ function AccessStep({
         return;
       }
       if (goal === "database" && !res.database && !res.warehouse) {
-        setError("That line doesn't include a database or a warehouse. Run the script again and type the number of the one Coderhelm should read when it asks.");
+        setError("That line doesn't include a database or a warehouse. Run the script again and type the number of the one CoderHelm should read when it asks.");
         return;
       }
       onConnected({ access, result: res, preselect });
@@ -169,8 +169,8 @@ function AccessStep({
     <div className="flex flex-col gap-6">
       <p className="max-w-prose text-sm text-zinc-400">
         {goal === "logs"
-          ? "Coderhelm needs permission to search your logs in AWS. It gets a role that can only read, and only Coderhelm can use it."
-          : "Coderhelm needs permission to read a PostgreSQL database or a Redshift warehouse in AWS. It gets a role and a database user that can only read, and only Coderhelm can use them."}
+          ? "CoderHelm needs permission to search your logs in AWS. It gets a role that can only read, and only CoderHelm can use it."
+          : "CoderHelm needs permission to read a PostgreSQL database or a Redshift warehouse in AWS. It gets a role and a database user that can only read, and only CoderHelm can use them."}
       </p>
 
       {reusable.length > 0 && mode === "existing" && (
@@ -206,11 +206,11 @@ function AccessStep({
               {goal === "database" ? (
                 <>
                   <p>
-                    It lists your PostgreSQL databases first. Type the number of the one Coderhelm should read and press Enter, then press
+                    It lists your PostgreSQL databases first. Type the number of the one CoderHelm should read and press Enter, then press
                     Enter again to keep the suggested database name. Type 0 to skip.
                   </p>
                   <p>
-                    Then it lists your Redshift warehouses. Type the number of the one Coderhelm should read, or 0 to skip. Every database in that
+                    Then it lists your Redshift warehouses. Type the number of the one CoderHelm should read, or 0 to skip. Every database in that
                     warehouse is shared; you can still hide columns afterwards.
                   </p>
                 </>
@@ -263,7 +263,7 @@ function AccessStep({
           <Disclosure summary="What does this script do?">
             <ul className="list-disc space-y-1 pl-5">
               <li>Creates a role called {setup.role_prefix} in your AWS account. It can read logs and nothing else.</li>
-              <li>Only Coderhelm can use the role, and only with your team&apos;s private ID, which is built into the script.</li>
+              <li>Only CoderHelm can use the role, and only with your team&apos;s private ID, which is built into the script.</li>
               <li>
                 If you choose a database, it creates a database user called coderhelm_readonly that can read every table and change none,
                 and stores its password as a secret in your account that only that role can read.
@@ -276,7 +276,7 @@ function AccessStep({
             </ul>
           </Disclosure>
           <Disclosure summary="Technical details">
-            <p>The role trusts Coderhelm&apos;s AWS account only when the request carries your private ID (an external ID). Running the script again updates the role in place.</p>
+            <p>The role trusts CoderHelm&apos;s AWS account only when the request carries your private ID (an external ID). Running the script again updates the role in place.</p>
             <p>Logs: DescribeLogGroups, StartQuery, GetQueryResults and StopQuery. Unmasking masked values is explicitly denied.</p>
             <p>
               Database: through the RDS Data API, the role may begin a transaction, run a statement and roll back, on the one database you
@@ -284,7 +284,7 @@ function AccessStep({
             </p>
             <p>
               Warehouse: through the Redshift Data API, the role may sign in only as coderhelm_readonly and run one statement at a time; batches
-              and every other way of signing in are explicitly denied. Redshift has no read-only transaction, so Coderhelm checks that the user
+              and every other way of signing in are explicitly denied. Redshift has no read-only transaction, so CoderHelm checks that the user
               can&apos;t change any table before it connects and again before it reads.
             </p>
             <p>The role can read only secrets whose names start with coderhelm-readonly-.</p>
@@ -376,7 +376,7 @@ function PickLogs({ connected, onConnected }: { connected: Connected; onConnecte
   return (
     <div className="flex flex-col gap-5">
       <p className="max-w-prose text-sm text-zinc-400">
-        Coderhelm can search only the log groups you choose here, in AWS account{" "}
+        CoderHelm can search only the log groups you choose here, in AWS account{" "}
         <span className="font-mono text-xs text-zinc-200">{connected.result.account}</span>. Pick the ones for the services it works on.
         You can change this later.
       </p>
@@ -510,8 +510,8 @@ function ConnectDbTarget({
       </dl>
       <p className="max-w-prose text-sm text-zinc-400">
         {warehouse
-          ? "Before connecting, Coderhelm signs in as the new user in every shared database and proves it can't change any table. If it could, nothing is saved."
-          : "Before connecting, Coderhelm signs in as the new user and proves it can't change any table. If it could, nothing is saved."}
+          ? "Before connecting, CoderHelm signs in as the new user in every shared database and proves it can't change any table. If it could, nothing is saved."
+          : "Before connecting, CoderHelm signs in as the new user and proves it can't change any table. If it could, nothing is saved."}
       </p>
       {items && (
         <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5">

@@ -21,7 +21,7 @@ export const SITE = {
   // with the topic in the subject. A person answers; there is no automatic
   // migration tool.
   moveUrl: "mailto:support@coderhelm.com?subject=Moving%20to%20self-hosted%20CoderHelm",
-  tagline: "The AI engineer that stays on the code after the pull request.",
+  tagline: "An engineering platform for GitHub and Jira: tickets, pull requests, review, alerts and releases.",
   // The one sentence that defines the product, used word for word in the home
   // page, the meta description, JSON-LD and llms.txt.
   entity:
@@ -98,8 +98,25 @@ const home: Page = {
     "Assign a GitHub issue or Jira ticket and get a pull request. Then CoderHelm keeps the code healthy: it fixes its CI, answers review comments, reviews PRs, turns alerts into fixes and answers questions about your code.",
   h1: "An engineering platform for your tickets, pull requests, alerts and releases.",
   lede:
-    "CoderHelm works on GitHub and Jira. It turns tickets into pull requests and stays on them through CI and review, reviews your team's pull requests, turns alerts into fixes, quarantines flaky tests, runs release steps and answers questions about your code and docs. Run it on our cloud or in your own AWS account.",
+    "CoderHelm works on GitHub and Jira, from the ticket to the pull request, its review, the alerts after it ships and the release. Run it on CoderHelm's cloud or in your own AWS account.",
   sections: [
+    {
+      id: "platform",
+      heading: "What the platform does",
+      blocks: [
+        {
+          type: "cards",
+          items: [
+            { title: "Tickets to pull requests", text: "Assign a GitHub issue or Jira ticket and it opens a pull request, fixes its failing checks and answers review comments until a person merges it.", href: "/pull-requests/", shot: "homeRun" },
+            { title: "Code review", text: "It reviews any pull request your team labels, not only its own, and comments on the lines that need a change.", href: "/reviewer/", shot: "homeReview" },
+            { title: "Alerts", text: "A production alarm becomes a read of the likely cause and a fix pull request that a person approves.", href: "/alerts/", shot: "homeAlert" },
+            { title: "Releases", text: "After merges it tags the release and writes notes your team can read, in the GitHub release, Confluence or email.", href: "/maintenance/", shot: "homeRelease" },
+            { title: "Chat and knowledge", text: "Ask about your code and documents, and the answer cites the files and lines it came from.", href: "/chat/", shot: "homeChat" },
+            { title: "App map", text: "A plain map of how your app fits together across its repositories, kept current with every push.", href: `${SITE.docsUrl}/concepts/app-map/`, shot: "homeAppMap" },
+          ],
+        },
+      ],
+    },
     {
       id: "how-it-works",
       heading: "From ticket to pull request",
@@ -133,9 +150,9 @@ const home: Page = {
             href: "https://github.com/CoderHelm/coderhelm/pull/7",
             facts: "Opened March 30, 2026 from [issue #2](https://github.com/CoderHelm/coderhelm/issues/2). Two files, four commits, checks passing, merged the same day.",
             thread: [
-              { who: "nambok", file: "src/components/GoogleAnalytics.tsx", text: "this is not a sensitive value it should be G-XTM8Y82LX9 please hardcode" },
+              { who: "Developer", file: "src/components/GoogleAnalytics.tsx", text: "this is not a sensitive value it should be G-XTM8Y82LX9 please hardcode" },
               { who: "coderhelm[bot]", bot: true, file: "src/components/GoogleAnalytics.tsx", text: "Done — hardcoded `G-XTM8Y82LX9` directly and removed the `NEXT_PUBLIC_GA_MEASUREMENT_ID` env var reference and its null guards." },
-              { who: "nambok", file: ".env.example", text: "we should remove this too no?" },
+              { who: "Developer", file: ".env.example", text: "we should remove this too no?" },
               { who: "coderhelm[bot]", bot: true, file: ".env.example", text: "Done — deleted `.env.example`." },
             ],
             commits: [
@@ -1053,7 +1070,7 @@ const skills: Page = {
 const security: Page = {
   slug: "security",
   path: "/security/",
-  navLabel: "Security",
+  navLabel: "Trust",
   title: "Security and data handling",
   description:
     "How CoderHelm handles your code and data: changes on its own branch, builds in a sandbox with no credentials, read only data access, KMS encrypted secrets, signed webhooks and team roles.",
@@ -1315,7 +1332,7 @@ const chat: Page = {
             ["Files", "PDF, Word, Markdown, text, CSV, Excel and HTML uploads"],
           ],
         },
-        { type: "shot", shot: "knowledge", caption: "A knowledge base fed by several apps, each card showing whether it is up to date. Example data." },
+        { type: "shot", shot: "knowledge", caption: "A knowledge base: what is searchable, how fresh it is, the one source that needs attention and how to fix it. Example data." },
         { type: "p", text: "CoderHelm only ever reads from these apps: nothing is changed, created or deleted there. Import the knowledge base you already have, connect Bedrock or any MCP search tool in place, and see what each base answers on [its own page](/knowledge/)." },
       ],
     },

@@ -77,7 +77,7 @@ const REVIEW = {
 
 export const ROLES = [
   { key: "viewer", label: "Viewer", level: 0, summary: "Read-only: sees runs, plans, reviews and settings, changes nothing.", assignable: true },
-  { key: "member", label: "Member", level: 1, summary: "Works with Coderhelm: plans, runs, reviews and recommendations.", assignable: true },
+  { key: "member", label: "Member", level: 1, summary: "Works with CoderHelm: plans, runs, reviews and recommendations.", assignable: true },
   { key: "billing", label: "Billing", level: 2, summary: "Older role with the same access as Member.", assignable: false },
   { key: "admin", label: "Admin", level: 3, summary: "Runs the workspace: repos, integrations, agent settings, the token limit and people.", assignable: true },
   { key: "owner", label: "Owner", level: 4, summary: "Everything, plus account-level changes and managing admins.", assignable: true },

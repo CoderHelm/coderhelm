@@ -28,7 +28,7 @@ export function CoverageView({ repo, canEdit }: { repo: string; canEdit: boolean
     const ok = await confirm({
       title: "Write this test?",
       message:
-        "Coderhelm writes the test and opens a pull request for your team to review. It only opens the PR once the test builds and passes 10 runs in a row, and for a bug, fails on the code before the fix.",
+        "CoderHelm writes the test and opens a pull request for your team to review. It only opens the PR once the test builds and passes 10 runs in a row, and for a bug, fails on the code before the fix.",
       confirmLabel: "Write the test",
     });
     if (ok !== "primary") return;
@@ -36,7 +36,7 @@ export function CoverageView({ repo, canEdit }: { repo: string; canEdit: boolean
     try {
       await api.acceptTestRecommendation(r.id);
       setStatus(r.id, "generating");
-      toast("Coderhelm is writing the test");
+      toast("CoderHelm is writing the test");
     } catch (e) {
       toast(errorMessage(e, "Couldn't start it."), "error");
     } finally {
@@ -123,7 +123,7 @@ export function CoverageView({ repo, canEdit }: { repo: string; canEdit: boolean
         </p>
         {areas.length === 0 ? (
           <EmptyBox>
-            No test map found. Add one (for example <code className="text-zinc-300">e2e/test-map.json</code> listing each area&apos;s paths) and Coderhelm can show which parts of the app have no test.
+            No test map found. Add one (for example <code className="text-zinc-300">e2e/test-map.json</code> listing each area&apos;s paths) and CoderHelm can show which parts of the app have no test.
           </EmptyBox>
         ) : (
           <>
