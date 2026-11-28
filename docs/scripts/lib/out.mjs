@@ -26,6 +26,15 @@ export function resolvePath(outDir, urlPath) {
   return candidates.find((c) => fs.existsSync(c) && fs.statSync(c).isFile()) ?? null;
 }
 
+/**
+ * A link in a shipped page that is still relative (`./uninstall.md`, `faq.md`):
+ * the docs left it as written because it named no page they know, and it
+ * resolves differently on /a/b and /a/b/, so it is broken on at least one.
+ */
+export function isUnresolvedRelative(href) {
+  return href !== '' && !/^([a-z][a-z0-9+.-]*:|\/|#|\?)/i.test(href);
+}
+
 /** Ids in an HTML file, for checking #fragments. */
 export function idsIn(html) {
   return new Set([...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]));

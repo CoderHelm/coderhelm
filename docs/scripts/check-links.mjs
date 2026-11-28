@@ -6,7 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { files, idsIn, resolvePath } from './lib/out.mjs';
+import { files, idsIn, isUnresolvedRelative, resolvePath } from './lib/out.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.join(ROOT, 'out');
@@ -22,6 +22,10 @@ const ids = (file) => {
 
 function check(from, href) {
   if (href.startsWith(SITE)) href = href.slice(SITE.length) || '/';
+  if (isUnresolvedRelative(href)) {
+    checked++;
+    return broken.push(`${path.relative(OUT, from)} → ${href} (a relative link: the docs turn a link into a page address only when it names an existing page's file, and pages are served with and without a trailing slash, so this one breaks)`);
+  }
   if (!href.startsWith('/') && !href.startsWith('#')) return;
   if (href.startsWith('//')) return;
   checked++;

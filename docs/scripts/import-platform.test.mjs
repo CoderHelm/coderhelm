@@ -1,9 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { INSTALL_GUIDE_LINK, UNINSTALL_GUIDE_LINK, importedName, convertGuide, guideOrder, groupByDate, releaseNotes, selfHostLead, sitePages, sortByOrder, stableTags } from './import-platform.mjs';
+import { INSTALL_GUIDE_LINK, UNINSTALL_GUIDE_LINK, importedName, convertGuide, guideLink, guideLinkProblems, selfHostAppPages, guideOrder, groupByDate, releaseNotes, selfHostLead, sitePages, sortByOrder, stableTags } from './import-platform.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import os from 'node:os';
 
 const REF = '0123456789abcdef0123456789abcdef01234567';
 
@@ -117,4 +118,56 @@ test('only stable self-host releases are listed, never the beta builds', () => {
     { name: 'nightly' },
   ];
   assert.deepEqual(stableTags(tags).map((t) => t.name), ['v0.8.111', 'v0.8.98']);
+});
+
+test('links to a renamed guide follow the rename: to its heading on the imported page, else to the app page that kept the address', () => {
+  const out = convertGuide('# A\n\nSee [keep](./uninstall.md#keep-the-data), [remove](./uninstall.md) and [faq](./faq.md).\n', 'docs/self-host/backups.md', REF);
+  assert.match(out, /\[keep\]\(\.\/uninstall-details\.md#keep-the-data\)/);
+  assert.match(out, /\[remove\]\(\/self-host\/uninstall\/\)/);
+  assert.match(out, /\[faq\]\(\.\/faq\.md\)/);
+  // Every rename is followed, not only today's one.
+  for (const [from, to] of Object.entries({ uninstall: 'uninstall-details' })) {
+    assert.equal(guideLink('', `${from}.md`, 'x'), `./${to}.md#x`);
+    assert.equal(guideLink('', `${from}.md`), `/self-host/${from}/`);
+  }
+});
+
+test('a bare link to another guide gains ./ so the docs resolve it to the page', () => {
+  const out = convertGuide('# A\n\nSee [security](security.md#the-reader-update) and [bedrock](bedrock.md).\n', 'docs/self-host/integrations.md', REF);
+  assert.match(out, /\[security\]\(\.\/security\.md#the-reader-update\)/);
+  assert.match(out, /\[bedrock\]\(\.\/bedrock\.md\)/);
+  assert.equal(guideLink('sub', 'faq.md'), '../faq.md');
+  assert.equal(guideLink('sub', 'sub/b.md'), './b.md');
+});
+
+test('the import fails on a link to a renamed, missing or bare page, and passes once each is fixed', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'self-host-'));
+  try {
+    fs.writeFileSync(path.join(dir, 'faq.md'), 'x');
+    fs.writeFileSync(path.join(dir, 'uninstall-details.md'), 'x');
+    // What the import wrote before renames were followed: each of these was a 404 on the site.
+    fs.writeFileSync(path.join(dir, 'backups.md'), 'See [a](./uninstall.md#keep), [b](security.md), [c](./gone.md) and [d](/self-host/nowhere/).\n');
+    assert.deepEqual(guideLinkProblems(dir, ['install', 'uninstall']), [
+      'backups.md: ./uninstall.md#keep',
+      'backups.md: security.md',
+      'backups.md: ./gone.md',
+      'backups.md: /self-host/nowhere/',
+    ]);
+    fs.writeFileSync(path.join(dir, 'backups.md'), 'See [a](./uninstall-details.md#keep), [b](./faq.md), [c](/self-host/uninstall/), [d](/self-host/faq/) and [e](https://example.com).\n\n```\n[not a link](./gone.md)\n```\n');
+    assert.deepEqual(guideLinkProblems(dir, ['install', 'uninstall']), []);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('the app pages a guide may link to are the folders under app/self-host', () => {
+  const pages = selfHostAppPages();
+  assert.ok(pages.includes('install') && pages.includes('uninstall'), pages.join(','));
+  for (const name of Object.keys({ uninstall: 1 })) assert.ok(pages.includes(name), `the renamed guide ${name} has an app page`);
+});
+
+test('check:links reports a link the docs left relative', async () => {
+  const { isUnresolvedRelative } = await import('./lib/out.mjs');
+  for (const href of ['./uninstall.md', './uninstall.md#keep', 'security.md', '../faq.md']) assert.ok(isUnresolvedRelative(href), href);
+  for (const href of ['/self-host/faq/', '#top', 'https://example.com', 'mailto:a@example.com', '?q=1']) assert.ok(!isUnresolvedRelative(href), href);
 });

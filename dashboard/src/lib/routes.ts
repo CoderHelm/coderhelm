@@ -200,6 +200,14 @@ export function parentHref(pathname: string | null | undefined, item?: string | 
   return found.info.parent ?? null;
 }
 
+/** The product's name as a browser tab and the app's metadata spell it. */
+export const PRODUCT_NAME = "CoderHelm";
+
+/** A browser tab's full title: the page's name, then the product's. */
+export function documentTitle(name?: string | null): string {
+  return name ? `${name} · ${PRODUCT_NAME}` : PRODUCT_NAME;
+}
+
 /** The browser tab's name for this page. */
 export function tabTitle(pathname: string | null | undefined, item?: string | null): string {
   if (item) return item;

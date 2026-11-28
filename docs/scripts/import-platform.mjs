@@ -91,6 +91,69 @@ export const APP_PAGE_RENAMES = { uninstall: 'uninstall-details' };
 export function importedName(name) {
   return APP_PAGE_RENAMES[name] ?? name;
 }
+
+/**
+ * A link from one guide to another, as the imported page needs it. `fromDir`
+ * and `target` are relative to docs/self-host. The docs resolve a link to a
+ * page only when it names the page's file with `./` or `../`, so a bare
+ * `faq.md` gains `./`. A guide imported under another name (APP_PAGE_RENAMES)
+ * is linked by that name; at the top level, a link without a #heading lands
+ * on the app page that kept the address, as the sidebar does.
+ */
+export function guideLink(fromDir, target, hash) {
+  const frag = hash ? `#${hash}` : '';
+  const ext = path.posix.extname(target);
+  const base = path.posix.basename(target, ext);
+  const targetDir = path.posix.dirname(target);
+  let file = target;
+  if (/^\.mdx?$/i.test(ext) && Object.hasOwn(APP_PAGE_RENAMES, base)) {
+    if (targetDir === '.' && !hash) return `/self-host/${base}/`;
+    file = path.posix.join(targetDir, `${APP_PAGE_RENAMES[base]}${ext}`);
+  }
+  let rel = path.posix.relative(fromDir || '.', file) || path.posix.basename(file);
+  if (!rel.startsWith('../')) rel = `./${rel}`;
+  return `${rel}${frag}`;
+}
+
+/** The app pages under app/self-host (each folder with a page), by name. */
+export function selfHostAppPages(dir = path.join(ROOT, 'app/self-host')) {
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory() && fs.existsSync(path.join(dir, e.name, 'page.tsx'))).map((e) => e.name);
+}
+
+/**
+ * Links in the imported self-host pages that lead nowhere: a relative link to
+ * a file that was not imported (renamed or missing), or a /self-host/ link to
+ * neither an imported page nor an app page. `dir` is content/docs/self-host.
+ */
+export function guideLinkProblems(dir, appPages = selfHostAppPages()) {
+  const problems = [];
+  const exists = (p) => [p, `${p}.md`, `${p}.mdx`, path.join(p, 'index.md'), path.join(p, 'index.mdx')].some((c) => fs.existsSync(c) && fs.statSync(c).isFile());
+  const walk = (d) => {
+    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      const file = path.join(d, e.name);
+      if (e.isDirectory()) { walk(file); continue; }
+      if (!/\.mdx?$/i.test(e.name)) continue;
+      const text = fs.readFileSync(file, 'utf8').replace(/```[\s\S]*?```/g, '');
+      for (const m of text.matchAll(/\]\(([^)\s]+)\)/g)) {
+        const target = m[1].split('#')[0];
+        if (!target || /^(https?:|mailto:)/.test(target)) continue;
+        let ok;
+        if (target.startsWith('/self-host')) {
+          const sub = target.replace(/^\/self-host\/?/, '').replace(/\/$/, '');
+          ok = sub === '' || appPages.includes(sub) || exists(path.join(dir, sub));
+        } else if (target.startsWith('/')) {
+          continue;
+        } else {
+          ok = /^\.\.?\//.test(target) && exists(path.resolve(path.dirname(file), target.replace(/\.mdx?$/i, '')));
+        }
+        if (!ok) problems.push(`${path.relative(dir, file)}: ${m[1]}`);
+      }
+    }
+  };
+  if (fs.existsSync(dir)) walk(dir);
+  return problems;
+}
 /**
  * Self-hosting pages that belong to this site rather than to the platform:
  * the install guide's own pages, such as what its Launch Stack does in the
@@ -173,6 +236,10 @@ function importSelfHost(platform) {
     fs.writeFileSync(path.join(out, rel, 'meta.json'), JSON.stringify({ ...(metaTitle ? { title: metaTitle } : {}), pages: [...lead, ...pages] }, null, 2) + '\n');
   };
   walk(src, '');
+  const broken = guideLinkProblems(out);
+  if (broken.length) {
+    throw new Error(`Self-host pages link to pages that don't exist (a guide renamed, removed or linked without ./):\n  ${broken.join('\n  ')}`);
+  }
   return { imported };
 }
 
@@ -222,10 +289,12 @@ export function convertGuide(raw, srcPath, ref) {
   }
   const dir = path.posix.dirname(srcPath);
   body = body.replace(/(\]\()([^)\s]+)(\))/g, (all, a, target, b) => {
-    if (/^(https?:|mailto:|#)/.test(target)) return all;
+    if (/^(https?:|mailto:|#|\/)/.test(target)) return all;
     const [file, hash] = target.split('#');
     const resolved = path.posix.normalize(path.posix.join(dir, file));
-    if (resolved.startsWith(`${SELF_HOST_SRC}/`) || resolved === SELF_HOST_SRC) return all;
+    if (resolved.startsWith(`${SELF_HOST_SRC}/`) || resolved === SELF_HOST_SRC) {
+      return `${a}${guideLink(path.posix.relative(SELF_HOST_SRC, dir), path.posix.relative(SELF_HOST_SRC, resolved), hash)}${b}`;
+    }
     return `${a}${REPO_URL}/blob/${ref}/${resolved}${hash ? `#${hash}` : ''}${b}`;
   });
   const lines = [

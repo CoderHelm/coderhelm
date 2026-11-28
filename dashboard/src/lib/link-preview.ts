@@ -22,12 +22,12 @@
 // placeholder previews without a picture rather than loading one from
 // somewhere else.
 
-import { ROUTES, routeFor, type RouteInfo } from "./routes";
+import { PRODUCT_NAME, ROUTES, documentTitle, routeFor, type RouteInfo } from "./routes";
 
 /** The origin a build without NEXT_PUBLIC_DASHBOARD_URL writes; replaced at upload. */
 export const PLACEHOLDER_ORIGIN = "https://coderhelm-install.invalid";
 
-export const SITE_NAME = "Coderhelm";
+export const SITE_NAME = PRODUCT_NAME;
 
 /** The dashboard's background (zinc-950): the browser's bar on a phone. */
 export const THEME_COLOR = "#09090b";
@@ -35,7 +35,7 @@ export const THEME_COLOR = "#09090b";
 export const OG_IMAGE_WIDTH = 1200;
 export const OG_IMAGE_HEIGHT = 630;
 
-const FALLBACK_DESCRIPTION = "Coderhelm turns tickets and issues into reviewed pull requests, then keeps watching the code after the merge.";
+const FALLBACK_DESCRIPTION = "CoderHelm turns tickets and issues into reviewed pull requests, then keeps watching the code after the merge.";
 
 /** The origin every absolute URL in a preview starts with, without a trailing slash. */
 export function previewOrigin(): string {
@@ -86,7 +86,7 @@ export function imageSections(): ImageSection[] {
 }
 
 export interface LinkPreview {
-  /** "Releases · Coderhelm": the tab title and the preview's title. */
+  /** "Releases · CoderHelm": the tab title and the preview's title. */
   title: string;
   description: string;
   /** This page's absolute address (no query: a run's id stays out of it). */
@@ -97,7 +97,7 @@ export interface LinkPreview {
 
 function titleOf(info: RouteInfo | undefined): string {
   const name = info ? info.tab ?? info.label : "";
-  return name ? `${name} · ${SITE_NAME}` : SITE_NAME;
+  return documentTitle(name);
 }
 
 /** The preview for a page, from its path alone. */

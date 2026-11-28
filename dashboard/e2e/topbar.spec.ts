@@ -64,7 +64,7 @@ test("the trail names where you are, ending on the current page", async ({ page 
   await page.goto(`/runs/detail?id=${RUN_ID}`);
   await settle(page);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Show the class schedule on the details page");
-  await expect(page).toHaveTitle("Show the class schedule on the details page · Coderhelm");
+  await expect(page).toHaveTitle("Show the class schedule on the details page · CoderHelm");
 });
 
 test("the page's actions sit beside its title", async ({ page }) => {

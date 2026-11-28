@@ -16,7 +16,7 @@ import {
 import { CommandPaletteButton } from "./command-palette";
 import { ChevronRightIcon } from "./icons";
 import { focusRing } from "./ui";
-import { parentHref, tabTitle, trailFor, type Crumb } from "@/lib/routes";
+import { documentTitle, parentHref, tabTitle, trailFor, type Crumb } from "@/lib/routes";
 
 // The one bar at the top of every page. Left: where you are, as a trail of
 // links ending on the current page. Right: search. On a phone: a back arrow
@@ -168,7 +168,7 @@ function TopBarFrame({ teamName, menuButton, canGoBack }: { teamName?: string; m
       data-testid="topbar"
       className="sticky top-0 z-30 border-b border-zinc-800/60 bg-zinc-950/95 backdrop-blur supports-[backdrop-filter]:bg-zinc-950/80"
     >
-      <title>{tab ? `${tab} · Coderhelm` : "Coderhelm"}</title>
+      <title>{documentTitle(tab)}</title>
       <div className="mx-auto box-content flex h-12 max-w-6xl min-w-0 items-center gap-2 px-4 md:px-8">
         {/* Phone: back one level, or home on a top-level page. */}
         <div className="flex shrink-0 md:hidden">

@@ -15,7 +15,7 @@ import { ScrollFade } from "./scroll-fade";
 import { ConfirmProvider } from "./confirm-dialog";
 import { CommandPaletteProvider, type PalettePage } from "./command-palette";
 import { Logo, TopBar, TopBarProvider } from "./top-bar";
-import { tabTitle as routeTabTitle } from "@/lib/routes";
+import { documentTitle, tabTitle as routeTabTitle } from "@/lib/routes";
 import { focusRing } from "./ui";
 import { helpHref, helpTargetFromUrl } from "@/lib/support";
 import { BookIcon, ChatIcon, GearIcon, LifeBuoyIcon, MapIcon, PlanIcon, PlayIcon, ReviewerIcon, ShieldCheckIcon, ShieldIcon, SlidersIcon, TemplateIcon, TrendingUpIcon } from "./icons";
@@ -330,7 +330,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   // Name the tab after the page (the top bar does it once a page shows; this
   // covers the screens before it). React hoists <title> into the head.
   const tabName = routeTabTitle(pathname);
-  const tabTitle = <title>{tabName ? `${tabName} · Coderhelm` : "Coderhelm"}</title>;
+  const tabTitle = <title>{documentTitle(tabName)}</title>;
 
   if (handoff) {
     return (
@@ -362,14 +362,14 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   if (moved) {
     return (
       <>
-        <title>Team moved · Coderhelm</title>
+        <title>{documentTitle("Team moved")}</title>
         <TeamMovedNotice url={moved.url} teams={teams} />
       </>
     );
   }
 
   if (!user) {
-    return <><title>Sign in · Coderhelm</title><AuthScreen onAuth={async (u) => {
+    return <><title>{documentTitle("Sign in")}</title><AuthScreen onAuth={async (u) => {
       const back = takeConsentReturn(window.location);
       if (back) {
         window.location.replace(back);
@@ -387,7 +387,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   if (twoFactor?.held) {
     return (
       <>
-        <title>Two-factor sign-in · Coderhelm</title>
+        <title>{documentTitle("Two-factor sign-in")}</title>
         <TwoFactorGate status={twoFactor} email={user.email || user.github_login || ""} onDone={() => window.location.reload()} />
       </>
     );
