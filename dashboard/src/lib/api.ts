@@ -5719,13 +5719,15 @@ export interface AutoUpdateSettings {
   auto: boolean;
   /** stable: releases only. beta: the nightly builds too (an updater from before calls it "preview"). */
   channel: "stable" | "beta";
-  /** mon…sun, or daily */
+  /** mon…sun, daily, or any: every hour (the beta channel only), gap_hours after the last install. */
   day: string;
   hour: number;
   timezone: string;
   majors: "ask" | "auto";
   /** How often the "What's new" email may go. Absent from an updater from before it existed. */
   digest?: "weekly" | "biweekly" | "off";
+  /** With day "any": the hours at least between two installs. Absent from an updater that has no "any". */
+  gap_hours?: number;
 }
 
 export interface UpdateEntry {
