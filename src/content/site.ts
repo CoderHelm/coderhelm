@@ -150,9 +150,9 @@ const home: Page = {
             href: "https://github.com/CoderHelm/coderhelm/pull/7",
             facts: "Opened March 30, 2026 from [issue #2](https://github.com/CoderHelm/coderhelm/issues/2). Two files, four commits, checks passing, merged the same day.",
             thread: [
-              { who: "nambok", file: "src/components/GoogleAnalytics.tsx", text: "this is not a sensitive value it should be G-XTM8Y82LX9 please hardcode" },
+              { who: "Developer", file: "src/components/GoogleAnalytics.tsx", text: "this is not a sensitive value it should be G-XTM8Y82LX9 please hardcode" },
               { who: "coderhelm[bot]", bot: true, file: "src/components/GoogleAnalytics.tsx", text: "Done — hardcoded `G-XTM8Y82LX9` directly and removed the `NEXT_PUBLIC_GA_MEASUREMENT_ID` env var reference and its null guards." },
-              { who: "nambok", file: ".env.example", text: "we should remove this too no?" },
+              { who: "Developer", file: ".env.example", text: "we should remove this too no?" },
               { who: "coderhelm[bot]", bot: true, file: ".env.example", text: "Done — deleted `.env.example`." },
             ],
             commits: [

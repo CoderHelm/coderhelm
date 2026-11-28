@@ -89,12 +89,26 @@ test("the footer and nav describe the platform", async ({ page }) => {
   await expect(nav.getByRole("link", { name: "Security", exact: true })).toHaveCount(0);
 });
 
+test("the generated text versions name no account in the thread", async ({ request }) => {
+  for (const path of ["/llms.txt", "/llms-full.txt", "/index.md"]) {
+    const res = await request.get(path);
+    expect(res.status(), path).toBe(200);
+    expect((await res.text()).toLowerCase(), path).not.toContain("nambok");
+  }
+  expect(await (await request.get("/index.md")).text()).toContain("**Developer** on `.env.example`: we should remove this too no?");
+});
+
 test("quotes the real pull request and links to it", async ({ page }) => {
   await page.goto("/");
   const pr = page.locator("#a-real-one");
   await expect(pr.getByRole("link", { name: "Add GA4 gtag.js to Next.js marketing site" })).toHaveAttribute("href", "https://github.com/CoderHelm/coderhelm/pull/7");
   await expect(pr.getByText("we should remove this too no?")).toBeVisible();
   await expect(pr.getByRole("link", { name: "5b016f4" })).toHaveAttribute("href", "https://github.com/CoderHelm/coderhelm/commit/5b016f4");
+  // The person in the thread is labelled by role, never by account name.
+  await expect(pr.getByText("Developer", { exact: true })).toHaveCount(2);
+  await expect(pr.getByText("coderhelm[bot]", { exact: true })).toHaveCount(2);
+  expect((await page.locator("body").innerText()).toLowerCase()).not.toContain("nambok");
+  expect((await page.content()).toLowerCase()).not.toContain("nambok");
 });
 
 test("has no eyebrow labels, gradient text or decorative grid", async ({ page }) => {
